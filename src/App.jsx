@@ -1127,6 +1127,7 @@ const [historial,    setHistorial]    = useState([]);
       sbGet("jardin_frecuencias", "?select=*", tok),
       // Buscar si ya hay verificación esta semana
       sbGet("jardin_semana", `?semana=eq.${cwk}&tarea_id=eq.VERIFICACION_FINAL&select=*`, tok),
+      sbGet("jardin_semana", `?tarea_id=eq.VERIFICACION_FINAL&semana=neq.${cwk}&select=*&order=semana.desc&limit=8`, tok),
     ]);
     setJsem(js); setJpunt(jp);
     const fm = {}; jf.forEach(x => fm[x.tarea_id] = x.frecuencia); setJfrec(fm);
