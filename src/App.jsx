@@ -673,7 +673,7 @@ export default function App() {
           )}
           {PAGES[page] ?? <Dashboard {...P} />}
         </div>
-        <MobileNav perfil={perfil} page={page} setPage={setPage} />
+        <MobileNav perfil={perfil} page={page} setPage={setPage} tok={tok} />
       </div>
     </>
   );
