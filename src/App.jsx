@@ -1083,7 +1083,7 @@ function JardinCheck({ perfil, tok, rol }) {
   const todoHecho = tot > 0 && comp === tot;
  
   const toggle = async (tareaId, isPunt = false) => {
-    if (isA || saving) return;
+    if (saving) return;
     setSaving(true);
     try {
       if (!isPunt) {
