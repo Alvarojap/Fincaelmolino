@@ -932,7 +932,7 @@ function Dashboard({ perfil, tok, setPage, rol }) {
 
 function DashA({ reservas, jsem, jpunt, jfrec, cwk, setPage }) {
   const sj   = {}; jsem.forEach(r => sj[r.tarea_id] = r);
-  const actv = JARDIN_T.filter(t => tocaSemana({...t,frec:jfrec[t.id]||t.frec},cwk));
+  const actv = JARDIN_T[getTemporada()].filter(t => tocaSemana({...t,frec:jfrec[t.id]||t.frec},cwk));
   const comp = actv.filter(t=>sj[t.id]?.done).length + jpunt.filter(t=>t.done).length;
   const tot  = actv.length + jpunt.length;
   const inc  = jsem.filter(r=>r.nota||r.foto_url).length + jpunt.filter(r=>r.nota||r.foto_url).length;
@@ -981,7 +981,7 @@ function DashA({ reservas, jsem, jpunt, jfrec, cwk, setPage }) {
 
 function DashJ({ perfil, jsem, jpunt, jfrec, cwk, setPage }) {
   const sj   = {}; jsem.forEach(r => sj[r.tarea_id] = r);
-  const actv = JARDIN_T.filter(t=>tocaSemana({...t,frec:jfrec[t.id]||t.frec},cwk));
+  const actv = JARDIN_T[getTemporada()].filter(t=>tocaSemana({...t,frec:jfrec[t.id]||t.frec},cwk));
   const tot  = actv.length+jpunt.length;
   const comp = actv.filter(t=>sj[t.id]?.done).length+jpunt.filter(t=>t.done).length;
   return <>
@@ -1459,7 +1459,7 @@ function JardinAdmin({ perfil, tok }) {
 
   const sj = {}; jsem.forEach(r=>sj[r.tarea_id]=r);
   const getFr = t => jfrec[t.id]||t.frec;
-  const actv  = JARDIN_T.filter(t=>tocaSemana({...t,frec:getFr(t)},cwk));
+  const actv  = JARDIN_T[getTemporada()].filter(t=>tocaSemana({...t,frec:getFr(t)},cwk));
 
   const addPunt = async () => {
     if (!form.txt||saving) return;
@@ -1531,7 +1531,7 @@ function JardinAdmin({ perfil, tok }) {
       </>}
       {tab==="frec"&&<div className="card">
         <div className="chdr"><span className="ctit">🔁 Frecuencias</span></div>
-        {JARDIN_T.map(t=>{
+        {JARDIN_T[getTemporada()].map(t=>{
           const f=getFr(t),activa=tocaSemana({...t,frec:f},cwk),ed=editFr===t.id;
           return <div key={t.id} style={{padding:"11px 0",borderBottom:"1px solid rgba(255,255,255,.05)"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8}}>
@@ -1582,7 +1582,7 @@ function Incidencias({ tok }) {
         sbGet("servicio_tareas","?nota=not.is.null&select=*,servicios(nombre)",tok),
       ]);
       const all=[
-        ...jsem.filter(r=>r.nota||r.foto_url).map(r=>({...r,tipo:"Jardín",tag:"🌿",tarea:JARDIN_T.find(t=>t.id===r.tarea_id)?.txt||r.tarea_id,zona:JARDIN_T.find(t=>t.id===r.tarea_id)?.zona||"—",isSemana:true})),
+        ...jsem.filter(r=>r.nota||r.foto_url).map(r=>({...r,tipo:"Jardín",tag:"🌿",tarea:Object.values(JARDIN_T).flat().find(t=>t.id===r.tarea_id)?.txt||r.tarea_id,zona:Object.values(JARDIN_T).flat().find(t=>t.id===r.tarea_id)?.zona||"—",isSemana:true})),
         ...jpunt.filter(r=>r.nota||r.foto_url).map(r=>({...r,tipo:"Jardín puntual",tag:"📌",tarea:r.txt,zona:r.zona||"General"})),
         ...stk.filter(r=>r.nota||r.foto_url).map(r=>({...r,tipo:`Limpieza: ${r.servicios?.nombre||""}`,tag:"🧹",tarea:r.txt||(LIMP_T.find(t=>t.id===r.tarea_id)?.txt)||r.tarea_id,zona:r.zona||"—"})),
       ].sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
