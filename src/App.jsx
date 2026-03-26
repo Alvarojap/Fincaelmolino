@@ -1121,7 +1121,7 @@ function JardinCheck({ perfil, tok, rol }) {
 const [historial,    setHistorial]    = useState([]);
  
   const load_ = async () => {
-    const [js, jp, jf, vrf] = await Promise.all([
+    const [js, jp, jf, vrf, hist] = await Promise.all([
       sbGet("jardin_semana", `?semana=eq.${cwk}&select=*`, tok),
       sbGet("jardin_puntual", `?semana=eq.${cwk}&select=*`, tok),
       sbGet("jardin_frecuencias", "?select=*", tok),
@@ -1132,6 +1132,7 @@ const [historial,    setHistorial]    = useState([]);
     setJsem(js); setJpunt(jp);
     const fm = {}; jf.forEach(x => fm[x.tarea_id] = x.frecuencia); setJfrec(fm);
     setYaVerificado(vrf[0] || null);
+    setHistorial(hist);
     setLoad(false);
   };
   useEffect(() => { load_(); }, []);
