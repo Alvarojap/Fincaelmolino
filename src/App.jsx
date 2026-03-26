@@ -1498,8 +1498,8 @@ const saveNota = async () => {
             <SemanaArchivada key={h.id} semana={h.semana} estado={h.done} nota={h.nota} />
           ))}
         </div>
-      )}
-        </div>
+   )}
+    </div>
     {modal && (
       <NotaModal nota={nota} setNota={setNota} foto={foto} setFoto={setFoto}
         onSave={saveNota} onClose={() => setModal(null)} tok={tok} />
