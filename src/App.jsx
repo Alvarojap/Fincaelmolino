@@ -1124,17 +1124,25 @@ function JardinCheck({ perfil, tok, rol }) {
     setNota(e?.nota || ""); setFoto(e?.foto_url || null); setModal({ id, isPunt });
   };
  
-  const saveNota = async () => {
+const saveNota = async () => {
     if (!modal || saving) return;
+    if (!nota.trim() && !foto) { setModal(null); return; }
     setSaving(true);
     try {
       if (!modal.isPunt) {
-        await sbUpsert("jardin_semana", { semana: cwk, tarea_id: modal.id, nota, foto_url: foto || null }, tok);
+        await sbUpsert("jardin_semana", {
+          semana: cwk, tarea_id: modal.id,
+          nota: nota.trim() || null,
+          foto_url: foto || null
+        }, tok);
       } else {
-        await sbPatch("jardin_puntual", `id=eq.${modal.id}`, { nota, foto_url: foto || null }, tok);
+        await sbPatch("jardin_puntual", `id=eq.${modal.id}`, {
+          nota: nota.trim() || null,
+          foto_url: foto || null
+        }, tok);
       }
       await load_();
-    } catch(_) {}
+    } catch(e) { console.error(e); }
     setSaving(false); setModal(null);
   };
  
