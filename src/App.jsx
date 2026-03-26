@@ -1059,6 +1059,43 @@ function DashC({ perfil, reservas, setPage }) {
   </>;
 }
 
+function SemanaArchivada({ semana, estado, nota }) {
+  const [open, setOpen] = useState(false);
+  const ok = estado === true;
+  const [año, wStr] = semana.split("-W");
+  const w = parseInt(wStr);
+  const d1 = new Date(parseInt(año), 0, 1 + (w - 1) * 7);
+  const d2 = new Date(d1); d2.setDate(d2.getDate() + 6);
+  const fmt = d => d.toLocaleDateString("es-ES", { day: "numeric", month: "short" });
+  const rango = `${fmt(d1)} – ${fmt(d2)}`;
+
+  return (
+    <div style={{
+      background: ok ? "rgba(16,185,129,.06)" : "rgba(245,158,11,.06)",
+      border: `1px solid ${ok ? "rgba(16,185,129,.2)" : "rgba(245,158,11,.2)"}`,
+      borderRadius: 10, marginBottom: 8, overflow: "hidden"
+    }}>
+      <div onClick={() => setOpen(!open)} style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", cursor: "pointer" }}>
+        <span style={{ fontSize: 18 }}>{ok ? "✅" : "⚠️"}</span>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: ok ? "#10b981" : "#f59e0b" }}>
+            Semana del {rango}
+          </div>
+          <div style={{ fontSize: 11, color: "#7a7f94", marginTop: 2 }}>
+            {ok ? "Jardín verificado ✓" : "Cerrado con incidencias"}
+          </div>
+        </div>
+        <span style={{ color: "#5a5e6e", fontSize: 18, transition: "transform .2s", transform: open ? "rotate(90deg)" : "none" }}>›</span>
+      </div>
+      {open && (
+        <div style={{ padding: "0 14px 14px", borderTop: "1px solid rgba(255,255,255,.05)" }}>
+          {nota && <div style={{ fontSize: 12, color: "#c9c5b8", marginTop: 10, lineHeight: 1.5 }}>📝 {nota}</div>}
+          <div style={{ fontSize: 11, color: "#5a5e6e", marginTop: 6 }}>Archivada · {semana}</div>
+        </div>
+      )}
+    </div>
+  );
+}
 // ─── JARDÍN CHECKLIST ────────────────────────────────────────────────────────
 function JardinCheck({ perfil, tok, rol }) {
   const isA      = rol === "admin";
