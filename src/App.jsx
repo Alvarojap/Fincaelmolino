@@ -183,7 +183,6 @@ const JARDIN_CONTROL_FINAL = [
 ];
 
 const FREC_LBL = { 1:"Cada semana", 2:"Cada 2 semanas", 4:"Cada mes", 12:"Trimestral" };
-];
 
 const LIMP_T = [
   // INICIO
