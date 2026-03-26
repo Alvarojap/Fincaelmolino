@@ -1372,135 +1372,55 @@ const saveNota = async () => {
     </div>
  
     {/* ── MODAL CONTROL FINAL ── */}
-    {showFinal && !isA && (
+{showFinal && !isA && (
       <div className="ov" style={{ alignItems: "flex-end", padding: 0 }}>
-        <div style={{
-          background: "#13161f", border: "1px solid rgba(201,168,76,.25)",
-          borderRadius: "20px 20px 0 0", padding: "24px 20px 36px",
-          width: "100%", maxWidth: 540, maxHeight: "92vh", overflowY: "auto"
-        }}>
-          {/* Header */}
+        <div style={{ background: "#13161f", border: "1px solid rgba(201,168,76,.25)", borderRadius: "20px 20px 0 0", padding: "24px 20px 36px", width: "100%", maxWidth: 540, maxHeight: "92vh", overflowY: "auto" }}>
           <div style={{ textAlign: "center", marginBottom: 20 }}>
             <div style={{ fontSize: 36, marginBottom: 8 }}>🌿</div>
-            <div style={{ fontFamily: "'Playfair Display',serif", fontSize: 20, color: "#e8e6e1", marginBottom: 4 }}>
-              ¡Últimas comprobaciones!
-            </div>
-            <div style={{ fontSize: 13, color: "#7a7f94" }}>
-              Has completado todas las tareas. Antes de cerrar, verifica que todo está correcto.
-            </div>
+            <div style={{ fontFamily: "'Playfair Display',serif", fontSize: 20, color: "#e8e6e1", marginBottom: 4 }}>¡Últimas comprobaciones!</div>
+            <div style={{ fontSize: 13, color: "#7a7f94" }}>Has completado todas las tareas. Antes de cerrar, verifica que todo está correcto.</div>
           </div>
- 
-          {/* Selector de modo */}
           {!finalMode && (
             <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 20 }}>
-              <button
-                className="btn bp"
-                style={{ width: "100%", justifyContent: "center", padding: "14px", fontSize: 15 }}
-                onClick={() => setFinalMode("ok")}>
-                ✅ Todo correcto — verificar jardín
-              </button>
-              <button
-                className="btn bg"
-                style={{ width: "100%", justifyContent: "center", padding: "14px", fontSize: 15 }}
-                onClick={() => setFinalMode("incidencia")}>
-                ⚠️ Hay incidencias — cerrar sin verificar
-              </button>
+              <button className="btn bp" style={{ width: "100%", justifyContent: "center", padding: "14px", fontSize: 15 }} onClick={() => setFinalMode("ok")}>✅ Todo correcto — verificar jardín</button>
+              <button className="btn bg" style={{ width: "100%", justifyContent: "center", padding: "14px", fontSize: 15 }} onClick={() => setFinalMode("incidencia")}>⚠️ Hay incidencias — cerrar sin verificar</button>
             </div>
           )}
- 
-          {/* Modo OK — checklist final */}
-          {finalMode === "ok" && (
-            <>
-              <div style={{ fontSize: 12, color: "#c9a84c", fontWeight: 600, marginBottom: 12, textTransform: "uppercase", letterSpacing: 1 }}>
-                ✅ Comprueba cada punto antes de confirmar
+          {finalMode === "ok" && <>
+            <div style={{ fontSize: 12, color: "#c9a84c", fontWeight: 600, marginBottom: 12, textTransform: "uppercase", letterSpacing: 1 }}>✅ Comprueba cada punto antes de confirmar</div>
+            {JARDIN_CONTROL_FINAL.map(item => (
+              <div key={item.id} onClick={() => setFinalCheck(prev => ({ ...prev, [item.id]: !prev[item.id] }))}
+                style={{ display: "flex", alignItems: "center", gap: 12, padding: "11px 12px", borderRadius: 10, marginBottom: 6, cursor: "pointer", background: finalCheck[item.id] ? "rgba(16,185,129,.08)" : "#0f1117", border: `1px solid ${finalCheck[item.id] ? "rgba(16,185,129,.25)" : "rgba(255,255,255,.06)"}`, transition: "all .15s" }}>
+                <div style={{ width: 24, height: 24, borderRadius: 6, flexShrink: 0, background: finalCheck[item.id] ? "#10b981" : "transparent", border: `2px solid ${finalCheck[item.id] ? "#10b981" : "rgba(255,255,255,.2)"}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, color: "#fff", fontWeight: 700 }}>{finalCheck[item.id] ? "✓" : ""}</div>
+                <span style={{ fontSize: 14, color: finalCheck[item.id] ? "#10b981" : "#c9c5b8" }}>{item.txt}</span>
               </div>
-              {JARDIN_CONTROL_FINAL.map(item => (
-                <div key={item.id}
-                  onClick={() => setFinalCheck(prev => ({ ...prev, [item.id]: !prev[item.id] }))}
-                  style={{
-                    display: "flex", alignItems: "center", gap: 12, padding: "11px 12px",
-                    borderRadius: 10, marginBottom: 6, cursor: "pointer",
-                    background: finalCheck[item.id] ? "rgba(16,185,129,.08)" : "#0f1117",
-                    border: `1px solid ${finalCheck[item.id] ? "rgba(16,185,129,.25)" : "rgba(255,255,255,.06)"}`,
-                    transition: "all .15s"
-                  }}>
-                  <div style={{
-                    width: 24, height: 24, borderRadius: 6, flexShrink: 0,
-                    background: finalCheck[item.id] ? "#10b981" : "transparent",
-                    border: `2px solid ${finalCheck[item.id] ? "#10b981" : "rgba(255,255,255,.2)"}`,
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    fontSize: 13, color: "#fff", fontWeight: 700, transition: "all .15s"
-                  }}>{finalCheck[item.id] ? "✓" : ""}</div>
-                  <span style={{ fontSize: 14, color: finalCheck[item.id] ? "#10b981" : "#c9c5b8" }}>{item.txt}</span>
-                </div>
-              ))}
-              <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
-                <button className="btn bg" style={{ flex: 1, justifyContent: "center" }}
-                  onClick={() => setFinalMode(null)}>← Volver</button>
-                <button
-                  className="btn bp"
-                  style={{ flex: 2, justifyContent: "center", padding: "12px", fontSize: 15 }}
-                  onClick={() => guardarFinal("ok")}
-                  disabled={finalSaving}>
-                  {finalSaving ? "Guardando…" : "✅ Jardín terminado y verificado"}
-                </button>
-              </div>
-            </>
-          )}
- 
-          {/* Modo INCIDENCIA */}
-          {finalMode === "incidencia" && (
-            <>
-              <div style={{ fontSize: 13, color: "#f59e0b", fontWeight: 600, marginBottom: 10 }}>
-                ⚠️ ¿Por qué no se ha podido completar el trabajo?
-              </div>
-              <textarea
-                className="fi"
-                rows={4}
-                value={finalNota}
-                onChange={e => setFinalNota(e.target.value)}
-                placeholder="Ej: Falta material para la piscina, queda pendiente para la próxima semana…"
-                style={{ marginBottom: 14, fontSize: 14, lineHeight: 1.5 }}
-              />
-              <div style={{ display: "flex", gap: 8 }}>
-                <button className="btn bg" style={{ flex: 1, justifyContent: "center" }}
-                  onClick={() => setFinalMode(null)}>← Volver</button>
-                <button
-                  className="btn"
-                  style={{ flex: 2, justifyContent: "center", padding: "12px", fontSize: 15, background: "#f59e0b", color: "#0f1117" }}
-                  onClick={() => guardarFinal("incidencia")}
-                  disabled={finalSaving || !finalNota.trim()}>
-                  {finalSaving ? "Guardando…" : "⚠️ Cerrar con incidencias"}
-                </button>
-              </div>
-            </>
-          )}
- 
-          {/* Botón cerrar sin hacer nada */}
-          <button
-            onClick={() => setShowFinal(false)}
-            style={{
-              background: "none", border: "none", color: "#5a5e6e", cursor: "pointer",
-              width: "100%", textAlign: "center", marginTop: 16, fontSize: 12,
-              fontFamily: "'DM Sans',sans-serif", padding: "8px"
-            }}>
-            Cerrar y decidir más tarde
-          </button>
+            ))}
+            <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
+              <button className="btn bg" style={{ flex: 1, justifyContent: "center" }} onClick={() => setFinalMode(null)}>← Volver</button>
+              <button className="btn bp" style={{ flex: 2, justifyContent: "center", padding: "12px", fontSize: 15 }} onClick={() => guardarFinal("ok")} disabled={finalSaving}>{finalSaving ? "Guardando…" : "✅ Jardín terminado y verificado"}</button>
+            </div>
+          </>}
+          {finalMode === "incidencia" && <>
+            <div style={{ fontSize: 13, color: "#f59e0b", fontWeight: 600, marginBottom: 10 }}>⚠️ ¿Por qué no se ha podido completar el trabajo?</div>
+            <textarea className="fi" rows={4} value={finalNota} onChange={e => setFinalNota(e.target.value)} placeholder="Ej: Falta material para la piscina…" style={{ marginBottom: 14, fontSize: 14, lineHeight: 1.5 }} />
+            <div style={{ display: "flex", gap: 8 }}>
+              <button className="btn bg" style={{ flex: 1, justifyContent: "center" }} onClick={() => setFinalMode(null)}>← Volver</button>
+              <button className="btn" style={{ flex: 2, justifyContent: "center", padding: "12px", fontSize: 15, background: "#f59e0b", color: "#0f1117" }} onClick={() => guardarFinal("incidencia")} disabled={finalSaving || !finalNota.trim()}>{finalSaving ? "Guardando…" : "⚠️ Cerrar con incidencias"}</button>
+            </div>
+          </>}
+          <button onClick={() => setShowFinal(false)} style={{ background: "none", border: "none", color: "#5a5e6e", cursor: "pointer", width: "100%", textAlign: "center", marginTop: 16, fontSize: 12, fontFamily: "'DM Sans',sans-serif", padding: "8px" }}>Cerrar y decidir más tarde</button>
         </div>
+      </div>
     )}
- 
-   </div>
-        
+
     {!isA && historial.length > 0 && (
-        <div style={{ marginTop: 24 }}>
-          <div style={{ fontSize: 11, color: "#5a5e6e", textTransform: "uppercase", letterSpacing: 1.5, marginBottom: 10 }}>
-            📁 Semanas anteriores
-          </div>
-          {historial.map(h => (
-            <SemanaArchivada key={h.id} semana={h.semana} estado={h.done} nota={h.nota} />
-          ))}
-        </div>
-   )}
+      <div style={{ padding: "0 32px 24px" }}>
+        <div style={{ fontSize: 11, color: "#5a5e6e", textTransform: "uppercase", letterSpacing: 1.5, marginBottom: 10 }}>📁 Semanas anteriores</div>
+        {historial.map(h => (
+          <SemanaArchivada key={h.id} semana={h.semana} estado={h.done} nota={h.nota} />
+        ))}
+      </div>
+    )}
 
     {modal && (
       <NotaModal nota={nota} setNota={setNota} foto={foto} setFoto={setFoto}
