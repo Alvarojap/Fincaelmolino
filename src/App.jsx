@@ -1571,42 +1571,55 @@ function JardinAdmin({ perfil, tok }) {
 
 // ─── INCIDENCIAS ─────────────────────────────────────────────────────────────
 function Incidencias({ tok }) {
-  const [items,  setItems]  = useState([]);
-  const [load,   setLoad]   = useState(true);
+  const [items, setItems] = useState([]);
+  const [load,  setLoad]  = useState(true);
 
-  useEffect(()=>{
-    (async()=>{
-      const [jsem,jpunt,stk]=await Promise.all([
-        sbGet("jardin_semana","?nota=not.is.null&select=*",tok),
-        sbGet("jardin_puntual","?nota=not.is.null&select=*",tok),
-        sbGet("servicio_tareas","?nota=not.is.null&select=*,servicios(nombre)",tok),
+  useEffect(() => {
+    (async () => {
+      const [jsem, jpunt, stk] = await Promise.all([
+        sbGet("jardin_semana", "?nota=not.is.null&tarea_id=neq.VERIFICACION_FINAL&select=*", tok),
+        sbGet("jardin_puntual", "?nota=not.is.null&select=*", tok),
+        sbGet("servicio_tareas", "?nota=not.is.null&select=*,servicios(nombre)", tok),
       ]);
-      const all=[
-        ...jsem.filter(r=>r.nota||r.foto_url).map(r=>({...r,tipo:"Jardín",tag:"🌿",tarea:Object.values(JARDIN_T).flat().find(t=>t.id===r.tarea_id)?.txt||r.tarea_id,zona:Object.values(JARDIN_T).flat().find(t=>t.id===r.tarea_id)?.zona||"—",isSemana:true})),
-        ...jpunt.filter(r=>r.nota||r.foto_url).map(r=>({...r,tipo:"Jardín puntual",tag:"📌",tarea:r.txt,zona:r.zona||"General"})),
-        ...stk.filter(r=>r.nota||r.foto_url).map(r=>({...r,tipo:`Limpieza: ${r.servicios?.nombre||""}`,tag:"🧹",tarea:r.txt||(LIMP_T.find(t=>t.id===r.tarea_id)?.txt)||r.tarea_id,zona:r.zona||"—"})),
-      ].sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
-      setItems(all); setLoad(false);
+      const all = [
+        ...jsem.filter(r => r.nota || r.foto_url).map(r => ({
+          ...r, tipo: "Jardín", tag: "🌿",
+          tarea: Object.values(JARDIN_T).flat().find(t => t.id === r.tarea_id)?.txt || r.tarea_id,
+          zona:  Object.values(JARDIN_T).flat().find(t => t.id === r.tarea_id)?.zona || "—",
+          isSemana: true
+        })),
+        ...jpunt.filter(r => r.nota || r.foto_url).map(r => ({
+          ...r, tipo: "Jardín puntual", tag: "📌",
+          tarea: r.txt, zona: r.zona || "General"
+        })),
+        ...stk.filter(r => r.nota || r.foto_url).map(r => ({
+          ...r, tipo: `Limpieza: ${r.servicios?.nombre || ""}`, tag: "🧹",
+          tarea: r.txt || (LIMP_T.find(t => t.id === r.tarea_id)?.txt) || r.tarea_id,
+          zona: r.zona || "—"
+        })),
+      ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+      setItems(all);
+      setLoad(false);
     })();
-  },[]);
+  }, []);
 
   const saveResp = async (item, resp) => {
-    if (item.isSemana) await sbPatch("jardin_semana",`id=eq.${item.id}`,{resp_admin:resp,resp_ts:new Date().toISOString()},tok);
-    else if (item.tipo.startsWith("Jardín")) await sbPatch("jardin_puntual",`id=eq.${item.id}`,{resp_admin:resp,resp_ts:new Date().toISOString()},tok);
-    else await sbPatch("servicio_tareas",`id=eq.${item.id}`,{resp_admin:resp,resp_ts:new Date().toISOString()},tok);
-    setItems(prev=>prev.map(x=>x.id===item.id?{...x,resp_admin:resp}:x));
+    if (item.isSemana) await sbPatch("jardin_semana", `id=eq.${item.id}`, { resp_admin: resp, resp_ts: new Date().toISOString() }, tok);
+    else if (item.tipo.startsWith("Jardín")) await sbPatch("jardin_puntual", `id=eq.${item.id}`, { resp_admin: resp, resp_ts: new Date().toISOString() }, tok);
+    else await sbPatch("servicio_tareas", `id=eq.${item.id}`, { resp_admin: resp, resp_ts: new Date().toISOString() }, tok);
+    setItems(prev => prev.map(x => x.id === item.id ? { ...x, resp_admin: resp } : x));
   };
 
-  if (load) return <div className="loading"><div className="spin"/><span>Cargando…</span></div>;
+  if (load) return <div className="loading"><div className="spin" /><span>Cargando…</span></div>;
   return <>
-    <div className="ph"><h2>Incidencias</h2><p>{items.length} registradas</p></div>
+    <div className="ph"><h2>Incidencias</h2><p>{items.length} anotaciones registradas</p></div>
     <div className="pb">
-      {items.length===0?<div className="empty"><span className="ico">✅</span><p>Sin incidencias</p></div>
-        :items.map(inc=><IncCard key={inc.id} inc={inc} onResp={saveResp}/>)}
+      {items.length === 0
+        ? <div className="empty"><span className="ico">✅</span><p>Sin incidencias registradas</p></div>
+        : items.map(inc => <IncCard key={inc.id} inc={inc} onResp={saveResp} />)}
     </div>
   </>;
 }
-
 function IncCard({ inc, onResp }) {
   const [show,  setShow]  = useState(false);
   const [reply, setReply] = useState(inc.resp_admin||"");
