@@ -805,24 +805,48 @@ function Sidebar({ perfil, page, setPage, onLogout, inDrawer, onClose }) {
 }
 
 // ─── MOBILE NAV ──────────────────────────────────────────────────────────────
-function MobileNav({ perfil, page, setPage }) {
-  const rol = perfil.rol;
-  const isA = rol==="admin", isJ = rol==="jardinero", isL = rol==="limpieza";
-  const items = [{ ico:"📊", lbl:"Inicio", id:"dashboard" }];
-  if (isA||isJ) items.push({ ico:"✅", lbl:isA?"Jardín":"Checklist", id:isA?"jadmin":"jcheck" });
-  if (isA)      items.push({ ico:"⚠️", lbl:"Incidencias", id:"incidencias" });
-  if (isA||isL) items.push({ ico:"🧹", lbl:"Limpieza", id:"limpieza" });
-  if (!isA&&!isJ&&!isL) items.push({ ico:"📅", lbl:"Calendario", id:"calendario" });
-  if (!isA&&!isJ&&!isL) items.push({ ico:"📋", lbl:"Reservas", id:"reservas" });
-  items.push({ ico:"💬", lbl:"Chat",   id:"chat"   });
-  items.push({ ico:"🔔", lbl:"Avisos", id:"notifs" });
-  const shown = items.slice(0,5);
+function MobileNav({ perfil, page, setPage, tok }) {
+  const rol  = perfil.rol;
+  const isA  = rol === "admin", isJ = rol === "jardinero", isL = rol === "limpieza";
+  const myId = isA ? "admin" : String(perfil.id);
+  const [chatUnread, setChatUnread] = useState(0);
+
+  useEffect(() => {
+    if (!tok) return;
+    const load = async () => {
+      try {
+        const msgs = await sbGet("mensajes", `?para=eq.${myId}&leido=eq.false&select=id`, tok);
+        setChatUnread(msgs.length);
+      } catch(_) {}
+    };
+    load();
+    const t = setInterval(load, 30000);
+    return () => clearInterval(t);
+  }, [page]);
+
+  const items = [{ ico: "📊", lbl: "Inicio", id: "dashboard" }];
+  if (isA || isJ) items.push({ ico: "✅", lbl: isA ? "Jardín" : "Checklist", id: isA ? "jadmin" : "jcheck" });
+  if (isA)        items.push({ ico: "⚠️", lbl: "Incidencias", id: "incidencias" });
+  if (isA || isL) items.push({ ico: "🧹", lbl: "Limpieza", id: "limpieza" });
+  if (!isA && !isJ && !isL) items.push({ ico: "📅", lbl: "Calendario", id: "calendario" });
+  if (!isA && !isJ && !isL) items.push({ ico: "📋", lbl: "Reservas", id: "reservas" });
+  items.push({ ico: "💬", lbl: "Chat", id: "chat", badge: chatUnread });
+  items.push({ ico: "🔔", lbl: "Avisos", id: "notifs" });
+  const shown = items.slice(0, 5);
+
   return (
     <nav className="mob-bar">
       <div className="mob-bar-inner">
         {shown.map(it => (
-          <button key={it.id} className={`mob-btn${page===it.id?" on":""}`} onClick={() => setPage(it.id)}>
-            <span className="mico">{it.ico}</span>
+          <button key={it.id} className={`mob-btn${page === it.id ? " on" : ""}`} onClick={() => setPage(it.id)}>
+            <span className="mico" style={{ position: "relative", display: "inline-block" }}>
+              {it.ico}
+              {(it.badge || 0) > 0 && (
+                <span style={{ position: "absolute", top: -4, right: -8, background: "#e85555", color: "#fff", borderRadius: 20, padding: "1px 5px", fontSize: 9, fontWeight: 700, minWidth: 14, textAlign: "center", lineHeight: "14px" }}>
+                  {it.badge > 9 ? "9+" : it.badge}
+                </span>
+              )}
+            </span>
             <span>{it.lbl}</span>
           </button>
         ))}
@@ -830,7 +854,6 @@ function MobileNav({ perfil, page, setPage }) {
     </nav>
   );
 }
-
 // ─── SHARED COMPONENTS ───────────────────────────────────────────────────────
 function SC({ lbl, val, sub, prog, valC, onClick }) {
   return (
