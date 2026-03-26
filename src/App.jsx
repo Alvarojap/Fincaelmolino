@@ -88,110 +88,89 @@ function sbSubscribe(table, filter, onEvent) {
 
 // ─── DATOS ESTÁTICOS ─────────────────────────────────────────────────────────
 const JARDIN_T = [
-  // ═══════════════════════════════════════════════════════════════
-// BLOQUE 1 — Reemplaza desde "const JARDIN_T = [" hasta "];"
-// (las 10 líneas actuales de tareas de jardín)
-// ═══════════════════════════════════════════════════════════════
- 
-// ── Función que detecta la temporada según el mes actual
+ // ── Función que detecta la temporada según el mes actual
 function getTemporada() {
-  const m = new Date().getMonth() + 1; // 1-12
-  if (m >= 4 && m <= 5)  return "primavera"; // Abril-Mayo
-  if (m >= 6 && m <= 9)  return "verano";    // Junio-Septiembre
-  return "invierno";                          // Octubre-Marzo
+  const m = new Date().getMonth() + 1;
+  if (m >= 4 && m <= 5)  return "primavera";
+  if (m >= 6 && m <= 9)  return "verano";
+  return "invierno";
 }
- 
+
 const TEMPORADA_LBL = {
   primavera: "🌸 Primavera (Abril–Mayo)",
   verano:    "☀️ Verano (Junio–Septiembre)",
   invierno:  "🍂 Invierno (Octubre–Marzo)",
 };
- 
-// frec: 1=semanal, 2=quincenal, 4=mensual, 12=trimestral
+
 const JARDIN_T = {
   primavera: [
-    // Riego agrupado (agrupa los 3 riegos semanales)
-    { id:"p1",  txt:"Riego semanal completado (césped + plantas + revisión zonas)", zona:"Riego",    frec:1 },
-    // Semanal
-    { id:"p2",  txt:"Cortar césped",                                               zona:"Césped",   frec:1 },
-    { id:"p3",  txt:"Perfilar bordes del césped",                                  zona:"Césped",   frec:1 },
-    { id:"p4",  txt:"Soplado general (hojas, ramas, suciedad)",                    zona:"General",  frec:1 },
-    { id:"p5",  txt:"Limpiar camino de entrada",                                   zona:"Accesos",  frec:1 },
-    { id:"p6",  txt:"Limpiar porche zona baños y BBQ",                             zona:"Porche",   frec:1 },
-    { id:"p7",  txt:"Vaciar papeleras",                                            zona:"General",  frec:1 },
-    { id:"p8",  txt:"Limpiar piscina (superficie + fondo rápido)",                 zona:"Piscina",  frec:1 },
-    { id:"p9",  txt:"Reponer cloro piscina",                                       zona:"Piscina",  frec:1 },
-    { id:"p10", txt:"Eliminar malas hierbas visibles",                             zona:"General",  frec:1 },
-    { id:"p11", txt:"Revisión general visual del jardín",                          zona:"General",  frec:1 },
-    // Quincenal
-    { id:"p12", txt:"Abonar césped",                                               zona:"Césped",   frec:2 },
-    { id:"p13", txt:"Limpieza profunda de grava (nivelar + retirar suciedad)",     zona:"Grava",    frec:2 },
-    { id:"p14", txt:"Limpieza de bordes y rincones",                               zona:"General",  frec:2 },
-    // Siempre al terminar
-    { id:"p15", txt:"Recoger manguera (bien enrollada)",                           zona:"Cierre",   frec:1 },
-    { id:"p16", txt:"Recoger herramientas y material",                             zona:"Cierre",   frec:1 },
-    { id:"p17", txt:"Dejar jardín limpio y ordenado",                              zona:"Cierre",   frec:1 },
+    { id:"p1",  txt:"Riego semanal completado (césped + plantas + revisión zonas)", zona:"Riego",   frec:1 },
+    { id:"p2",  txt:"Cortar césped",                                                zona:"Césped",  frec:1 },
+    { id:"p3",  txt:"Perfilar bordes del césped",                                   zona:"Césped",  frec:1 },
+    { id:"p4",  txt:"Soplado general (hojas, ramas, suciedad)",                     zona:"General", frec:1 },
+    { id:"p5",  txt:"Limpiar camino de entrada",                                    zona:"Accesos", frec:1 },
+    { id:"p6",  txt:"Limpiar porche zona baños y BBQ",                              zona:"Porche",  frec:1 },
+    { id:"p7",  txt:"Vaciar papeleras",                                             zona:"General", frec:1 },
+    { id:"p8",  txt:"Limpiar piscina (superficie + fondo rápido)",                  zona:"Piscina", frec:1 },
+    { id:"p9",  txt:"Reponer cloro piscina",                                        zona:"Piscina", frec:1 },
+    { id:"p10", txt:"Eliminar malas hierbas visibles",                              zona:"General", frec:1 },
+    { id:"p11", txt:"Revisión general visual del jardín",                           zona:"General", frec:1 },
+    { id:"p12", txt:"Abonar césped",                                                zona:"Césped",  frec:2 },
+    { id:"p13", txt:"Limpieza profunda de grava (nivelar + retirar suciedad)",      zona:"Grava",   frec:2 },
+    { id:"p14", txt:"Limpieza de bordes y rincones",                                zona:"General", frec:2 },
+    { id:"p15", txt:"Recoger manguera (bien enrollada)",                            zona:"Cierre",  frec:1 },
+    { id:"p16", txt:"Recoger herramientas y material",                              zona:"Cierre",  frec:1 },
+    { id:"p17", txt:"Dejar jardín limpio y ordenado",                               zona:"Cierre",  frec:1 },
   ],
   verano: [
-    // Riego agrupado (agrupa el riego diario)
-    { id:"v1",  txt:"Riego diario completado (césped + plantas, mañana o noche)",  zona:"Riego",    frec:1 },
-    { id:"v2",  txt:"Revisión visual rápida + retirar hojas y suciedad",           zona:"General",  frec:1 },
-    // Semanal
-    { id:"v3",  txt:"Cortar césped",                                               zona:"Césped",   frec:1 },
-    { id:"v4",  txt:"Perfilar bordes",                                             zona:"Césped",   frec:1 },
-    { id:"v5",  txt:"Soplado general",                                             zona:"General",  frec:1 },
-    { id:"v6",  txt:"Limpiar camino de entrada",                                   zona:"Accesos",  frec:1 },
-    { id:"v7",  txt:"Limpiar porche zona baños y BBQ",                             zona:"Porche",   frec:1 },
-    { id:"v8",  txt:"Limpiar piscina (fondo + paredes)",                           zona:"Piscina",  frec:1 },
-    { id:"v9",  txt:"Ajustar cloro y pH",                                          zona:"Piscina",  frec:1 },
-    { id:"v10", txt:"Limpiar y ordenar zona piscina",                              zona:"Piscina",  frec:1 },
-    { id:"v11", txt:"Vaciar papeleras",                                            zona:"General",  frec:1 },
-    { id:"v12", txt:"Eliminar malas hierbas visibles",                             zona:"General",  frec:1 },
-    // Quincenal
-    { id:"v13", txt:"Eliminación profunda de malas hierbas (raíz)",                zona:"General",  frec:2 },
-    { id:"v14", txt:"Limpieza y nivelado de grava",                                zona:"Grava",    frec:2 },
-    { id:"v15", txt:"Limpieza de drenajes y rejillas",                             zona:"General",  frec:2 },
-    // Mensual
-    { id:"v16", txt:"Abonar césped",                                               zona:"Césped",   frec:4 },
-    { id:"v17", txt:"Revisión de ramas secas o caídas",                            zona:"General",  frec:4 },
-    { id:"v18", txt:"Limpieza profunda de pavimentos (manchas)",                   zona:"Accesos",  frec:4 },
-    // Siempre al terminar
-    { id:"v19", txt:"Recoger manguera",                                            zona:"Cierre",   frec:1 },
-    { id:"v20", txt:"Recoger herramientas",                                        zona:"Cierre",   frec:1 },
-    { id:"v21", txt:"Dejar todo perfecto visualmente",                             zona:"Cierre",   frec:1 },
+    { id:"v1",  txt:"Riego diario completado (césped + plantas, mañana o noche)",   zona:"Riego",   frec:1 },
+    { id:"v2",  txt:"Revisión visual rápida + retirar hojas y suciedad",            zona:"General", frec:1 },
+    { id:"v3",  txt:"Cortar césped",                                                zona:"Césped",  frec:1 },
+    { id:"v4",  txt:"Perfilar bordes",                                              zona:"Césped",  frec:1 },
+    { id:"v5",  txt:"Soplado general",                                              zona:"General", frec:1 },
+    { id:"v6",  txt:"Limpiar camino de entrada",                                    zona:"Accesos", frec:1 },
+    { id:"v7",  txt:"Limpiar porche zona baños y BBQ",                              zona:"Porche",  frec:1 },
+    { id:"v8",  txt:"Limpiar piscina (fondo + paredes)",                            zona:"Piscina", frec:1 },
+    { id:"v9",  txt:"Ajustar cloro y pH",                                           zona:"Piscina", frec:1 },
+    { id:"v10", txt:"Limpiar y ordenar zona piscina",                               zona:"Piscina", frec:1 },
+    { id:"v11", txt:"Vaciar papeleras",                                             zona:"General", frec:1 },
+    { id:"v12", txt:"Eliminar malas hierbas visibles",                              zona:"General", frec:1 },
+    { id:"v13", txt:"Eliminación profunda de malas hierbas (raíz)",                 zona:"General", frec:2 },
+    { id:"v14", txt:"Limpieza y nivelado de grava",                                 zona:"Grava",   frec:2 },
+    { id:"v15", txt:"Limpieza de drenajes y rejillas",                              zona:"General", frec:2 },
+    { id:"v16", txt:"Abonar césped",                                                zona:"Césped",  frec:4 },
+    { id:"v17", txt:"Revisión de ramas secas o caídas",                             zona:"General", frec:4 },
+    { id:"v18", txt:"Limpieza profunda de pavimentos (manchas)",                    zona:"Accesos", frec:4 },
+    { id:"v19", txt:"Recoger manguera",                                             zona:"Cierre",  frec:1 },
+    { id:"v20", txt:"Recoger herramientas",                                         zona:"Cierre",  frec:1 },
+    { id:"v21", txt:"Dejar todo perfecto visualmente",                              zona:"Cierre",  frec:1 },
   ],
   invierno: [
-    // Semanal
-    { id:"i1",  txt:"Riego semanal (según clima)",                                 zona:"Riego",    frec:1 },
-    { id:"i2",  txt:"Soplado de hojas",                                            zona:"General",  frec:1 },
-    { id:"i3",  txt:"Limpiar camino de entrada",                                   zona:"Accesos",  frec:1 },
-    { id:"i4",  txt:"Limpiar porche zona baños y BBQ",                             zona:"Porche",   frec:1 },
-    { id:"i5",  txt:"Limpieza general del jardín",                                 zona:"General",  frec:1 },
-    { id:"i6",  txt:"Vaciar papeleras",                                            zona:"General",  frec:1 },
-    // Quincenal
-    { id:"i7",  txt:"Limpiar piscina",                                             zona:"Piscina",  frec:2 },
-    { id:"i8",  txt:"Ajustar cloro",                                               zona:"Piscina",  frec:2 },
-    { id:"i9",  txt:"Revisar estado del agua",                                     zona:"Piscina",  frec:2 },
-    { id:"i10", txt:"Eliminar malas hierbas visibles",                             zona:"General",  frec:2 },
-    // Mensual
-    { id:"i11", txt:"Cortar césped",                                               zona:"Césped",   frec:4 },
-    { id:"i12", txt:"Perfilar bordes",                                             zona:"Césped",   frec:4 },
-    { id:"i13", txt:"Limpieza profunda de grava",                                  zona:"Grava",    frec:4 },
-    { id:"i14", txt:"Revisión general del jardín",                                 zona:"General",  frec:4 },
-    // Trimestral
-    { id:"i15", txt:"Poda de árboles",                                             zona:"Árboles",  frec:12 },
-    { id:"i16", txt:"Recorte de setos",                                            zona:"Setos",    frec:12 },
-    { id:"i17", txt:"Re-siembra de césped",                                        zona:"Césped",   frec:12 },
-    { id:"i18", txt:"Abonado de recuperación",                                     zona:"General",  frec:12 },
-    { id:"i19", txt:"Limpieza profunda general",                                   zona:"General",  frec:12 },
-    // Siempre al terminar
-    { id:"i20", txt:"Recoger manguera",                                            zona:"Cierre",   frec:1 },
-    { id:"i21", txt:"Recoger herramientas",                                        zona:"Cierre",   frec:1 },
-    { id:"i22", txt:"Dejar todo ordenado",                                         zona:"Cierre",   frec:1 },
+    { id:"i1",  txt:"Riego semanal (según clima)",                                  zona:"Riego",   frec:1 },
+    { id:"i2",  txt:"Soplado de hojas",                                             zona:"General", frec:1 },
+    { id:"i3",  txt:"Limpiar camino de entrada",                                    zona:"Accesos", frec:1 },
+    { id:"i4",  txt:"Limpiar porche zona baños y BBQ",                              zona:"Porche",  frec:1 },
+    { id:"i5",  txt:"Limpieza general del jardín",                                  zona:"General", frec:1 },
+    { id:"i6",  txt:"Vaciar papeleras",                                             zona:"General", frec:1 },
+    { id:"i7",  txt:"Limpiar piscina",                                              zona:"Piscina", frec:2 },
+    { id:"i8",  txt:"Ajustar cloro",                                                zona:"Piscina", frec:2 },
+    { id:"i9",  txt:"Revisar estado del agua",                                      zona:"Piscina", frec:2 },
+    { id:"i10", txt:"Eliminar malas hierbas visibles",                              zona:"General", frec:2 },
+    { id:"i11", txt:"Cortar césped",                                                zona:"Césped",  frec:4 },
+    { id:"i12", txt:"Perfilar bordes",                                              zona:"Césped",  frec:4 },
+    { id:"i13", txt:"Limpieza profunda de grava",                                   zona:"Grava",   frec:4 },
+    { id:"i14", txt:"Revisión general del jardín",                                  zona:"General", frec:4 },
+    { id:"i15", txt:"Poda de árboles",                                              zona:"Árboles", frec:12 },
+    { id:"i16", txt:"Recorte de setos",                                             zona:"Setos",   frec:12 },
+    { id:"i17", txt:"Re-siembra de césped",                                         zona:"Césped",  frec:12 },
+    { id:"i18", txt:"Abonado de recuperación",                                      zona:"General", frec:12 },
+    { id:"i19", txt:"Limpieza profunda general",                                    zona:"General", frec:12 },
+    { id:"i20", txt:"Recoger manguera",                                             zona:"Cierre",  frec:1 },
+    { id:"i21", txt:"Recoger herramientas",                                         zona:"Cierre",  frec:1 },
+    { id:"i22", txt:"Dejar todo ordenado",                                          zona:"Cierre",  frec:1 },
   ],
 };
- 
-// Control final — igual para todas las temporadas
+
 const JARDIN_CONTROL_FINAL = [
   { id:"cf1", txt:"No hay hojas visibles" },
   { id:"cf2", txt:"No hay malas hierbas visibles" },
@@ -203,8 +182,7 @@ const JARDIN_CONTROL_FINAL = [
   { id:"cf8", txt:"No hay herramientas visibles" },
   { id:"cf9", txt:"Manguera recogida" },
 ];
- 
-// Actualizar FREC_LBL para incluir trimestral
+
 const FREC_LBL = { 1:"Cada semana", 2:"Cada 2 semanas", 4:"Cada mes", 12:"Trimestral" };
 ];
 
