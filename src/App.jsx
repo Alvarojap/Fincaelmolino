@@ -1384,7 +1384,15 @@ function Limpieza({ perfil, tok, rol }) {
         {srv&&<div>
           <div style={{background:"rgba(201,168,76,.08)",border:"1px solid rgba(201,168,76,.15)",borderRadius:10,padding:"12px 16px",marginBottom:12,display:"flex",justifyContent:"space-between",alignItems:"center",gap:8}}>
             <div style={{minWidth:0}}><div style={{fontSize:13,fontWeight:600,color:"#c9a84c",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>🧹 {srv.nombre}</div><div style={{fontSize:11,color:"#7a7f94"}}>{new Date(srv.fecha).toLocaleDateString("es-ES")} · {comp}/{tareas.length}</div></div>
-            {isA&&<button className="btn bg sm" style={{flexShrink:0}} onClick={()=>setShowEx(true)}>+ Extra</button>}
+           {isA&&<div style={{display:"flex",gap:6,flexShrink:0}}>
+  <button className="btn bg sm" onClick={()=>setShowEx(true)}>+ Extra</button>
+  <button className="btn br sm" onClick={async()=>{
+    if(!window.confirm(`¿Eliminar el servicio "${srv.nombre}"? Esta acción no se puede deshacer.`)) return;
+    await sbDelete("servicio_tareas",`servicio_id=eq.${srv.id}`,tok);
+    await sbDelete("servicios",`id=eq.${srv.id}`,tok);
+    setActId(null); setTareas([]); await loadSrvs();
+  }}>🗑 Eliminar</button>
+</div>}
           </div>
           {fijas.map(t=>(
             <div key={t.id} className={`cli${t.done?" done":""}`}>
