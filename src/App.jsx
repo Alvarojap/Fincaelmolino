@@ -1117,7 +1117,8 @@ function JardinCheck({ perfil, tok, rol }) {
   const [finalMode,  setFinalMode]  = useState(null); // "ok" | "incidencia"
   const [finalNota,  setFinalNota]  = useState("");
   const [finalSaving,setFinalSaving]= useState(false);
-  const [yaVerificado, setYaVerificado] = useState(null); // registro de verificación
+  const [yaVerificado, setYaVerificado] = useState(null);
+const [historial,    setHistorial]    = useState([]);
  
   const load_ = async () => {
     const [js, jp, jf, vrf] = await Promise.all([
