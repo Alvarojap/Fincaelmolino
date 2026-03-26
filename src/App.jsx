@@ -1490,6 +1490,16 @@ const saveNota = async () => {
       </div>
     )}
  
+   {!isA && historial.length > 0 && (
+        <div style={{ marginTop: 24 }}>
+          <div style={{ fontSize: 11, color: "#5a5e6e", textTransform: "uppercase", letterSpacing: 1.5, marginBottom: 10 }}>
+            📁 Semanas anteriores
+          </div>
+          {historial.map(h => (
+            <SemanaArchivada key={h.id} semana={h.semana} estado={h.done} nota={h.nota} />
+          ))}
+        </div>
+      )}
     {modal && (
       <NotaModal nota={nota} setNota={setNota} foto={foto} setFoto={setFoto}
         onSave={saveNota} onClose={() => setModal(null)} tok={tok} />
