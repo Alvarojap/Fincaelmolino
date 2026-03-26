@@ -88,17 +88,126 @@ function sbSubscribe(table, filter, onEvent) {
 
 // ─── DATOS ESTÁTICOS ─────────────────────────────────────────────────────────
 const JARDIN_T = [
-  { id:"j1",  txt:"Cortar el césped principal",       zona:"Jardín principal", frec:2, ini:1 },
-  { id:"j2",  txt:"Regar todas las plantas",          zona:"General",          frec:1, ini:1 },
-  { id:"j3",  txt:"Podar setos del perímetro",        zona:"Perímetro",        frec:8, ini:1 },
-  { id:"j4",  txt:"Limpiar hojas y residuos",         zona:"General",          frec:1, ini:1 },
-  { id:"j5",  txt:"Revisar sistema de riego",         zona:"Riego",            frec:4, ini:1 },
-  { id:"j6",  txt:"Fertilizar plantas de temporada",  zona:"Jardín principal", frec:8, ini:1 },
-  { id:"j7",  txt:"Limpiar fuentes y estanques",      zona:"Agua",             frec:2, ini:1 },
-  { id:"j8",  txt:"Revisar iluminación exterior",     zona:"Iluminación",      frec:4, ini:1 },
-  { id:"j9",  txt:"Mantenimiento caminos",            zona:"Accesos",          frec:2, ini:1 },
-  { id:"j10", txt:"Control de plagas",                zona:"General",          frec:8, ini:1 },
+  // ═══════════════════════════════════════════════════════════════
+// BLOQUE 1 — Reemplaza desde "const JARDIN_T = [" hasta "];"
+// (las 10 líneas actuales de tareas de jardín)
+// ═══════════════════════════════════════════════════════════════
+ 
+// ── Función que detecta la temporada según el mes actual
+function getTemporada() {
+  const m = new Date().getMonth() + 1; // 1-12
+  if (m >= 4 && m <= 5)  return "primavera"; // Abril-Mayo
+  if (m >= 6 && m <= 9)  return "verano";    // Junio-Septiembre
+  return "invierno";                          // Octubre-Marzo
+}
+ 
+const TEMPORADA_LBL = {
+  primavera: "🌸 Primavera (Abril–Mayo)",
+  verano:    "☀️ Verano (Junio–Septiembre)",
+  invierno:  "🍂 Invierno (Octubre–Marzo)",
+};
+ 
+// frec: 1=semanal, 2=quincenal, 4=mensual, 12=trimestral
+const JARDIN_T = {
+  primavera: [
+    // Riego agrupado (agrupa los 3 riegos semanales)
+    { id:"p1",  txt:"Riego semanal completado (césped + plantas + revisión zonas)", zona:"Riego",    frec:1 },
+    // Semanal
+    { id:"p2",  txt:"Cortar césped",                                               zona:"Césped",   frec:1 },
+    { id:"p3",  txt:"Perfilar bordes del césped",                                  zona:"Césped",   frec:1 },
+    { id:"p4",  txt:"Soplado general (hojas, ramas, suciedad)",                    zona:"General",  frec:1 },
+    { id:"p5",  txt:"Limpiar camino de entrada",                                   zona:"Accesos",  frec:1 },
+    { id:"p6",  txt:"Limpiar porche zona baños y BBQ",                             zona:"Porche",   frec:1 },
+    { id:"p7",  txt:"Vaciar papeleras",                                            zona:"General",  frec:1 },
+    { id:"p8",  txt:"Limpiar piscina (superficie + fondo rápido)",                 zona:"Piscina",  frec:1 },
+    { id:"p9",  txt:"Reponer cloro piscina",                                       zona:"Piscina",  frec:1 },
+    { id:"p10", txt:"Eliminar malas hierbas visibles",                             zona:"General",  frec:1 },
+    { id:"p11", txt:"Revisión general visual del jardín",                          zona:"General",  frec:1 },
+    // Quincenal
+    { id:"p12", txt:"Abonar césped",                                               zona:"Césped",   frec:2 },
+    { id:"p13", txt:"Limpieza profunda de grava (nivelar + retirar suciedad)",     zona:"Grava",    frec:2 },
+    { id:"p14", txt:"Limpieza de bordes y rincones",                               zona:"General",  frec:2 },
+    // Siempre al terminar
+    { id:"p15", txt:"Recoger manguera (bien enrollada)",                           zona:"Cierre",   frec:1 },
+    { id:"p16", txt:"Recoger herramientas y material",                             zona:"Cierre",   frec:1 },
+    { id:"p17", txt:"Dejar jardín limpio y ordenado",                              zona:"Cierre",   frec:1 },
+  ],
+  verano: [
+    // Riego agrupado (agrupa el riego diario)
+    { id:"v1",  txt:"Riego diario completado (césped + plantas, mañana o noche)",  zona:"Riego",    frec:1 },
+    { id:"v2",  txt:"Revisión visual rápida + retirar hojas y suciedad",           zona:"General",  frec:1 },
+    // Semanal
+    { id:"v3",  txt:"Cortar césped",                                               zona:"Césped",   frec:1 },
+    { id:"v4",  txt:"Perfilar bordes",                                             zona:"Césped",   frec:1 },
+    { id:"v5",  txt:"Soplado general",                                             zona:"General",  frec:1 },
+    { id:"v6",  txt:"Limpiar camino de entrada",                                   zona:"Accesos",  frec:1 },
+    { id:"v7",  txt:"Limpiar porche zona baños y BBQ",                             zona:"Porche",   frec:1 },
+    { id:"v8",  txt:"Limpiar piscina (fondo + paredes)",                           zona:"Piscina",  frec:1 },
+    { id:"v9",  txt:"Ajustar cloro y pH",                                          zona:"Piscina",  frec:1 },
+    { id:"v10", txt:"Limpiar y ordenar zona piscina",                              zona:"Piscina",  frec:1 },
+    { id:"v11", txt:"Vaciar papeleras",                                            zona:"General",  frec:1 },
+    { id:"v12", txt:"Eliminar malas hierbas visibles",                             zona:"General",  frec:1 },
+    // Quincenal
+    { id:"v13", txt:"Eliminación profunda de malas hierbas (raíz)",                zona:"General",  frec:2 },
+    { id:"v14", txt:"Limpieza y nivelado de grava",                                zona:"Grava",    frec:2 },
+    { id:"v15", txt:"Limpieza de drenajes y rejillas",                             zona:"General",  frec:2 },
+    // Mensual
+    { id:"v16", txt:"Abonar césped",                                               zona:"Césped",   frec:4 },
+    { id:"v17", txt:"Revisión de ramas secas o caídas",                            zona:"General",  frec:4 },
+    { id:"v18", txt:"Limpieza profunda de pavimentos (manchas)",                   zona:"Accesos",  frec:4 },
+    // Siempre al terminar
+    { id:"v19", txt:"Recoger manguera",                                            zona:"Cierre",   frec:1 },
+    { id:"v20", txt:"Recoger herramientas",                                        zona:"Cierre",   frec:1 },
+    { id:"v21", txt:"Dejar todo perfecto visualmente",                             zona:"Cierre",   frec:1 },
+  ],
+  invierno: [
+    // Semanal
+    { id:"i1",  txt:"Riego semanal (según clima)",                                 zona:"Riego",    frec:1 },
+    { id:"i2",  txt:"Soplado de hojas",                                            zona:"General",  frec:1 },
+    { id:"i3",  txt:"Limpiar camino de entrada",                                   zona:"Accesos",  frec:1 },
+    { id:"i4",  txt:"Limpiar porche zona baños y BBQ",                             zona:"Porche",   frec:1 },
+    { id:"i5",  txt:"Limpieza general del jardín",                                 zona:"General",  frec:1 },
+    { id:"i6",  txt:"Vaciar papeleras",                                            zona:"General",  frec:1 },
+    // Quincenal
+    { id:"i7",  txt:"Limpiar piscina",                                             zona:"Piscina",  frec:2 },
+    { id:"i8",  txt:"Ajustar cloro",                                               zona:"Piscina",  frec:2 },
+    { id:"i9",  txt:"Revisar estado del agua",                                     zona:"Piscina",  frec:2 },
+    { id:"i10", txt:"Eliminar malas hierbas visibles",                             zona:"General",  frec:2 },
+    // Mensual
+    { id:"i11", txt:"Cortar césped",                                               zona:"Césped",   frec:4 },
+    { id:"i12", txt:"Perfilar bordes",                                             zona:"Césped",   frec:4 },
+    { id:"i13", txt:"Limpieza profunda de grava",                                  zona:"Grava",    frec:4 },
+    { id:"i14", txt:"Revisión general del jardín",                                 zona:"General",  frec:4 },
+    // Trimestral
+    { id:"i15", txt:"Poda de árboles",                                             zona:"Árboles",  frec:12 },
+    { id:"i16", txt:"Recorte de setos",                                            zona:"Setos",    frec:12 },
+    { id:"i17", txt:"Re-siembra de césped",                                        zona:"Césped",   frec:12 },
+    { id:"i18", txt:"Abonado de recuperación",                                     zona:"General",  frec:12 },
+    { id:"i19", txt:"Limpieza profunda general",                                   zona:"General",  frec:12 },
+    // Siempre al terminar
+    { id:"i20", txt:"Recoger manguera",                                            zona:"Cierre",   frec:1 },
+    { id:"i21", txt:"Recoger herramientas",                                        zona:"Cierre",   frec:1 },
+    { id:"i22", txt:"Dejar todo ordenado",                                         zona:"Cierre",   frec:1 },
+  ],
+};
+ 
+// Control final — igual para todas las temporadas
+const JARDIN_CONTROL_FINAL = [
+  { id:"cf1", txt:"No hay hojas visibles" },
+  { id:"cf2", txt:"No hay malas hierbas visibles" },
+  { id:"cf3", txt:"Césped uniforme" },
+  { id:"cf4", txt:"Grava limpia y nivelada" },
+  { id:"cf5", txt:"Camino limpio" },
+  { id:"cf6", txt:"Porche limpio" },
+  { id:"cf7", txt:"Piscina limpia" },
+  { id:"cf8", txt:"No hay herramientas visibles" },
+  { id:"cf9", txt:"Manguera recogida" },
 ];
+ 
+// Actualizar FREC_LBL para incluir trimestral
+const FREC_LBL = { 1:"Cada semana", 2:"Cada 2 semanas", 4:"Cada mes", 12:"Trimestral" };
+];
+
 const LIMP_T = [
   // INICIO
   { id:"l1",  txt:"Ventilar toda la casa (abrir ventanas)",          zona:"General"      },
@@ -954,124 +1063,391 @@ function DashC({ perfil, reservas, setPage }) {
 
 // ─── JARDÍN CHECKLIST ────────────────────────────────────────────────────────
 function JardinCheck({ perfil, tok, rol }) {
-  const isA  = rol==="admin";
-  const cwk  = wkKey();
-  const [jsem,  setJsem]  = useState([]);
-  const [jpunt, setJpunt] = useState([]);
-  const [jfrec, setJfrec] = useState({});
-  const [load,  setLoad]  = useState(true);
-  const [modal, setModal] = useState(null);
-  const [nota,  setNota]  = useState("");
-  const [foto,  setFoto]  = useState(null);
-  const [saving,setSaving]= useState(false);
-
+  const isA      = rol === "admin";
+  const cwk      = wkKey();
+  const temp     = getTemporada();
+  const tareasTemp = JARDIN_T[temp]; // tareas de la temporada actual
+ 
+  const [jsem,       setJsem]       = useState([]);
+  const [jpunt,      setJpunt]      = useState([]);
+  const [jfrec,      setJfrec]      = useState({});
+  const [load,       setLoad]       = useState(true);
+  const [modal,      setModal]      = useState(null);
+  const [nota,       setNota]       = useState("");
+  const [foto,       setFoto]       = useState(null);
+  const [saving,     setSaving]     = useState(false);
+  // Control final
+  const [showFinal,  setShowFinal]  = useState(false);
+  const [finalCheck, setFinalCheck] = useState({});  // { cf1: true, cf2: false, ... }
+  const [finalMode,  setFinalMode]  = useState(null); // "ok" | "incidencia"
+  const [finalNota,  setFinalNota]  = useState("");
+  const [finalSaving,setFinalSaving]= useState(false);
+  const [yaVerificado, setYaVerificado] = useState(null); // registro de verificación
+ 
   const load_ = async () => {
-    const [js,jp,jf] = await Promise.all([
-      sbGet("jardin_semana",`?semana=eq.${cwk}&select=*`,tok),
-      sbGet("jardin_puntual",`?semana=eq.${cwk}&select=*`,tok),
-      sbGet("jardin_frecuencias","?select=*",tok),
+    const [js, jp, jf, vrf] = await Promise.all([
+      sbGet("jardin_semana", `?semana=eq.${cwk}&select=*`, tok),
+      sbGet("jardin_puntual", `?semana=eq.${cwk}&select=*`, tok),
+      sbGet("jardin_frecuencias", "?select=*", tok),
+      // Buscar si ya hay verificación esta semana
+      sbGet("jardin_semana", `?semana=eq.${cwk}&tarea_id=eq.VERIFICACION_FINAL&select=*`, tok),
     ]);
     setJsem(js); setJpunt(jp);
-    const fm={}; jf.forEach(x=>fm[x.tarea_id]=x.frecuencia); setJfrec(fm);
+    const fm = {}; jf.forEach(x => fm[x.tarea_id] = x.frecuencia); setJfrec(fm);
+    setYaVerificado(vrf[0] || null);
     setLoad(false);
   };
-  useEffect(()=>{load_();},[]);
-
-  const sj   = {}; jsem.forEach(r=>sj[r.tarea_id]=r);
-  const fr   = jfrec;
-  const actv = JARDIN_T.filter(t=>tocaSemana({...t,frec:fr[t.id]||t.frec},cwk));
-  const inac = JARDIN_T.filter(t=>!tocaSemana({...t,frec:fr[t.id]||t.frec},cwk));
-  const comp = actv.filter(t=>sj[t.id]?.done).length + jpunt.filter(t=>t.done).length;
-  const tot  = actv.length + jpunt.length;
-
-  const toggle = async (tareaId, isPunt=false) => {
+  useEffect(() => { load_(); }, []);
+ 
+  const sj      = {}; jsem.forEach(r => sj[r.tarea_id] = r);
+  const fr      = jfrec;
+  const actv    = tareasTemp.filter(t => tocaSemana({ ...t, frec: fr[t.id] || t.frec }, cwk));
+  const inac    = tareasTemp.filter(t => !tocaSemana({ ...t, frec: fr[t.id] || t.frec }, cwk));
+  const comp    = actv.filter(t => sj[t.id]?.done).length + jpunt.filter(t => t.done).length;
+  const tot     = actv.length + jpunt.length;
+  const todoHecho = tot > 0 && comp === tot;
+ 
+  const toggle = async (tareaId, isPunt = false) => {
     if (isA || saving) return;
     setSaving(true);
     try {
       if (!isPunt) {
         const cur = sj[tareaId];
-        const body = { semana:cwk, tarea_id:tareaId, done:!cur?.done, completado_por:perfil.nombre, completado_ts:new Date().toISOString() };
-        await sbUpsert("jardin_semana", body, tok);
+        const nuevoDone = !cur?.done;
+        await sbUpsert("jardin_semana", {
+          semana: cwk, tarea_id: tareaId,
+          done: nuevoDone,
+          completado_por: perfil.nombre,
+          completado_ts: new Date().toISOString()
+        }, tok);
+        await load_();
+        // Recalcular tras cargar y mostrar ventana final si se acaban de completar todas
+        const jsNew = await sbGet("jardin_semana", `?semana=eq.${cwk}&select=*`, tok);
+        const sjNew = {}; jsNew.forEach(r => sjNew[r.tarea_id] = r);
+        const compNew = actv.filter(t => sjNew[t.id]?.done).length + jpunt.filter(t => t.done).length;
+        if (nuevoDone && compNew === tot && !yaVerificado) {
+          setFinalCheck({});
+          setFinalMode(null);
+          setFinalNota("");
+          setShowFinal(true);
+        }
       } else {
-        const cur = jpunt.find(t=>t.id===tareaId);
-        await sbPatch("jardin_puntual",`id=eq.${tareaId}`,{done:!cur?.done,completado_por:perfil.nombre,completado_ts:new Date().toISOString()},tok);
+        const cur = jpunt.find(t => t.id === tareaId);
+        await sbPatch("jardin_puntual", `id=eq.${tareaId}`, {
+          done: !cur?.done,
+          completado_por: perfil.nombre,
+          completado_ts: new Date().toISOString()
+        }, tok);
+        await load_();
       }
-      await load_();
     } catch(_) {}
     setSaving(false);
   };
-
+ 
   const openNota = (id, isPunt) => {
-    const e = isPunt ? jpunt.find(t=>t.id===id) : (sj[id]||{});
-    setNota(e?.nota||""); setFoto(e?.foto_url||null); setModal({id,isPunt});
+    const e = isPunt ? jpunt.find(t => t.id === id) : (sj[id] || {});
+    setNota(e?.nota || ""); setFoto(e?.foto_url || null); setModal({ id, isPunt });
   };
-
+ 
   const saveNota = async () => {
     if (!modal || saving) return;
     setSaving(true);
     try {
       if (!modal.isPunt) {
-        await sbUpsert("jardin_semana",{semana:cwk,tarea_id:modal.id,nota,foto_url:foto||null},tok);
+        await sbUpsert("jardin_semana", { semana: cwk, tarea_id: modal.id, nota, foto_url: foto || null }, tok);
       } else {
-        await sbPatch("jardin_puntual",`id=eq.${modal.id}`,{nota,foto_url:foto||null},tok);
+        await sbPatch("jardin_puntual", `id=eq.${modal.id}`, { nota, foto_url: foto || null }, tok);
       }
       await load_();
     } catch(_) {}
     setSaving(false); setModal(null);
   };
-
-  if (load) return <div className="loading"><div className="spin"/><span>Cargando…</span></div>;
-
+ 
+  // Guardar verificación final
+  const guardarFinal = async (modo) => {
+    if (finalSaving) return;
+    if (modo === "incidencia" && !finalNota.trim()) return;
+    setFinalSaving(true);
+    try {
+      const notaFinal = modo === "ok"
+        ? `✅ Verificado OK · ${new Date().toLocaleString("es-ES")}`
+        : `⚠️ Sin verificar: ${finalNota}`;
+      await sbUpsert("jardin_semana", {
+        semana: cwk,
+        tarea_id: "VERIFICACION_FINAL",
+        done: modo === "ok",
+        completado_por: perfil.nombre,
+        completado_ts: new Date().toISOString(),
+        nota: notaFinal,
+      }, tok);
+      // Notificar al admin
+      const admins = await sbGet("usuarios", "?rol=eq.admin&select=id", tok);
+      const emoji  = modo === "ok" ? "✅" : "⚠️";
+      const msg    = modo === "ok"
+        ? `${emoji} ${perfil.nombre} ha verificado el jardín. Todo correcto.`
+        : `${emoji} ${perfil.nombre} ha cerrado el jardín con incidencias: "${finalNota}"`;
+      for (const a of admins) {
+        await sbPost("notificaciones", { para: a.id, txt: msg }, tok);
+        sendPush("🌾 Finca El Molino", msg, "jardin-verificacion");
+      }
+      await load_();
+      setShowFinal(false);
+    } catch(_) {}
+    setFinalSaving(false);
+  };
+ 
+  if (load) return <div className="loading"><div className="spin" /><span>Cargando…</span></div>;
+ 
+  // Banner de verificación ya completada
+  const BannerVerificado = () => {
+    if (!yaVerificado) return null;
+    const ok = yaVerificado.done;
+    return (
+      <div style={{
+        background: ok ? "rgba(16,185,129,.1)" : "rgba(245,158,11,.1)",
+        border: `1px solid ${ok ? "rgba(16,185,129,.3)" : "rgba(245,158,11,.3)"}`,
+        borderRadius: 10, padding: "12px 16px", marginBottom: 16,
+        display: "flex", alignItems: "center", gap: 10
+      }}>
+        <span style={{ fontSize: 20 }}>{ok ? "✅" : "⚠️"}</span>
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: ok ? "#10b981" : "#f59e0b" }}>
+            {ok ? "Jardín verificado esta semana" : "Semana cerrada con incidencias"}
+          </div>
+          <div style={{ fontSize: 11, color: "#7a7f94", marginTop: 2 }}>
+            {yaVerificado.nota} · {fmtDT(yaVerificado.completado_ts)}
+          </div>
+        </div>
+        {!isA && (
+          <button className="btn bg sm" style={{ marginLeft: "auto", flexShrink: 0 }}
+            onClick={() => { setFinalCheck({}); setFinalMode(null); setFinalNota(""); setShowFinal(true); }}>
+            Cambiar
+          </button>
+        )}
+      </div>
+    );
+  };
+ 
   return <>
-    <div className="ph"><h2>{isA?"Checklist jardín":"Mi checklist"}</h2><p>{comp}/{tot} tareas esta semana</p></div>
-    <div className="pb">
-      <div className="prog" style={{marginBottom:18,height:7}}><div className="pfill" style={{width:`${tot?(comp/tot)*100:0}%`}}/></div>
-      {actv.length>0 && <div className="card" style={{marginBottom:14}}>
-        <div className="chdr"><span className="ctit">📋 Esta semana</span><span className="badge" style={{background:"rgba(16,185,129,.1)",color:"#10b981"}}>{actv.length}</span></div>
-        {actv.map(t=>{
-          const e=sj[t.id]||{};
-          return <div key={t.id} className={`cli${e.done?" done":""}`}>
-            {!isA?<div className={`chk${e.done?" on":""}`} onClick={()=>toggle(t.id)}/>:<span style={{fontSize:17,flexShrink:0}}>{e.done?"✅":"⬜"}</span>}
-            <div style={{flex:1,minWidth:0}}>
-              <span className="tz">{t.zona}</span>
-              <div className={`tl${e.done?" done":""}`}>{t.txt}</div>
-              <div className="tm" style={{color:"#6366f1"}}>🔁 {FREC_LBL[fr[t.id]||t.frec]}</div>
-              {e.done&&<div className="tm">✓ {e.completado_por} · {fmtDT(e.completado_ts)}</div>}
-              {e.nota&&<div className="nbox">📝 {e.nota}</div>}
-              {e.foto_url&&<img src={e.foto_url} alt="" className="pthumb"/>}
-              {e.resp_admin&&<div className="rbox">✅ Admin: {e.resp_admin}</div>}
-            </div>
-            <span className="ibtn" onClick={()=>openNota(t.id,false)}>{e.nota||e.foto_url?"✏️":"➕"}</span>
-          </div>;
-        })}
-      </div>}
-      {jpunt.length>0 && <div className="card" style={{marginBottom:14}}>
-        <div className="chdr"><span className="ctit">⭐ Puntuales</span></div>
-        {jpunt.map(t=>(
-          <div key={t.id} className={`cli${t.done?" done":""}`}>
-            {!isA?<div className={`chk${t.done?" on":""}`} onClick={()=>toggle(t.id,true)}/>:<span style={{fontSize:17,flexShrink:0}}>{t.done?"✅":"⬜"}</span>}
-            <div style={{flex:1,minWidth:0}}>
-              <span className="tz">{t.zona||"General"}</span>
-              <div className={`tl${t.done?" done":""}`}>{t.txt}</div>
-              <div className="tm" style={{color:"#f59e0b"}}>📌 Puntual · {t.creado_por}</div>
-              {t.done&&<div className="tm">✓ {t.completado_por} · {fmtDT(t.completado_ts)}</div>}
-              {t.nota&&<div className="nbox">📝 {t.nota}</div>}
-              {t.foto_url&&<img src={t.foto_url} alt="" className="pthumb"/>}
-              {t.resp_admin&&<div className="rbox">✅ Admin: {t.resp_admin}</div>}
-            </div>
-            <span className="ibtn" onClick={()=>openNota(t.id,true)}>{t.nota||t.foto_url?"✏️":"➕"}</span>
-          </div>))}
-      </div>}
-      {tot===0&&<div className="empty"><span className="ico">✅</span><p>Sin tareas esta semana</p></div>}
-      {inac.length>0&&<div className="card" style={{opacity:.4}}>
-        <div className="chdr"><span className="ctit" style={{color:"#5a5e6e"}}>⏭ No toca esta semana</span></div>
-        {inac.map(t=><div key={t.id} style={{display:"flex",alignItems:"center",gap:10,padding:"7px 0",borderBottom:"1px solid rgba(255,255,255,.04)"}}>
-          <span style={{fontSize:13}}>⏸</span>
-          <div><div style={{fontSize:12,color:"#5a5e6e"}}>{t.txt}</div><div style={{fontSize:10,color:"#3d4155"}}>🔁 {FREC_LBL[fr[t.id]||t.frec]}</div></div>
-        </div>)}
-      </div>}
+    <div className="ph">
+      <h2>{isA ? "Checklist jardín" : "Mi checklist"}</h2>
+      <p>{TEMPORADA_LBL[temp]} · {comp}/{tot} tareas</p>
     </div>
-    {modal&&<NotaModal nota={nota} setNota={setNota} foto={foto} setFoto={setFoto} onSave={saveNota} onClose={()=>setModal(null)} tok={tok}/>}
+    <div className="pb">
+      {/* Barra de progreso */}
+      <div className="prog" style={{ marginBottom: 14, height: 7 }}>
+        <div className="pfill" style={{ width: `${tot ? (comp / tot) * 100 : 0}%` }} />
+      </div>
+ 
+      {/* Banner si ya está verificado */}
+      <BannerVerificado />
+ 
+      {/* Botón manual para abrir control final si ya están todas hechas */}
+      {todoHecho && !showFinal && !isA && (
+        <div style={{ marginBottom: 16, textAlign: "center" }}>
+          <button className="btn bp" style={{ width: "100%", justifyContent: "center", fontSize: 15, padding: "12px" }}
+            onClick={() => { setFinalCheck({}); setFinalMode(null); setFinalNota(""); setShowFinal(true); }}>
+            ✅ Abrir control final del jardín
+          </button>
+        </div>
+      )}
+ 
+      {/* Tareas activas */}
+      {actv.length > 0 && (
+        <div className="card" style={{ marginBottom: 14 }}>
+          <div className="chdr">
+            <span className="ctit">📋 Esta semana</span>
+            <span className="badge" style={{ background: "rgba(16,185,129,.1)", color: "#10b981" }}>{actv.length}</span>
+          </div>
+          {actv.map(t => {
+            const e = sj[t.id] || {};
+            return (
+              <div key={t.id} className={`cli${e.done ? " done" : ""}`}>
+                {!isA
+                  ? <div className={`chk${e.done ? " on" : ""}`} onClick={() => toggle(t.id)} />
+                  : <span style={{ fontSize: 17, flexShrink: 0 }}>{e.done ? "✅" : "⬜"}</span>}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <span className="tz">{t.zona}</span>
+                  <div className={`tl${e.done ? " done" : ""}`}>{t.txt}</div>
+                  <div className="tm" style={{ color: "#6366f1" }}>🔁 {FREC_LBL[fr[t.id] || t.frec]}</div>
+                  {e.done && <div className="tm">✓ {e.completado_por} · {fmtDT(e.completado_ts)}</div>}
+                  {e.nota && <div className="nbox">📝 {e.nota}</div>}
+                  {e.foto_url && <img src={e.foto_url} alt="" className="pthumb" />}
+                  {e.resp_admin && <div className="rbox">✅ Admin: {e.resp_admin}</div>}
+                </div>
+                <span className="ibtn" onClick={() => openNota(t.id, false)}>{e.nota || e.foto_url ? "✏️" : "➕"}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+ 
+      {/* Puntuales */}
+      {jpunt.length > 0 && (
+        <div className="card" style={{ marginBottom: 14 }}>
+          <div className="chdr"><span className="ctit">⭐ Puntuales</span></div>
+          {jpunt.map(t => (
+            <div key={t.id} className={`cli${t.done ? " done" : ""}`}>
+              {!isA
+                ? <div className={`chk${t.done ? " on" : ""}`} onClick={() => toggle(t.id, true)} />
+                : <span style={{ fontSize: 17, flexShrink: 0 }}>{t.done ? "✅" : "⬜"}</span>}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <span className="tz">{t.zona || "General"}</span>
+                <div className={`tl${t.done ? " done" : ""}`}>{t.txt}</div>
+                <div className="tm" style={{ color: "#f59e0b" }}>📌 Puntual · {t.creado_por}</div>
+                {t.done && <div className="tm">✓ {t.completado_por} · {fmtDT(t.completado_ts)}</div>}
+                {t.nota && <div className="nbox">📝 {t.nota}</div>}
+                {t.foto_url && <img src={t.foto_url} alt="" className="pthumb" />}
+                {t.resp_admin && <div className="rbox">✅ Admin: {t.resp_admin}</div>}
+              </div>
+              <span className="ibtn" onClick={() => openNota(t.id, true)}>{t.nota || t.foto_url ? "✏️" : "➕"}</span>
+            </div>
+          ))}
+        </div>
+      )}
+ 
+      {tot === 0 && <div className="empty"><span className="ico">✅</span><p>Sin tareas esta semana</p></div>}
+ 
+      {/* Tareas que no tocan esta semana */}
+      {inac.length > 0 && (
+        <div className="card" style={{ opacity: .4 }}>
+          <div className="chdr"><span className="ctit" style={{ color: "#5a5e6e" }}>⏭ No toca esta semana</span></div>
+          {inac.map(t => (
+            <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 0", borderBottom: "1px solid rgba(255,255,255,.04)" }}>
+              <span style={{ fontSize: 13 }}>⏸</span>
+              <div>
+                <div style={{ fontSize: 12, color: "#5a5e6e" }}>{t.txt}</div>
+                <div style={{ fontSize: 10, color: "#3d4155" }}>🔁 {FREC_LBL[fr[t.id] || t.frec]}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+ 
+    {/* ── MODAL CONTROL FINAL ── */}
+    {showFinal && !isA && (
+      <div className="ov" style={{ alignItems: "flex-end", padding: 0 }}>
+        <div style={{
+          background: "#13161f", border: "1px solid rgba(201,168,76,.25)",
+          borderRadius: "20px 20px 0 0", padding: "24px 20px 36px",
+          width: "100%", maxWidth: 540, maxHeight: "92vh", overflowY: "auto"
+        }}>
+          {/* Header */}
+          <div style={{ textAlign: "center", marginBottom: 20 }}>
+            <div style={{ fontSize: 36, marginBottom: 8 }}>🌿</div>
+            <div style={{ fontFamily: "'Playfair Display',serif", fontSize: 20, color: "#e8e6e1", marginBottom: 4 }}>
+              ¡Últimas comprobaciones!
+            </div>
+            <div style={{ fontSize: 13, color: "#7a7f94" }}>
+              Has completado todas las tareas. Antes de cerrar, verifica que todo está correcto.
+            </div>
+          </div>
+ 
+          {/* Selector de modo */}
+          {!finalMode && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 20 }}>
+              <button
+                className="btn bp"
+                style={{ width: "100%", justifyContent: "center", padding: "14px", fontSize: 15 }}
+                onClick={() => setFinalMode("ok")}>
+                ✅ Todo correcto — verificar jardín
+              </button>
+              <button
+                className="btn bg"
+                style={{ width: "100%", justifyContent: "center", padding: "14px", fontSize: 15 }}
+                onClick={() => setFinalMode("incidencia")}>
+                ⚠️ Hay incidencias — cerrar sin verificar
+              </button>
+            </div>
+          )}
+ 
+          {/* Modo OK — checklist final */}
+          {finalMode === "ok" && (
+            <>
+              <div style={{ fontSize: 12, color: "#c9a84c", fontWeight: 600, marginBottom: 12, textTransform: "uppercase", letterSpacing: 1 }}>
+                ✅ Comprueba cada punto antes de confirmar
+              </div>
+              {JARDIN_CONTROL_FINAL.map(item => (
+                <div key={item.id}
+                  onClick={() => setFinalCheck(prev => ({ ...prev, [item.id]: !prev[item.id] }))}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 12, padding: "11px 12px",
+                    borderRadius: 10, marginBottom: 6, cursor: "pointer",
+                    background: finalCheck[item.id] ? "rgba(16,185,129,.08)" : "#0f1117",
+                    border: `1px solid ${finalCheck[item.id] ? "rgba(16,185,129,.25)" : "rgba(255,255,255,.06)"}`,
+                    transition: "all .15s"
+                  }}>
+                  <div style={{
+                    width: 24, height: 24, borderRadius: 6, flexShrink: 0,
+                    background: finalCheck[item.id] ? "#10b981" : "transparent",
+                    border: `2px solid ${finalCheck[item.id] ? "#10b981" : "rgba(255,255,255,.2)"}`,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    fontSize: 13, color: "#fff", fontWeight: 700, transition: "all .15s"
+                  }}>{finalCheck[item.id] ? "✓" : ""}</div>
+                  <span style={{ fontSize: 14, color: finalCheck[item.id] ? "#10b981" : "#c9c5b8" }}>{item.txt}</span>
+                </div>
+              ))}
+              <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
+                <button className="btn bg" style={{ flex: 1, justifyContent: "center" }}
+                  onClick={() => setFinalMode(null)}>← Volver</button>
+                <button
+                  className="btn bp"
+                  style={{ flex: 2, justifyContent: "center", padding: "12px", fontSize: 15 }}
+                  onClick={() => guardarFinal("ok")}
+                  disabled={finalSaving}>
+                  {finalSaving ? "Guardando…" : "✅ Jardín terminado y verificado"}
+                </button>
+              </div>
+            </>
+          )}
+ 
+          {/* Modo INCIDENCIA */}
+          {finalMode === "incidencia" && (
+            <>
+              <div style={{ fontSize: 13, color: "#f59e0b", fontWeight: 600, marginBottom: 10 }}>
+                ⚠️ ¿Por qué no se ha podido completar el trabajo?
+              </div>
+              <textarea
+                className="fi"
+                rows={4}
+                value={finalNota}
+                onChange={e => setFinalNota(e.target.value)}
+                placeholder="Ej: Falta material para la piscina, queda pendiente para la próxima semana…"
+                style={{ marginBottom: 14, fontSize: 14, lineHeight: 1.5 }}
+              />
+              <div style={{ display: "flex", gap: 8 }}>
+                <button className="btn bg" style={{ flex: 1, justifyContent: "center" }}
+                  onClick={() => setFinalMode(null)}>← Volver</button>
+                <button
+                  className="btn"
+                  style={{ flex: 2, justifyContent: "center", padding: "12px", fontSize: 15, background: "#f59e0b", color: "#0f1117" }}
+                  onClick={() => guardarFinal("incidencia")}
+                  disabled={finalSaving || !finalNota.trim()}>
+                  {finalSaving ? "Guardando…" : "⚠️ Cerrar con incidencias"}
+                </button>
+              </div>
+            </>
+          )}
+ 
+          {/* Botón cerrar sin hacer nada */}
+          <button
+            onClick={() => setShowFinal(false)}
+            style={{
+              background: "none", border: "none", color: "#5a5e6e", cursor: "pointer",
+              width: "100%", textAlign: "center", marginTop: 16, fontSize: 12,
+              fontFamily: "'DM Sans',sans-serif", padding: "8px"
+            }}>
+            Cerrar y decidir más tarde
+          </button>
+        </div>
+      </div>
+    )}
+ 
+    {modal && (
+      <NotaModal nota={nota} setNota={setNota} foto={foto} setFoto={setFoto}
+        onSave={saveNota} onClose={() => setModal(null)} tok={tok} />
+    )}
   </>;
 }
 
