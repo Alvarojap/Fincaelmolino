@@ -1487,7 +1487,6 @@ const saveNota = async () => {
             Cerrar y decidir más tarde
           </button>
         </div>
-      </div>
     )}
  
    {!isA && historial.length > 0 && (
@@ -1500,6 +1499,7 @@ const saveNota = async () => {
           ))}
         </div>
       )}
+        </div>
     {modal && (
       <NotaModal nota={nota} setNota={setNota} foto={foto} setFoto={setFoto}
         onSave={saveNota} onClose={() => setModal(null)} tok={tok} />
