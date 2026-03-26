@@ -266,7 +266,6 @@ const ESTADOS = [
   { id:"precio_total",       lbl:"Total pagado",       col:"#10b981" },
   { id:"finalizada",         lbl:"Finalizado",         col:"#6b7280" },
 ];
-const FREC_LBL = { 1:"Cada semana", 2:"Cada 2 semanas", 4:"Cada mes", 8:"Cada 2 meses" };
 const MESES  = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
 const D_SEM  = ["L","M","X","J","V","S","D"];
 
