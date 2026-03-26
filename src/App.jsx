@@ -87,8 +87,7 @@ function sbSubscribe(table, filter, onEvent) {
 }
 
 // ─── DATOS ESTÁTICOS ─────────────────────────────────────────────────────────
-const JARDIN_T = [
- // ── Función que detecta la temporada según el mes actual
+// ── Función que detecta la temporada según el mes actual
 function getTemporada() {
   const m = new Date().getMonth() + 1;
   if (m >= 4 && m <= 5)  return "primavera";
