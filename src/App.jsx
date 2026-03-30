@@ -793,7 +793,7 @@ function DashA({reservas,jsem,jpunt,cwk,setPage}){
     <div className="ph"><h2>Panel administración 👋</h2><p>{new Date().toLocaleDateString("es-ES",{weekday:"long",year:"numeric",month:"long",day:"numeric"})}</p></div>
     <div className="pb">
       <div className="sg">
-        <SC lbl="Reservas totales" val={reservas.length} sub="en la finca"/>
+        <SC lbl="Reservas activas" val={reservas.filter(r=>["visita","pendiente_contrato","contrato_firmado","reserva_pagada","precio_total"].includes(r.estado)).length} sub="en curso"/>
         <SC lbl="Ingresos confirmados" val={`${ing.toLocaleString("es-ES")}€`}/>
         <SC lbl="Jardín esta semana" val={`${comp}/${tot}`} prog={tot?comp/tot:0}/>
         <SC lbl="Incidencias" val={inc} valC={inc>0?"#f59e0b":undefined} sub={inc>0?"⚠️ Ver panel":"Sin incidencias"} onClick={()=>setPage("incidencias")}/>
@@ -849,7 +849,7 @@ function DashC({perfil,reservas,setPage}){
   return <>
     <div className="ph"><h2>Hola, {perfil.nombre.split(" ")[0]} 👋</h2><p>{new Date().toLocaleDateString("es-ES",{weekday:"long",year:"numeric",month:"long",day:"numeric"})}</p></div>
     <div className="pb">
-      <div className="sg"><SC lbl="Total reservas" val={reservas.length}/><SC lbl="Pendientes de firma" val={pend} valC={pend>0?"#f59e0b":undefined}/></div>
+      <div className="sg"><SC lbl="Reservas activas" val={reservas.filter(r=>["visita","pendiente_contrato","contrato_firmado","reserva_pagada","precio_total"].includes(r.estado)).length} sub="en curso"/><SC lbl="Pendientes de firma" val={pend} valC={pend>0?"#f59e0b":undefined}/></div>
       <div className="g2">{[{ico:"📋",t:"Reservas",s:"Listado completo",id:"reservas"},{ico:"📅",t:"Calendario",s:"Disponibilidad",id:"calendario"}].map(it=>(
         <button key={it.id} className="card" style={{cursor:"pointer",textAlign:"left",border:"1px solid rgba(201,168,76,.15)"}} onClick={()=>setPage(it.id)}>
           <div style={{fontSize:28,marginBottom:8}}>{it.ico}</div><div style={{fontSize:14,fontWeight:600,color:"#c9c5b8"}}>{it.t}</div><div style={{fontSize:12,color:"#5a5e6e",marginTop:3}}>{it.s}</div>
@@ -2029,6 +2029,14 @@ function Reservas({tok,rol,perfil}){
 
   const load_=async()=>{
     const r=await sbGet("reservas","?select=*&order=fecha.asc",tok);
+    // Auto-finalizar reservas pasadas que siguen activas
+    const hoy=new Date().toISOString().split("T")[0];
+    const ACTIVOS_=["visita","pendiente_contrato","contrato_firmado","reserva_pagada","precio_total"];
+    const pasadas=r.filter(x=>x.fecha<hoy&&ACTIVOS_.includes(x.estado));
+    for(const p of pasadas){
+      await sbPatch("reservas",`id=eq.${p.id}`,{estado:"finalizada"},tok).catch(()=>{});
+      p.estado="finalizada";
+    }
     setReservas(r);setLoad(false);
   };
   useEffect(()=>{load_();},[]);
@@ -2051,7 +2059,7 @@ function Reservas({tok,rol,perfil}){
 
   const activas=reservas.filter(r=>ACTIVOS.includes(r.estado));
   const finalizadas=reservas.filter(r=>r.estado==="finalizada");
-  const canceladas=reservas.filter(r=>r.estado==="cancelada"||r.obs?.startsWith("CANCELADA:"));
+  const canceladas=reservas.filter(r=>r.estado==="cancelada");
   const lista=filtro==="activas"?activas:filtro==="finalizadas"?finalizadas:filtro==="canceladas"?canceladas:reservas;
 
   const RCard=({r})=>{
@@ -2251,7 +2259,7 @@ function Visitas({perfil,tok,rol}){
     try{
       await sbPatch("visitas",`id=eq.${sel.id}`,{estado:"reserva_cancelada",nota_cancelacion:notaCancelacion},tok);
       if(sel.reserva_id){
-        await sbPatch("reservas",`id=eq.${sel.reserva_id}`,{estado:"finalizada",obs:`CANCELADA: ${notaCancelacion}`},tok);
+        await sbPatch("reservas",`id=eq.${sel.reserva_id}`,{estado:"cancelada",obs:`CANCELADA: ${notaCancelacion}`},tok);
         await addHistorial("reserva",sel.reserva_id,`Reserva cancelada: ${notaCancelacion}`,perfil.nombre,tok);
       }
       await addHistorial("visita",sel.id,`Reserva cancelada: ${notaCancelacion}`,perfil.nombre,tok);
