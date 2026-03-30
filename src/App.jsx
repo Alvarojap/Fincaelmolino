@@ -1534,8 +1534,6 @@ function Limpieza({perfil,tok,rol}){
 
     {/* NOTA INCIDENCIA */}
     {notaM&&<NotaModal nota={nota} setNota={setNota} foto={foto} setFoto={setFoto} onSave={saveNota} onClose={()=>setNotaM(null)} tok={tok}/>}
-    {bloqueado&&<ModalOcupado fecha={form.fecha} conflictos={bloqueado} tipoAccion="visita" perfil={perfil} tok={tok} onCerrar={()=>setBloqueado(null)} onForzar={()=>setBloqueado(null)}/>}
-
     {/* MODAL VERIFICACIÓN FINAL */}
     {showFinal&&!isA&&(
       <div className="ov" style={{alignItems:"flex-end",padding:0}}>
@@ -1745,8 +1743,8 @@ function ModalOcupado({fecha,conflictos,tipoAccion,perfil,tok,onCerrar,onForzar}
     setSaving(false);
   };
 
-  return <div className="ov" onClick={onCerrar}>
-    <div className="modal" style={{maxWidth:460}} onClick={e=>e.stopPropagation()}>
+  return <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.82)",backdropFilter:"blur(4px)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:16,overflowY:"auto"}}>
+    <div style={{background:"#13161f",border:"1px solid rgba(201,168,76,.2)",borderRadius:14,padding:"24px 20px",width:"100%",maxWidth:460,position:"relative"}} onClick={e=>e.stopPropagation()}>
       {!enviado?<>
         <div style={{textAlign:"center",marginBottom:20}}>
           <div style={{fontSize:40,marginBottom:10}}>🔒</div>
@@ -1761,21 +1759,21 @@ function ModalOcupado({fecha,conflictos,tipoAccion,perfil,tok,onCerrar,onForzar}
             </div>
           ))}
         </div>
-        <div style={{background:"rgba(201,168,76,.06)",border:"1px solid rgba(201,168,76,.15)",borderRadius:10,padding:"14px",marginBottom:16}}>
-          <div style={{fontSize:12,color:"#c9a84c",fontWeight:600,marginBottom:8}}>¿Necesitas usar esta fecha de todas formas?</div>
-          <div style={{fontSize:12,color:"#7a7f94",marginBottom:10,lineHeight:1.5}}>Puedes solicitar al administrador que revise la disponibilidad y autorice una franja horaria concreta.</div>
-          <textarea className="fi" rows={3} value={motivo} onChange={e=>setMotivo(e.target.value)} placeholder={`Ej: Visita rápida por la mañana antes de las 11:00, los huéspedes llegan a las 16:00…`} style={{fontSize:13,marginBottom:8}}/>
-          <button className="btn bp" style={{width:"100%",justifyContent:"center"}} onClick={solicitar} disabled={saving}>
-            {saving?"Enviando…":"📨 Solicitar desbloqueo al administrador"}
+        <div style={{background:"rgba(201,168,76,.06)",border:"1px solid rgba(201,168,76,.15)",borderRadius:10,padding:"14px",marginBottom:12}}>
+          <div style={{fontSize:13,color:"#c9a84c",fontWeight:600,marginBottom:6}}>¿Necesitas usar esta fecha?</div>
+          <div style={{fontSize:12,color:"#7a7f94",marginBottom:10,lineHeight:1.5}}>Solicita al administrador que autorice una franja horaria concreta.</div>
+          <textarea className="fi" rows={3} value={motivo} onChange={e=>setMotivo(e.target.value)} placeholder="Ej: Visita rápida por la mañana, los huéspedes llegan a las 16:00…" style={{fontSize:13,marginBottom:10}}/>
+          <button className="btn bp" style={{width:"100%",justifyContent:"center",padding:"12px",fontSize:14}} onClick={solicitar} disabled={saving}>
+            {saving?"Enviando…":"📨 Solicitar desbloqueo"}
           </button>
         </div>
-        <button className="btn bg" style={{width:"100%",justifyContent:"center"}} onClick={onCerrar}>Cancelar</button>
+        <button className="btn bg" style={{width:"100%",justifyContent:"center",marginTop:4}} onClick={onCerrar}>← Volver sin solicitar</button>
       </>:<>
-        <div style={{textAlign:"center",padding:"20px 0"}}>
-          <div style={{fontSize:40,marginBottom:12}}>📨</div>
-          <div style={{fontFamily:"'Playfair Display',serif",fontSize:18,color:"#e8e6e1",marginBottom:8}}>Solicitud enviada</div>
-          <div style={{fontSize:13,color:"#7a7f94",lineHeight:1.6}}>El administrador ha recibido tu solicitud y te notificará si aprueba la franja horaria.</div>
-          <button className="btn bp" style={{marginTop:20,width:"100%",justifyContent:"center"}} onClick={onCerrar}>Entendido</button>
+        <div style={{textAlign:"center",padding:"16px 0"}}>
+          <div style={{fontSize:44,marginBottom:12}}>📨</div>
+          <div style={{fontFamily:"'Playfair Display',serif",fontSize:18,color:"#e8e6e1",marginBottom:10}}>Solicitud enviada</div>
+          <div style={{fontSize:13,color:"#7a7f94",lineHeight:1.6,marginBottom:20}}>El administrador ha recibido tu solicitud y te notificará si aprueba una franja horaria.</div>
+          <button className="btn bp" style={{width:"100%",justifyContent:"center",padding:"12px",fontSize:14}} onClick={onCerrar}>Entendido</button>
         </div>
       </>}
     </div>
@@ -2510,7 +2508,7 @@ function Visitas({perfil,tok,rol}){
     setSaving(true);
     try{
       const disp=await checkDisponibilidad(form.fecha,tok);
-      if(!disp.libre){setSaving(false);setBloqueado(disp.conflictos);return;}
+      if(!disp.libre){setSaving(false);setShowForm(false);setBloqueado(disp.conflictos);return;}
       const [v]=await sbPost("visitas",{...form,invitados:parseInt(form.invitados)||null,estado:"pendiente",creado_por:perfil.nombre},tok);
       await addHistorial("visita",v.id,`Visita registrada para el ${new Date(form.fecha+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"long",year:"numeric"})} a las ${form.hora}`,perfil.nombre,tok);
       setShowForm(false);setForm(formVacio);await load_();
@@ -2771,6 +2769,9 @@ function Visitas({perfil,tok,rol}){
         </div>
       </div>
     </div>}
+
+    {/* MODAL FECHA OCUPADA */}
+    {bloqueado&&<ModalOcupado fecha={form.fecha} conflictos={bloqueado} tipoAccion="visita" perfil={perfil} tok={tok} onCerrar={()=>setBloqueado(null)} onForzar={()=>setBloqueado(null)}/>}
   </>;
 }
 
@@ -2840,7 +2841,7 @@ function ReservasAirbnb({perfil,tok,rol}){
       if(!disp.libre){conflictoEncontrado=disp.conflictos;fechaConflicto=fecha;break;}
       d.setDate(d.getDate()+1);
     }
-    if(conflictoEncontrado){setSaving(false);setBloqueadoA(conflictoEncontrado);setFechaBloqA(fechaConflicto);return;}
+    if(conflictoEncontrado){setSaving(false);setShowForm(false);setBloqueadoA(conflictoEncontrado);setFechaBloqA(fechaConflicto);return;}
     try{
       await sbPost("reservas_airbnb",{
         ...form,
@@ -2959,5 +2960,8 @@ function ReservasAirbnb({perfil,tok,rol}){
         {isA&&<button className="btn br" style={{width:"100%",justifyContent:"center"}} onClick={()=>eliminar(sel.id)}>🗑 Eliminar reserva</button>}
       </div>
     </div>}
+
+    {/* MODAL FECHA OCUPADA */}
+    {bloqueadoA&&fechaBloqA&&<ModalOcupado fecha={fechaBloqA} conflictos={bloqueadoA} tipoAccion="airbnb" perfil={perfil} tok={tok} onCerrar={()=>{setBloqueadoA(null);setFechaBloqA(null);}} onForzar={()=>{setBloqueadoA(null);setFechaBloqA(null);}}/>}
   </>;
 }
