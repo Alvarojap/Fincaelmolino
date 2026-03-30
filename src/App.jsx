@@ -1534,6 +1534,7 @@ function Limpieza({perfil,tok,rol}){
 
     {/* NOTA INCIDENCIA */}
     {notaM&&<NotaModal nota={nota} setNota={setNota} foto={foto} setFoto={setFoto} onSave={saveNota} onClose={()=>setNotaM(null)} tok={tok}/>}
+    {bloqueado&&<ModalOcupado fecha={form.fecha} conflictos={bloqueado} tipoAccion="visita" perfil={perfil} tok={tok} onCerrar={()=>setBloqueado(null)} onForzar={()=>setBloqueado(null)}/>}
 
     {/* MODAL VERIFICACIÓN FINAL */}
     {showFinal&&!isA&&(
@@ -1695,6 +1696,178 @@ function Chat({perfil,tok,rol}){
 }
 
 // ─── NOTIFICACIONES ──────────────────────────────────────────────────────────
+
+// ─── DISPONIBILIDAD ───────────────────────────────────────────────────────────
+async function checkDisponibilidad(fecha, tok){
+  // Returns {libre, conflictos:[{tipo,nombre,detalle}]}
+  const [reservas, airbnbs] = await Promise.all([
+    sbGet("reservas", `?fecha=eq.${fecha}&select=nombre,tipo,estado`, tok),
+    sbGet("reservas_airbnb", `?fecha_entrada=lte.${fecha}&fecha_salida=gte.${fecha}&select=huesped,fecha_entrada,fecha_salida`, tok),
+  ]);
+  const conflictos=[
+    ...reservas.filter(r=>["visita","pendiente_contrato","contrato_firmado","reserva_pagada","precio_total"].includes(r.estado)).map(r=>({tipo:"evento",nombre:r.nombre,detalle:`Evento: ${r.tipo||""}`,color:"#6366f1"})),
+    ...airbnbs.map(a=>({tipo:"airbnb",nombre:"Alojamiento turístico",detalle:`Airbnb: ${a.huesped}`,color:"#10b981"})),
+  ];
+  return {libre:conflictos.length===0, conflictos};
+}
+
+// ─── MODAL DISPONIBILIDAD ─────────────────────────────────────────────────────
+function ModalOcupado({fecha,conflictos,tipoAccion,perfil,tok,onCerrar,onForzar}){
+  const [motivo,setMotivo]=useState("");
+  const [saving,setSaving]=useState(false);
+  const [enviado,setEnviado]=useState(false);
+
+  const fmtFecha=new Date(fecha+"T12:00:00").toLocaleDateString("es-ES",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
+  const tipoLbl={visita:"una visita",reserva:"una reserva de evento",airbnb:"una reserva Airbnb"}[tipoAccion]||"una reserva";
+
+  const solicitar=async()=>{
+    if(saving)return;
+    setSaving(true);
+    try{
+      // Crear solicitud de desbloqueo
+      const [sol]=await sbPost("solicitudes_desbloqueo",{
+        fecha,
+        motivo:motivo||`Solicitud de ${tipoLbl}`,
+        solicitado_por:perfil.nombre,
+        solicitado_por_id:perfil.id,
+        tipo_accion:tipoAccion,
+        estado:"pendiente",
+      },tok);
+      // Notificar a admins
+      const admins=await sbGet("usuarios","?rol=eq.admin&select=id",tok);
+      const msg=`🔒 ${perfil.nombre} solicita ${tipoLbl} el ${fmtFecha}. La fecha está ocupada. Revisa las solicitudes para aprobar o rechazar.`;
+      for(const a of admins){
+        await sbPost("notificaciones",{para:a.id,txt:msg},tok);
+        sendPush("🔒 Solicitud de desbloqueo",msg,"desbloqueo");
+      }
+      setEnviado(true);
+    }catch(_){}
+    setSaving(false);
+  };
+
+  return <div className="ov" onClick={onCerrar}>
+    <div className="modal" style={{maxWidth:460}} onClick={e=>e.stopPropagation()}>
+      {!enviado?<>
+        <div style={{textAlign:"center",marginBottom:20}}>
+          <div style={{fontSize:40,marginBottom:10}}>🔒</div>
+          <div style={{fontFamily:"'Playfair Display',serif",fontSize:19,color:"#e8e6e1",marginBottom:8}}>Fecha no disponible</div>
+          <div style={{fontSize:13,color:"#7a7f94",lineHeight:1.5}}>El <strong style={{color:"#c9c5b8"}}>{fmtFecha}</strong> ya tiene reservas activas.</div>
+        </div>
+        <div style={{marginBottom:16}}>
+          {conflictos.map((c,i)=>(
+            <div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",background:"#0f1117",borderRadius:8,marginBottom:6,borderLeft:`3px solid ${c.color}`}}>
+              <span style={{fontSize:16}}>{c.tipo==="airbnb"?"🏠":"🎉"}</span>
+              <div><div style={{fontSize:13,color:"#c9c5b8",fontWeight:500}}>{c.nombre}</div><div style={{fontSize:11,color:"#5a5e6e"}}>{c.detalle}</div></div>
+            </div>
+          ))}
+        </div>
+        <div style={{background:"rgba(201,168,76,.06)",border:"1px solid rgba(201,168,76,.15)",borderRadius:10,padding:"14px",marginBottom:16}}>
+          <div style={{fontSize:12,color:"#c9a84c",fontWeight:600,marginBottom:8}}>¿Necesitas usar esta fecha de todas formas?</div>
+          <div style={{fontSize:12,color:"#7a7f94",marginBottom:10,lineHeight:1.5}}>Puedes solicitar al administrador que revise la disponibilidad y autorice una franja horaria concreta.</div>
+          <textarea className="fi" rows={3} value={motivo} onChange={e=>setMotivo(e.target.value)} placeholder={`Ej: Visita rápida por la mañana antes de las 11:00, los huéspedes llegan a las 16:00…`} style={{fontSize:13,marginBottom:8}}/>
+          <button className="btn bp" style={{width:"100%",justifyContent:"center"}} onClick={solicitar} disabled={saving}>
+            {saving?"Enviando…":"📨 Solicitar desbloqueo al administrador"}
+          </button>
+        </div>
+        <button className="btn bg" style={{width:"100%",justifyContent:"center"}} onClick={onCerrar}>Cancelar</button>
+      </>:<>
+        <div style={{textAlign:"center",padding:"20px 0"}}>
+          <div style={{fontSize:40,marginBottom:12}}>📨</div>
+          <div style={{fontFamily:"'Playfair Display',serif",fontSize:18,color:"#e8e6e1",marginBottom:8}}>Solicitud enviada</div>
+          <div style={{fontSize:13,color:"#7a7f94",lineHeight:1.6}}>El administrador ha recibido tu solicitud y te notificará si aprueba la franja horaria.</div>
+          <button className="btn bp" style={{marginTop:20,width:"100%",justifyContent:"center"}} onClick={onCerrar}>Entendido</button>
+        </div>
+      </>}
+    </div>
+  </div>;
+}
+
+// ─── PANEL SOLICITUDES (para admin en Notificaciones) ─────────────────────────
+function PanelSolicitudes({tok,perfil}){
+  const [solicitudes,setSolicitudes]=useState([]);
+  const [load,setLoad]=useState(true);
+  const [sel,setSel]=useState(null);
+  const [horaP,setHoraP]=useState("10:00");
+  const [notaA,setNotaA]=useState("");
+  const [saving,setSaving]=useState(false);
+
+  const load_=async()=>{
+    try{const s=await sbGet("solicitudes_desbloqueo","?estado=eq.pendiente&select=*&order=created_at.desc",tok);setSolicitudes(s);}catch(_){}
+    setLoad(false);
+  };
+  useEffect(()=>{load_();},[]);
+
+  const responder=async(accion)=>{
+    if(!sel||saving)return;
+    setSaving(true);
+    try{
+      await sbPatch("solicitudes_desbloqueo",`id=eq.${sel.id}`,{
+        estado:accion,
+        hora_permitida:accion==="aprobada"?horaP:null,
+        nota_admin:notaA||null,
+        respondido_por:perfil.nombre,
+        respondido_ts:new Date().toISOString(),
+      },tok);
+      const fmtF=new Date(sel.fecha+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"long"});
+      const tipoLbl={visita:"una visita",reserva:"una reserva",airbnb:"una reserva Airbnb"}[sel.tipo_accion]||"la acción";
+      let msg="";
+      if(accion==="aprobada"){
+        msg=`✅ Solicitud aprobada: puedes hacer ${tipoLbl} el ${fmtF} de ${horaP} a ${notaA||"la hora indicada"}. ${notaA?`Nota: ${notaA}`:""}`;
+      }else{
+        msg=`❌ Solicitud rechazada para el ${fmtF}. ${notaA?`Motivo: ${notaA}`:"Contacta con el administrador."}`;
+      }
+      // Notificar al solicitante
+      if(sel.solicitado_por_id){
+        await sbPost("notificaciones",{para:sel.solicitado_por_id,txt:msg},tok);
+        sendPush("🌾 Finca El Molino",msg,"solicitud-resp");
+      }
+      setSel(null);setHoraP("10:00");setNotaA("");
+      await load_();
+    }catch(_){}
+    setSaving(false);
+  };
+
+  if(load)return <div style={{color:"#5a5e6e",fontSize:13,padding:"8px 0"}}>Cargando…</div>;
+  if(solicitudes.length===0)return <div style={{background:"rgba(16,185,129,.06)",border:"1px solid rgba(16,185,129,.15)",borderRadius:10,padding:"12px 16px",fontSize:13,color:"#10b981",marginBottom:16}}>✅ Sin solicitudes de desbloqueo pendientes</div>;
+
+  return <div style={{marginBottom:20}}>
+    <div style={{fontSize:11,color:"#e85555",textTransform:"uppercase",letterSpacing:1,fontWeight:600,marginBottom:10}}>🔒 Solicitudes de desbloqueo ({solicitudes.length})</div>
+    {solicitudes.map(s=>{
+      const fmtF=new Date(s.fecha+"T12:00:00").toLocaleDateString("es-ES",{weekday:"long",day:"numeric",month:"long"});
+      const tipoLbl={visita:"Visita",reserva:"Reserva evento",airbnb:"Reserva Airbnb"}[s.tipo_accion]||s.tipo_accion;
+      return <div key={s.id} className="card" style={{marginBottom:10,borderLeft:"3px solid #e85555"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8,marginBottom:10}}>
+          <div>
+            <div style={{fontSize:14,fontWeight:600,color:"#e8e6e1"}}>🔒 {tipoLbl} · {fmtF}</div>
+            <div style={{fontSize:12,color:"#7a7f94",marginTop:3}}>Solicitado por <strong>{s.solicitado_por}</strong></div>
+            {s.motivo&&<div style={{fontSize:12,color:"#c9c5b8",marginTop:5,background:"#0f1117",borderRadius:7,padding:"6px 10px"}}>{s.motivo}</div>}
+          </div>
+          <span style={{fontSize:10,color:"#5a5e6e",flexShrink:0}}>{fmtDT(s.created_at)}</span>
+        </div>
+        {sel?.id===s.id?(
+          <div style={{background:"rgba(201,168,76,.06)",border:"1px solid rgba(201,168,76,.15)",borderRadius:10,padding:"12px"}}>
+            <div className="fg" style={{marginBottom:10}}>
+              <label>Hora permitida</label>
+              <input type="time" className="fi" value={horaP} onChange={e=>setHoraP(e.target.value)}/>
+            </div>
+            <div className="fg" style={{marginBottom:10}}>
+              <label>Nota para el solicitante</label>
+              <textarea className="fi" rows={2} value={notaA} onChange={e=>setNotaA(e.target.value)} placeholder="Ej: Solo de 10:00 a 11:30, los huéspedes llegan a las 16:00"/>
+            </div>
+            <div style={{display:"flex",gap:8}}>
+              <button className="btn bg" style={{flex:1,justifyContent:"center"}} onClick={()=>setSel(null)}>Cancelar</button>
+              <button className="btn br" style={{flex:1,justifyContent:"center"}} onClick={()=>responder("rechazada")} disabled={saving}>❌ Rechazar</button>
+              <button className="btn bp" style={{flex:2,justifyContent:"center"}} onClick={()=>responder("aprobada")} disabled={saving}>{saving?"…":"✅ Aprobar"}</button>
+            </div>
+          </div>
+        ):(
+          <button className="btn bp" style={{width:"100%",justifyContent:"center"}} onClick={()=>{setSel(s);setHoraP("10:00");setNotaA("");}}>Revisar y responder</button>
+        )}
+      </div>;
+    })}
+  </div>;
+}
+
 function Notifs({perfil,tok,rol}){
   const isA=rol==="admin";
   const [notifs,setNotifs]=useState([]);const [usuarios,setUsuarios]=useState([]);
@@ -1707,6 +1880,7 @@ function Notifs({perfil,tok,rol}){
   return <>
     <div className="ph"><h2>🔔 Notificaciones</h2><p>{isA?"Envía avisos al equipo":`${notifs.filter(n=>!n.leida).length} sin leer`}</p></div>
     <div className="pb">
+      {isA&&<PanelSolicitudes tok={tok} perfil={perfil}/>}
       {isA&&<div className="card" style={{marginBottom:20}}>
         <div className="ctit" style={{marginBottom:14}}>📢 Enviar aviso</div>
         <div className="fg"><label>Destinatario</label><select className="fi" value={dest} onChange={e=>setDest(e.target.value)}><option value="">Selecciona…</option><option value="todos">📢 Todos los operarios</option>{usuarios.map(u=><option key={u.id} value={String(u.id)}>{u.nombre} ({RL[u.rol]||u.rol})</option>)}</select></div>
@@ -2259,9 +2433,13 @@ function NuevaReserva({perfil,tok,setPage}){
   const [form,setForm]=useState({nombre:"",fecha:"",tipo:"Boda",precio:"",contacto:"",obs:"",estado:"visita"});
   const [ok,setOk]=useState(false);const [saving,setSaving]=useState(false);
   const tipos=["Boda","Cumpleaños","Comunión","Bautizo","Aniversario","Empresa","Otro"];
+  const [bloqueadoR,setBloqueadoR]=useState(null);
+
   const submit=async()=>{
     if(!form.nombre||!form.fecha||saving)return;setSaving(true);
     try{
+      const disp=await checkDisponibilidad(form.fecha,tok);
+      if(!disp.libre){setSaving(false);setBloqueadoR(disp.conflictos);return;}
       const [res]=await sbPost("reservas",{...form,precio:parseFloat(form.precio)||0,creado_por:perfil.id},tok);
       await addHistorial("reserva",res.id,`Reserva creada por ${perfil.nombre}`,perfil.nombre,tok);
       setOk(true);setTimeout(()=>{setOk(false);setPage("reservas");},2000);
@@ -2281,6 +2459,7 @@ function NuevaReserva({perfil,tok,setPage}){
         <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}><button className="btn bg" onClick={()=>setPage("reservas")}>Cancelar</button><button className="btn bp" onClick={submit} disabled={saving}>✓ Crear reserva</button></div>
       </div>
     </div></div>
+    {bloqueadoR&&<ModalOcupado fecha={form.fecha} conflictos={bloqueadoR} tipoAccion="reserva" perfil={perfil} tok={tok} onCerrar={()=>setBloqueadoR(null)} onForzar={()=>setBloqueadoR(null)}/>}
   </>;
 }
 
@@ -2324,10 +2503,14 @@ function Visitas({perfil,tok,rol}){
   const proximas=visitas.filter(v=>v.estado==="pendiente");
   const anteriores=visitas.filter(v=>v.estado!=="pendiente");
 
+  const [bloqueado,setBloqueado]=useState(null); // {conflictos}
+
   const crearVisita=async()=>{
     if(!form.nombre||!form.fecha||!form.hora||saving)return;
     setSaving(true);
     try{
+      const disp=await checkDisponibilidad(form.fecha,tok);
+      if(!disp.libre){setSaving(false);setBloqueado(disp.conflictos);return;}
       const [v]=await sbPost("visitas",{...form,invitados:parseInt(form.invitados)||null,estado:"pendiente",creado_por:perfil.nombre},tok);
       await addHistorial("visita",v.id,`Visita registrada para el ${new Date(form.fecha+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"long",year:"numeric"})} a las ${form.hora}`,perfil.nombre,tok);
       setShowForm(false);setForm(formVacio);await load_();
@@ -2639,10 +2822,25 @@ function ReservasAirbnb({perfil,tok,rol}){
   const anteriores=airbnbs.filter(a=>a.fecha_salida<hoy);
   const [tab,setTab]=useState("proximas");
 
+  const [bloqueadoA,setBloqueadoA]=useState(null);
+  const [fechaBloqA,setFechaBloqA]=useState(null);
+
   const crear=async()=>{
     if(!form.huesped||!form.fecha_entrada||!form.fecha_salida||saving)return;
     if(form.fecha_salida<form.fecha_entrada){alert("La fecha de salida no puede ser anterior a la de entrada");return;}
     setSaving(true);
+    // Check every date in range
+    const d=new Date(form.fecha_entrada+"T12:00:00");
+    const fin=new Date(form.fecha_salida+"T12:00:00");
+    let conflictoEncontrado=null;
+    let fechaConflicto=null;
+    while(d<=fin){
+      const fecha=d.toISOString().split("T")[0];
+      const disp=await checkDisponibilidad(fecha,tok);
+      if(!disp.libre){conflictoEncontrado=disp.conflictos;fechaConflicto=fecha;break;}
+      d.setDate(d.getDate()+1);
+    }
+    if(conflictoEncontrado){setSaving(false);setBloqueadoA(conflictoEncontrado);setFechaBloqA(fechaConflicto);return;}
     try{
       await sbPost("reservas_airbnb",{
         ...form,
