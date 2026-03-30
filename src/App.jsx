@@ -1520,24 +1520,101 @@ function Usuarios({tok}){
 
 // ─── CALENDARIO ──────────────────────────────────────────────────────────────
 function CalBase({tok,simple=false}){
-  const today=new Date();const [mes,setMes]=useState(today.getMonth());const [año,setAño]=useState(today.getFullYear());const [sel,setSel]=useState(null);const [reservas,setReservas]=useState([]);
+  const today=new Date();
+  const [mes,setMes]=useState(today.getMonth());
+  const [año,setAño]=useState(today.getFullYear());
+  const [sel,setSel]=useState(null);
+  const [reservas,setReservas]=useState([]);
+  const [busqueda,setBusqueda]=useState("");
+  const [resultadoBusqueda,setResultadoBusqueda]=useState(null); // null | {fecha, reservas[], libre}
+
   useEffect(()=>{sbGet("reservas","?select=*&order=fecha.asc",tok).then(setReservas).catch(()=>{});},[]);
-  const pm=()=>mes===0?(setMes(11),setAño(y=>y-1)):setMes(m=>m-1);const nm=()=>mes===11?(setMes(0),setAño(y=>y+1)):setMes(m=>m+1);
-  const ds=d=>`${año}-${String(mes+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;const gr=d=>reservas.filter(r=>r.fecha===ds(d));
+
+  const pm=()=>mes===0?(setMes(11),setAño(y=>y-1)):setMes(m=>m-1);
+  const nm=()=>mes===11?(setMes(0),setAño(y=>y+1)):setMes(m=>m+1);
+  const ds=d=>`${año}-${String(mes+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+  const gr=d=>reservas.filter(r=>r.fecha===ds(d));
   const off=new Date(año,mes,1).getDay();const ofs=off===0?6:off-1;const dim=new Date(año,mes+1,0).getDate();
   const rsvMes=reservas.filter(r=>{const d=new Date(r.fecha);return d.getMonth()===mes&&d.getFullYear()===año;}).sort((a,b)=>new Date(a.fecha)-new Date(b.fecha));
+
+  const buscar=()=>{
+    if(!busqueda)return;
+    const fecha=busqueda; // formato YYYY-MM-DD
+    const rsvFecha=reservas.filter(r=>r.fecha===fecha);
+    const d=new Date(fecha+"T12:00:00");
+    // Navegar al mes de la fecha buscada
+    setMes(d.getMonth());
+    setAño(d.getFullYear());
+    setSel(d.getDate());
+    setResultadoBusqueda({fecha,reservas:rsvFecha,libre:rsvFecha.length===0});
+  };
+
+  const limpiarBusqueda=()=>{
+    setBusqueda("");setResultadoBusqueda(null);setSel(null);
+  };
+
   return <>
+    {/* BUSCADOR DE FECHA */}
+    {!simple&&<div style={{background:"#13161f",border:"1px solid rgba(201,168,76,.2)",borderRadius:12,padding:"14px 16px",marginBottom:14}}>
+      <div style={{fontSize:11,color:"#c9a84c",textTransform:"uppercase",letterSpacing:1,fontWeight:600,marginBottom:10}}>🔍 Consultar disponibilidad</div>
+      <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+        <input
+          type="date"
+          className="fi"
+          value={busqueda}
+          onChange={e=>{setBusqueda(e.target.value);setResultadoBusqueda(null);}}
+          style={{flex:1,minWidth:160,maxWidth:220}}
+        />
+        <button className="btn bp" onClick={buscar} disabled={!busqueda} style={{flexShrink:0}}>Buscar</button>
+        {resultadoBusqueda&&<button className="btn bg" onClick={limpiarBusqueda} style={{flexShrink:0}}>✕ Limpiar</button>}
+      </div>
+      {resultadoBusqueda&&(
+        <div style={{marginTop:12,padding:"12px 14px",borderRadius:10,background:resultadoBusqueda.libre?"rgba(16,185,129,.08)":"rgba(232,85,85,.08)",border:`1px solid ${resultadoBusqueda.libre?"rgba(16,185,129,.25)":"rgba(232,85,85,.25)"}`}}>
+          <div style={{fontSize:14,fontWeight:600,color:resultadoBusqueda.libre?"#10b981":"#e85555",marginBottom:resultadoBusqueda.libre?0:8}}>
+            {resultadoBusqueda.libre
+              ?"✅ Fecha disponible — sin reservas"
+              :`❌ Fecha ocupada — ${resultadoBusqueda.reservas.length} reserva${resultadoBusqueda.reservas.length>1?"s":""}`}
+          </div>
+          {!resultadoBusqueda.libre&&resultadoBusqueda.reservas.map(r=>{
+            const est=ESTADOS.find(e=>e.id===r.estado);
+            return <div key={r.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,marginTop:6,paddingTop:6,borderTop:"1px solid rgba(255,255,255,.06)"}}>
+              <div>
+                <div style={{fontSize:13,fontWeight:600,color:"#e8e6e1"}}>{r.nombre}</div>
+                {r.tipo&&<div style={{fontSize:11,color:"#7a7f94"}}>🎉 {r.tipo}</div>}
+              </div>
+              {est&&<span className="badge" style={{background:`${est.col}18`,color:est.col,border:`1px solid ${est.col}30`,flexShrink:0}}>{est.lbl}</span>}
+            </div>;
+          })}
+        </div>
+      )}
+    </div>}
+
     <div className="cal-card" style={{overflow:"hidden"}}>
       <div className="cnav"><button onClick={pm}>‹</button><span className="cmon">{MESES[mes]} {año}</span><button onClick={nm}>›</button></div>
       <div className="cg">
         {D_SEM.map(d=><div key={d} className="ch">{d}</div>)}
         {Array(ofs).fill(null).map((_,i)=><div key={`e${i}`} className="cd empty"/>)}
-        {Array(dim).fill(null).map((_,i)=>{const d=i+1,rsv=gr(d),isT=d===today.getDate()&&mes===today.getMonth()&&año===today.getFullYear();return <div key={d} className={`cd${isT?" today":""}${rsv.length?" hasev":""}${!simple&&sel===d?" sel":""}`} onClick={()=>!simple&&setSel(sel===d?null:d)}><span>{d}</span>{rsv.length>0&&<div className="cdot" style={{background:simple?"#6366f1":(ESTADOS.find(e=>e.id===rsv[0].estado)?.col||"#6366f1")}}/>}</div>;})}
+        {Array(dim).fill(null).map((_,i)=>{
+          const d=i+1,rsv=gr(d),isT=d===today.getDate()&&mes===today.getMonth()&&año===today.getFullYear();
+          const isBusq=resultadoBusqueda&&ds(d)===resultadoBusqueda.fecha;
+          return <div key={d}
+            className={`cd${isT?" today":""}${rsv.length?" hasev":""}${!simple&&sel===d?" sel":""}`}
+            style={isBusq?{boxShadow:"0 0 0 2px #c9a84c",background:"rgba(201,168,76,.12)"}:{}}
+            onClick={()=>!simple&&setSel(sel===d?null:d)}>
+            <span>{d}</span>
+            {rsv.length>0&&<div className="cdot" style={{background:simple?"#6366f1":(ESTADOS.find(e=>e.id===rsv[0].estado)?.col||"#6366f1")}}/>}
+          </div>;
+        })}
       </div>
     </div>
     <div style={{marginTop:14}}>
-      {!simple&&(sel?gr(sel).length===0?<div className="card"><div className="empty"><span className="ico">✅</span><p>{sel} de {MESES[mes]} — Libre</p></div></div>:gr(sel).map(r=>{const est=ESTADOS.find(e=>e.id===r.estado);return <div key={r.id} className="card" style={{marginBottom:8,borderLeft:`3px solid ${est?.col||"#6366f1"}`}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8}}><div style={{minWidth:0}}><div style={{fontSize:14,fontWeight:600,color:"#e8e6e1"}}>{r.nombre}</div>{r.tipo&&<div style={{fontSize:12,color:"#7a7f94",marginTop:3}}>🎉 {r.tipo}</div>}{r.precio&&<div style={{fontSize:12,color:"#c9a84c",marginTop:2}}>💰 {parseFloat(r.precio).toLocaleString("es-ES")}€</div>}</div>{est&&<span className="badge" style={{background:`${est.col}18`,color:est.col,border:`1px solid ${est.col}30`,flexShrink:0}}>{est.lbl}</span>}</div></div>;}):<div className="card"><div className="empty"><span className="ico">📅</span><p>Pulsa un día para ver detalles</p></div></div>)}
-      {simple&&(rsvMes.length===0?<div className="card"><div className="empty"><span className="ico">✅</span><p>Sin eventos este mes</p></div></div>:rsvMes.map(r=><div key={r.id} className="card" style={{marginBottom:8,borderLeft:"3px solid #6366f1"}}><div style={{fontSize:13,fontWeight:600,color:"#e8e6e1"}}>{r.nombre}</div><div style={{fontSize:12,color:"#7a7f94",marginTop:3}}>📅 {new Date(r.fecha).toLocaleDateString("es-ES",{weekday:"long",day:"numeric",month:"long"})}</div>{r.tipo&&<div style={{fontSize:11,color:"#5a5e6e",marginTop:2}}>🎉 {r.tipo}</div>}</div>))}
+      {!simple&&(sel?gr(sel).length===0
+        ?<div className="card"><div className="empty"><span className="ico">✅</span><p>{sel} de {MESES[mes]} — Libre</p></div></div>
+        :gr(sel).map(r=>{const est=ESTADOS.find(e=>e.id===r.estado);return <div key={r.id} className="card" style={{marginBottom:8,borderLeft:`3px solid ${est?.col||"#6366f1"}`}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8}}><div style={{minWidth:0}}><div style={{fontSize:14,fontWeight:600,color:"#e8e6e1"}}>{r.nombre}</div>{r.tipo&&<div style={{fontSize:12,color:"#7a7f94",marginTop:3}}>🎉 {r.tipo}</div>}{r.precio&&<div style={{fontSize:12,color:"#c9a84c",marginTop:2}}>💰 {parseFloat(r.precio).toLocaleString("es-ES")}€</div>}</div>{est&&<span className="badge" style={{background:`${est.col}18`,color:est.col,border:`1px solid ${est.col}30`,flexShrink:0}}>{est.lbl}</span>}</div></div>;})
+        :<div className="card"><div className="empty"><span className="ico">📅</span><p>Pulsa un día para ver detalles</p></div></div>)}
+      {simple&&(rsvMes.length===0
+        ?<div className="card"><div className="empty"><span className="ico">✅</span><p>Sin eventos este mes</p></div></div>
+        :rsvMes.map(r=><div key={r.id} className="card" style={{marginBottom:8,borderLeft:"3px solid #6366f1"}}><div style={{fontSize:13,fontWeight:600,color:"#e8e6e1"}}>{r.nombre}</div><div style={{fontSize:12,color:"#7a7f94",marginTop:3}}>📅 {new Date(r.fecha).toLocaleDateString("es-ES",{weekday:"long",day:"numeric",month:"long"})}</div>{r.tipo&&<div style={{fontSize:11,color:"#5a5e6e",marginTop:2}}>🎉 {r.tipo}</div>}</div>))}
     </div>
   </>;
 }
