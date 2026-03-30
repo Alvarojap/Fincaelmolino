@@ -920,21 +920,30 @@ function JardinCheck({perfil,tok,rol}){
   const tot=actv.length+jpunt.length;
   const todoHecho=tot>0&&comp===tot;
 
-  const toggle=async(tareaId,isPunt=false)=>{
+const toggle=async(tareaId,isPunt=false)=>{
     if(saving)return;
     setSaving(true);
     try{
       if(!isPunt){
         const cur=sj[tareaId];
         const nuevoDone=!cur?.done;
-        await sbUpsert("jardin_semana",{
-          semana:cwk,tarea_id:tareaId,
-          done:nuevoDone,
-          completado_por:nuevoDone?perfil.nombre:null,
-          completado_ts:nuevoDone?new Date().toISOString():null,
-          nota:cur?.nota||null,
-          foto_url:cur?.foto_url||null,
-        },tok);
+        if(cur?.id){
+          // Ya existe — actualizar
+          await sbPatch("jardin_semana",`id=eq.${cur.id}`,{
+            done:nuevoDone,
+            completado_por:nuevoDone?perfil.nombre:null,
+            completado_ts:nuevoDone?new Date().toISOString():null,
+          },tok);
+        }else{
+          // No existe — crear
+          await sbPost("jardin_semana",{
+            semana:cwk,tarea_id:tareaId,
+            done:true,
+            completado_por:perfil.nombre,
+            completado_ts:new Date().toISOString(),
+            nota:null,foto_url:null,
+          },tok);
+        }
         await load_();
         if(!isA&&nuevoDone){
           const jsNew=await sbGet("jardin_semana",`?semana=eq.${cwk}&select=*`,tok);
