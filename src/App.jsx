@@ -499,10 +499,12 @@ export default function App() {
     incidencias: <Incidencias {...P}/>,
     limpieza:    <Limpieza    {...P}/>,
     "cal-limp":  <CalLimpieza {...P}/>,
-    calendario:  <Calendario  {...P}/>,
+    "cal-jardin": <CalJardin    {...P}/>,
+    calendario:  <Calendario  {...P} rol={rol}/>,
     reservas:    <Reservas    {...P} perfil={perfil}/>,
     "nueva-res": <NuevaReserva {...P}/>,
     visitas:     <Visitas     {...P}/>,
+    airbnb:      <ReservasAirbnb {...P}/>,
     chat:        <Chat        {...P}/>,
     notifs:      <Notifs      {...P}/>,
     usuarios:    <Usuarios    {...P}/>,
@@ -613,6 +615,7 @@ function Sidebar({perfil,page,setPage,onLogout,inDrawer,onClose}){
         <N ico="✅" lbl={isA?"Checklist jardín":"Mi checklist"} id="jcheck"/>
         {isA&&<N ico="🌿" lbl="Gestión jardín" id="jadmin"/>}
         {isA&&<N ico="⚠️" lbl="Incidencias" id="incidencias"/>}
+        {isJ&&<N ico="📅" lbl="Calendario" id="cal-jardin"/>}
       </>}
       {(isA||isL)&&<><p className="nav-sec">Limpieza</p>
         <N ico="🧹" lbl={isA?"Gestión limpieza":"Mi servicio"} id="limpieza"/>
@@ -623,6 +626,7 @@ function Sidebar({perfil,page,setPage,onLogout,inDrawer,onClose}){
         <N ico="📋" lbl="Reservas" id="reservas"/>
         {isA&&<N ico="➕" lbl="Nueva reserva" id="nueva-res"/>}
         <N ico="👁" lbl="Visitas" id="visitas"/>
+        {isA&&<N ico="🏠" lbl="Airbnb" id="airbnb"/>}
       </>}
       <p className="nav-sec">Comunicación</p>
       <N ico="💬" lbl={isA?"Chat con equipo":"Chat con admin"} id="chat"/>
@@ -669,6 +673,7 @@ function MobileNav({perfil,page,setPage,tok}){
 
   const items=[{ico:"📊",lbl:"Inicio",id:"dashboard"}];
   if(isA||isJ)items.push({ico:"✅",lbl:isA?"Jardín":"Checklist",id:isA?"jadmin":"jcheck"});
+  if(isJ)items.push({ico:"📅",lbl:"Calendario",id:"cal-jardin"});
   if(isA)items.push({ico:"⚠️",lbl:"Incidencias",id:"incidencias"});
   if(isA||isL)items.push({ico:"🧹",lbl:"Limpieza",id:"limpieza"});
   if(!isA&&!isJ&&!isL)items.push({ico:"📅",lbl:"Calendario",id:"calendario"});
@@ -1763,69 +1768,119 @@ function Usuarios({tok}){
 }
 
 // ─── CALENDARIO ──────────────────────────────────────────────────────────────
-function CalBase({tok,simple=false}){
+// helper: given airbnb rows, get all dates in range
+function airbnbFechas(airbnbs){
+  const fechas=new Set();
+  for(const a of airbnbs){
+    const d=new Date(a.fecha_entrada+"T12:00:00");
+    const fin=new Date(a.fecha_salida+"T12:00:00");
+    while(d<=fin){
+      fechas.add(d.toISOString().split("T")[0]);
+      d.setDate(d.getDate()+1);
+    }
+  }
+  return fechas;
+}
+
+// CalBase now receives rol to filter info
+function CalBase({tok,rol="admin"}){
+  const isA=rol==="admin";
+  const isC=rol==="comercial";
+  const isL=rol==="limpieza";
+  const isJ=rol==="jardinero";
+
   const today=new Date();
   const [mes,setMes]=useState(today.getMonth());
   const [año,setAño]=useState(today.getFullYear());
   const [sel,setSel]=useState(null);
   const [reservas,setReservas]=useState([]);
+  const [airbnbs,setAirbnbs]=useState([]);
   const [busqueda,setBusqueda]=useState("");
-  const [resultadoBusqueda,setResultadoBusqueda]=useState(null); // null | {fecha, reservas[], libre}
+  const [resultadoBusqueda,setResultadoBusqueda]=useState(null);
 
-  useEffect(()=>{sbGet("reservas","?select=*&order=fecha.asc",tok).then(setReservas).catch(()=>{});},[]);
+  useEffect(()=>{
+    sbGet("reservas","?select=*&order=fecha.asc",tok).then(setReservas).catch(()=>{});
+    sbGet("reservas_airbnb","?select=*&order=fecha_entrada.asc",tok).then(setAirbnbs).catch(()=>{});
+  },[]);
 
   const pm=()=>mes===0?(setMes(11),setAño(y=>y-1)):setMes(m=>m-1);
   const nm=()=>mes===11?(setMes(0),setAño(y=>y+1)):setMes(m=>m+1);
   const ds=d=>`${año}-${String(mes+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
-  const gr=d=>reservas.filter(r=>r.fecha===ds(d));
-  const off=new Date(año,mes,1).getDay();const ofs=off===0?6:off-1;const dim=new Date(año,mes+1,0).getDate();
+
+  // Dates blocked by airbnb
+  const airbnbDates=airbnbFechas(airbnbs);
+
+  // Reservas normales para un día
+  const grReservas=d=>reservas.filter(r=>r.fecha===ds(d));
+  // Airbnbs que cubren un día
+  const grAirbnb=d=>{
+    const fecha=ds(d);
+    return airbnbs.filter(a=>a.fecha_entrada<=fecha&&a.fecha_salida>=fecha);
+  };
+
+  const off=new Date(año,mes,1).getDay();
+  const ofs=off===0?6:off-1;
+  const dim=new Date(año,mes+1,0).getDate();
+
   const rsvMes=reservas.filter(r=>{const d=new Date(r.fecha);return d.getMonth()===mes&&d.getFullYear()===año;}).sort((a,b)=>new Date(a.fecha)-new Date(b.fecha));
+  const airbnbMes=airbnbs.filter(a=>{
+    // Show if range overlaps with current month
+    const ini=new Date(a.fecha_entrada+"T12:00:00");
+    const fin=new Date(a.fecha_salida+"T12:00:00");
+    return (ini.getMonth()===mes&&ini.getFullYear()===año)||(fin.getMonth()===mes&&fin.getFullYear()===año)||(ini<new Date(año,mes,1)&&fin>=new Date(año,mes,1));
+  });
 
   const buscar=()=>{
     if(!busqueda)return;
-    const fecha=busqueda; // formato YYYY-MM-DD
+    const fecha=busqueda;
     const rsvFecha=reservas.filter(r=>r.fecha===fecha);
+    const airFecha=airbnbs.filter(a=>a.fecha_entrada<=fecha&&a.fecha_salida>=fecha);
+    const ocupado=rsvFecha.length>0||airFecha.length>0;
     const d=new Date(fecha+"T12:00:00");
-    // Navegar al mes de la fecha buscada
-    setMes(d.getMonth());
-    setAño(d.getFullYear());
-    setSel(d.getDate());
-    setResultadoBusqueda({fecha,reservas:rsvFecha,libre:rsvFecha.length===0});
+    setMes(d.getMonth());setAño(d.getFullYear());setSel(d.getDate());
+    setResultadoBusqueda({fecha,reservas:rsvFecha,airbnbs:airFecha,libre:!ocupado});
   };
+  const limpiarBusqueda=()=>{setBusqueda("");setResultadoBusqueda(null);setSel(null);};
 
-  const limpiarBusqueda=()=>{
-    setBusqueda("");setResultadoBusqueda(null);setSel(null);
-  };
+  const fmtRango=a=>`${new Date(a.fecha_entrada+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"})} – ${new Date(a.fecha_salida+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"})}`;
 
   return <>
-    {/* BUSCADOR DE FECHA */}
-    {!simple&&<div style={{background:"#13161f",border:"1px solid rgba(201,168,76,.2)",borderRadius:12,padding:"14px 16px",marginBottom:14}}>
+    {/* BUSCADOR - visible para admin y comercial */}
+    {(isA||isC)&&<div style={{background:"#13161f",border:"1px solid rgba(201,168,76,.2)",borderRadius:12,padding:"14px 16px",marginBottom:14}}>
       <div style={{fontSize:11,color:"#c9a84c",textTransform:"uppercase",letterSpacing:1,fontWeight:600,marginBottom:10}}>🔍 Consultar disponibilidad</div>
       <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
-        <input
-          type="date"
-          className="fi"
-          value={busqueda}
-          onChange={e=>{setBusqueda(e.target.value);setResultadoBusqueda(null);}}
-          style={{flex:1,minWidth:140}}
-        />
+        <input type="date" className="fi" value={busqueda} onChange={e=>{setBusqueda(e.target.value);setResultadoBusqueda(null);}} style={{flex:1,minWidth:140}}/>
         <button className="btn bp" onClick={buscar} disabled={!busqueda} style={{flexShrink:0}}>Buscar</button>
         {resultadoBusqueda&&<button className="btn bg" onClick={limpiarBusqueda} style={{flexShrink:0}}>✕</button>}
       </div>
       {resultadoBusqueda&&(
         <div style={{marginTop:12,padding:"12px 14px",borderRadius:10,background:resultadoBusqueda.libre?"rgba(16,185,129,.08)":"rgba(232,85,85,.08)",border:`1px solid ${resultadoBusqueda.libre?"rgba(16,185,129,.25)":"rgba(232,85,85,.25)"}`}}>
-          <div style={{fontSize:14,fontWeight:600,color:resultadoBusqueda.libre?"#10b981":"#e85555",marginBottom:resultadoBusqueda.libre?0:8}}>
-            {resultadoBusqueda.libre
-              ?"✅ Fecha disponible — sin reservas"
-              :`❌ Fecha ocupada — ${resultadoBusqueda.reservas.length} reserva${resultadoBusqueda.reservas.length>1?"s":""}`}
+          <div style={{fontSize:14,fontWeight:600,color:resultadoBusqueda.libre?"#10b981":"#e85555",marginBottom:(resultadoBusqueda.reservas.length+resultadoBusqueda.airbnbs.length)>0?8:0}}>
+            {resultadoBusqueda.libre?"✅ Fecha disponible — sin reservas":"❌ Fecha no disponible"}
           </div>
-          {!resultadoBusqueda.libre&&resultadoBusqueda.reservas.map(r=>{
+          {/* Comercial: solo muestra "Ocupado" sin detalles de airbnb */}
+          {isC&&!resultadoBusqueda.libre&&resultadoBusqueda.airbnbs.length>0&&resultadoBusqueda.reservas.length===0&&(
+            <div style={{fontSize:13,color:"#e85555"}}>🔴 Fecha bloqueada</div>
+          )}
+          {/* Admin: muestra todo */}
+          {isA&&resultadoBusqueda.reservas.map(r=>{
             const est=ESTADOS.find(e=>e.id===r.estado);
-            return <div key={r.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,marginTop:6,paddingTop:6,borderTop:"1px solid rgba(255,255,255,.06)"}}>
-              <div>
-                <div style={{fontSize:13,fontWeight:600,color:"#e8e6e1"}}>{r.nombre}</div>
-                {r.tipo&&<div style={{fontSize:11,color:"#7a7f94"}}>🎉 {r.tipo}</div>}
-              </div>
+            return <div key={r.id} style={{display:"flex",justifyContent:"space-between",gap:8,marginTop:6,paddingTop:6,borderTop:"1px solid rgba(255,255,255,.06)"}}>
+              <div><div style={{fontSize:13,fontWeight:600,color:"#e8e6e1"}}>{r.nombre}</div>{r.tipo&&<div style={{fontSize:11,color:"#7a7f94"}}>🎉 {r.tipo}</div>}</div>
+              {est&&<span className="badge" style={{background:`${est.col}18`,color:est.col,border:`1px solid ${est.col}30`,flexShrink:0}}>{est.lbl}</span>}
+            </div>;
+          })}
+          {isA&&resultadoBusqueda.airbnbs.map(a=>(
+            <div key={a.id} style={{display:"flex",justifyContent:"space-between",gap:8,marginTop:6,paddingTop:6,borderTop:"1px solid rgba(255,255,255,.06)"}}>
+              <div><div style={{fontSize:13,fontWeight:600,color:"#e8e6e1"}}>🏠 {a.huesped}</div><div style={{fontSize:11,color:"#7a7f94"}}>{fmtRango(a)}</div></div>
+              <span className="badge" style={{background:"rgba(16,185,129,.12)",color:"#10b981",border:"1px solid rgba(16,185,129,.25)",flexShrink:0}}>Airbnb</span>
+            </div>
+          ))}
+          {/* Comercial: muestra evento pero no airbnb info */}
+          {isC&&resultadoBusqueda.reservas.map(r=>{
+            const est=ESTADOS.find(e=>e.id===r.estado);
+            return <div key={r.id} style={{display:"flex",justifyContent:"space-between",gap:8,marginTop:6,paddingTop:6,borderTop:"1px solid rgba(255,255,255,.06)"}}>
+              <div><div style={{fontSize:13,fontWeight:600,color:"#e8e6e1"}}>{r.nombre}</div>{r.tipo&&<div style={{fontSize:11,color:"#7a7f94"}}>🎉 {r.tipo}</div>}</div>
               {est&&<span className="badge" style={{background:`${est.col}18`,color:est.col,border:`1px solid ${est.col}30`,flexShrink:0}}>{est.lbl}</span>}
             </div>;
           })}
@@ -1833,37 +1888,113 @@ function CalBase({tok,simple=false}){
       )}
     </div>}
 
+    {/* CALENDARIO */}
     <div className="cal-card" style={{overflow:"hidden"}}>
       <div className="cnav"><button onClick={pm}>‹</button><span className="cmon">{MESES[mes]} {año}</span><button onClick={nm}>›</button></div>
       <div className="cg">
         {D_SEM.map(d=><div key={d} className="ch">{d}</div>)}
         {Array(ofs).fill(null).map((_,i)=><div key={`e${i}`} className="cd empty"/>)}
         {Array(dim).fill(null).map((_,i)=>{
-          const d=i+1,rsv=gr(d),isT=d===today.getDate()&&mes===today.getMonth()&&año===today.getFullYear();
-          const isBusq=resultadoBusqueda&&ds(d)===resultadoBusqueda.fecha;
+          const d=i+1;
+          const fecha=ds(d);
+          const rsv=grReservas(d);
+          const airD=grAirbnb(d);
+          const isT=d===today.getDate()&&mes===today.getMonth()&&año===today.getFullYear();
+          const isBusq=resultadoBusqueda&&fecha===resultadoBusqueda.fecha;
+          const hasAir=airD.length>0;
+          const hasRsv=rsv.length>0;
           return <div key={d}
-            className={`cd${isT?" today":""}${rsv.length?" hasev":""}${!simple&&sel===d?" sel":""}`}
-            style={isBusq?{boxShadow:"0 0 0 2px #c9a84c",background:"rgba(201,168,76,.12)"}:{}}
-            onClick={()=>!simple&&setSel(sel===d?null:d)}>
+            className={`cd${isT?" today":""}${(hasRsv||hasAir)?" hasev":""}${sel===d?" sel":""}`}
+            style={{
+              ...(isBusq?{boxShadow:"0 0 0 2px #c9a84c",background:"rgba(201,168,76,.12)"}:{}),
+              // Airbnb days: reddish tint (for comercial just shows blocked, no info)
+              ...(hasAir&&!hasRsv?{background:"rgba(232,85,85,.08)"}:{}),
+            }}
+            onClick={()=>setSel(sel===d?null:d)}>
             <span>{d}</span>
-            {rsv.length>0&&<div className="cdot" style={{background:simple?"#6366f1":(ESTADOS.find(e=>e.id===rsv[0].estado)?.col||"#6366f1")}}/>}
+            {hasRsv&&<div className="cdot" style={{background:ESTADOS.find(e=>e.id===rsv[0].estado)?.col||"#6366f1"}}/>}
+            {hasAir&&!hasRsv&&<div className="cdot" style={{background:"#e85555"}}/>}
+            {hasAir&&hasRsv&&<div style={{display:"flex",gap:2,marginTop:2}}><div className="cdot" style={{background:ESTADOS.find(e=>e.id===rsv[0].estado)?.col||"#6366f1"}}/><div className="cdot" style={{background:"#e85555"}}/></div>}
           </div>;
         })}
       </div>
     </div>
-    <div style={{marginTop:14}}>
-      {!simple&&(sel?gr(sel).length===0
-        ?<div className="card"><div className="empty"><span className="ico">✅</span><p>{sel} de {MESES[mes]} — Libre</p></div></div>
-        :gr(sel).map(r=>{const est=ESTADOS.find(e=>e.id===r.estado);return <div key={r.id} className="card" style={{marginBottom:8,borderLeft:`3px solid ${est?.col||"#6366f1"}`}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8}}><div style={{minWidth:0}}><div style={{fontSize:14,fontWeight:600,color:"#e8e6e1"}}>{r.nombre}</div>{r.tipo&&<div style={{fontSize:12,color:"#7a7f94",marginTop:3}}>🎉 {r.tipo}</div>}{r.precio&&<div style={{fontSize:12,color:"#c9a84c",marginTop:2}}>💰 {parseFloat(r.precio).toLocaleString("es-ES")}€</div>}</div>{est&&<span className="badge" style={{background:`${est.col}18`,color:est.col,border:`1px solid ${est.col}30`,flexShrink:0}}>{est.lbl}</span>}</div></div>;})
-        :<div className="card"><div className="empty"><span className="ico">📅</span><p>Pulsa un día para ver detalles</p></div></div>)}
-      {simple&&(rsvMes.length===0
-        ?<div className="card"><div className="empty"><span className="ico">✅</span><p>Sin eventos este mes</p></div></div>
-        :rsvMes.map(r=><div key={r.id} className="card" style={{marginBottom:8,borderLeft:"3px solid #6366f1"}}><div style={{fontSize:13,fontWeight:600,color:"#e8e6e1"}}>{r.nombre}</div><div style={{fontSize:12,color:"#7a7f94",marginTop:3}}>📅 {new Date(r.fecha).toLocaleDateString("es-ES",{weekday:"long",day:"numeric",month:"long"})}</div>{r.tipo&&<div style={{fontSize:11,color:"#5a5e6e",marginTop:2}}>🎉 {r.tipo}</div>}</div>))}
+
+    {/* LEYENDA */}
+    <div style={{display:"flex",gap:12,marginTop:8,marginBottom:4,flexWrap:"wrap"}}>
+      <div style={{display:"flex",alignItems:"center",gap:5,fontSize:11,color:"#7a7f94"}}><div style={{width:8,height:8,borderRadius:"50%",background:"#6366f1"}}/> Evento</div>
+      {(isA||isL||isJ)&&<div style={{display:"flex",alignItems:"center",gap:5,fontSize:11,color:"#7a7f94"}}><div style={{width:8,height:8,borderRadius:"50%",background:"#e85555"}}/> {isC?"Bloqueado":"Airbnb"}</div>}
+      {isC&&<div style={{display:"flex",alignItems:"center",gap:5,fontSize:11,color:"#7a7f94"}}><div style={{width:8,height:8,borderRadius:"50%",background:"#e85555"}}/> No disponible</div>}
     </div>
+
+    {/* DETALLE DÍA SELECCIONADO */}
+    {sel&&<div style={{marginTop:10}}>
+      {/* Eventos del día */}
+      {grReservas(sel).length===0&&grAirbnb(sel).length===0&&(
+        <div className="card"><div className="empty"><span className="ico">✅</span><p>{sel} de {MESES[mes]} — Libre</p></div></div>
+      )}
+      {grReservas(sel).map(r=>{
+        const est=ESTADOS.find(e=>e.id===r.estado);
+        return <div key={r.id} className="card" style={{marginBottom:8,borderLeft:`3px solid ${est?.col||"#6366f1"}`}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8}}>
+            <div style={{minWidth:0}}>
+              <div style={{fontSize:14,fontWeight:600,color:"#e8e6e1"}}>{r.nombre}</div>
+              {r.tipo&&<div style={{fontSize:12,color:"#7a7f94",marginTop:3}}>🎉 {r.tipo}</div>}
+              {isA&&r.precio&&<div style={{fontSize:12,color:"#c9a84c",marginTop:2}}>💰 {parseFloat(r.precio).toLocaleString("es-ES")}€</div>}
+            </div>
+            {est&&<span className="badge" style={{background:`${est.col}18`,color:est.col,border:`1px solid ${est.col}30`,flexShrink:0}}>{est.lbl}</span>}
+          </div>
+        </div>;
+      })}
+      {/* Airbnb del día — admin y limpieza ven info, comercial ve bloqueado, jardinero ve rango */}
+      {grAirbnb(sel).map(a=>(
+        isC
+          ?<div key={a.id} className="card" style={{marginBottom:8,borderLeft:"3px solid #e85555"}}>
+            <div style={{fontSize:14,fontWeight:600,color:"#e85555"}}>🔴 Fecha no disponible</div>
+          </div>
+          :<div key={a.id} className="card" style={{marginBottom:8,borderLeft:"3px solid #10b981"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8}}>
+              <div>
+                <div style={{fontSize:12,color:"#10b981",fontWeight:600,marginBottom:3}}>🏠 Airbnb</div>
+                {(isA||isL)&&<div style={{fontSize:14,fontWeight:600,color:"#e8e6e1"}}>{a.huesped}</div>}
+                {isJ&&<div style={{fontSize:14,fontWeight:600,color:"#e8e6e1"}}>Alojamiento turístico</div>}
+                <div style={{fontSize:12,color:"#7a7f94",marginTop:3}}>📅 {fmtRango(a)}{a.personas?` · 👥 ${a.personas} personas`:""}</div>
+                {isA&&a.precio&&<div style={{fontSize:12,color:"#c9a84c",marginTop:2}}>💰 {parseFloat(a.precio).toLocaleString("es-ES")}€</div>}
+              </div>
+              <span className="badge" style={{background:"rgba(16,185,129,.12)",color:"#10b981",border:"1px solid rgba(16,185,129,.25)",flexShrink:0}}>Airbnb</span>
+            </div>
+          </div>
+      ))}
+    </div>}
+
+    {/* LISTA MES - para limpieza y jardinero */}
+    {(isL||isJ)&&!sel&&<div style={{marginTop:14}}>
+      {rsvMes.length===0&&airbnbMes.length===0
+        ?<div className="card"><div className="empty"><span className="ico">✅</span><p>Sin eventos este mes</p></div></div>
+        :<>
+          {rsvMes.map(r=><div key={r.id} className="card" style={{marginBottom:8,borderLeft:"3px solid #6366f1"}}>
+            <div style={{fontSize:13,fontWeight:600,color:"#e8e6e1"}}>{r.nombre}</div>
+            <div style={{fontSize:12,color:"#7a7f94",marginTop:3}}>📅 {new Date(r.fecha).toLocaleDateString("es-ES",{weekday:"long",day:"numeric",month:"long"})}</div>
+            {r.tipo&&<div style={{fontSize:11,color:"#5a5e6e",marginTop:2}}>🎉 {r.tipo}</div>}
+          </div>)}
+          {airbnbMes.map(a=><div key={a.id} className="card" style={{marginBottom:8,borderLeft:"3px solid #10b981"}}>
+            <div style={{fontSize:13,fontWeight:600,color:"#e8e6e1"}}>{isL?`🏠 Airbnb: ${a.huesped}`:"🏠 Alojamiento turístico"}</div>
+            <div style={{fontSize:12,color:"#7a7f94",marginTop:3}}>📅 {fmtRango(a)}{a.personas?` · 👥 ${a.personas} personas`:""}</div>
+          </div>)}
+        </>}
+    </div>}
   </>;
 }
-function Calendario({tok}){return <><div className="ph"><h2>Calendario de reservas</h2></div><div className="pb" style={{maxWidth:900}}><CalBase tok={tok}/></div></>;}
-function CalLimpieza({tok}){return <><div className="ph"><h2>Calendario</h2><p>Organiza tu servicio según los eventos</p></div><div className="pb" style={{maxWidth:900}}><CalBase tok={tok} simple/></div></>;}
+
+function Calendario({tok,rol}){
+  return <><div className="ph"><h2>Calendario de reservas</h2></div><div className="pb" style={{maxWidth:900}}><CalBase tok={tok} rol={rol}/></div></>;
+}
+function CalLimpieza({tok}){
+  return <><div className="ph"><h2>Calendario</h2><p>Próximos eventos y alojamientos</p></div><div className="pb" style={{maxWidth:900}}><CalBase tok={tok} rol="limpieza"/></div></>;
+}
+function CalJardin({tok}){
+  return <><div className="ph"><h2>Calendario de la finca</h2><p>Próximos eventos y alojamientos</p></div><div className="pb" style={{maxWidth:900}}><CalBase tok={tok} rol="jardinero"/></div></>;
+}
 
 // ─── HELPERS HISTORIAL Y DOCS ────────────────────────────────────────────────
 async function addHistorial(entidad_tipo, entidad_id, texto, creado_por, tok, tipo="auto"){
@@ -2484,4 +2615,151 @@ function NotaVisita({sel,onGuardar,puedeEditar}){
       </div>
     )}
   </div>;
+}
+
+// ─── RESERVAS AIRBNB ─────────────────────────────────────────────────────────
+function ReservasAirbnb({perfil,tok,rol}){
+  const isA=rol==="admin";
+  const [airbnbs,setAirbnbs]=useState([]);
+  const [load,setLoad]=useState(true);
+  const [showForm,setShowForm]=useState(false);
+  const [sel,setSel]=useState(null);
+  const [saving,setSaving]=useState(false);
+  const hoy=new Date().toISOString().split("T")[0];
+  const formVacio={huesped:"",fecha_entrada:hoy,fecha_salida:hoy,personas:"",precio:"",notas:""};
+  const [form,setForm]=useState(formVacio);
+
+  const load_=async()=>{
+    try{const a=await sbGet("reservas_airbnb","?select=*&order=fecha_entrada.asc",tok);setAirbnbs(a);}catch(_){}
+    setLoad(false);
+  };
+  useEffect(()=>{load_();},[]);
+
+  const proximas=airbnbs.filter(a=>a.fecha_salida>=hoy);
+  const anteriores=airbnbs.filter(a=>a.fecha_salida<hoy);
+  const [tab,setTab]=useState("proximas");
+
+  const crear=async()=>{
+    if(!form.huesped||!form.fecha_entrada||!form.fecha_salida||saving)return;
+    if(form.fecha_salida<form.fecha_entrada){alert("La fecha de salida no puede ser anterior a la de entrada");return;}
+    setSaving(true);
+    try{
+      await sbPost("reservas_airbnb",{
+        ...form,
+        personas:parseInt(form.personas)||null,
+        precio:parseFloat(form.precio)||null,
+        creado_por:perfil.nombre,
+      },tok);
+      setShowForm(false);setForm(formVacio);await load_();
+    }catch(_){}
+    setSaving(false);
+  };
+
+  const eliminar=async id=>{
+    if(!window.confirm("¿Eliminar esta reserva Airbnb?"))return;
+    await sbDelete("reservas_airbnb",`id=eq.${id}`,tok);
+    await load_();setSel(null);
+  };
+
+  const fmtRango=a=>{
+    const ini=new Date(a.fecha_entrada+"T12:00:00").toLocaleDateString("es-ES",{weekday:"short",day:"numeric",month:"short",year:"numeric"});
+    const fin=new Date(a.fecha_salida+"T12:00:00").toLocaleDateString("es-ES",{weekday:"short",day:"numeric",month:"short",year:"numeric"});
+    return `${ini} → ${fin}`;
+  };
+  const noches=a=>Math.round((new Date(a.fecha_salida)-new Date(a.fecha_entrada))/(1000*60*60*24));
+
+  if(load)return <div className="loading"><div className="spin"/><span>Cargando…</span></div>;
+
+  const lista=tab==="proximas"?proximas:anteriores;
+
+  return <>
+    <div className="ph">
+      <h2>🏠 Reservas Airbnb</h2>
+      <p>{proximas.length} próximas · {anteriores.length} anteriores</p>
+    </div>
+    <div className="pb">
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16,gap:12,flexWrap:"wrap"}}>
+        <div className="tabs" style={{marginBottom:0}}>
+          <button className={`tab${tab==="proximas"?" on":""}`} onClick={()=>setTab("proximas")}>📅 Próximas ({proximas.length})</button>
+          <button className={`tab${tab==="anteriores"?" on":""}`} onClick={()=>setTab("anteriores")}>📁 Anteriores ({anteriores.length})</button>
+        </div>
+        {isA&&<button className="btn bp" onClick={()=>{setForm(formVacio);setShowForm(true);}}>➕ Nueva reserva</button>}
+      </div>
+
+      {lista.length===0&&<div className="empty"><span className="ico">🏠</span><p>{tab==="proximas"?"No hay reservas próximas":"No hay reservas anteriores"}</p></div>}
+
+      {lista.map(a=>{
+        const n=noches(a);
+        return <div key={a.id} className="card" style={{marginBottom:10,borderLeft:"3px solid #10b981",cursor:"pointer"}} onClick={()=>setSel(a)}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:12}}>
+            <div style={{minWidth:0}}>
+              <div style={{fontSize:15,fontWeight:600,color:"#e8e6e1",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>🏠 {a.huesped}</div>
+              <div style={{fontSize:12,color:"#7a7f94",marginTop:4}}>📅 {fmtRango(a)}</div>
+              <div style={{display:"flex",gap:6,marginTop:6,flexWrap:"wrap"}}>
+                <span className="badge" style={{background:"rgba(16,185,129,.1)",color:"#10b981",border:"1px solid rgba(16,185,129,.25)"}}>Airbnb · {n} noche{n!==1?"s":""}</span>
+                {a.personas&&<span className="badge" style={{background:"rgba(255,255,255,.06)",color:"#7a7f94"}}>👥 {a.personas} personas</span>}
+                {a.precio&&<span className="badge" style={{background:"rgba(201,168,76,.1)",color:"#c9a84c"}}>💰 {parseFloat(a.precio).toLocaleString("es-ES")}€</span>}
+              </div>
+            </div>
+            <span style={{color:"#5a5e6e",fontSize:22,flexShrink:0}}>›</span>
+          </div>
+          {a.notas&&<div className="nbox" style={{marginTop:10}}>📝 {a.notas}</div>}
+        </div>;
+      })}
+    </div>
+
+    {/* MODAL NUEVA RESERVA */}
+    {showForm&&<div className="ov" onClick={()=>setShowForm(false)}>
+      <div className="modal" onClick={e=>e.stopPropagation()}>
+        <h3>🏠 Nueva reserva Airbnb</h3>
+        <div className="fg"><label>Nombre del huésped *</label><input className="fi" value={form.huesped} onChange={e=>setForm(v=>({...v,huesped:e.target.value}))} placeholder="Ej: Familia Martínez"/></div>
+        <div className="g2">
+          <div className="fg"><label>Fecha entrada *</label><input type="date" className="fi" value={form.fecha_entrada} onChange={e=>setForm(v=>({...v,fecha_entrada:e.target.value}))}/></div>
+          <div className="fg"><label>Fecha salida *</label><input type="date" className="fi" value={form.fecha_salida} onChange={e=>setForm(v=>({...v,fecha_salida:e.target.value}))}/></div>
+        </div>
+        {form.fecha_entrada&&form.fecha_salida&&form.fecha_salida>=form.fecha_entrada&&(
+          <div style={{fontSize:12,color:"#c9a84c",marginBottom:10}}>🌙 {Math.round((new Date(form.fecha_salida)-new Date(form.fecha_entrada))/(1000*60*60*24))} noches</div>
+        )}
+        <div className="g2">
+          <div className="fg"><label>Personas</label><input type="number" inputMode="numeric" className="fi" value={form.personas} onChange={e=>setForm(v=>({...v,personas:e.target.value}))} placeholder="Ej: 4"/></div>
+          <div className="fg"><label>Precio total (€)</label><input type="number" inputMode="numeric" className="fi" value={form.precio} onChange={e=>setForm(v=>({...v,precio:e.target.value}))} placeholder="0"/></div>
+        </div>
+        <div className="fg"><label>Notas</label><textarea className="fi" rows={3} value={form.notas} onChange={e=>setForm(v=>({...v,notas:e.target.value}))} placeholder="Observaciones, necesidades especiales…"/></div>
+        <div className="mft"><button className="btn bg" onClick={()=>setShowForm(false)}>Cancelar</button><button className="btn bp" onClick={crear} disabled={saving}>{saving?"Guardando…":"✓ Crear reserva"}</button></div>
+      </div>
+    </div>}
+
+    {/* MODAL DETALLE */}
+    {sel&&<div className="ov" onClick={()=>setSel(null)}>
+      <div className="modal" style={{maxWidth:500}} onClick={e=>e.stopPropagation()}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:16,gap:8}}>
+          <div>
+            <h3 style={{marginBottom:6}}>🏠 {sel.huesped}</h3>
+            <span className="badge" style={{background:"rgba(16,185,129,.12)",color:"#10b981",border:"1px solid rgba(16,185,129,.25)"}}>Airbnb · {noches(sel)} noches</span>
+          </div>
+          <button className="btn bg sm" style={{flexShrink:0}} onClick={()=>setSel(null)}>✕</button>
+        </div>
+        <div className="g2" style={{marginBottom:14}}>
+          {[
+            {l:"ENTRADA",v:new Date(sel.fecha_entrada+"T12:00:00").toLocaleDateString("es-ES",{weekday:"long",day:"numeric",month:"long",year:"numeric"})},
+            {l:"SALIDA",v:new Date(sel.fecha_salida+"T12:00:00").toLocaleDateString("es-ES",{weekday:"long",day:"numeric",month:"long",year:"numeric"})},
+            {l:"PERSONAS",v:sel.personas?`${sel.personas} personas`:null},
+            {l:"PRECIO",v:sel.precio?`${parseFloat(sel.precio).toLocaleString("es-ES")}€`:null,gold:true},
+          ].filter(x=>x.v).map(x=><div key={x.l} style={{background:"#0f1117",borderRadius:8,padding:"10px 12px"}}>
+            <div style={{fontSize:10,color:"#5a5e6e",marginBottom:3}}>{x.l}</div>
+            <div style={{fontSize:x.gold?16:13,fontWeight:x.gold?700:400,color:x.gold?"#c9a84c":"#e8e6e1"}}>{x.v}</div>
+          </div>)}
+        </div>
+        {sel.notas&&<div style={{background:"#0f1117",borderRadius:8,padding:"10px 12px",marginBottom:14}}>
+          <div style={{fontSize:10,color:"#5a5e6e",marginBottom:5}}>NOTAS</div>
+          <div style={{fontSize:13,color:"#c9c5b8",lineHeight:1.5}}>{sel.notas}</div>
+        </div>}
+        <div style={{background:"rgba(232,85,85,.06)",border:"1px solid rgba(232,85,85,.15)",borderRadius:8,padding:"10px 12px",marginBottom:14,fontSize:12,color:"#e85555"}}>
+          🔴 Estas fechas quedan bloqueadas automáticamente en el calendario
+        </div>
+        {sel.creado_por&&<div style={{fontSize:11,color:"#3d4155",marginBottom:14,textAlign:"right"}}>Creada por {sel.creado_por}</div>}
+        {isA&&<button className="btn br" style={{width:"100%",justifyContent:"center"}} onClick={()=>eliminar(sel.id)}>🗑 Eliminar reserva</button>}
+      </div>
+    </div>}
+  </>;
 }
