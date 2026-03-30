@@ -224,6 +224,7 @@ const ESTADOS = [
   {id:"reserva_pagada",     lbl:"Señal pagada",       col:"#8b5cf6"},
   {id:"precio_total",       lbl:"Total pagado",       col:"#10b981"},
   {id:"finalizada",         lbl:"Finalizado",         col:"#6b7280"},
+  {id:"cancelada",          lbl:"Cancelada",          col:"#e85555"},
 ];
 const FREC_LBL = {1:"Cada semana",2:"Cada 2 semanas",4:"Cada mes",12:"Trimestral"};
 const MESES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
@@ -1563,10 +1564,10 @@ function CalBase({tok,simple=false}){
           className="fi"
           value={busqueda}
           onChange={e=>{setBusqueda(e.target.value);setResultadoBusqueda(null);}}
-          style={{flex:1,minWidth:160,maxWidth:220}}
+          style={{flex:1,minWidth:140}}
         />
         <button className="btn bp" onClick={buscar} disabled={!busqueda} style={{flexShrink:0}}>Buscar</button>
-        {resultadoBusqueda&&<button className="btn bg" onClick={limpiarBusqueda} style={{flexShrink:0}}>✕ Limpiar</button>}
+        {resultadoBusqueda&&<button className="btn bg" onClick={limpiarBusqueda} style={{flexShrink:0}}>✕</button>}
       </div>
       {resultadoBusqueda&&(
         <div style={{marginTop:12,padding:"12px 14px",borderRadius:10,background:resultadoBusqueda.libre?"rgba(16,185,129,.08)":"rgba(232,85,85,.08)",border:`1px solid ${resultadoBusqueda.libre?"rgba(16,185,129,.25)":"rgba(232,85,85,.25)"}`}}>
@@ -1777,23 +1778,23 @@ function Documentos({entidad_tipo,entidad_id,tok,perfil}){
 // ─── RESERVAS ────────────────────────────────────────────────────────────────
 function Reservas({tok,rol,perfil}){
   const isA=rol==="admin";
+  const ACTIVOS=["visita","pendiente_contrato","contrato_firmado","reserva_pagada","precio_total"];
   const [reservas,setReservas]=useState([]);
-  const [filtro,setFiltro]=useState("todas");
+  const [filtro,setFiltro]=useState("activas");
   const [sel,setSel]=useState(null);
   const [load,setLoad]=useState(true);
 
   const load_=async()=>{
-    const r=await sbGet("reservas","?select=*&order=fecha.desc",tok);
+    const r=await sbGet("reservas","?select=*&order=fecha.asc",tok);
     setReservas(r);setLoad(false);
   };
   useEffect(()=>{load_();},[]);
 
   const cambiarE=async(id,e)=>{
-    const prev=reservas.find(r=>r.id===id);
     await sbPatch("reservas",`id=eq.${id}`,{estado:e,updated_at:new Date().toISOString()},tok);
     const est=ESTADOS.find(s=>s.id===e);
     await addHistorial("reserva",id,`Estado cambiado a: ${est?.lbl||e}`,perfil?.nombre||"Admin",tok);
-    setReservas(prev2=>prev2.map(r=>r.id===id?{...r,estado:e}:r));
+    setReservas(prev=>prev.map(r=>r.id===id?{...r,estado:e}:r));
     setSel(p=>p?.id===id?{...p,estado:e}:p);
   };
 
@@ -1804,24 +1805,46 @@ function Reservas({tok,rol,perfil}){
   };
 
   if(load)return <div className="loading"><div className="spin"/><span>Cargando…</span></div>;
-  const lista=reservas.filter(r=>filtro==="todas"||r.estado===filtro);
+
+  const activas=reservas.filter(r=>ACTIVOS.includes(r.estado));
+  const finalizadas=reservas.filter(r=>r.estado==="finalizada");
+  const canceladas=reservas.filter(r=>r.estado==="cancelada"||r.obs?.startsWith("CANCELADA:"));
+  const lista=filtro==="activas"?activas:filtro==="finalizadas"?finalizadas:filtro==="canceladas"?canceladas:reservas;
+
+  const RCard=({r})=>{
+    const est=ESTADOS.find(e=>e.id===r.estado);
+    return <div className="rc" style={{borderLeftColor:est?.col}} onClick={()=>setSel(r)}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10}}>
+        <div style={{minWidth:0}}>
+          <div style={{fontSize:14,fontWeight:600,color:"#e8e6e1",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.nombre}</div>
+          <div style={{fontSize:11,color:"#7a7f94",marginTop:3}}>📅 {new Date(r.fecha).toLocaleDateString("es-ES",{weekday:"long",day:"numeric",month:"long",year:"numeric"})}</div>
+          {r.tipo&&<div style={{fontSize:11,color:"#5a5e6e"}}>🎉 {r.tipo}</div>}
+        </div>
+        <div style={{textAlign:"right",flexShrink:0}}>
+          <div style={{fontSize:16,fontWeight:700,color:"#c9a84c"}}>{parseFloat(r.precio||0).toLocaleString("es-ES")}€</div>
+          {est&&<span className="badge" style={{background:`${est.col}18`,color:est.col,border:`1px solid ${est.col}30`,display:"inline-block",marginTop:3}}>{est.lbl}</span>}
+        </div>
+      </div>
+    </div>;
+  };
 
   return <>
-    <div className="ph"><h2>Reservas</h2><p>{reservas.length} registradas</p></div>
+    <div className="ph">
+      <h2>Reservas</h2>
+      <p>{activas.length} activas · {finalizadas.length} finalizadas · {canceladas.length} canceladas</p>
+    </div>
     <div className="pb">
       <div className="tabs">
-        <button className={`tab${filtro==="todas"?" on":""}`} onClick={()=>setFiltro("todas")}>Todas</button>
-        {ESTADOS.map(e=><button key={e.id} className={`tab${filtro===e.id?" on":""}`} onClick={()=>setFiltro(e.id)}>{e.lbl}</button>)}
+        <button className={`tab${filtro==="activas"?" on":""}`} onClick={()=>{setFiltro("activas");setSel(null);}}>🟢 Activas ({activas.length})</button>
+        <button className={`tab${filtro==="finalizadas"?" on":""}`} onClick={()=>{setFiltro("finalizadas");setSel(null);}}>✅ Finalizadas ({finalizadas.length})</button>
+        <button className={`tab${filtro==="canceladas"?" on":""}`} onClick={()=>{setFiltro("canceladas");setSel(null);}}>❌ Canceladas ({canceladas.length})</button>
+        <button className={`tab${filtro==="todas"?" on":""}`} onClick={()=>{setFiltro("todas");setSel(null);}}>📋 Todas ({reservas.length})</button>
       </div>
       <div className="g2" style={{alignItems:"flex-start"}}>
         <div>
-          {lista.length===0?<div className="empty"><span className="ico">📋</span><p>Sin reservas</p></div>
-            :lista.map(r=>{const est=ESTADOS.find(e=>e.id===r.estado);return <div key={r.id} className="rc" style={{borderLeftColor:est?.col}} onClick={()=>setSel(r)}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10}}>
-                <div style={{minWidth:0}}><div style={{fontSize:14,fontWeight:600,color:"#e8e6e1",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.nombre}</div><div style={{fontSize:11,color:"#7a7f94",marginTop:3}}>📅 {new Date(r.fecha).toLocaleDateString("es-ES",{weekday:"long",day:"numeric",month:"long",year:"numeric"})}</div>{r.tipo&&<div style={{fontSize:11,color:"#5a5e6e"}}>🎉 {r.tipo}</div>}</div>
-                <div style={{textAlign:"right",flexShrink:0}}><div style={{fontSize:16,fontWeight:700,color:"#c9a84c"}}>{parseFloat(r.precio||0).toLocaleString("es-ES")}€</div>{est&&<span className="badge" style={{background:`${est.col}18`,color:est.col,border:`1px solid ${est.col}30`,display:"inline-block",marginTop:3}}>{est.lbl}</span>}</div>
-              </div>
-            </div>;})}
+          {lista.length===0
+            ?<div className="empty"><span className="ico">📋</span><p>Sin reservas en esta categoría</p></div>
+            :lista.map(r=><RCard key={r.id} r={r}/>)}
         </div>
         {sel&&<div className="card" style={{position:"sticky",top:20}}>
           <div style={{display:"flex",justifyContent:"space-between",marginBottom:16,gap:8}}>
