@@ -1272,15 +1272,53 @@ function IncCard({inc,onResp}){
 }
 
 // ─── LIMPIEZA ────────────────────────────────────────────────────────────────
+const LIMP_CF = [
+  {id:"cf1", txt:"Sin pelos en suelos ni baños"},
+  {id:"cf2", txt:"Sin manchas en espejos ni grifos"},
+  {id:"cf3", txt:"Camas perfectas, sin arrugas"},
+  {id:"cf4", txt:"Cocina limpia y ordenada"},
+  {id:"cf5", txt:"Casa huele bien"},
+  {id:"cf6", txt:"Basura retirada"},
+  {id:"cf7", txt:"Luces funcionan"},
+  {id:"cf8", txt:"Puertas y ventanas cerradas"},
+  {id:"cf9", txt:"Reposición completa (toallas, papel, café…)"},
+];
+
 function Limpieza({perfil,tok,rol}){
   const isA=rol==="admin";
-  const [servicios,setServicios]=useState([]);const [actId,setActId]=useState(null);const [tareas,setTareas]=useState([]);
-  const [load,setLoad]=useState(true);const [showNew,setShowNew]=useState(false);const [showEx,setShowEx]=useState(false);
-  const [newS,setNewS]=useState({nombre:"",fecha:new Date().toISOString().split("T")[0]});const [newE,setNewE]=useState({txt:"",zona:""});
-  const [notaM,setNotaM]=useState(null);const [nota,setNota]=useState("");const [foto,setFoto]=useState(null);const [saving,setSaving]=useState(false);
-  const loadSrvs=async()=>{const s=await sbGet("servicios","?select=*&order=fecha.desc",tok);setServicios(s);if(!isA&&s.length>0&&!actId)setActId(s[0].id);setLoad(false);};
-  const loadTareas=async sid=>{if(!sid)return;const t=await sbGet("servicio_tareas",`?servicio_id=eq.${sid}&select=*`,tok);setTareas(t);};
-  useEffect(()=>{loadSrvs();},[]);useEffect(()=>{if(actId)loadTareas(actId);},[actId]);
+  const [servicios,setServicios]=useState([]);
+  const [actId,setActId]=useState(null);
+  const [tareas,setTareas]=useState([]);
+  const [load,setLoad]=useState(true);
+  const [saving,setSaving]=useState(false);
+  const [showNew,setShowNew]=useState(false);
+  const [showEx,setShowEx]=useState(false);
+  const [newS,setNewS]=useState({nombre:"",fecha:new Date().toISOString().split("T")[0]});
+  const [newE,setNewE]=useState({txt:"",zona:""});
+  const [notaM,setNotaM]=useState(null);
+  const [nota,setNota]=useState("");
+  const [foto,setFoto]=useState(null);
+  // Verificación final
+  const [showFinal,setShowFinal]=useState(false);
+  const [finalCheck,setFinalCheck]=useState({});
+  const [finalMode,setFinalMode]=useState(null);
+  const [finalNota,setFinalNota]=useState("");
+  const [finalSaving,setFinalSaving]=useState(false);
+
+  const loadSrvs=async()=>{
+    const s=await sbGet("servicios","?select=*&order=fecha.desc",tok);
+    setServicios(s);
+    if(!isA&&s.length>0&&!actId)setActId(s[0].id);
+    setLoad(false);
+  };
+  const loadTareas=async sid=>{
+    if(!sid)return;
+    const t=await sbGet("servicio_tareas",`?servicio_id=eq.${sid}&select=*`,tok);
+    setTareas(t);
+  };
+  useEffect(()=>{loadSrvs();},[]);
+  useEffect(()=>{if(actId)loadTareas(actId);},[actId]);
+
   const crearSrv=async()=>{
     if(!newS.nombre||saving)return;setSaving(true);
     try{
@@ -1291,47 +1329,252 @@ function Limpieza({perfil,tok,rol}){
       setActId(srv.id);setShowNew(false);setNewS({nombre:"",fecha:new Date().toISOString().split("T")[0]});await loadSrvs();
     }catch(_){}setSaving(false);
   };
-  const toggleT=async tareaId=>{if(isA||saving)return;setSaving(true);const cur=tareas.find(t=>t.id===tareaId);await sbPatch("servicio_tareas",`id=eq.${tareaId}`,{done:!cur?.done,completado_por:perfil.nombre,completado_ts:new Date().toISOString()},tok);await loadTareas(actId);setSaving(false);};
-  const addExtra=async()=>{if(!actId||!newE.txt||saving)return;setSaving(true);await sbPost("servicio_tareas",{servicio_id:actId,txt:newE.txt,zona:newE.zona,es_extra:true,done:false,creado_por:perfil.nombre},tok);setNewE({txt:"",zona:""});setShowEx(false);await loadTareas(actId);setSaving(false);};
-  const saveNota=async()=>{if(!notaM||saving)return;setSaving(true);await sbPatch("servicio_tareas",`id=eq.${notaM.id}`,{nota,foto_url:foto||null},tok);setNotaM(null);await loadTareas(actId);setSaving(false);};
+
+  const toggleT=async tareaId=>{
+    if(isA||saving)return;
+    setSaving(true);
+    const cur=tareas.find(t=>t.id===tareaId);
+    const nuevoDone=!cur?.done;
+    await sbPatch("servicio_tareas",`id=eq.${tareaId}`,{
+      done:nuevoDone,
+      completado_por:nuevoDone?perfil.nombre:null,
+      completado_ts:nuevoDone?new Date().toISOString():null,
+    },tok);
+    await loadTareas(actId);
+    // Comprobar si están todas hechas para abrir verificación
+    const updated=await sbGet("servicio_tareas",`?servicio_id=eq.${actId}&select=*`,tok);
+    const srv=servicios.find(s=>s.id===actId);
+    const yaVerif=srv?.verificado;
+    const todas=updated.every(t=>t.done);
+    if(todas&&!yaVerif&&!isA){
+      setFinalCheck({});setFinalMode(null);setFinalNota("");setShowFinal(true);
+    }
+    setSaving(false);
+  };
+
+  const addExtra=async()=>{
+    if(!actId||!newE.txt||saving)return;setSaving(true);
+    await sbPost("servicio_tareas",{servicio_id:actId,txt:newE.txt,zona:newE.zona,es_extra:true,done:false,creado_por:perfil.nombre},tok);
+    setNewE({txt:"",zona:""});setShowEx(false);await loadTareas(actId);setSaving(false);
+  };
+
+  const saveNota=async()=>{
+    if(!notaM||saving)return;setSaving(true);
+    await sbPatch("servicio_tareas",`id=eq.${notaM.id}`,{nota,foto_url:foto||null},tok);
+    setNotaM(null);await loadTareas(actId);setSaving(false);
+  };
   const openN=t=>{setNota(t.nota||"");setFoto(t.foto_url||null);setNotaM(t);};
-  const srv=servicios.find(s=>s.id===actId);const fijas=tareas.filter(t=>!t.es_extra);const extras=tareas.filter(t=>t.es_extra);const comp=tareas.filter(t=>t.done).length;
+
+  const guardarFinal=async(modo)=>{
+    if(finalSaving)return;
+    if(modo==="incidencia"&&!finalNota.trim())return;
+    setFinalSaving(true);
+    try{
+      const notaFinal=modo==="ok"
+        ?`✅ Verificado OK · ${new Date().toLocaleString("es-ES")}`
+        :`⚠️ Con incidencias: ${finalNota}`;
+      await sbPatch("servicios",`id=eq.${actId}`,{
+        verificado:true,
+        verificado_ok:modo==="ok",
+        verificado_nota:notaFinal,
+        verificado_por:perfil.nombre,
+        verificado_ts:new Date().toISOString(),
+      },tok);
+      const admins=await sbGet("usuarios","?rol=eq.admin&select=id",tok);
+      const srv=servicios.find(s=>s.id===actId);
+      const emoji=modo==="ok"?"✅":"⚠️";
+      const msg=modo==="ok"
+        ?`${emoji} ${perfil.nombre} ha verificado el servicio "${srv?.nombre}". Todo listo.`
+        :`${emoji} ${perfil.nombre} ha cerrado "${srv?.nombre}" con incidencias: "${finalNota}"`;
+      for(const a of admins){
+        await sbPost("notificaciones",{para:a.id,txt:msg},tok);
+        sendPush("🌾 Finca El Molino",msg,"limpieza-verificacion");
+      }
+      await loadSrvs();
+      setShowFinal(false);
+    }catch(_){}
+    setFinalSaving(false);
+  };
+
+  const openN2=t=>{setNota(t.nota||"");setFoto(t.foto_url||null);setNotaM(t);};
+
   if(load)return <div className="loading"><div className="spin"/><span>Cargando…</span></div>;
   if(!isA&&servicios.length===0)return <><div className="ph"><h2>Mi servicio</h2></div><div className="pb"><div className="empty"><span className="ico">🧹</span><p>Sin servicios asignados todavía</p></div></div></>;
+
+  const srv=servicios.find(s=>s.id===actId);
+  const fijas=tareas.filter(t=>!t.es_extra);
+  const extras=tareas.filter(t=>t.es_extra);
+  const comp=tareas.filter(t=>t.done).length;
+  const tot=tareas.length;
+  const todoHecho=tot>0&&comp===tot;
+  const yaVerif=srv?.verificado;
+
   return <>
     <div className="ph"><h2>{isA?"Gestión limpieza":"Mi servicio"}</h2></div>
     <div className="pb">
       <div className="g2" style={{alignItems:"flex-start"}}>
+        {/* LISTA SERVICIOS */}
         <div>
-          <div className="chdr" style={{marginBottom:12}}><span className="ctit">Servicios</span>{isA&&<button className="btn bp sm" onClick={()=>setShowNew(true)}>+ Nuevo</button>}</div>
-          {servicios.map(s=><div key={s.id} className="card" style={{marginBottom:8,cursor:"pointer",borderColor:actId===s.id?"rgba(201,168,76,.35)":undefined}} onClick={()=>setActId(s.id)}><div style={{fontSize:13,fontWeight:600,color:"#c9a84c",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{s.nombre}</div><div style={{fontSize:11,color:"#7a7f94",marginTop:3}}>📅 {new Date(s.fecha).toLocaleDateString("es-ES")}</div></div>)}
+          <div className="chdr" style={{marginBottom:12}}>
+            <span className="ctit">Servicios</span>
+            {isA&&<button className="btn bp sm" onClick={()=>setShowNew(true)}>+ Nuevo</button>}
+          </div>
+          {servicios.map(s=>{
+            const vOk=s.verificado&&s.verificado_ok;
+            const vInc=s.verificado&&!s.verificado_ok;
+            return <div key={s.id} className="card" style={{marginBottom:8,cursor:"pointer",borderColor:actId===s.id?"rgba(201,168,76,.35)":undefined}} onClick={()=>setActId(s.id)}>
+              <div style={{fontSize:13,fontWeight:600,color:"#c9a84c",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>🧹 {s.nombre}</div>
+              <div style={{fontSize:11,color:"#7a7f94",marginTop:3}}>📅 {new Date(s.fecha).toLocaleDateString("es-ES")}</div>
+              {s.verificado&&<div style={{marginTop:5,fontSize:11,color:vOk?"#10b981":"#f59e0b",fontWeight:600}}>{vOk?"✅ Verificado":"⚠️ Con incidencias"}</div>}
+            </div>;
+          })}
         </div>
+
+        {/* DETALLE SERVICIO */}
         {srv&&<div>
+          {/* Banner verificado */}
+          {yaVerif&&<div style={{background:srv.verificado_ok?"rgba(16,185,129,.1)":"rgba(245,158,11,.1)",border:`1px solid ${srv.verificado_ok?"rgba(16,185,129,.3)":"rgba(245,158,11,.3)"}`,borderRadius:10,padding:"12px 16px",marginBottom:14,display:"flex",alignItems:"center",gap:10}}>
+            <span style={{fontSize:20}}>{srv.verificado_ok?"✅":"⚠️"}</span>
+            <div>
+              <div style={{fontSize:13,fontWeight:600,color:srv.verificado_ok?"#10b981":"#f59e0b"}}>{srv.verificado_ok?"Servicio verificado":"Cerrado con incidencias"}</div>
+              <div style={{fontSize:11,color:"#7a7f94",marginTop:2}}>{srv.verificado_nota}</div>
+            </div>
+          </div>}
+
+          {/* Cabecera servicio */}
           <div style={{background:"rgba(201,168,76,.08)",border:"1px solid rgba(201,168,76,.15)",borderRadius:10,padding:"12px 16px",marginBottom:12,display:"flex",justifyContent:"space-between",alignItems:"center",gap:8}}>
-            <div style={{minWidth:0}}><div style={{fontSize:13,fontWeight:600,color:"#c9a84c",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>🧹 {srv.nombre}</div><div style={{fontSize:11,color:"#7a7f94"}}>{new Date(srv.fecha).toLocaleDateString("es-ES")} · {comp}/{tareas.length}</div></div>
+            <div style={{minWidth:0}}>
+              <div style={{fontSize:13,fontWeight:600,color:"#c9a84c",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>🧹 {srv.nombre}</div>
+              <div style={{fontSize:11,color:"#7a7f94"}}>{new Date(srv.fecha).toLocaleDateString("es-ES")} · {comp}/{tot} tareas</div>
+            </div>
             {isA&&<div style={{display:"flex",gap:6,flexShrink:0}}>
               <button className="btn bg sm" onClick={()=>setShowEx(true)}>+ Extra</button>
-              <button className="btn br sm" onClick={async()=>{if(!window.confirm(`¿Eliminar el servicio "${srv.nombre}"?`))return;await sbDelete("servicio_tareas",`servicio_id=eq.${srv.id}`,tok);await sbDelete("servicios",`id=eq.${srv.id}`,tok);setActId(null);setTareas([]);await loadSrvs();}}>🗑 Eliminar</button>
+              <button className="btn br sm" onClick={async()=>{if(!window.confirm(`¿Eliminar "${srv.nombre}"?`))return;await sbDelete("servicio_tareas",`servicio_id=eq.${srv.id}`,tok);await sbDelete("servicios",`id=eq.${srv.id}`,tok);setActId(null);setTareas([]);await loadSrvs();}}>🗑</button>
             </div>}
           </div>
-          {fijas.map(t=><div key={t.id} className={`cli${t.done?" done":""}`}>
-            {!isA?<div className={`chk${t.done?" on":""}`} onClick={()=>toggleT(t.id)}/>:<span style={{fontSize:17,flexShrink:0}}>{t.done?"✅":"⬜"}</span>}
-            <div style={{flex:1,minWidth:0}}><span className="tz">{t.zona}</span><div className={`tl${t.done?" done":""}`}>{LIMP_T.find(x=>x.id===t.tarea_id)?.txt||t.txt}</div>{t.done&&<div className="tm">✓ {t.completado_por} · {fmtDT(t.completado_ts)}</div>}{t.nota&&<div className="nbox">📝 {t.nota}</div>}{t.foto_url&&<img src={t.foto_url} alt="" className="pthumb"/>}</div>
-            <span className="ibtn" onClick={()=>openN(t)}>{t.nota||t.foto_url?"✏️":"➕"}</span>
-          </div>)}
-          {extras.length>0&&<><hr className="div"/><div style={{fontSize:12,color:"#c9a84c",fontWeight:600,marginBottom:9}}>⭐ Extras</div>
-            {extras.map(t=><div key={t.id} className={`cli${t.done?" done":""}`}>
-              {!isA?<div className={`chk${t.done?" on":""}`} onClick={()=>toggleT(t.id)}/>:<span style={{fontSize:17,flexShrink:0}}>{t.done?"✅":"⬜"}</span>}
-              <div style={{flex:1,minWidth:0}}><span className="tz">{t.zona||"General"}</span><div className={`tl${t.done?" done":""}`}>{t.txt}</div>{t.done&&<div className="tm">✓ {t.completado_por}</div>}{t.nota&&<div className="nbox">📝 {t.nota}</div>}</div>
-              <span className="ibtn" onClick={()=>openN(t)}>{t.nota||t.foto_url?"✏️":"➕"}</span>
-            </div>)}
+
+          {/* Barra progreso */}
+          <div className="prog" style={{marginBottom:14,height:7}}>
+            <div className="pfill" style={{width:`${tot?(comp/tot)*100:0}%`}}/>
+          </div>
+
+          {/* Botón verificación si todo hecho y no verificado */}
+          {!isA&&todoHecho&&!yaVerif&&(
+            <div style={{marginBottom:14}}>
+              <button className="btn bp" style={{width:"100%",justifyContent:"center",fontSize:15,padding:"12px"}} onClick={()=>{setFinalCheck({});setFinalMode(null);setFinalNota("");setShowFinal(true);}}>
+                ✅ Abrir verificación final del servicio
+              </button>
+            </div>
+          )}
+
+          {/* TAREAS FIJAS */}
+          {fijas.map(t=>(
+            <div key={t.id} className={`cli${t.done?" done":""}`}>
+              {!isA
+                ?<div className={`chk${t.done?" on":""}`} onClick={()=>toggleT(t.id)} style={{cursor:"pointer"}}/>
+                :<span style={{fontSize:17,flexShrink:0}}>{t.done?"✅":"⬜"}</span>}
+              <div style={{flex:1,minWidth:0}}>
+                <span className="tz">{t.zona}</span>
+                <div className={`tl${t.done?" done":""}`}>{LIMP_T.find(x=>x.id===t.tarea_id)?.txt||t.txt}</div>
+                {t.done&&<div className="tm">✓ {t.completado_por} · {fmtDT(t.completado_ts)}</div>}
+                {t.nota&&<div className="nbox">📝 {t.nota}</div>}
+                {t.foto_url&&<img src={t.foto_url} alt="" className="pthumb"/>}
+              </div>
+              <span className="ibtn" onClick={()=>openN2(t)}>{t.nota||t.foto_url?"✏️":"➕"}</span>
+            </div>
+          ))}
+
+          {/* EXTRAS */}
+          {extras.length>0&&<>
+            <hr className="div"/>
+            <div style={{fontSize:12,color:"#c9a84c",fontWeight:600,marginBottom:9}}>⭐ Extras</div>
+            {extras.map(t=>(
+              <div key={t.id} className={`cli${t.done?" done":""}`}>
+                {!isA
+                  ?<div className={`chk${t.done?" on":""}`} onClick={()=>toggleT(t.id)} style={{cursor:"pointer"}}/>
+                  :<span style={{fontSize:17,flexShrink:0}}>{t.done?"✅":"⬜"}</span>}
+                <div style={{flex:1,minWidth:0}}>
+                  <span className="tz">{t.zona||"General"}</span>
+                  <div className={`tl${t.done?" done":""}`}>{t.txt}</div>
+                  {t.done&&<div className="tm">✓ {t.completado_por}</div>}
+                  {t.nota&&<div className="nbox">📝 {t.nota}</div>}
+                </div>
+                <span className="ibtn" onClick={()=>openN2(t)}>{t.nota||t.foto_url?"✏️":"➕"}</span>
+              </div>
+            ))}
           </>}
         </div>}
       </div>
     </div>
-    {showNew&&<div className="ov" onClick={()=>setShowNew(false)}><div className="modal" onClick={e=>e.stopPropagation()}><h3>🧹 Nuevo servicio</h3><div className="fg"><label>Nombre *</label><input className="fi" value={newS.nombre} onChange={e=>setNewS(v=>({...v,nombre:e.target.value}))} placeholder="Ej: Limpieza post-boda García"/></div><div className="fg"><label>Fecha</label><input type="date" className="fi" value={newS.fecha} onChange={e=>setNewS(v=>({...v,fecha:e.target.value}))}/></div><div className="mft"><button className="btn bg" onClick={()=>setShowNew(false)}>Cancelar</button><button className="btn bp" onClick={crearSrv} disabled={saving}>Crear y notificar</button></div></div></div>}
-    {showEx&&<div className="ov" onClick={()=>setShowEx(false)}><div className="modal" onClick={e=>e.stopPropagation()}><h3>➕ Tarea extra</h3><div className="fg"><label>Descripción</label><input className="fi" value={newE.txt} onChange={e=>setNewE(v=>({...v,txt:e.target.value}))} placeholder="Ej: Limpiar jardín de invierno"/></div><div className="fg"><label>Zona</label><input className="fi" value={newE.zona} onChange={e=>setNewE(v=>({...v,zona:e.target.value}))} placeholder="Ej: Exterior"/></div><div className="mft"><button className="btn bg" onClick={()=>setShowEx(false)}>Cancelar</button><button className="btn bp" onClick={addExtra} disabled={saving}>Añadir</button></div></div></div>}
+
+    {/* MODAL NUEVO SERVICIO */}
+    {showNew&&<div className="ov" onClick={()=>setShowNew(false)}>
+      <div className="modal" onClick={e=>e.stopPropagation()}>
+        <h3>🧹 Nuevo servicio</h3>
+        <div className="fg"><label>Nombre *</label><input className="fi" value={newS.nombre} onChange={e=>setNewS(v=>({...v,nombre:e.target.value}))} placeholder="Ej: Limpieza post-boda García"/></div>
+        <div className="fg"><label>Fecha</label><input type="date" className="fi" value={newS.fecha} onChange={e=>setNewS(v=>({...v,fecha:e.target.value}))}/></div>
+        <div className="mft"><button className="btn bg" onClick={()=>setShowNew(false)}>Cancelar</button><button className="btn bp" onClick={crearSrv} disabled={saving}>Crear y notificar</button></div>
+      </div>
+    </div>}
+
+    {/* MODAL EXTRA */}
+    {showEx&&<div className="ov" onClick={()=>setShowEx(false)}>
+      <div className="modal" onClick={e=>e.stopPropagation()}>
+        <h3>➕ Tarea extra</h3>
+        <div className="fg"><label>Descripción</label><input className="fi" value={newE.txt} onChange={e=>setNewE(v=>({...v,txt:e.target.value}))} placeholder="Ej: Limpiar terraza exterior"/></div>
+        <div className="fg"><label>Zona</label><input className="fi" value={newE.zona} onChange={e=>setNewE(v=>({...v,zona:e.target.value}))} placeholder="Ej: Exterior"/></div>
+        <div className="mft"><button className="btn bg" onClick={()=>setShowEx(false)}>Cancelar</button><button className="btn bp" onClick={addExtra} disabled={saving}>Añadir</button></div>
+      </div>
+    </div>}
+
+    {/* NOTA INCIDENCIA */}
     {notaM&&<NotaModal nota={nota} setNota={setNota} foto={foto} setFoto={setFoto} onSave={saveNota} onClose={()=>setNotaM(null)} tok={tok}/>}
+
+    {/* MODAL VERIFICACIÓN FINAL */}
+    {showFinal&&!isA&&(
+      <div className="ov" style={{alignItems:"flex-end",padding:0}}>
+        <div style={{background:"#13161f",border:"1px solid rgba(201,168,76,.25)",borderRadius:"20px 20px 0 0",padding:"24px 20px 36px",width:"100%",maxWidth:540,maxHeight:"92vh",overflowY:"auto"}}>
+          <div style={{textAlign:"center",marginBottom:20}}>
+            <div style={{fontSize:36,marginBottom:8}}>🧹</div>
+            <div style={{fontFamily:"'Playfair Display',serif",fontSize:20,color:"#e8e6e1",marginBottom:4}}>¡Comprobación final!</div>
+            <div style={{fontSize:13,color:"#7a7f94"}}>Has completado todas las tareas. Verifica que la casa está perfecta antes de cerrar.</div>
+          </div>
+
+          {!finalMode&&(
+            <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:20}}>
+              <button className="btn bp" style={{width:"100%",justifyContent:"center",padding:"14px",fontSize:15}} onClick={()=>setFinalMode("ok")}>✅ Todo correcto — casa lista</button>
+              <button className="btn bg" style={{width:"100%",justifyContent:"center",padding:"14px",fontSize:15}} onClick={()=>setFinalMode("incidencia")}>⚠️ Hay incidencias — cerrar con nota</button>
+            </div>
+          )}
+
+          {finalMode==="ok"&&<>
+            <div style={{fontSize:12,color:"#c9a84c",fontWeight:600,marginBottom:12,textTransform:"uppercase",letterSpacing:1}}>✅ Marca cada punto antes de confirmar</div>
+            {LIMP_CF.map(item=>(
+              <div key={item.id} onClick={()=>setFinalCheck(prev=>({...prev,[item.id]:!prev[item.id]}))}
+                style={{display:"flex",alignItems:"center",gap:12,padding:"11px 12px",borderRadius:10,marginBottom:6,cursor:"pointer",background:finalCheck[item.id]?"rgba(16,185,129,.08)":"#0f1117",border:`1px solid ${finalCheck[item.id]?"rgba(16,185,129,.25)":"rgba(255,255,255,.06)"}`,transition:"all .15s"}}>
+                <div style={{width:24,height:24,borderRadius:6,flexShrink:0,background:finalCheck[item.id]?"#10b981":"transparent",border:`2px solid ${finalCheck[item.id]?"#10b981":"rgba(255,255,255,.2)"}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,color:"#fff",fontWeight:700}}>{finalCheck[item.id]?"✓":""}</div>
+                <span style={{fontSize:14,color:finalCheck[item.id]?"#10b981":"#c9c5b8"}}>{item.txt}</span>
+              </div>
+            ))}
+            <div style={{display:"flex",gap:8,marginTop:16}}>
+              <button className="btn bg" style={{flex:1,justifyContent:"center"}} onClick={()=>setFinalMode(null)}>← Volver</button>
+              <button className="btn bp" style={{flex:2,justifyContent:"center",padding:"12px",fontSize:15}} onClick={()=>guardarFinal("ok")} disabled={finalSaving}>{finalSaving?"Guardando…":"✅ Servicio terminado y verificado"}</button>
+            </div>
+          </>}
+
+          {finalMode==="incidencia"&&<>
+            <div style={{fontSize:13,color:"#f59e0b",fontWeight:600,marginBottom:10}}>⚠️ ¿Qué incidencia hay?</div>
+            <textarea className="fi" rows={4} value={finalNota} onChange={e=>setFinalNota(e.target.value)} placeholder="Ej: Falta reponer gel en baño principal, mancha en sofá…" style={{marginBottom:14,fontSize:14,lineHeight:1.5}}/>
+            <div style={{display:"flex",gap:8}}>
+              <button className="btn bg" style={{flex:1,justifyContent:"center"}} onClick={()=>setFinalMode(null)}>← Volver</button>
+              <button className="btn" style={{flex:2,justifyContent:"center",padding:"12px",fontSize:15,background:"#f59e0b",color:"#0f1117"}} onClick={()=>guardarFinal("incidencia")} disabled={finalSaving||!finalNota.trim()}>{finalSaving?"Guardando…":"⚠️ Cerrar con incidencias"}</button>
+            </div>
+          </>}
+
+          <button onClick={()=>setShowFinal(false)} style={{background:"none",border:"none",color:"#5a5e6e",cursor:"pointer",width:"100%",textAlign:"center",marginTop:16,fontSize:12,fontFamily:"'DM Sans',sans-serif",padding:"8px"}}>Cerrar y decidir más tarde</button>
+        </div>
+      </div>
+    )}
   </>;
 }
 
