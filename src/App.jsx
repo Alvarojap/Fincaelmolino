@@ -1608,13 +1608,14 @@ function NuevaReserva({perfil,tok,setPage}){
 // ─── VISITAS ─────────────────────────────────────────────────────────────────
 const TIPOS_EVENTO = ["Boda","Comunión","Bautizo","Cumpleaños","Aniversario","Empresa","Otro"];
 const ESTADOS_VISITA = {
-  pendiente:   {lbl:"Pendiente",    col:"#f59e0b"},
-  realizada:   {lbl:"Realizada",    col:"#10b981"},
-  convertida:  {lbl:"Reserva formalizada", col:"#6366f1"},
-  cancelada:   {lbl:"Cancelada",    col:"#e85555"},
+  pendiente:      {lbl:"Pendiente",          col:"#f59e0b"},
+  realizada:      {lbl:"Realizada",          col:"#10b981"},
+  convertida:     {lbl:"Reserva formalizada",col:"#6366f1"},
+  no_presentado:  {lbl:"No se presentó",     col:"#e85555"},
+  cancelada:      {lbl:"Cancelada",          col:"#6b7280"},
 };
 
-function Visitas({perfil,tok,rol,setPage}){
+function Visitas({perfil,tok,rol}){
   const isA=rol==="admin", isC=rol==="comercial";
   const puedeEditar=isA||isC;
   const hoy=new Date().toISOString().split("T")[0];
@@ -1625,11 +1626,13 @@ function Visitas({perfil,tok,rol,setPage}){
   const [showForm,setShowForm]=useState(false);
   const [sel,setSel]=useState(null);
   const [showConvertir,setShowConvertir]=useState(false);
+  const [showNoPresentado,setShowNoPresentado]=useState(false);
   const [saving,setSaving]=useState(false);
 
   const formVacio={nombre:"",fecha:hoy,hora:"10:00",tipo_evento:"Boda",invitados:"",telefono:"",email:"",nota:""};
   const [form,setForm]=useState(formVacio);
-  const [formRes,setFormRes]=useState({precio:"",contacto:"",obs:"",estado:"visita"});
+  // formRes ahora incluye fecha_evento
+  const [formRes,setFormRes]=useState({fecha_evento:"",precio:"",contacto:"",invitados:"",obs:"",estado:"visita"});
 
   const load_=async()=>{
     try{
@@ -1640,8 +1643,8 @@ function Visitas({perfil,tok,rol,setPage}){
   };
   useEffect(()=>{load_();},[]);
 
-  const proximas=visitas.filter(v=>v.fecha>=hoy&&v.estado!=="cancelada");
-  const anteriores=visitas.filter(v=>v.fecha<hoy||v.estado==="cancelada"||v.estado==="convertida");
+  const proximas=visitas.filter(v=>v.estado==="pendiente");
+  const anteriores=visitas.filter(v=>v.estado!=="pendiente");
 
   const crearVisita=async()=>{
     if(!form.nombre||!form.fecha||!form.hora||saving)return;
@@ -1658,10 +1661,40 @@ function Visitas({perfil,tok,rol,setPage}){
     setSaving(false);
   };
 
-  const marcarRealizada=async(v)=>{
-    await sbPatch("visitas",`id=eq.${v.id}`,{estado:"realizada"},tok);
-    setSel(prev=>prev?{...prev,estado:"realizada"}:prev);
+  const marcarRealizada=async()=>{
+    if(!sel)return;
+    await sbPatch("visitas",`id=eq.${sel.id}`,{estado:"realizada"},tok);
+    setSel(prev=>({...prev,estado:"realizada"}));
     await load_();
+  };
+
+  const marcarNoPresentado=async(accion)=>{
+    if(!sel||saving)return;
+    setSaving(true);
+    try{
+      await sbPatch("visitas",`id=eq.${sel.id}`,{estado:"no_presentado"},tok);
+      setSel(prev=>({...prev,estado:"no_presentado"}));
+      setShowNoPresentado(false);
+      if(accion==="reprogramar"){
+        // Abrir formulario nueva visita con datos precargados
+        setForm({
+          nombre:sel.nombre,
+          fecha:hoy,
+          hora:sel.hora?.slice(0,5)||"10:00",
+          tipo_evento:sel.tipo_evento||"Boda",
+          invitados:sel.invitados||"",
+          telefono:sel.telefono||"",
+          email:sel.email||"",
+          nota:sel.nota||"",
+        });
+        setSel(null);
+        setShowForm(true);
+      }else{
+        setSel(null);
+      }
+      await load_();
+    }catch(_){}
+    setSaving(false);
   };
 
   const guardarNota=async(v,nota)=>{
@@ -1670,22 +1703,32 @@ function Visitas({perfil,tok,rol,setPage}){
     await load_();
   };
 
+  const abrirConvertir=()=>{
+    setFormRes({
+      fecha_evento:"",
+      precio:"",
+      contacto:sel.telefono||"",
+      invitados:sel.invitados||"",
+      obs:sel.nota||"",
+      estado:"visita",
+    });
+    setShowConvertir(true);
+  };
+
   const convertirEnReserva=async()=>{
-    if(!sel||saving)return;
+    if(!sel||saving||!formRes.fecha_evento)return;
     setSaving(true);
     try{
-      // Crear reserva
       const [res]=await sbPost("reservas",{
         nombre:sel.nombre,
-        fecha:sel.fecha,
-        tipo:sel.tipo_evento,
+        fecha:formRes.fecha_evento,
+        tipo:sel.tipo_evento||"Boda",
         precio:parseFloat(formRes.precio)||0,
-        contacto:formRes.contacto||sel.telefono||"",
-        obs:formRes.obs||sel.nota||"",
+        contacto:formRes.contacto||"",
+        obs:formRes.obs||"",
         estado:formRes.estado||"visita",
         creado_por:perfil.id,
       },tok);
-      // Marcar visita como convertida
       await sbPatch("visitas",`id=eq.${sel.id}`,{
         estado:"convertida",
         reserva_id:res.id,
@@ -1728,7 +1771,7 @@ function Visitas({perfil,tok,rol,setPage}){
               <div style={{display:"flex",gap:6,marginTop:6,flexWrap:"wrap"}}>
                 <span className="badge" style={{background:`${est.col}18`,color:est.col,border:`1px solid ${est.col}30`}}>{est.lbl}</span>
                 {v.tipo_evento&&<span className="badge" style={{background:"rgba(201,168,76,.1)",color:"#c9a84c"}}>🎉 {v.tipo_evento}</span>}
-                {v.invitados&&<span className="badge" style={{background:"rgba(255,255,255,.06)",color:"#7a7f94"}}>👥 {v.invitados} invitados</span>}
+                {v.invitados&&<span className="badge" style={{background:"rgba(255,255,255,.06)",color:"#7a7f94"}}>👥 {v.invitados} inv.</span>}
               </div>
             </div>
             <span style={{color:"#5a5e6e",fontSize:22,flexShrink:0}}>›</span>
@@ -1744,7 +1787,7 @@ function Visitas({perfil,tok,rol,setPage}){
         <h3>📅 Nueva visita</h3>
         <div className="fg"><label>Nombre pareja / cliente *</label><input className="fi" value={form.nombre} onChange={e=>setForm(v=>({...v,nombre:e.target.value}))} placeholder="Ej: Laura y Antonio García"/></div>
         <div className="g2">
-          <div className="fg"><label>Fecha *</label><input type="date" className="fi" value={form.fecha} onChange={e=>setForm(v=>({...v,fecha:e.target.value}))}/></div>
+          <div className="fg"><label>Fecha visita *</label><input type="date" className="fi" value={form.fecha} onChange={e=>setForm(v=>({...v,fecha:e.target.value}))}/></div>
           <div className="fg"><label>Hora *</label><input type="time" className="fi" value={form.hora} onChange={e=>setForm(v=>({...v,hora:e.target.value}))}/></div>
         </div>
         <div className="g2">
@@ -1761,7 +1804,7 @@ function Visitas({perfil,tok,rol,setPage}){
     </div>}
 
     {/* MODAL DETALLE VISITA */}
-    {sel&&!showConvertir&&<div className="ov" onClick={()=>setSel(null)}>
+    {sel&&!showConvertir&&!showNoPresentado&&<div className="ov" onClick={()=>setSel(null)}>
       <div className="modal" style={{maxWidth:560}} onClick={e=>e.stopPropagation()}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:16,gap:8}}>
           <div style={{minWidth:0}}>
@@ -1773,7 +1816,7 @@ function Visitas({perfil,tok,rol,setPage}){
 
         <div className="g2" style={{marginBottom:14}}>
           {[
-            {l:"FECHA",v:new Date(sel.fecha+"T12:00:00").toLocaleDateString("es-ES",{weekday:"long",day:"numeric",month:"long",year:"numeric"})},
+            {l:"FECHA VISITA",v:new Date(sel.fecha+"T12:00:00").toLocaleDateString("es-ES",{weekday:"long",day:"numeric",month:"long",year:"numeric"})},
             {l:"HORA",v:sel.hora?.slice(0,5)},
             {l:"TIPO",v:sel.tipo_evento},
             {l:"INVITADOS",v:sel.invitados?`${sel.invitados} personas`:null},
@@ -1785,19 +1828,21 @@ function Visitas({perfil,tok,rol,setPage}){
           </div>)}
         </div>
 
-        {/* Nota / Observaciones */}
-        <NotaVisita sel={sel} onGuardar={guardarNota} tok={tok} puedeEditar={puedeEditar}/>
+        <NotaVisita sel={sel} onGuardar={guardarNota} puedeEditar={puedeEditar}/>
 
-        {/* Acciones */}
+        {/* ACCIONES según estado */}
         {puedeEditar&&sel.estado==="pendiente"&&(
-          <div style={{display:"flex",gap:8,marginTop:16,paddingTop:14,borderTop:"1px solid rgba(255,255,255,.06)"}}>
-            <button className="btn bg" style={{flex:1,justifyContent:"center"}} onClick={()=>marcarRealizada(sel)}>✅ Marcar realizada</button>
-            <button className="btn bp" style={{flex:1,justifyContent:"center"}} onClick={()=>{setFormRes({precio:"",contacto:sel.telefono||"",obs:sel.nota||"",estado:"visita"});setShowConvertir(true);}}>🔄 Convertir en reserva</button>
+          <div style={{display:"flex",flexDirection:"column",gap:8,marginTop:16,paddingTop:14,borderTop:"1px solid rgba(255,255,255,.06)"}}>
+            <div style={{display:"flex",gap:8}}>
+              <button className="btn bg" style={{flex:1,justifyContent:"center"}} onClick={marcarRealizada}>✅ Marcar realizada</button>
+              <button className="btn bp" style={{flex:1,justifyContent:"center"}} onClick={abrirConvertir}>🔄 Convertir en reserva</button>
+            </div>
+            <button className="btn br" style={{width:"100%",justifyContent:"center"}} onClick={()=>setShowNoPresentado(true)}>❌ No se ha presentado</button>
           </div>
         )}
         {puedeEditar&&sel.estado==="realizada"&&(
           <div style={{marginTop:16,paddingTop:14,borderTop:"1px solid rgba(255,255,255,.06)"}}>
-            <button className="btn bp" style={{width:"100%",justifyContent:"center"}} onClick={()=>{setFormRes({precio:"",contacto:sel.telefono||"",obs:sel.nota||"",estado:"visita"});setShowConvertir(true);}}>🔄 Convertir en reserva</button>
+            <button className="btn bp" style={{width:"100%",justifyContent:"center"}} onClick={abrirConvertir}>🔄 Convertir en reserva</button>
           </div>
         )}
         {sel.estado==="convertida"&&(
@@ -1805,50 +1850,79 @@ function Visitas({perfil,tok,rol,setPage}){
             ✅ Esta visita ya fue convertida en reserva
           </div>
         )}
+        {sel.estado==="no_presentado"&&(
+          <div style={{marginTop:16,padding:"12px 14px",background:"rgba(232,85,85,.08)",border:"1px solid rgba(232,85,85,.2)",borderRadius:10,fontSize:13,color:"#e85555",textAlign:"center"}}>
+            ❌ El cliente no se presentó a esta visita
+          </div>
+        )}
         {sel.creado_por&&<div style={{marginTop:12,fontSize:11,color:"#3d4155",textAlign:"right"}}>Creada por {sel.creado_por}</div>}
+      </div>
+    </div>}
+
+    {/* MODAL NO SE PRESENTÓ */}
+    {sel&&showNoPresentado&&<div className="ov" onClick={()=>setShowNoPresentado(false)}>
+      <div className="modal" style={{maxWidth:420}} onClick={e=>e.stopPropagation()}>
+        <h3>❌ No se presentó</h3>
+        <p style={{fontSize:13,color:"#7a7f94",marginBottom:20,lineHeight:1.6}}>
+          <strong style={{color:"#e8e6e1"}}>{sel.nombre}</strong> no se ha presentado a la visita del {new Date(sel.fecha+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"long"})} a las {sel.hora?.slice(0,5)||"—"}.<br/><br/>
+          ¿Qué deseas hacer?
+        </p>
+        <div style={{display:"flex",flexDirection:"column",gap:10}}>
+          <button className="btn bp" style={{width:"100%",justifyContent:"center",padding:"14px",fontSize:14}} onClick={()=>marcarNoPresentado("reprogramar")} disabled={saving}>
+            📅 Marcar como no presentado y programar nueva visita
+          </button>
+          <button className="btn br" style={{width:"100%",justifyContent:"center",padding:"14px",fontSize:14}} onClick={()=>marcarNoPresentado("cancelar")} disabled={saving}>
+            🗑 Marcar como no presentado y cancelar
+          </button>
+        </div>
+        <button className="btn bg" style={{width:"100%",justifyContent:"center",marginTop:10}} onClick={()=>setShowNoPresentado(false)}>Volver</button>
       </div>
     </div>}
 
     {/* MODAL CONVERTIR EN RESERVA */}
     {sel&&showConvertir&&<div className="ov" onClick={()=>setShowConvertir(false)}>
       <div className="modal" style={{maxWidth:500}} onClick={e=>e.stopPropagation()}>
-        <h3>🔄 Convertir en reserva</h3>
-        <div style={{background:"rgba(201,168,76,.06)",border:"1px solid rgba(201,168,76,.15)",borderRadius:10,padding:"12px 14px",marginBottom:18,fontSize:13,color:"#c9a84c"}}>
-          Se creará una reserva para <strong>{sel.nombre}</strong> el {new Date(sel.fecha+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"long",year:"numeric"})}.
+        <h3>🔄 Formalizar reserva</h3>
+        <div style={{background:"rgba(201,168,76,.06)",border:"1px solid rgba(201,168,76,.15)",borderRadius:10,padding:"12px 14px",marginBottom:18}}>
+          <div style={{fontSize:13,color:"#c9a84c",fontWeight:600,marginBottom:2}}>{sel.nombre}</div>
+          <div style={{fontSize:12,color:"#7a7f94"}}>🎉 {sel.tipo_evento} · 👥 {sel.invitados||"—"} invitados</div>
+        </div>
+        <div className="fg">
+          <label>📅 Fecha del evento * <span style={{color:"#e85555"}}>(día de la boda/evento, no de la visita)</span></label>
+          <input type="date" className="fi" value={formRes.fecha_evento} onChange={e=>setFormRes(v=>({...v,fecha_evento:e.target.value}))}/>
         </div>
         <div className="g2">
           <div className="fg"><label>Precio (€)</label><input type="number" inputMode="numeric" className="fi" value={formRes.precio} onChange={e=>setFormRes(v=>({...v,precio:e.target.value}))} placeholder="0"/></div>
           <div className="fg"><label>Contacto</label><input className="fi" type="tel" value={formRes.contacto} onChange={e=>setFormRes(v=>({...v,contacto:e.target.value}))} placeholder="600 000 000"/></div>
         </div>
-        <div className="fg"><label>Estado inicial</label>
+        <div className="fg"><label>Estado inicial de la reserva</label>
           <select className="fi" value={formRes.estado} onChange={e=>setFormRes(v=>({...v,estado:e.target.value}))}>
             {ESTADOS.map(e=><option key={e.id} value={e.id}>{e.lbl}</option>)}
           </select>
         </div>
         <div className="fg"><label>Observaciones</label><textarea className="fi" rows={3} value={formRes.obs} onChange={e=>setFormRes(v=>({...v,obs:e.target.value}))} placeholder="Notas para la reserva…"/></div>
+        {!formRes.fecha_evento&&<div style={{fontSize:12,color:"#e85555",marginBottom:10}}>⚠️ La fecha del evento es obligatoria</div>}
         <div className="mft">
           <button className="btn bg" onClick={()=>setShowConvertir(false)}>Cancelar</button>
-          <button className="btn bp" onClick={convertirEnReserva} disabled={saving}>{saving?"Creando…":"✅ Crear reserva"}</button>
+          <button className="btn bp" onClick={convertirEnReserva} disabled={saving||!formRes.fecha_evento}>{saving?"Creando…":"✅ Crear reserva"}</button>
         </div>
       </div>
     </div>}
   </>;
 }
 
-// Subcomponente nota editable dentro del detalle de visita
-function NotaVisita({sel,onGuardar,tok,puedeEditar}){
+// Subcomponente nota editable
+function NotaVisita({sel,onGuardar,puedeEditar}){
   const [editando,setEditando]=useState(false);
   const [txt,setTxt]=useState(sel.nota||"");
   const [saving,setSaving]=useState(false);
-
   const guardar=async()=>{
     setSaving(true);
     await onGuardar(sel,txt);
     setSaving(false);setEditando(false);
   };
-
-  return <div>
-    <div style={{fontSize:10,color:"#5a5e6e",textTransform:"uppercase",letterSpacing:.8,marginBottom:8}}>Observaciones / Nota</div>
+  return <div style={{marginBottom:4}}>
+    <div style={{fontSize:10,color:"#5a5e6e",textTransform:"uppercase",letterSpacing:.8,marginBottom:8}}>Observaciones / Nota comercial</div>
     {editando?(
       <>
         <textarea className="fi" rows={4} value={txt} onChange={e=>setTxt(e.target.value)} placeholder="Ej: Les ha encantado la finca, piden presupuesto esta semana…" style={{marginBottom:8}}/>
@@ -1860,7 +1934,7 @@ function NotaVisita({sel,onGuardar,tok,puedeEditar}){
     ):(
       <div style={{background:"#0f1117",borderRadius:8,padding:"10px 12px",minHeight:52,position:"relative"}}>
         {sel.nota
-          ?<div style={{fontSize:13,color:"#c9c5b8",lineHeight:1.5}}>{sel.nota}</div>
+          ?<div style={{fontSize:13,color:"#c9c5b8",lineHeight:1.5,paddingRight:80}}>{sel.nota}</div>
           :<div style={{fontSize:13,color:"#3d4155",fontStyle:"italic"}}>Sin observaciones todavía…</div>}
         {puedeEditar&&<button className="btn bg sm" style={{position:"absolute",top:8,right:8}} onClick={()=>setEditando(true)}>{sel.nota?"✏️":"➕ Añadir"}</button>}
       </div>
