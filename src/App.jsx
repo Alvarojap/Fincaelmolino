@@ -499,7 +499,7 @@ export default function App() {
     limpieza:    <Limpieza    {...P}/>,
     "cal-limp":  <CalLimpieza {...P}/>,
     calendario:  <Calendario  {...P}/>,
-    reservas:    <Reservas    {...P}/>,
+    reservas:    <Reservas    {...P} perfil={perfil}/>,
     "nueva-res": <NuevaReserva {...P}/>,
     visitas:     <Visitas     {...P}/>,
     chat:        <Chat        {...P}/>,
@@ -1544,36 +1544,229 @@ function CalBase({tok,simple=false}){
 function Calendario({tok}){return <><div className="ph"><h2>Calendario de reservas</h2></div><div className="pb" style={{maxWidth:900}}><CalBase tok={tok}/></div></>;}
 function CalLimpieza({tok}){return <><div className="ph"><h2>Calendario</h2><p>Organiza tu servicio según los eventos</p></div><div className="pb" style={{maxWidth:900}}><CalBase tok={tok} simple/></div></>;}
 
+// ─── HELPERS HISTORIAL Y DOCS ────────────────────────────────────────────────
+async function addHistorial(entidad_tipo, entidad_id, texto, creado_por, tok, tipo="auto"){
+  try{await sbPost("historial",{entidad_tipo,entidad_id,texto,tipo,creado_por},tok);}catch(_){}
+}
+async function uploadDoc(file, tok){
+  const ext=file.name.split(".").pop();
+  const path=`${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+  const r=await fetch(`${SB_URL}/storage/v1/object/documentos/${path}`,{
+    method:"POST",headers:{"apikey":SB_KEY,"Authorization":`Bearer ${tok}`,"Content-Type":file.type},body:file
+  });
+  if(!r.ok)throw new Error(await r.text());
+  return {url:`${SB_URL}/storage/v1/object/public/documentos/${path}`,nombre:file.name,tipo_archivo:file.type};
+}
+
+// ─── HISTORIAL COMPONENT ──────────────────────────────────────────────────────
+function Historial({entidad_tipo,entidad_id,tok,perfil}){
+  const [items,setItems]=useState([]);
+  const [open,setOpen]=useState(false);
+  const [nota,setNota]=useState("");
+  const [saving,setSaving]=useState(false);
+  const [load,setLoad]=useState(false);
+
+  const cargar=async()=>{
+    setLoad(true);
+    try{
+      const h=await sbGet("historial",`?entidad_tipo=eq.${entidad_tipo}&entidad_id=eq.${entidad_id}&order=created_at.asc`,tok);
+      setItems(h);
+    }catch(_){}
+    setLoad(false);
+  };
+
+  useEffect(()=>{if(open)cargar();},[open]);
+
+  const addNota=async()=>{
+    if(!nota.trim()||saving)return;
+    setSaving(true);
+    await addHistorial(entidad_tipo,entidad_id,nota.trim(),perfil.nombre,tok,"manual");
+    setNota("");await cargar();setSaving(false);
+  };
+
+  const iconTipo=(txt)=>{
+    if(txt.includes("creada")||txt.includes("registrada"))return "✨";
+    if(txt.includes("realizada"))return "✅";
+    if(txt.includes("reserva"))return "📋";
+    if(txt.includes("cancelad"))return "❌";
+    if(txt.includes("presentó"))return "🚫";
+    if(txt.includes("contrato")||txt.includes("firmado"))return "✍️";
+    if(txt.includes("pago")||txt.includes("pagado"))return "💰";
+    return "📝";
+  };
+
+  return <div style={{marginTop:16,borderTop:"1px solid rgba(255,255,255,.06)",paddingTop:14}}>
+    <button onClick={()=>setOpen(!open)} style={{background:"none",border:"none",cursor:"pointer",color:"#7a7f94",fontSize:13,display:"flex",alignItems:"center",gap:6,padding:0,fontFamily:"'DM Sans',sans-serif",width:"100%",justifyContent:"space-between"}}>
+      <span>📋 Historial de movimientos</span>
+      <span style={{transition:"transform .2s",transform:open?"rotate(90deg)":"none",fontSize:16}}>›</span>
+    </button>
+    {open&&<div style={{marginTop:12}}>
+      {load?<div style={{color:"#5a5e6e",fontSize:13,padding:"8px 0"}}>Cargando…</div>
+        :items.length===0?<div style={{color:"#3d4155",fontSize:13,padding:"8px 0",fontStyle:"italic"}}>Sin movimientos registrados</div>
+        :<div style={{position:"relative",paddingLeft:20}}>
+          <div style={{position:"absolute",left:7,top:0,bottom:0,width:1,background:"rgba(255,255,255,.08)"}}/>
+          {items.map((h,i)=>(
+            <div key={h.id} style={{position:"relative",marginBottom:12}}>
+              <div style={{position:"absolute",left:-20,top:2,width:14,height:14,borderRadius:"50%",background:h.tipo==="manual"?"#c9a84c":"#3d4155",border:"2px solid #0f1117",display:"flex",alignItems:"center",justifyContent:"center",fontSize:8}}/>
+              <div style={{fontSize:12,color:h.tipo==="manual"?"#c9c5b8":"#7a7f94",lineHeight:1.4}}>{iconTipo(h.texto)} {h.texto}</div>
+              <div style={{fontSize:10,color:"#3d4155",marginTop:2}}>{fmtDT(h.created_at)}{h.creado_por&&` · ${h.creado_por}`}</div>
+            </div>
+          ))}
+        </div>}
+      <div style={{marginTop:10,display:"flex",gap:6}}>
+        <input className="fi" value={nota} onChange={e=>setNota(e.target.value)} placeholder="Añadir nota manual…" style={{fontSize:12,padding:"7px 10px"}} onKeyDown={e=>e.key==="Enter"&&addNota()}/>
+        <button className="btn bp sm" onClick={addNota} disabled={saving||!nota.trim()}>+</button>
+      </div>
+    </div>}
+  </div>;
+}
+
+// ─── DOCUMENTOS COMPONENT ────────────────────────────────────────────────────
+function Documentos({entidad_tipo,entidad_id,tok,perfil}){
+  const [docs,setDocs]=useState([]);
+  const [open,setOpen]=useState(false);
+  const [uploading,setUploading]=useState(false);
+  const [load,setLoad]=useState(false);
+
+  const cargar=async()=>{
+    setLoad(true);
+    try{
+      const d=await sbGet("documentos",`?entidad_tipo=eq.${entidad_tipo}&entidad_id=eq.${entidad_id}&order=created_at.desc`,tok);
+      setDocs(d);
+    }catch(_){}
+    setLoad(false);
+  };
+
+  useEffect(()=>{if(open)cargar();},[open]);
+
+  const subir=async(e)=>{
+    const files=Array.from(e.target.files);
+    if(!files.length)return;
+    setUploading(true);
+    for(const file of files){
+      try{
+        const {url,nombre,tipo_archivo}=await uploadDoc(file,tok);
+        await sbPost("documentos",{entidad_tipo,entidad_id,nombre,url,tipo_archivo,subido_por:perfil.nombre},tok);
+      }catch(_){}
+    }
+    await cargar();
+    setUploading(false);
+    e.target.value="";
+  };
+
+  const eliminar=async(doc)=>{
+    if(!window.confirm(`¿Eliminar "${doc.nombre}"?`))return;
+    await sbDelete("documentos",`id=eq.${doc.id}`,tok);
+    setDocs(prev=>prev.filter(d=>d.id!==doc.id));
+  };
+
+  const icono=(tipo)=>{
+    if(!tipo)return "📄";
+    if(tipo.includes("pdf"))return "📑";
+    if(tipo.includes("image"))return "🖼️";
+    if(tipo.includes("word")||tipo.includes("document"))return "📝";
+    if(tipo.includes("sheet")||tipo.includes("excel"))return "📊";
+    return "📄";
+  };
+
+  return <div style={{marginTop:16,borderTop:"1px solid rgba(255,255,255,.06)",paddingTop:14}}>
+    <button onClick={()=>setOpen(!open)} style={{background:"none",border:"none",cursor:"pointer",color:"#7a7f94",fontSize:13,display:"flex",alignItems:"center",gap:6,padding:0,fontFamily:"'DM Sans',sans-serif",width:"100%",justifyContent:"space-between"}}>
+      <span>📁 Documentos {docs.length>0&&!open?`(${docs.length})`:""}</span>
+      <span style={{transition:"transform .2s",transform:open?"rotate(90deg)":"none",fontSize:16}}>›</span>
+    </button>
+    {open&&<div style={{marginTop:12}}>
+      {load?<div style={{color:"#5a5e6e",fontSize:13}}>Cargando…</div>
+        :docs.length===0?<div style={{color:"#3d4155",fontSize:13,fontStyle:"italic",marginBottom:10}}>Sin documentos adjuntos</div>
+        :<div style={{marginBottom:10}}>
+          {docs.map(doc=>(
+            <div key={doc.id} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",background:"#0f1117",borderRadius:8,marginBottom:6}}>
+              <span style={{fontSize:18,flexShrink:0}}>{icono(doc.tipo_archivo)}</span>
+              <div style={{flex:1,minWidth:0}}>
+                <a href={doc.url} target="_blank" rel="noreferrer" style={{fontSize:13,color:"#c9a84c",textDecoration:"none",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",display:"block"}}>{doc.nombre}</a>
+                <div style={{fontSize:10,color:"#3d4155"}}>{doc.subido_por} · {fmtDT(doc.created_at)}</div>
+              </div>
+              <button onClick={()=>eliminar(doc)} style={{background:"none",border:"none",color:"#5a5e6e",cursor:"pointer",fontSize:16,padding:4,flexShrink:0}}>🗑</button>
+            </div>
+          ))}
+        </div>}
+      <label className="pbtn" style={{fontSize:13,padding:"9px 14px"}}>
+        {uploading?"⏳ Subiendo…":"📎 Adjuntar documento"}
+        <input type="file" multiple style={{display:"none"}} onChange={subir} disabled={uploading}/>
+      </label>
+    </div>}
+  </div>;
+}
+
 // ─── RESERVAS ────────────────────────────────────────────────────────────────
-function Reservas({tok,rol}){
-  const isA=rol==="admin";const [reservas,setReservas]=useState([]);const [filtro,setFiltro]=useState("todas");const [sel,setSel]=useState(null);const [load,setLoad]=useState(true);
-  const load_=async()=>{const r=await sbGet("reservas","?select=*&order=fecha.desc",tok);setReservas(r);setLoad(false);};
+function Reservas({tok,rol,perfil}){
+  const isA=rol==="admin";
+  const [reservas,setReservas]=useState([]);
+  const [filtro,setFiltro]=useState("todas");
+  const [sel,setSel]=useState(null);
+  const [load,setLoad]=useState(true);
+
+  const load_=async()=>{
+    const r=await sbGet("reservas","?select=*&order=fecha.desc",tok);
+    setReservas(r);setLoad(false);
+  };
   useEffect(()=>{load_();},[]);
-  const cambiarE=async(id,e)=>{await sbPatch("reservas",`id=eq.${id}`,{estado:e,updated_at:new Date().toISOString()},tok);setReservas(prev=>prev.map(r=>r.id===id?{...r,estado:e}:r));setSel(p=>p?.id===id?{...p,estado:e}:p);};
-  const del=async id=>{await sbDelete("reservas",`id=eq.${id}`,tok);setReservas(prev=>prev.filter(r=>r.id!==id));setSel(null);};
+
+  const cambiarE=async(id,e)=>{
+    const prev=reservas.find(r=>r.id===id);
+    await sbPatch("reservas",`id=eq.${id}`,{estado:e,updated_at:new Date().toISOString()},tok);
+    const est=ESTADOS.find(s=>s.id===e);
+    await addHistorial("reserva",id,`Estado cambiado a: ${est?.lbl||e}`,perfil?.nombre||"Admin",tok);
+    setReservas(prev2=>prev2.map(r=>r.id===id?{...r,estado:e}:r));
+    setSel(p=>p?.id===id?{...p,estado:e}:p);
+  };
+
+  const del=async id=>{
+    await sbDelete("reservas",`id=eq.${id}`,tok);
+    setReservas(prev=>prev.filter(r=>r.id!==id));
+    setSel(null);
+  };
+
   if(load)return <div className="loading"><div className="spin"/><span>Cargando…</span></div>;
   const lista=reservas.filter(r=>filtro==="todas"||r.estado===filtro);
+
   return <>
     <div className="ph"><h2>Reservas</h2><p>{reservas.length} registradas</p></div>
     <div className="pb">
-      <div className="tabs"><button className={`tab${filtro==="todas"?" on":""}`} onClick={()=>setFiltro("todas")}>Todas</button>{ESTADOS.map(e=><button key={e.id} className={`tab${filtro===e.id?" on":""}`} onClick={()=>setFiltro(e.id)}>{e.lbl}</button>)}</div>
+      <div className="tabs">
+        <button className={`tab${filtro==="todas"?" on":""}`} onClick={()=>setFiltro("todas")}>Todas</button>
+        {ESTADOS.map(e=><button key={e.id} className={`tab${filtro===e.id?" on":""}`} onClick={()=>setFiltro(e.id)}>{e.lbl}</button>)}
+      </div>
       <div className="g2" style={{alignItems:"flex-start"}}>
-        <div>{lista.length===0?<div className="empty"><span className="ico">📋</span><p>Sin reservas</p></div>:lista.map(r=>{const est=ESTADOS.find(e=>e.id===r.estado);return <div key={r.id} className="rc" style={{borderLeftColor:est?.col}} onClick={()=>setSel(r)}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10}}>
-            <div style={{minWidth:0}}><div style={{fontSize:14,fontWeight:600,color:"#e8e6e1",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.nombre}</div><div style={{fontSize:11,color:"#7a7f94",marginTop:3}}>📅 {new Date(r.fecha).toLocaleDateString("es-ES",{weekday:"long",day:"numeric",month:"long",year:"numeric"})}</div>{r.tipo&&<div style={{fontSize:11,color:"#5a5e6e"}}>🎉 {r.tipo}</div>}</div>
-            <div style={{textAlign:"right",flexShrink:0}}><div style={{fontSize:16,fontWeight:700,color:"#c9a84c"}}>{parseFloat(r.precio||0).toLocaleString("es-ES")}€</div>{est&&<span className="badge" style={{background:`${est.col}18`,color:est.col,border:`1px solid ${est.col}30`,display:"inline-block",marginTop:3}}>{est.lbl}</span>}</div>
-          </div>
-        </div>;})}
+        <div>
+          {lista.length===0?<div className="empty"><span className="ico">📋</span><p>Sin reservas</p></div>
+            :lista.map(r=>{const est=ESTADOS.find(e=>e.id===r.estado);return <div key={r.id} className="rc" style={{borderLeftColor:est?.col}} onClick={()=>setSel(r)}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10}}>
+                <div style={{minWidth:0}}><div style={{fontSize:14,fontWeight:600,color:"#e8e6e1",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.nombre}</div><div style={{fontSize:11,color:"#7a7f94",marginTop:3}}>📅 {new Date(r.fecha).toLocaleDateString("es-ES",{weekday:"long",day:"numeric",month:"long",year:"numeric"})}</div>{r.tipo&&<div style={{fontSize:11,color:"#5a5e6e"}}>🎉 {r.tipo}</div>}</div>
+                <div style={{textAlign:"right",flexShrink:0}}><div style={{fontSize:16,fontWeight:700,color:"#c9a84c"}}>{parseFloat(r.precio||0).toLocaleString("es-ES")}€</div>{est&&<span className="badge" style={{background:`${est.col}18`,color:est.col,border:`1px solid ${est.col}30`,display:"inline-block",marginTop:3}}>{est.lbl}</span>}</div>
+              </div>
+            </div>;})}
         </div>
         {sel&&<div className="card" style={{position:"sticky",top:20}}>
-          <div style={{display:"flex",justifyContent:"space-between",marginBottom:16,gap:8}}><div style={{minWidth:0}}><div style={{fontSize:18,fontWeight:700,color:"#e8e6e1",fontFamily:"'Playfair Display',serif"}}>{sel.nombre}</div><SBadge e={sel.estado}/></div><button className="btn bg sm" style={{flexShrink:0}} onClick={()=>setSel(null)}>✕</button></div>
-          <div className="g2" style={{marginBottom:14}}>{[{l:"FECHA",v:new Date(sel.fecha).toLocaleDateString("es-ES",{day:"numeric",month:"long",year:"numeric"})},{l:"PRECIO",v:`${parseFloat(sel.precio||0).toLocaleString("es-ES")}€`,gold:true},{l:"TIPO",v:sel.tipo},{l:"CONTACTO",v:sel.contacto}].filter(x=>x.v).map(x=><div key={x.l} style={{background:"#0f1117",borderRadius:8,padding:11}}><div style={{fontSize:10,color:"#5a5e6e"}}>{x.l}</div><div style={{fontSize:x.gold?16:12,fontWeight:x.gold?700:400,color:x.gold?"#c9a84c":"#e8e6e1",marginTop:3}}>{x.v}</div></div>)}</div>
+          <div style={{display:"flex",justifyContent:"space-between",marginBottom:16,gap:8}}>
+            <div style={{minWidth:0}}><div style={{fontSize:18,fontWeight:700,color:"#e8e6e1",fontFamily:"'Playfair Display',serif"}}>{sel.nombre}</div><SBadge e={sel.estado}/></div>
+            <button className="btn bg sm" style={{flexShrink:0}} onClick={()=>setSel(null)}>✕</button>
+          </div>
+          <div className="g2" style={{marginBottom:14}}>
+            {[{l:"FECHA",v:new Date(sel.fecha).toLocaleDateString("es-ES",{day:"numeric",month:"long",year:"numeric"})},{l:"PRECIO",v:`${parseFloat(sel.precio||0).toLocaleString("es-ES")}€`,gold:true},{l:"TIPO",v:sel.tipo},{l:"CONTACTO",v:sel.contacto}].filter(x=>x.v).map(x=><div key={x.l} style={{background:"#0f1117",borderRadius:8,padding:11}}><div style={{fontSize:10,color:"#5a5e6e"}}>{x.l}</div><div style={{fontSize:x.gold?16:12,fontWeight:x.gold?700:400,color:x.gold?"#c9a84c":"#e8e6e1",marginTop:3}}>{x.v}</div></div>)}
+          </div>
           {sel.obs&&<div style={{background:"#0f1117",borderRadius:8,padding:11,marginBottom:14}}><div style={{fontSize:10,color:"#5a5e6e",marginBottom:5}}>OBSERVACIONES</div><div style={{fontSize:12,color:"#c9c5b8",lineHeight:1.5}}>{sel.obs}</div></div>}
           {isA&&<><hr className="div"/>
             <div style={{fontSize:10,color:"#5a5e6e",marginBottom:9,textTransform:"uppercase",letterSpacing:1}}>Cambiar estado</div>
-            <div style={{display:"flex",flexDirection:"column",gap:5}}>{ESTADOS.map(e=><button key={e.id} className="btn bg" style={{justifyContent:"flex-start",borderColor:sel.estado===e.id?e.col:undefined,color:sel.estado===e.id?e.col:undefined}} onClick={()=>cambiarE(sel.id,e.id)}><span style={{width:7,height:7,borderRadius:"50%",background:e.col,display:"inline-block",flexShrink:0}}/>{e.lbl}{sel.estado===e.id?" ✓":""}</button>)}</div>
-            <hr className="div"/><button className="btn br" style={{width:"100%",justifyContent:"center"}} onClick={()=>del(sel.id)}>🗑 Eliminar reserva</button>
+            <div style={{display:"flex",flexDirection:"column",gap:5}}>
+              {ESTADOS.map(e=><button key={e.id} className="btn bg" style={{justifyContent:"flex-start",borderColor:sel.estado===e.id?e.col:undefined,color:sel.estado===e.id?e.col:undefined}} onClick={()=>cambiarE(sel.id,e.id)}>
+                <span style={{width:7,height:7,borderRadius:"50%",background:e.col,display:"inline-block",flexShrink:0}}/>{e.lbl}{sel.estado===e.id?" ✓":""}
+              </button>)}
+            </div>
+            <hr className="div"/>
+            <button className="btn br" style={{width:"100%",justifyContent:"center"}} onClick={()=>del(sel.id)}>🗑 Eliminar reserva</button>
           </>}
+          <Historial entidad_tipo="reserva" entidad_id={sel.id} tok={tok} perfil={perfil||{nombre:"Admin"}}/>
+          <Documentos entidad_tipo="reserva" entidad_id={sel.id} tok={tok} perfil={perfil||{nombre:"Admin"}}/>
         </div>}
       </div>
     </div>
@@ -1586,8 +1779,12 @@ function NuevaReserva({perfil,tok,setPage}){
   const tipos=["Boda","Cumpleaños","Comunión","Bautizo","Aniversario","Empresa","Otro"];
   const submit=async()=>{
     if(!form.nombre||!form.fecha||saving)return;setSaving(true);
-    try{await sbPost("reservas",{...form,precio:parseFloat(form.precio)||0,creado_por:perfil.id},tok);setOk(true);setTimeout(()=>{setOk(false);setPage("reservas");},2000);setForm({nombre:"",fecha:"",tipo:"Boda",precio:"",contacto:"",obs:"",estado:"visita"});}
-    catch(_){}setSaving(false);
+    try{
+      const [res]=await sbPost("reservas",{...form,precio:parseFloat(form.precio)||0,creado_por:perfil.id},tok);
+      await addHistorial("reserva",res.id,`Reserva creada por ${perfil.nombre}`,perfil.nombre,tok);
+      setOk(true);setTimeout(()=>{setOk(false);setPage("reservas");},2000);
+      setForm({nombre:"",fecha:"",tipo:"Boda",precio:"",contacto:"",obs:"",estado:"visita"});
+    }catch(_){}setSaving(false);
   };
   return <>
     <div className="ph"><h2>Nueva reserva</h2></div>
@@ -1608,11 +1805,12 @@ function NuevaReserva({perfil,tok,setPage}){
 // ─── VISITAS ─────────────────────────────────────────────────────────────────
 const TIPOS_EVENTO = ["Boda","Comunión","Bautizo","Cumpleaños","Aniversario","Empresa","Otro"];
 const ESTADOS_VISITA = {
-  pendiente:      {lbl:"Pendiente",          col:"#f59e0b"},
-  realizada:      {lbl:"Realizada",          col:"#10b981"},
-  convertida:     {lbl:"Reserva formalizada",col:"#6366f1"},
-  no_presentado:  {lbl:"No se presentó",     col:"#e85555"},
-  cancelada:      {lbl:"Cancelada",          col:"#6b7280"},
+  pendiente:      {lbl:"Pendiente",           col:"#f59e0b"},
+  realizada:      {lbl:"Realizada",           col:"#10b981"},
+  convertida:     {lbl:"Reserva formalizada", col:"#6366f1"},
+  no_presentado:  {lbl:"No se presentó",      col:"#e85555"},
+  cancelada:      {lbl:"Cancelada",           col:"#6b7280"},
+  reserva_cancelada:{lbl:"Reserva cancelada", col:"#e85555"},
 };
 
 function Visitas({perfil,tok,rol}){
@@ -1627,18 +1825,16 @@ function Visitas({perfil,tok,rol}){
   const [sel,setSel]=useState(null);
   const [showConvertir,setShowConvertir]=useState(false);
   const [showNoPresentado,setShowNoPresentado]=useState(false);
+  const [showRevertir,setShowRevertir]=useState(false);
+  const [notaCancelacion,setNotaCancelacion]=useState("");
   const [saving,setSaving]=useState(false);
 
   const formVacio={nombre:"",fecha:hoy,hora:"10:00",tipo_evento:"Boda",invitados:"",telefono:"",email:"",nota:""};
   const [form,setForm]=useState(formVacio);
-  // formRes ahora incluye fecha_evento
-  const [formRes,setFormRes]=useState({fecha_evento:"",precio:"",contacto:"",invitados:"",obs:"",estado:"visita"});
+  const [formRes,setFormRes]=useState({fecha_evento:"",precio:"",contacto:"",obs:"",estado:"visita"});
 
   const load_=async()=>{
-    try{
-      const v=await sbGet("visitas","?select=*&order=fecha.asc,hora.asc",tok);
-      setVisitas(v);
-    }catch(_){}
+    try{const v=await sbGet("visitas","?select=*&order=fecha.asc,hora.asc",tok);setVisitas(v);}catch(_){}
     setLoad(false);
   };
   useEffect(()=>{load_();},[]);
@@ -1650,12 +1846,8 @@ function Visitas({perfil,tok,rol}){
     if(!form.nombre||!form.fecha||!form.hora||saving)return;
     setSaving(true);
     try{
-      await sbPost("visitas",{
-        ...form,
-        invitados:parseInt(form.invitados)||null,
-        estado:"pendiente",
-        creado_por:perfil.nombre,
-      },tok);
+      const [v]=await sbPost("visitas",{...form,invitados:parseInt(form.invitados)||null,estado:"pendiente",creado_por:perfil.nombre},tok);
+      await addHistorial("visita",v.id,`Visita registrada para el ${new Date(form.fecha+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"long",year:"numeric"})} a las ${form.hora}`,perfil.nombre,tok);
       setShowForm(false);setForm(formVacio);await load_();
     }catch(_){}
     setSaving(false);
@@ -1664,6 +1856,7 @@ function Visitas({perfil,tok,rol}){
   const marcarRealizada=async()=>{
     if(!sel)return;
     await sbPatch("visitas",`id=eq.${sel.id}`,{estado:"realizada"},tok);
+    await addHistorial("visita",sel.id,"Visita realizada en la finca",perfil.nombre,tok);
     setSel(prev=>({...prev,estado:"realizada"}));
     await load_();
   };
@@ -1673,25 +1866,12 @@ function Visitas({perfil,tok,rol}){
     setSaving(true);
     try{
       await sbPatch("visitas",`id=eq.${sel.id}`,{estado:"no_presentado"},tok);
-      setSel(prev=>({...prev,estado:"no_presentado"}));
+      await addHistorial("visita",sel.id,"El cliente no se presentó a la visita",perfil.nombre,tok);
       setShowNoPresentado(false);
       if(accion==="reprogramar"){
-        // Abrir formulario nueva visita con datos precargados
-        setForm({
-          nombre:sel.nombre,
-          fecha:hoy,
-          hora:sel.hora?.slice(0,5)||"10:00",
-          tipo_evento:sel.tipo_evento||"Boda",
-          invitados:sel.invitados||"",
-          telefono:sel.telefono||"",
-          email:sel.email||"",
-          nota:sel.nota||"",
-        });
-        setSel(null);
-        setShowForm(true);
-      }else{
-        setSel(null);
-      }
+        setForm({nombre:sel.nombre,fecha:hoy,hora:sel.hora?.slice(0,5)||"10:00",tipo_evento:sel.tipo_evento||"Boda",invitados:sel.invitados||"",telefono:sel.telefono||"",email:sel.email||"",nota:sel.nota||""});
+        setSel(null);setShowForm(true);
+      }else{setSel(null);}
       await load_();
     }catch(_){}
     setSaving(false);
@@ -1704,14 +1884,7 @@ function Visitas({perfil,tok,rol}){
   };
 
   const abrirConvertir=()=>{
-    setFormRes({
-      fecha_evento:"",
-      precio:"",
-      contacto:sel.telefono||"",
-      invitados:sel.invitados||"",
-      obs:sel.nota||"",
-      estado:"visita",
-    });
+    setFormRes({fecha_evento:"",precio:"",contacto:sel.telefono||"",obs:sel.nota||"",estado:"visita"});
     setShowConvertir(true);
   };
 
@@ -1719,29 +1892,33 @@ function Visitas({perfil,tok,rol}){
     if(!sel||saving||!formRes.fecha_evento)return;
     setSaving(true);
     try{
-      const [res]=await sbPost("reservas",{
-        nombre:sel.nombre,
-        fecha:formRes.fecha_evento,
-        tipo:sel.tipo_evento||"Boda",
-        precio:parseFloat(formRes.precio)||0,
-        contacto:formRes.contacto||"",
-        obs:formRes.obs||"",
-        estado:formRes.estado||"visita",
-        creado_por:perfil.id,
-      },tok);
-      await sbPatch("visitas",`id=eq.${sel.id}`,{
-        estado:"convertida",
-        reserva_id:res.id,
-      },tok);
+      const [res]=await sbPost("reservas",{nombre:sel.nombre,fecha:formRes.fecha_evento,tipo:sel.tipo_evento||"Boda",precio:parseFloat(formRes.precio)||0,contacto:formRes.contacto||"",obs:formRes.obs||"",estado:formRes.estado||"visita",creado_por:perfil.id},tok);
+      await sbPatch("visitas",`id=eq.${sel.id}`,{estado:"convertida",reserva_id:res.id},tok);
+      await addHistorial("visita",sel.id,`Visita convertida en reserva para el ${new Date(formRes.fecha_evento+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"long",year:"numeric"})}`,perfil.nombre,tok);
+      await addHistorial("reserva",res.id,`Reserva creada a partir de visita de ${sel.nombre}`,perfil.nombre,tok);
       setSel(prev=>({...prev,estado:"convertida",reserva_id:res.id}));
-      setShowConvertir(false);
-      await load_();
+      setShowConvertir(false);await load_();
+    }catch(_){}
+    setSaving(false);
+  };
+
+  const revertirReserva=async()=>{
+    if(!sel||saving||!notaCancelacion.trim())return;
+    setSaving(true);
+    try{
+      await sbPatch("visitas",`id=eq.${sel.id}`,{estado:"reserva_cancelada",nota_cancelacion:notaCancelacion},tok);
+      if(sel.reserva_id){
+        await sbPatch("reservas",`id=eq.${sel.reserva_id}`,{estado:"finalizada",obs:`CANCELADA: ${notaCancelacion}`},tok);
+        await addHistorial("reserva",sel.reserva_id,`Reserva cancelada: ${notaCancelacion}`,perfil.nombre,tok);
+      }
+      await addHistorial("visita",sel.id,`Reserva cancelada: ${notaCancelacion}`,perfil.nombre,tok);
+      setSel(prev=>({...prev,estado:"reserva_cancelada",nota_cancelacion:notaCancelacion}));
+      setShowRevertir(false);setNotaCancelacion("");await load_();
     }catch(_){}
     setSaving(false);
   };
 
   if(load)return <div className="loading"><div className="spin"/><span>Cargando…</span></div>;
-
   const lista=tab==="proximas"?proximas:anteriores;
 
   return <>
@@ -1777,6 +1954,7 @@ function Visitas({perfil,tok,rol}){
             <span style={{color:"#5a5e6e",fontSize:22,flexShrink:0}}>›</span>
           </div>
           {v.nota&&<div className="nbox" style={{marginTop:10}}>💬 {v.nota}</div>}
+          {v.nota_cancelacion&&<div style={{marginTop:8,fontSize:12,color:"#e85555",background:"rgba(232,85,85,.06)",border:"1px solid rgba(232,85,85,.15)",borderRadius:7,padding:"6px 10px"}}>❌ {v.nota_cancelacion}</div>}
         </div>;
       })}
     </div>
@@ -1804,7 +1982,7 @@ function Visitas({perfil,tok,rol}){
     </div>}
 
     {/* MODAL DETALLE VISITA */}
-    {sel&&!showConvertir&&!showNoPresentado&&<div className="ov" onClick={()=>setSel(null)}>
+    {sel&&!showConvertir&&!showNoPresentado&&!showRevertir&&<div className="ov" onClick={()=>setSel(null)}>
       <div className="modal" style={{maxWidth:560}} onClick={e=>e.stopPropagation()}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:16,gap:8}}>
           <div style={{minWidth:0}}>
@@ -1828,13 +2006,15 @@ function Visitas({perfil,tok,rol}){
           </div>)}
         </div>
 
+        {sel.nota_cancelacion&&<div style={{marginBottom:14,padding:"10px 12px",background:"rgba(232,85,85,.06)",border:"1px solid rgba(232,85,85,.2)",borderRadius:8,fontSize:13,color:"#e85555"}}>❌ Motivo cancelación: {sel.nota_cancelacion}</div>}
+
         <NotaVisita sel={sel} onGuardar={guardarNota} puedeEditar={puedeEditar}/>
 
-        {/* ACCIONES según estado */}
+        {/* ACCIONES */}
         {puedeEditar&&sel.estado==="pendiente"&&(
           <div style={{display:"flex",flexDirection:"column",gap:8,marginTop:16,paddingTop:14,borderTop:"1px solid rgba(255,255,255,.06)"}}>
             <div style={{display:"flex",gap:8}}>
-              <button className="btn bg" style={{flex:1,justifyContent:"center"}} onClick={marcarRealizada}>✅ Marcar realizada</button>
+              <button className="btn bg" style={{flex:1,justifyContent:"center"}} onClick={marcarRealizada}>✅ Realizada</button>
               <button className="btn bp" style={{flex:1,justifyContent:"center"}} onClick={abrirConvertir}>🔄 Convertir en reserva</button>
             </div>
             <button className="btn br" style={{width:"100%",justifyContent:"center"}} onClick={()=>setShowNoPresentado(true)}>❌ No se ha presentado</button>
@@ -1845,17 +2025,21 @@ function Visitas({perfil,tok,rol}){
             <button className="btn bp" style={{width:"100%",justifyContent:"center"}} onClick={abrirConvertir}>🔄 Convertir en reserva</button>
           </div>
         )}
-        {sel.estado==="convertida"&&(
-          <div style={{marginTop:16,padding:"12px 14px",background:"rgba(99,102,241,.08)",border:"1px solid rgba(99,102,241,.2)",borderRadius:10,fontSize:13,color:"#a5b4fc",textAlign:"center"}}>
-            ✅ Esta visita ya fue convertida en reserva
+        {puedeEditar&&sel.estado==="convertida"&&(
+          <div style={{marginTop:16,paddingTop:14,borderTop:"1px solid rgba(255,255,255,.06)"}}>
+            <div style={{padding:"10px 12px",background:"rgba(99,102,241,.08)",border:"1px solid rgba(99,102,241,.2)",borderRadius:8,fontSize:13,color:"#a5b4fc",marginBottom:10,textAlign:"center"}}>
+              ✅ Reserva formalizada en el calendario
+            </div>
+            <button className="btn br" style={{width:"100%",justifyContent:"center"}} onClick={()=>{setNotaCancelacion("");setShowRevertir(true);}}>↩️ Cancelar esta reserva</button>
           </div>
         )}
-        {sel.estado==="no_presentado"&&(
-          <div style={{marginTop:16,padding:"12px 14px",background:"rgba(232,85,85,.08)",border:"1px solid rgba(232,85,85,.2)",borderRadius:10,fontSize:13,color:"#e85555",textAlign:"center"}}>
-            ❌ El cliente no se presentó a esta visita
-          </div>
-        )}
+        {sel.estado==="no_presentado"&&<div style={{marginTop:16,padding:"10px 12px",background:"rgba(232,85,85,.08)",border:"1px solid rgba(232,85,85,.2)",borderRadius:8,fontSize:13,color:"#e85555",textAlign:"center"}}>❌ El cliente no se presentó a esta visita</div>}
+        {sel.estado==="reserva_cancelada"&&<div style={{marginTop:16,padding:"10px 12px",background:"rgba(107,114,128,.08)",border:"1px solid rgba(107,114,128,.2)",borderRadius:8,fontSize:13,color:"#9ca3af",textAlign:"center"}}>↩️ Reserva cancelada</div>}
+
         {sel.creado_por&&<div style={{marginTop:12,fontSize:11,color:"#3d4155",textAlign:"right"}}>Creada por {sel.creado_por}</div>}
+
+        <Historial entidad_tipo="visita" entidad_id={sel.id} tok={tok} perfil={perfil}/>
+        <Documentos entidad_tipo="visita" entidad_id={sel.id} tok={tok} perfil={perfil}/>
       </div>
     </div>}
 
@@ -1864,18 +2048,32 @@ function Visitas({perfil,tok,rol}){
       <div className="modal" style={{maxWidth:420}} onClick={e=>e.stopPropagation()}>
         <h3>❌ No se presentó</h3>
         <p style={{fontSize:13,color:"#7a7f94",marginBottom:20,lineHeight:1.6}}>
-          <strong style={{color:"#e8e6e1"}}>{sel.nombre}</strong> no se ha presentado a la visita del {new Date(sel.fecha+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"long"})} a las {sel.hora?.slice(0,5)||"—"}.<br/><br/>
-          ¿Qué deseas hacer?
+          <strong style={{color:"#e8e6e1"}}>{sel.nombre}</strong> no se ha presentado a la visita del {new Date(sel.fecha+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"long"})} a las {sel.hora?.slice(0,5)||"—"}.<br/><br/>¿Qué deseas hacer?
         </p>
         <div style={{display:"flex",flexDirection:"column",gap:10}}>
-          <button className="btn bp" style={{width:"100%",justifyContent:"center",padding:"14px",fontSize:14}} onClick={()=>marcarNoPresentado("reprogramar")} disabled={saving}>
-            📅 Marcar como no presentado y programar nueva visita
-          </button>
-          <button className="btn br" style={{width:"100%",justifyContent:"center",padding:"14px",fontSize:14}} onClick={()=>marcarNoPresentado("cancelar")} disabled={saving}>
-            🗑 Marcar como no presentado y cancelar
-          </button>
+          <button className="btn bp" style={{width:"100%",justifyContent:"center",padding:"14px",fontSize:14}} onClick={()=>marcarNoPresentado("reprogramar")} disabled={saving}>📅 Marcar y programar nueva visita</button>
+          <button className="btn br" style={{width:"100%",justifyContent:"center",padding:"14px",fontSize:14}} onClick={()=>marcarNoPresentado("cancelar")} disabled={saving}>🗑 Marcar y cancelar</button>
         </div>
         <button className="btn bg" style={{width:"100%",justifyContent:"center",marginTop:10}} onClick={()=>setShowNoPresentado(false)}>Volver</button>
+      </div>
+    </div>}
+
+    {/* MODAL CANCELAR RESERVA */}
+    {sel&&showRevertir&&<div className="ov" onClick={()=>setShowRevertir(false)}>
+      <div className="modal" style={{maxWidth:440}} onClick={e=>e.stopPropagation()}>
+        <h3>↩️ Cancelar reserva</h3>
+        <p style={{fontSize:13,color:"#7a7f94",marginBottom:16,lineHeight:1.5}}>
+          La reserva de <strong style={{color:"#e8e6e1"}}>{sel.nombre}</strong> quedará cancelada. Indica el motivo:
+        </p>
+        <div className="fg">
+          <label>Motivo de cancelación *</label>
+          <textarea className="fi" rows={4} value={notaCancelacion} onChange={e=>setNotaCancelacion(e.target.value)} placeholder="Ej: No firmaron el contrato, encontraron otra finca…"/>
+        </div>
+        {!notaCancelacion.trim()&&<div style={{fontSize:12,color:"#e85555",marginBottom:10}}>⚠️ El motivo es obligatorio</div>}
+        <div className="mft">
+          <button className="btn bg" onClick={()=>setShowRevertir(false)}>Cancelar</button>
+          <button className="btn br" onClick={revertirReserva} disabled={saving||!notaCancelacion.trim()}>{saving?"Procesando…":"↩️ Confirmar cancelación"}</button>
+        </div>
       </div>
     </div>}
 
@@ -1888,14 +2086,14 @@ function Visitas({perfil,tok,rol}){
           <div style={{fontSize:12,color:"#7a7f94"}}>🎉 {sel.tipo_evento} · 👥 {sel.invitados||"—"} invitados</div>
         </div>
         <div className="fg">
-          <label>📅 Fecha del evento * <span style={{color:"#e85555"}}>(día de la boda/evento, no de la visita)</span></label>
+          <label>📅 Fecha del evento * <span style={{color:"#e85555",fontSize:11}}>(día de la boda/evento)</span></label>
           <input type="date" className="fi" value={formRes.fecha_evento} onChange={e=>setFormRes(v=>({...v,fecha_evento:e.target.value}))}/>
         </div>
         <div className="g2">
           <div className="fg"><label>Precio (€)</label><input type="number" inputMode="numeric" className="fi" value={formRes.precio} onChange={e=>setFormRes(v=>({...v,precio:e.target.value}))} placeholder="0"/></div>
           <div className="fg"><label>Contacto</label><input className="fi" type="tel" value={formRes.contacto} onChange={e=>setFormRes(v=>({...v,contacto:e.target.value}))} placeholder="600 000 000"/></div>
         </div>
-        <div className="fg"><label>Estado inicial de la reserva</label>
+        <div className="fg"><label>Estado inicial</label>
           <select className="fi" value={formRes.estado} onChange={e=>setFormRes(v=>({...v,estado:e.target.value}))}>
             {ESTADOS.map(e=><option key={e.id} value={e.id}>{e.lbl}</option>)}
           </select>
@@ -1911,15 +2109,12 @@ function Visitas({perfil,tok,rol}){
   </>;
 }
 
-// Subcomponente nota editable
 function NotaVisita({sel,onGuardar,puedeEditar}){
   const [editando,setEditando]=useState(false);
   const [txt,setTxt]=useState(sel.nota||"");
   const [saving,setSaving]=useState(false);
   const guardar=async()=>{
-    setSaving(true);
-    await onGuardar(sel,txt);
-    setSaving(false);setEditando(false);
+    setSaving(true);await onGuardar(sel,txt);setSaving(false);setEditando(false);
   };
   return <div style={{marginBottom:4}}>
     <div style={{fontSize:10,color:"#5a5e6e",textTransform:"uppercase",letterSpacing:.8,marginBottom:8}}>Observaciones / Nota comercial</div>
@@ -1933,9 +2128,7 @@ function NotaVisita({sel,onGuardar,puedeEditar}){
       </>
     ):(
       <div style={{background:"#0f1117",borderRadius:8,padding:"10px 12px",minHeight:52,position:"relative"}}>
-        {sel.nota
-          ?<div style={{fontSize:13,color:"#c9c5b8",lineHeight:1.5,paddingRight:80}}>{sel.nota}</div>
-          :<div style={{fontSize:13,color:"#3d4155",fontStyle:"italic"}}>Sin observaciones todavía…</div>}
+        {sel.nota?<div style={{fontSize:13,color:"#c9c5b8",lineHeight:1.5,paddingRight:80}}>{sel.nota}</div>:<div style={{fontSize:13,color:"#3d4155",fontStyle:"italic"}}>Sin observaciones todavía…</div>}
         {puedeEditar&&<button className="btn bg sm" style={{position:"absolute",top:8,right:8}} onClick={()=>setEditando(true)}>{sel.nota?"✏️":"➕ Añadir"}</button>}
       </div>
     )}
