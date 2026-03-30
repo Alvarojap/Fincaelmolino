@@ -501,6 +501,7 @@ export default function App() {
     calendario:  <Calendario  {...P}/>,
     reservas:    <Reservas    {...P}/>,
     "nueva-res": <NuevaReserva {...P}/>,
+    visitas:     <Visitas     {...P}/>,
     chat:        <Chat        {...P}/>,
     notifs:      <Notifs      {...P}/>,
     usuarios:    <Usuarios    {...P}/>,
@@ -620,6 +621,7 @@ function Sidebar({perfil,page,setPage,onLogout,inDrawer,onClose}){
         <N ico="📅" lbl="Calendario" id="calendario"/>
         <N ico="📋" lbl="Reservas" id="reservas"/>
         {isA&&<N ico="➕" lbl="Nueva reserva" id="nueva-res"/>}
+        <N ico="👁" lbl="Visitas" id="visitas"/>
       </>}
       <p className="nav-sec">Comunicación</p>
       <N ico="💬" lbl={isA?"Chat con equipo":"Chat con admin"} id="chat"/>
@@ -670,6 +672,7 @@ function MobileNav({perfil,page,setPage,tok}){
   if(isA||isL)items.push({ico:"🧹",lbl:"Limpieza",id:"limpieza"});
   if(!isA&&!isJ&&!isL)items.push({ico:"📅",lbl:"Calendario",id:"calendario"});
   if(!isA&&!isJ&&!isL)items.push({ico:"📋",lbl:"Reservas",id:"reservas"});
+  if(!isA&&!isJ&&!isL)items.push({ico:"👁",lbl:"Visitas",id:"visitas"});
   items.push({ico:"💬",lbl:"Chat",id:"chat",badge:chatBadge});
   items.push({ico:"🔔",lbl:"Avisos",id:"notifs"});
   const shown=items.slice(0,5);
@@ -920,30 +923,21 @@ function JardinCheck({perfil,tok,rol}){
   const tot=actv.length+jpunt.length;
   const todoHecho=tot>0&&comp===tot;
 
-const toggle=async(tareaId,isPunt=false)=>{
+  const toggle=async(tareaId,isPunt=false)=>{
     if(saving)return;
     setSaving(true);
     try{
       if(!isPunt){
         const cur=sj[tareaId];
         const nuevoDone=!cur?.done;
-        if(cur?.id){
-          // Ya existe — actualizar
-          await sbPatch("jardin_semana",`id=eq.${cur.id}`,{
-            done:nuevoDone,
-            completado_por:nuevoDone?perfil.nombre:null,
-            completado_ts:nuevoDone?new Date().toISOString():null,
-          },tok);
-        }else{
-          // No existe — crear
-          await sbPost("jardin_semana",{
-            semana:cwk,tarea_id:tareaId,
-            done:true,
-            completado_por:perfil.nombre,
-            completado_ts:new Date().toISOString(),
-            nota:null,foto_url:null,
-          },tok);
-        }
+        await sbUpsert("jardin_semana",{
+          semana:cwk,tarea_id:tareaId,
+          done:nuevoDone,
+          completado_por:nuevoDone?perfil.nombre:null,
+          completado_ts:nuevoDone?new Date().toISOString():null,
+          nota:cur?.nota||null,
+          foto_url:cur?.foto_url||null,
+        },tok);
         await load_();
         if(!isA&&nuevoDone){
           const jsNew=await sbGet("jardin_semana",`?semana=eq.${cwk}&select=*`,tok);
@@ -1609,4 +1603,267 @@ function NuevaReserva({perfil,tok,setPage}){
       </div>
     </div></div>
   </>;
+}
+
+// ─── VISITAS ─────────────────────────────────────────────────────────────────
+const TIPOS_EVENTO = ["Boda","Comunión","Bautizo","Cumpleaños","Aniversario","Empresa","Otro"];
+const ESTADOS_VISITA = {
+  pendiente:   {lbl:"Pendiente",    col:"#f59e0b"},
+  realizada:   {lbl:"Realizada",    col:"#10b981"},
+  convertida:  {lbl:"Reserva formalizada", col:"#6366f1"},
+  cancelada:   {lbl:"Cancelada",    col:"#e85555"},
+};
+
+function Visitas({perfil,tok,rol,setPage}){
+  const isA=rol==="admin", isC=rol==="comercial";
+  const puedeEditar=isA||isC;
+  const hoy=new Date().toISOString().split("T")[0];
+
+  const [visitas,setVisitas]=useState([]);
+  const [load,setLoad]=useState(true);
+  const [tab,setTab]=useState("proximas");
+  const [showForm,setShowForm]=useState(false);
+  const [sel,setSel]=useState(null);
+  const [showConvertir,setShowConvertir]=useState(false);
+  const [saving,setSaving]=useState(false);
+
+  const formVacio={nombre:"",fecha:hoy,hora:"10:00",tipo_evento:"Boda",invitados:"",telefono:"",email:"",nota:""};
+  const [form,setForm]=useState(formVacio);
+  const [formRes,setFormRes]=useState({precio:"",contacto:"",obs:"",estado:"visita"});
+
+  const load_=async()=>{
+    try{
+      const v=await sbGet("visitas","?select=*&order=fecha.asc,hora.asc",tok);
+      setVisitas(v);
+    }catch(_){}
+    setLoad(false);
+  };
+  useEffect(()=>{load_();},[]);
+
+  const proximas=visitas.filter(v=>v.fecha>=hoy&&v.estado!=="cancelada");
+  const anteriores=visitas.filter(v=>v.fecha<hoy||v.estado==="cancelada"||v.estado==="convertida");
+
+  const crearVisita=async()=>{
+    if(!form.nombre||!form.fecha||!form.hora||saving)return;
+    setSaving(true);
+    try{
+      await sbPost("visitas",{
+        ...form,
+        invitados:parseInt(form.invitados)||null,
+        estado:"pendiente",
+        creado_por:perfil.nombre,
+      },tok);
+      setShowForm(false);setForm(formVacio);await load_();
+    }catch(_){}
+    setSaving(false);
+  };
+
+  const marcarRealizada=async(v)=>{
+    await sbPatch("visitas",`id=eq.${v.id}`,{estado:"realizada"},tok);
+    setSel(prev=>prev?{...prev,estado:"realizada"}:prev);
+    await load_();
+  };
+
+  const guardarNota=async(v,nota)=>{
+    await sbPatch("visitas",`id=eq.${v.id}`,{nota},tok);
+    setSel(prev=>prev?{...prev,nota}:prev);
+    await load_();
+  };
+
+  const convertirEnReserva=async()=>{
+    if(!sel||saving)return;
+    setSaving(true);
+    try{
+      // Crear reserva
+      const [res]=await sbPost("reservas",{
+        nombre:sel.nombre,
+        fecha:sel.fecha,
+        tipo:sel.tipo_evento,
+        precio:parseFloat(formRes.precio)||0,
+        contacto:formRes.contacto||sel.telefono||"",
+        obs:formRes.obs||sel.nota||"",
+        estado:formRes.estado||"visita",
+        creado_por:perfil.id,
+      },tok);
+      // Marcar visita como convertida
+      await sbPatch("visitas",`id=eq.${sel.id}`,{
+        estado:"convertida",
+        reserva_id:res.id,
+      },tok);
+      setSel(prev=>({...prev,estado:"convertida",reserva_id:res.id}));
+      setShowConvertir(false);
+      await load_();
+    }catch(_){}
+    setSaving(false);
+  };
+
+  if(load)return <div className="loading"><div className="spin"/><span>Cargando…</span></div>;
+
+  const lista=tab==="proximas"?proximas:anteriores;
+
+  return <>
+    <div className="ph">
+      <h2>👁 Visitas</h2>
+      <p>{proximas.length} próximas · {anteriores.length} anteriores</p>
+    </div>
+    <div className="pb">
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16,gap:12,flexWrap:"wrap"}}>
+        <div className="tabs" style={{marginBottom:0}}>
+          <button className={`tab${tab==="proximas"?" on":""}`} onClick={()=>setTab("proximas")}>📅 Próximas ({proximas.length})</button>
+          <button className={`tab${tab==="anteriores"?" on":""}`} onClick={()=>setTab("anteriores")}>📁 Anteriores ({anteriores.length})</button>
+        </div>
+        {puedeEditar&&<button className="btn bp" onClick={()=>{setForm(formVacio);setShowForm(true);}}>➕ Nueva visita</button>}
+      </div>
+
+      {lista.length===0&&<div className="empty"><span className="ico">{tab==="proximas"?"📅":"📁"}</span><p>{tab==="proximas"?"No hay visitas programadas":"No hay visitas anteriores"}</p></div>}
+
+      {lista.map(v=>{
+        const est=ESTADOS_VISITA[v.estado]||ESTADOS_VISITA.pendiente;
+        const fechaFmt=new Date(v.fecha+"T12:00:00").toLocaleDateString("es-ES",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
+        return <div key={v.id} className="card" style={{marginBottom:10,borderLeft:`3px solid ${est.col}`,cursor:"pointer"}} onClick={()=>setSel(v)}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:12}}>
+            <div style={{minWidth:0}}>
+              <div style={{fontSize:15,fontWeight:600,color:"#e8e6e1",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{v.nombre}</div>
+              <div style={{fontSize:12,color:"#7a7f94",marginTop:4}}>📅 {fechaFmt} · 🕐 {v.hora?.slice(0,5)||"—"}</div>
+              <div style={{display:"flex",gap:6,marginTop:6,flexWrap:"wrap"}}>
+                <span className="badge" style={{background:`${est.col}18`,color:est.col,border:`1px solid ${est.col}30`}}>{est.lbl}</span>
+                {v.tipo_evento&&<span className="badge" style={{background:"rgba(201,168,76,.1)",color:"#c9a84c"}}>🎉 {v.tipo_evento}</span>}
+                {v.invitados&&<span className="badge" style={{background:"rgba(255,255,255,.06)",color:"#7a7f94"}}>👥 {v.invitados} invitados</span>}
+              </div>
+            </div>
+            <span style={{color:"#5a5e6e",fontSize:22,flexShrink:0}}>›</span>
+          </div>
+          {v.nota&&<div className="nbox" style={{marginTop:10}}>💬 {v.nota}</div>}
+        </div>;
+      })}
+    </div>
+
+    {/* MODAL NUEVA VISITA */}
+    {showForm&&<div className="ov" onClick={()=>setShowForm(false)}>
+      <div className="modal" onClick={e=>e.stopPropagation()}>
+        <h3>📅 Nueva visita</h3>
+        <div className="fg"><label>Nombre pareja / cliente *</label><input className="fi" value={form.nombre} onChange={e=>setForm(v=>({...v,nombre:e.target.value}))} placeholder="Ej: Laura y Antonio García"/></div>
+        <div className="g2">
+          <div className="fg"><label>Fecha *</label><input type="date" className="fi" value={form.fecha} onChange={e=>setForm(v=>({...v,fecha:e.target.value}))}/></div>
+          <div className="fg"><label>Hora *</label><input type="time" className="fi" value={form.hora} onChange={e=>setForm(v=>({...v,hora:e.target.value}))}/></div>
+        </div>
+        <div className="g2">
+          <div className="fg"><label>Tipo de evento</label><select className="fi" value={form.tipo_evento} onChange={e=>setForm(v=>({...v,tipo_evento:e.target.value}))}>{TIPOS_EVENTO.map(t=><option key={t}>{t}</option>)}</select></div>
+          <div className="fg"><label>Invitados estimados</label><input type="number" inputMode="numeric" className="fi" value={form.invitados} onChange={e=>setForm(v=>({...v,invitados:e.target.value}))} placeholder="Ej: 120"/></div>
+        </div>
+        <div className="g2">
+          <div className="fg"><label>Teléfono</label><input className="fi" type="tel" value={form.telefono} onChange={e=>setForm(v=>({...v,telefono:e.target.value}))} placeholder="600 000 000"/></div>
+          <div className="fg"><label>Email</label><input className="fi" type="email" value={form.email} onChange={e=>setForm(v=>({...v,email:e.target.value}))} placeholder="correo@email.com"/></div>
+        </div>
+        <div className="fg"><label>Observaciones iniciales</label><textarea className="fi" rows={3} value={form.nota} onChange={e=>setForm(v=>({...v,nota:e.target.value}))} placeholder="Notas previas a la visita…"/></div>
+        <div className="mft"><button className="btn bg" onClick={()=>setShowForm(false)}>Cancelar</button><button className="btn bp" onClick={crearVisita} disabled={saving}>{saving?"Guardando…":"✓ Crear visita"}</button></div>
+      </div>
+    </div>}
+
+    {/* MODAL DETALLE VISITA */}
+    {sel&&!showConvertir&&<div className="ov" onClick={()=>setSel(null)}>
+      <div className="modal" style={{maxWidth:560}} onClick={e=>e.stopPropagation()}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:16,gap:8}}>
+          <div style={{minWidth:0}}>
+            <h3 style={{marginBottom:6}}>{sel.nombre}</h3>
+            {(()=>{const est=ESTADOS_VISITA[sel.estado]||ESTADOS_VISITA.pendiente;return <span className="badge" style={{background:`${est.col}18`,color:est.col,border:`1px solid ${est.col}30`}}>{est.lbl}</span>;})()}
+          </div>
+          <button className="btn bg sm" style={{flexShrink:0}} onClick={()=>setSel(null)}>✕</button>
+        </div>
+
+        <div className="g2" style={{marginBottom:14}}>
+          {[
+            {l:"FECHA",v:new Date(sel.fecha+"T12:00:00").toLocaleDateString("es-ES",{weekday:"long",day:"numeric",month:"long",year:"numeric"})},
+            {l:"HORA",v:sel.hora?.slice(0,5)},
+            {l:"TIPO",v:sel.tipo_evento},
+            {l:"INVITADOS",v:sel.invitados?`${sel.invitados} personas`:null},
+            {l:"TELÉFONO",v:sel.telefono},
+            {l:"EMAIL",v:sel.email},
+          ].filter(x=>x.v).map(x=><div key={x.l} style={{background:"#0f1117",borderRadius:8,padding:"10px 12px"}}>
+            <div style={{fontSize:10,color:"#5a5e6e",marginBottom:3}}>{x.l}</div>
+            <div style={{fontSize:13,color:"#e8e6e1"}}>{x.v}</div>
+          </div>)}
+        </div>
+
+        {/* Nota / Observaciones */}
+        <NotaVisita sel={sel} onGuardar={guardarNota} tok={tok} puedeEditar={puedeEditar}/>
+
+        {/* Acciones */}
+        {puedeEditar&&sel.estado==="pendiente"&&(
+          <div style={{display:"flex",gap:8,marginTop:16,paddingTop:14,borderTop:"1px solid rgba(255,255,255,.06)"}}>
+            <button className="btn bg" style={{flex:1,justifyContent:"center"}} onClick={()=>marcarRealizada(sel)}>✅ Marcar realizada</button>
+            <button className="btn bp" style={{flex:1,justifyContent:"center"}} onClick={()=>{setFormRes({precio:"",contacto:sel.telefono||"",obs:sel.nota||"",estado:"visita"});setShowConvertir(true);}}>🔄 Convertir en reserva</button>
+          </div>
+        )}
+        {puedeEditar&&sel.estado==="realizada"&&(
+          <div style={{marginTop:16,paddingTop:14,borderTop:"1px solid rgba(255,255,255,.06)"}}>
+            <button className="btn bp" style={{width:"100%",justifyContent:"center"}} onClick={()=>{setFormRes({precio:"",contacto:sel.telefono||"",obs:sel.nota||"",estado:"visita"});setShowConvertir(true);}}>🔄 Convertir en reserva</button>
+          </div>
+        )}
+        {sel.estado==="convertida"&&(
+          <div style={{marginTop:16,padding:"12px 14px",background:"rgba(99,102,241,.08)",border:"1px solid rgba(99,102,241,.2)",borderRadius:10,fontSize:13,color:"#a5b4fc",textAlign:"center"}}>
+            ✅ Esta visita ya fue convertida en reserva
+          </div>
+        )}
+        {sel.creado_por&&<div style={{marginTop:12,fontSize:11,color:"#3d4155",textAlign:"right"}}>Creada por {sel.creado_por}</div>}
+      </div>
+    </div>}
+
+    {/* MODAL CONVERTIR EN RESERVA */}
+    {sel&&showConvertir&&<div className="ov" onClick={()=>setShowConvertir(false)}>
+      <div className="modal" style={{maxWidth:500}} onClick={e=>e.stopPropagation()}>
+        <h3>🔄 Convertir en reserva</h3>
+        <div style={{background:"rgba(201,168,76,.06)",border:"1px solid rgba(201,168,76,.15)",borderRadius:10,padding:"12px 14px",marginBottom:18,fontSize:13,color:"#c9a84c"}}>
+          Se creará una reserva para <strong>{sel.nombre}</strong> el {new Date(sel.fecha+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"long",year:"numeric"})}.
+        </div>
+        <div className="g2">
+          <div className="fg"><label>Precio (€)</label><input type="number" inputMode="numeric" className="fi" value={formRes.precio} onChange={e=>setFormRes(v=>({...v,precio:e.target.value}))} placeholder="0"/></div>
+          <div className="fg"><label>Contacto</label><input className="fi" type="tel" value={formRes.contacto} onChange={e=>setFormRes(v=>({...v,contacto:e.target.value}))} placeholder="600 000 000"/></div>
+        </div>
+        <div className="fg"><label>Estado inicial</label>
+          <select className="fi" value={formRes.estado} onChange={e=>setFormRes(v=>({...v,estado:e.target.value}))}>
+            {ESTADOS.map(e=><option key={e.id} value={e.id}>{e.lbl}</option>)}
+          </select>
+        </div>
+        <div className="fg"><label>Observaciones</label><textarea className="fi" rows={3} value={formRes.obs} onChange={e=>setFormRes(v=>({...v,obs:e.target.value}))} placeholder="Notas para la reserva…"/></div>
+        <div className="mft">
+          <button className="btn bg" onClick={()=>setShowConvertir(false)}>Cancelar</button>
+          <button className="btn bp" onClick={convertirEnReserva} disabled={saving}>{saving?"Creando…":"✅ Crear reserva"}</button>
+        </div>
+      </div>
+    </div>}
+  </>;
+}
+
+// Subcomponente nota editable dentro del detalle de visita
+function NotaVisita({sel,onGuardar,tok,puedeEditar}){
+  const [editando,setEditando]=useState(false);
+  const [txt,setTxt]=useState(sel.nota||"");
+  const [saving,setSaving]=useState(false);
+
+  const guardar=async()=>{
+    setSaving(true);
+    await onGuardar(sel,txt);
+    setSaving(false);setEditando(false);
+  };
+
+  return <div>
+    <div style={{fontSize:10,color:"#5a5e6e",textTransform:"uppercase",letterSpacing:.8,marginBottom:8}}>Observaciones / Nota</div>
+    {editando?(
+      <>
+        <textarea className="fi" rows={4} value={txt} onChange={e=>setTxt(e.target.value)} placeholder="Ej: Les ha encantado la finca, piden presupuesto esta semana…" style={{marginBottom:8}}/>
+        <div style={{display:"flex",gap:6}}>
+          <button className="btn bg sm" onClick={()=>{setTxt(sel.nota||"");setEditando(false);}}>Cancelar</button>
+          <button className="btn bp sm" onClick={guardar} disabled={saving}>{saving?"Guardando…":"✓ Guardar"}</button>
+        </div>
+      </>
+    ):(
+      <div style={{background:"#0f1117",borderRadius:8,padding:"10px 12px",minHeight:52,position:"relative"}}>
+        {sel.nota
+          ?<div style={{fontSize:13,color:"#c9c5b8",lineHeight:1.5}}>{sel.nota}</div>
+          :<div style={{fontSize:13,color:"#3d4155",fontStyle:"italic"}}>Sin observaciones todavía…</div>}
+        {puedeEditar&&<button className="btn bg sm" style={{position:"absolute",top:8,right:8}} onClick={()=>setEditando(true)}>{sel.nota?"✏️":"➕ Añadir"}</button>}
+      </div>
+    )}
+  </div>;
 }
