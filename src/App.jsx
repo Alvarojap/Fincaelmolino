@@ -936,14 +936,23 @@ function JardinCheck({perfil,tok,rol}){
       if(!isPunt){
         const cur=sj[tareaId];
         const nuevoDone=!cur?.done;
-        await sbUpsert("jardin_semana",{
-          semana:cwk,tarea_id:tareaId,
-          done:nuevoDone,
-          completado_por:nuevoDone?perfil.nombre:null,
-          completado_ts:nuevoDone?new Date().toISOString():null,
-          nota:cur?.nota||null,
-          foto_url:cur?.foto_url||null,
-        },tok);
+        if(cur?.id){
+          // Registro existe — actualizar
+          await sbPatch("jardin_semana",`id=eq.${cur.id}`,{
+            done:nuevoDone,
+            completado_por:nuevoDone?perfil.nombre:null,
+            completado_ts:nuevoDone?new Date().toISOString():null,
+          },tok);
+        }else{
+          // Registro nuevo — crear
+          await sbPost("jardin_semana",{
+            semana:cwk,tarea_id:tareaId,
+            done:true,
+            completado_por:perfil.nombre,
+            completado_ts:new Date().toISOString(),
+            nota:null,foto_url:null,
+          },tok);
+        }
         await load_();
         if(!isA&&nuevoDone){
           const jsNew=await sbGet("jardin_semana",`?semana=eq.${cwk}&select=*`,tok);
@@ -960,7 +969,7 @@ function JardinCheck({perfil,tok,rol}){
         },tok);
         await load_();
       }
-    }catch(_){}
+    }catch(e){console.error("toggle error:",e);}
     setSaving(false);
   };
 
@@ -976,14 +985,21 @@ function JardinCheck({perfil,tok,rol}){
     try{
       if(!modal.isPunt){
         const cur=sj[modal.id]||{};
-        await sbUpsert("jardin_semana",{
-          semana:cwk,tarea_id:modal.id,
-          done:cur.done||false,
-          completado_por:cur.completado_por||null,
-          completado_ts:cur.completado_ts||null,
-          nota:nota.trim()||null,
-          foto_url:foto||null,
-        },tok);
+        if(cur.id){
+          await sbPatch("jardin_semana",`id=eq.${cur.id}`,{
+            nota:nota.trim()||null,
+            foto_url:foto||null,
+          },tok);
+        }else{
+          await sbPost("jardin_semana",{
+            semana:cwk,tarea_id:modal.id,
+            done:false,
+            completado_por:null,
+            completado_ts:null,
+            nota:nota.trim()||null,
+            foto_url:foto||null,
+          },tok);
+        }
       }else{
         await sbPatch("jardin_puntual",`id=eq.${modal.id}`,{nota:nota.trim()||null,foto_url:foto||null},tok);
       }
