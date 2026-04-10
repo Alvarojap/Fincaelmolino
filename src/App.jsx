@@ -244,12 +244,31 @@ function semanaRango(semana){
 }
 
 // ─── PUSH ────────────────────────────────────────────────────────────────────
+const VAPID_PUBLIC="BP-c4VnGEBjkN782qzYSnB8BbrSkKK9rXK5HC3MyxAtscKzh-Wcs4D5E9t8YJpWNnp92r_lZYvSlG-9oW5qSapQ";
 let swReg=null;
-async function regSW(){if(!("serviceWorker"in navigator))return;try{swReg=await navigator.serviceWorker.register("/sw.js");}catch(_){}}
+let swReady=null;
+async function regSW(){if(!("serviceWorker"in navigator))return;try{swReg=await navigator.serviceWorker.register("/sw.js");swReady=navigator.serviceWorker.ready;}catch(_){}}
 async function askPerm(){if(!("Notification"in window))return "denied";if(Notification.permission==="granted")return "granted";return Notification.requestPermission();}
 function sendPush(title,body,tag="molino"){
   if(swReg?.active)swReg.active.postMessage({type:"NOTIFY",title,body,tag});
   else if(Notification?.permission==="granted"){try{new Notification(title,{body,tag});}catch(_){}}
+}
+async function subscribePush(userId,tok){
+  if(!("PushManager"in window))return;
+  try{
+    const reg=swReady?await swReady:swReg;
+    if(!reg)return;
+    let sub=await reg.pushManager.getSubscription();
+    if(!sub){
+      const key=Uint8Array.from(atob(VAPID_PUBLIC.replace(/-/g,"+").replace(/_/g,"/")),c=>c.charCodeAt(0));
+      sub=await swReg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:key});
+    }
+    const {endpoint,keys}=sub.toJSON();
+    await fetch(`${SB_URL}/rest/v1/push_subscriptions`,{
+      method:"POST",headers:{...HDRA(tok),"Prefer":"resolution=merge-duplicates,return=minimal"},
+      body:JSON.stringify({user_id:userId,endpoint,p256dh:keys.p256dh,auth:keys.auth})
+    });
+  }catch(_){}
 }
 
 // ─── LOGO ────────────────────────────────────────────────────────────────────
@@ -461,7 +480,7 @@ export default function App() {
         const s=JSON.parse(saved);
         setSession(s);
         sbGet("usuarios",`?id=eq.${s.user.id}&select=*`,s.access_token)
-          .then(rows=>{if(rows[0])setPerfil(rows[0]);})
+          .then(rows=>{if(rows[0]){setPerfil(rows[0]);subscribePush(s.user.id,s.access_token);}})
           .catch(()=>{});
       }catch(_){localStorage.removeItem("fm_session");}
     }
@@ -475,7 +494,7 @@ export default function App() {
     const rows=await sbGet("usuarios",`?id=eq.${d.user.id}&select=*`,d.access_token);
     if(rows[0])setPerfil(rows[0]);
     setPage("dashboard");
-    askPerm().then(setPerm);
+    askPerm().then(p=>{setPerm(p);if(p==="granted")subscribePush(d.user.id,d.access_token);});
   };
 
   const logout=async()=>{
@@ -902,20 +921,28 @@ function JardinCheck({perfil,tok,rol}){
   const [finalSaving,setFinalSaving]=useState(false);
   const [yaVerif,setYaVerif]=useState(null);
   const [historial,setHistorial]=useState([]);
+  // Servicios a medida
+  const [misSrvs,setMisSrvs]=useState([]);
+  const [srvOpen,setSrvOpen]=useState({});
+  const [srvModal,setSrvModal]=useState(null);
+  const [srvNota,setSrvNota]=useState("");
+  const [srvFoto,setSrvFoto]=useState(null);
 
   const load_=async()=>{
     try{
-      const [js,jp,jf,vrf,hist]=await Promise.all([
+      const [js,jp,jf,vrf,hist,svs]=await Promise.all([
         sbGet("jardin_semana",`?semana=eq.${cwk}&select=*`,tok),
         sbGet("jardin_puntual",`?semana=eq.${cwk}&select=*`,tok),
         sbGet("jardin_frecuencias","?select=*",tok),
         sbGet("jardin_semana",`?semana=eq.${cwk}&tarea_id=eq.VERIFICACION_FINAL&select=*`,tok),
         sbGet("jardin_semana",`?tarea_id=eq.VERIFICACION_FINAL&semana=neq.${cwk}&select=*&order=semana.desc&limit=8`,tok),
+        sbGet("jardin_servicios",`?select=*,jardin_servicio_tareas(*)&estado=eq.activo&jardinero_id=eq.${perfil.id}`,tok),
       ]);
       setJsem(js);setJpunt(jp);
       const fm={}; jf.forEach(x=>fm[x.tarea_id]=x.frecuencia); setJfrec(fm);
       setYaVerif(vrf[0]||null);
       setHistorial(hist);
+      setMisSrvs(svs);
     }catch(_){}
     setLoad(false);
   };
@@ -1008,6 +1035,26 @@ function JardinCheck({perfil,tok,rol}){
     setSaving(false);setModal(null);
   };
 
+  const toggleSrvTarea=async(tareaId,cur)=>{
+    if(saving)return;setSaving(true);
+    try{
+      await sbPatch("jardin_servicio_tareas",`id=eq.${tareaId}`,{
+        done:!cur,completado_por:!cur?perfil.nombre:null,completado_ts:!cur?new Date().toISOString():null
+      },tok);
+      await load_();
+    }catch(_){}setSaving(false);
+  };
+  const saveSrvNota=async()=>{
+    if(!srvModal||saving)return;
+    setSaving(true);
+    try{
+      await sbPatch("jardin_servicio_tareas",`id=eq.${srvModal}`,{nota:srvNota.trim()||null,foto_url:srvFoto||null},tok);
+      await load_();
+    }catch(_){}
+    setSaving(false);setSrvModal(null);
+  };
+  const openSrvNota=(t)=>{setSrvNota(t.nota||"");setSrvFoto(t.foto_url||null);setSrvModal(t.id);};
+
   const guardarFinal=async(modo)=>{
     if(finalSaving)return;
     if(modo==="incidencia"&&!finalNota.trim())return;
@@ -1087,7 +1134,34 @@ function JardinCheck({perfil,tok,rol}){
           ))}
         </div>
       )}
-      {tot===0&&<div className="empty"><span className="ico">✅</span><p>Sin tareas esta semana</p></div>}
+      {misSrvs.length>0&&misSrvs.map(s=>{const tareas=s.jardin_servicio_tareas||[];const hechas=tareas.filter(t=>t.done).length;
+        const fi=new Date(s.fecha_inicio+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"});
+        const ff=new Date(s.fecha_fin+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"});
+        const abierto=srvOpen[s.id];
+        return <div key={s.id} className="card" style={{marginBottom:14,border:"1px solid rgba(201,168,76,.2)"}}>
+          <div className="chdr" onClick={()=>setSrvOpen(prev=>({...prev,[s.id]:!prev[s.id]}))} style={{cursor:"pointer"}}>
+            <span className="ctit">{abierto?"▼":"▶"} 🌿 {s.nombre}</span>
+            <span className="badge" style={{background:"rgba(201,168,76,.1)",color:"#c9a84c"}}>{hechas}/{tareas.length}</span>
+          </div>
+          <div style={{padding:"2px 0",fontSize:12,color:"#7a7f94"}}>📅 {fi} – {ff}</div>
+          {abierto&&<>
+            {s.notas&&<div className="nbox" style={{margin:"6px 0"}}>📝 {s.notas}</div>}
+            <div className="prog" style={{margin:"8px 0",height:5}}><div className="pfill" style={{width:`${tareas.length?(hechas/tareas.length)*100:0}%`,background:"#c9a84c"}}/></div>
+            {tareas.map(t=><div key={t.id} className={`cli${t.done?" done":""}`}>
+              <div className={`chk${t.done?" on":""}`} onClick={()=>toggleSrvTarea(t.id,t.done)} style={{cursor:"pointer"}}/>
+              <div style={{flex:1,minWidth:0}}>
+                <div className={`tl${t.done?" done":""}`}>{t.txt}</div>
+                {t.done&&<div className="tm">✓ {t.completado_por} · {fmtDT(t.completado_ts)}</div>}
+                {t.nota&&<div className="nbox">📝 {t.nota}</div>}
+                {t.foto_url&&<img src={t.foto_url} alt="" className="pthumb"/>}
+              </div>
+              <span className="ibtn" onClick={()=>openSrvNota(t)}>{t.nota||t.foto_url?"✏️":"➕"}</span>
+            </div>)}
+            {hechas===tareas.length&&tareas.length>0&&<div style={{textAlign:"center",padding:"10px 0",fontSize:13,color:"#10b981",fontWeight:600}}>✅ ¡Servicio completado!</div>}
+          </>}
+        </div>;
+      })}
+      {tot===0&&misSrvs.length===0&&<div className="empty"><span className="ico">✅</span><p>Sin tareas esta semana</p></div>}
       {inac.length>0&&(
         <div className="card" style={{opacity:.4}}>
           <div className="chdr"><span className="ctit" style={{color:"#5a5e6e"}}>⏭ No toca esta semana</span></div>
@@ -1148,19 +1222,35 @@ function JardinCheck({perfil,tok,rol}){
       </div>
     )}
     {modal&&<NotaModal nota={nota} setNota={setNota} foto={foto} setFoto={setFoto} onSave={saveNota} onClose={()=>setModal(null)} tok={tok}/>}
+    {srvModal&&<NotaModal nota={srvNota} setNota={setSrvNota} foto={srvFoto} setFoto={setSrvFoto} onSave={saveSrvNota} onClose={()=>setSrvModal(null)} tok={tok}/>}
   </>;
 }
 
 // ─── JARDÍN ADMIN ────────────────────────────────────────────────────────────
 function JardinAdmin({perfil,tok}){
   const cwk=wkKey();
+  const hoy=new Date().toISOString().split("T")[0];
   const [jsem,setJsem]=useState([]);const [jpunt,setJpunt]=useState([]);const [jfrec,setJfrec]=useState({});
   const [load,setLoad]=useState(true);const [tab,setTab]=useState("semana");const [editFr,setEditFr]=useState(null);
   const [showM,setShowM]=useState(false);const [form,setForm]=useState({txt:"",zona:"",sem:cwk});const [saving,setSaving]=useState(false);
+  // Servicios a medida
+  const [srvs,setSrvs]=useState([]);const [showSrv,setShowSrv]=useState(false);const [selSrv,setSelSrv]=useState(null);
+  const [jardineros,setJardineros]=useState([]);
+  const srvVacio={nombre:"",fecha_inicio:hoy,fecha_fin:hoy,jardinero_id:"",notas:""};
+  const [srvForm,setSrvForm]=useState(srvVacio);
+  const [srvTareas,setSrvTareas]=useState([]);
+  const [nuevaTarea,setNuevaTarea]=useState("");
   const sems=Array.from({length:5},(_,i)=>{const d=new Date();d.setDate(d.getDate()+i*7);const k=wkKey(d);return {k,lbl:i===0?`Esta semana (${k})`:`Sem ${k.split("-W")[1]} · ${d.toLocaleDateString("es-ES",{day:"numeric",month:"short"})}`};});
   const load_=async()=>{
-    const [js,jp,jf]=await Promise.all([sbGet("jardin_semana",`?semana=eq.${cwk}&select=*`,tok),sbGet("jardin_puntual",`?semana=eq.${cwk}&select=*`,tok),sbGet("jardin_frecuencias","?select=*",tok)]);
-    setJsem(js);setJpunt(jp);const fm={}; jf.forEach(x=>fm[x.tarea_id]=x.frecuencia); setJfrec(fm);setLoad(false);
+    const [js,jp,jf,sv,jds]=await Promise.all([
+      sbGet("jardin_semana",`?semana=eq.${cwk}&select=*`,tok),
+      sbGet("jardin_puntual",`?semana=eq.${cwk}&select=*`,tok),
+      sbGet("jardin_frecuencias","?select=*",tok),
+      sbGet("jardin_servicios","?select=*,jardin_servicio_tareas(*)&order=created_at.desc",tok),
+      sbGet("usuarios","?rol=eq.jardinero&select=id,nombre",tok),
+    ]);
+    setJsem(js);setJpunt(jp);const fm={}; jf.forEach(x=>fm[x.tarea_id]=x.frecuencia); setJfrec(fm);
+    setSrvs(sv);setJardineros(jds);setLoad(false);
   };
   useEffect(()=>{load_();},[]);
   const sj={}; jsem.forEach(r=>sj[r.tarea_id]=r);
@@ -1177,12 +1267,47 @@ function JardinAdmin({perfil,tok}){
   };
   const delPunt=async id=>{await sbDelete("jardin_puntual",`id=eq.${id}`,tok);await load_();};
   const setFrOv=async(tareaId,v)=>{await sbUpsert("jardin_frecuencias",{tarea_id:tareaId,frecuencia:parseInt(v),updated_at:new Date().toISOString()},tok);setEditFr(null);await load_();};
+
+  // ─ Servicios a medida ─
+  const addTareaTemp=()=>{if(!nuevaTarea.trim())return;setSrvTareas(prev=>[...prev,nuevaTarea.trim()]);setNuevaTarea("");};
+  const removeTareaTemp=i=>setSrvTareas(prev=>prev.filter((_,idx)=>idx!==i));
+  const crearServicio=async()=>{
+    if(!srvForm.nombre||!srvForm.fecha_inicio||!srvForm.fecha_fin||!srvForm.jardinero_id||srvTareas.length===0||saving)return;
+    setSaving(true);
+    try{
+      const jd=jardineros.find(j=>j.id===srvForm.jardinero_id);
+      const [srv]=await sbPost("jardin_servicios",{
+        nombre:srvForm.nombre,fecha_inicio:srvForm.fecha_inicio,fecha_fin:srvForm.fecha_fin,
+        jardinero_id:srvForm.jardinero_id,jardinero_nombre:jd?.nombre||"",
+        estado:"activo",notas:srvForm.notas||null,creado_por:perfil.nombre
+      },tok);
+      for(const txt of srvTareas){await sbPost("jardin_servicio_tareas",{servicio_id:srv.id,txt,done:false},tok);}
+      const fi=new Date(srvForm.fecha_inicio+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"long"});
+      const ff=new Date(srvForm.fecha_fin+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"long"});
+      const msg=`Nuevo servicio de jardinería: "${srvForm.nombre}" (${fi} – ${ff}). ${srvTareas.length} tareas asignadas.`;
+      await sbPost("notificaciones",{para:srvForm.jardinero_id,txt:msg},tok);
+      sendPush("🌿 Finca El Molino",msg,"jardin-servicio");
+      setShowSrv(false);setSrvForm(srvVacio);setSrvTareas([]);await load_();
+    }catch(_){}setSaving(false);
+  };
+  const finalizarServicio=async id=>{
+    await sbPatch("jardin_servicios",`id=eq.${id}`,{estado:"completado"},tok);await load_();
+  };
+  const cancelarServicio=async id=>{
+    await sbPatch("jardin_servicios",`id=eq.${id}`,{estado:"cancelado"},tok);await load_();
+  };
+
   if(load)return <div className="loading"><div className="spin"/><span>Cargando…</span></div>;
+
+  const srvsActivos=srvs.filter(s=>s.estado==="activo");
+  const srvsHist=srvs.filter(s=>s.estado!=="activo");
+
   return <>
     <div className="ph"><h2>Gestión Jardín</h2><p>Seguimiento y planificación</p></div>
     <div className="pb">
       <div className="tabs">
         <button className={`tab${tab==="semana"?" on":""}`} onClick={()=>setTab("semana")}>Esta semana</button>
+        <button className={`tab${tab==="servicios"?" on":""}`} onClick={()=>setTab("servicios")}>Servicios</button>
         <button className={`tab${tab==="frec"?" on":""}`} onClick={()=>setTab("frec")}>Frecuencias</button>
       </div>
       {tab==="semana"&&<>
@@ -1205,6 +1330,59 @@ function JardinAdmin({perfil,tok}){
               <button className="btn br sm" onClick={()=>delPunt(t.id)}>🗑</button>
             </div>)}
         </div>
+      </>}
+      {tab==="servicios"&&<>
+        <div style={{marginBottom:14}}>
+          <button className="btn bp" style={{width:"100%",justifyContent:"center",padding:"12px",fontSize:15}} onClick={()=>{setSrvForm(srvVacio);setSrvTareas([]);setShowSrv(true);}}>+ Crear servicio a medida</button>
+        </div>
+        {srvsActivos.length===0&&srvsHist.length===0&&<div className="empty"><span className="ico">🌿</span><p>Sin servicios creados</p></div>}
+        {srvsActivos.map(s=>{const tareas=s.jardin_servicio_tareas||[];const hechas=tareas.filter(t=>t.done).length;
+          const fi=new Date(s.fecha_inicio+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"});
+          const ff=new Date(s.fecha_fin+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"});
+          const abierto=selSrv===s.id;
+          return <div key={s.id} className="card" style={{marginBottom:14}}>
+            <div className="chdr" onClick={()=>setSelSrv(abierto?null:s.id)} style={{cursor:"pointer"}}>
+              <span className="ctit">{abierto?"▼":"▶"} 🌿 {s.nombre}</span>
+              <span className="badge" style={{background:"rgba(16,185,129,.1)",color:"#10b981"}}>{hechas}/{tareas.length}</span>
+            </div>
+            <div style={{padding:"4px 0 0",fontSize:12,color:"#7a7f94",display:"flex",gap:12,flexWrap:"wrap"}}>
+              <span>📅 {fi} – {ff}</span>
+              <span>👤 {s.jardinero_nombre}</span>
+            </div>
+            {abierto&&<>
+              <div style={{marginTop:10}}>
+                {tareas.map(t=><div key={t.id} className={`cli${t.done?" done":""}`} style={{padding:"8px 0"}}>
+                  <span style={{fontSize:17,flexShrink:0}}>{t.done?"✅":"⬜"}</span>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div className="tl">{t.txt}</div>
+                    {t.done?<div className="tm">✓ {t.completado_por} · {fmtDT(t.completado_ts)}</div>:<div className="tm" style={{color:"#e85555"}}>⏳ Pendiente</div>}
+                    {t.nota&&<div className="nbox">📝 {t.nota}</div>}
+                    {t.foto_url&&<img src={t.foto_url} alt="" className="pthumb"/>}
+                  </div>
+                </div>)}
+              </div>
+              {s.notas&&<div className="nbox" style={{marginTop:8}}>📝 {s.notas}</div>}
+              <div style={{display:"flex",gap:8,marginTop:12}}>
+                {hechas===tareas.length&&tareas.length>0&&<button className="btn bp sm" onClick={()=>finalizarServicio(s.id)}>✅ Finalizar</button>}
+                <button className="btn br sm" onClick={()=>cancelarServicio(s.id)}>Cancelar servicio</button>
+              </div>
+            </>}
+          </div>;
+        })}
+        {srvsHist.length>0&&<>
+          <div style={{fontSize:11,color:"#5a5e6e",textTransform:"uppercase",letterSpacing:1.5,marginTop:20,marginBottom:10}}>📁 Historial</div>
+          {srvsHist.map(s=>{const tareas=s.jardin_servicio_tareas||[];const hechas=tareas.filter(t=>t.done).length;
+            const fi=new Date(s.fecha_inicio+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"});
+            const ff=new Date(s.fecha_fin+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"});
+            return <div key={s.id} className="card" style={{marginBottom:10,opacity:.6}}>
+              <div className="chdr">
+                <span className="ctit">{s.estado==="completado"?"✅":"❌"} {s.nombre}</span>
+                <span className="badge" style={{background:s.estado==="completado"?"rgba(16,185,129,.1)":"rgba(232,85,85,.1)",color:s.estado==="completado"?"#10b981":"#e85555"}}>{s.estado==="completado"?"Completado":"Cancelado"}</span>
+              </div>
+              <div style={{fontSize:12,color:"#5a5e6e"}}>📅 {fi} – {ff} · 👤 {s.jardinero_nombre} · {hechas}/{tareas.length} tareas</div>
+            </div>;
+          })}
+        </>}
       </>}
       {tab==="frec"&&<div className="card">
         <div className="chdr"><span className="ctit">🔁 Frecuencias</span></div>
@@ -1229,6 +1407,34 @@ function JardinAdmin({perfil,tok}){
       <div className="fg"><label>Zona</label><input className="fi" value={form.zona} onChange={e=>setForm(v=>({...v,zona:e.target.value}))} placeholder="Ej: Piscina"/></div>
       <div className="fg"><label>Semana</label><select className="fi" value={form.sem} onChange={e=>setForm(v=>({...v,sem:e.target.value}))}>{sems.map(s=><option key={s.k} value={s.k}>{s.lbl}</option>)}</select></div>
       <div className="mft"><button className="btn bg" onClick={()=>setShowM(false)}>Cancelar</button><button className="btn bp" onClick={addPunt} disabled={saving}>📌 Asignar y notificar</button></div>
+    </div></div>}
+    {showSrv&&<div className="ov" onClick={()=>setShowSrv(false)}><div className="modal" onClick={e=>e.stopPropagation()} style={{maxHeight:"90vh",overflowY:"auto"}}>
+      <h3>🌿 Crear servicio a medida</h3>
+      <div className="fg"><label>Nombre del servicio *</label><input className="fi" value={srvForm.nombre} onChange={e=>setSrvForm(v=>({...v,nombre:e.target.value}))} placeholder="Ej: Preparación jardín boda García"/></div>
+      <div style={{display:"flex",gap:10}}>
+        <div className="fg" style={{flex:1}}><label>Fecha inicio *</label><input className="fi" type="date" value={srvForm.fecha_inicio} onChange={e=>setSrvForm(v=>({...v,fecha_inicio:e.target.value}))}/></div>
+        <div className="fg" style={{flex:1}}><label>Fecha fin *</label><input className="fi" type="date" value={srvForm.fecha_fin} onChange={e=>setSrvForm(v=>({...v,fecha_fin:e.target.value}))}/></div>
+      </div>
+      <div className="fg"><label>Jardinero asignado *</label><select className="fi" value={srvForm.jardinero_id} onChange={e=>setSrvForm(v=>({...v,jardinero_id:e.target.value}))}>
+        <option value="">Seleccionar jardinero…</option>
+        {jardineros.map(j=><option key={j.id} value={j.id}>{j.nombre}</option>)}
+      </select></div>
+      <div className="fg"><label>Notas (opcional)</label><textarea className="fi" rows={2} value={srvForm.notas} onChange={e=>setSrvForm(v=>({...v,notas:e.target.value}))} placeholder="Instrucciones adicionales…"/></div>
+      <div className="fg">
+        <label>Tareas ({srvTareas.length})</label>
+        <div style={{display:"flex",gap:8}}>
+          <input className="fi" style={{flex:1}} value={nuevaTarea} onChange={e=>setNuevaTarea(e.target.value)} placeholder="Escribir tarea…" onKeyDown={e=>{if(e.key==="Enter"){e.preventDefault();addTareaTemp();}}}/>
+          <button className="btn bp sm" onClick={addTareaTemp} style={{flexShrink:0}}>+ Añadir</button>
+        </div>
+        {srvTareas.length>0&&<div style={{marginTop:10}}>
+          {srvTareas.map((t,i)=><div key={i} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",background:"rgba(255,255,255,.03)",borderRadius:8,marginBottom:4}}>
+            <span style={{color:"#c9a84c",fontSize:13,flexShrink:0}}>{i+1}.</span>
+            <span style={{flex:1,fontSize:13,color:"#c9c5b8"}}>{t}</span>
+            <button onClick={()=>removeTareaTemp(i)} style={{background:"none",border:"none",color:"#e85555",cursor:"pointer",fontSize:15,padding:"0 4px"}}>×</button>
+          </div>)}
+        </div>}
+      </div>
+      <div className="mft"><button className="btn bg" onClick={()=>setShowSrv(false)}>Cancelar</button><button className="btn bp" onClick={crearServicio} disabled={saving||!srvForm.nombre||!srvForm.jardinero_id||srvTareas.length===0}>{saving?"Creando…":"🌿 Crear y notificar"}</button></div>
     </div></div>}
   </>;
 }
