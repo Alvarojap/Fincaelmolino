@@ -1596,10 +1596,9 @@ function DashJ({perfil,jsem,jpunt,cwk,setPage,tok}){
   const loadSrvActivo=async()=>{
     try{
       const jId=perfil.es_operario?perfil.referencia_id:perfil.id;
-      const srvs=await sbGet("servicios_jardineria",`?estado=eq.en_curso&jardinero_id=eq.${jId}&select=*`,tok).catch(()=>[]);
+      const srvs=await sbGet("jardin_servicios",`?jardinero_id=eq.${jId}&estado=eq.activo&select=*`,tok).catch(()=>[]);
       if(srvs.length===0){setSrvActivo(null);setSrvTareas([]);setSrvExtras([]);return;}
       const s=srvs[0];setSrvActivo(s);
-      // Tareas from jardin_servicio_tareas
       const allTareas=await sbGet("jardin_servicio_tareas",`?servicio_id=eq.${s.id}&select=*&order=created_at.asc`,tok).catch(()=>[]);
       setSrvTareas(allTareas.filter(t=>!t.añadida_por_jardinero));
       setSrvExtras(allTareas.filter(t=>t.añadida_por_jardinero));
@@ -1670,7 +1669,7 @@ function DashJ({perfil,jsem,jpunt,cwk,setPage,tok}){
       await sbPatch("jornadas_jardineria",`id=eq.${jornada.id}`,{hora_fin:hf,duracion_minutos:durMin,pausas},tok);
       const horasJornada=Math.round(durMin/60*100)/100;
       const prevHoras=parseFloat(srvActivo.horas_totales)||0;
-      await sbPatch("servicios_jardineria",`id=eq.${srvActivo.id}`,{horas_totales:prevHoras+horasJornada},tok).catch(()=>{});
+      await sbPatch("jardin_servicios",`id=eq.${srvActivo.id}`,{horas_totales:prevHoras+horasJornada},tok).catch(()=>{});
       localStorage.removeItem(`fm_jornada_inicio_${srvActivo.id}`);
       setJornada(prev=>({...prev,hora_fin:hf,duracion_minutos:durMin}));setShowFinJornada(false);
       await loadSrvActivo();
@@ -1706,16 +1705,19 @@ function DashJ({perfil,jsem,jpunt,cwk,setPage,tok}){
     if(!srvActivo||saving2)return;setSaving2(true);
     try{
       if(jornada&&!jornada.hora_fin)await terminarJornada();
-      const s=await sbGet("servicios_jardineria",`?id=eq.${srvActivo.id}&select=*`,tok).then(r=>r[0]).catch(()=>srvActivo);
+      const s=await sbGet("jardin_servicios",`?id=eq.${srvActivo.id}&select=*`,tok).then(r=>r[0]).catch(()=>srvActivo);
       const horasT=parseFloat(s?.horas_totales)||0;
       const mod=s?.modalidad_pago||s?.modalidad||"por_horas";
       let costeTotal=0;
       if(mod==="por_horas")costeTotal=Math.round(horasT*(parseFloat(s?.tarifa_hora_aplicada)||parseFloat(s?.tarifa_hora)||0)*100)/100;
       else if(mod==="precio_fijo_servicio")costeTotal=parseFloat(s?.precio_fijo_acordado)||parseFloat(s?.importe_fijo)||0;
       const costeHoraReal=horasT>0?Math.round(costeTotal/horasT*100)/100:0;
-      await sbPatch("servicios_jardineria",`id=eq.${srvActivo.id}`,{estado:"finalizado",fecha_fin:hoyStr,coste_total:costeTotal,coste_hora_real:costeHoraReal},tok);
+      await sbPatch("jardin_servicios",`id=eq.${srvActivo.id}`,{estado:"finalizado",fecha_fin:hoyStr,coste_total:costeTotal,coste_hora_real:costeHoraReal},tok).catch(()=>{
+        // Fallback if coste columns don't exist
+        return sbPatch("jardin_servicios",`id=eq.${srvActivo.id}`,{estado:"completado"},tok);
+      });
       const admins=await sbGet("usuarios","?rol=eq.admin&select=id",tok);
-      const msg=`🌿 ${perfil.nombre} ha completado "${srvActivo.titulo}". Total: ${horasT}h. Coste: ${costeTotal}€.`;
+      const msg=`🌿 ${perfil.nombre} ha completado "${srvActivo.nombre||srvActivo.titulo}". Total: ${horasT}h. Coste: ${costeTotal}€.`;
       for(const a of admins){await sbPost("notificaciones",{para:a.id,txt:msg},tok);sendPush("🌿 Finca El Molino",msg,"jardin-srv-fin");}
       localStorage.removeItem(`fm_jornada_inicio_${srvActivo.id}`);
       setShowFinSrv(false);setSrvActivo(null);setSrvTareas([]);setSrvExtras([]);
@@ -1731,8 +1733,10 @@ function DashJ({perfil,jsem,jpunt,cwk,setPage,tok}){
       {/* SERVICIO ACTIVO */}
       {srvActivo&&<div className="card" style={{marginBottom:16,border:"1px solid rgba(16,185,129,.3)",background:"rgba(16,185,129,.04)"}}>
         <div className="chdr"><span className="ctit">🌿 Servicio activo</span></div>
-        <div style={{fontSize:16,fontWeight:600,color:"#1A1A1A",marginBottom:4}}>{srvActivo.titulo}</div>
-        <div style={{fontSize:12,color:"#8A8580",marginBottom:12}}>Tareas: {srvTareas.filter(t=>t.done).length} de {srvTareas.length} completadas{srvExtras.length>0?` + ${srvExtras.length} extra`:""}</div>
+        <div style={{fontSize:16,fontWeight:600,color:"#1A1A1A",marginBottom:4}}>{srvActivo.nombre||srvActivo.titulo}</div>
+        {(srvActivo.fecha_inicio||srvActivo.fecha_fin)&&<div style={{fontSize:11,color:"#8A8580",marginBottom:4}}>📅 {srvActivo.fecha_inicio?new Date(srvActivo.fecha_inicio+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"}):""}{srvActivo.fecha_fin?` → ${new Date(srvActivo.fecha_fin+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"})}`:""}</div>}
+        <div style={{fontSize:12,color:"#8A8580",marginBottom:6}}>Tareas: {srvTareas.filter(t=>t.done).length} de {srvTareas.length} completadas{srvExtras.length>0?` + ${srvExtras.length} extra`:""}</div>
+        <div className="prog" style={{marginBottom:14,height:8}}><div className="pfill" style={{width:`${srvTareas.length?(srvTareas.filter(t=>t.done).length/srvTareas.length)*100:0}%`}}/></div>
 
         {/* Cronómetro */}
         {jornada&&!jornada.hora_fin&&<>
@@ -1790,19 +1794,22 @@ function DashJ({perfil,jsem,jpunt,cwk,setPage,tok}){
         {tareasAdminOk&&(!jornada||jornada.hora_fin)&&<button className="btn bp" style={{width:"100%",justifyContent:"center",padding:"14px",fontSize:15,marginTop:12,background:"#A6BE59"}} onClick={()=>setShowFinSrv(true)}>✅ Marcar servicio completado</button>}
       </div>}
 
-      <div className="sg"><SC lbl="Tareas esta semana" val={tot}/><SC lbl="Completadas" val={comp} prog={tot?comp/tot:0} valC="#10b981" sub={comp===tot&&tot>0?"¡Al día! ✓":undefined}/><SC lbl="Pendientes" val={tot-comp} valC={tot-comp>0?"#f59e0b":"#10b981"}/></div>
-      <div className="card"><div className="chdr"><span className="ctit">📋 Mis tareas</span><button className="btn bp sm" onClick={()=>setPage("jcheck")}>Ir al checklist →</button></div>
-        {actv.slice(0,6).map(t=><MTask key={t.id} lbl={t.txt} sub={t.zona} done={sj[t.id]?.done}/>)}
-        {jpunt.map(t=><MTask key={t.id} lbl={t.txt} sub="📌 Puntual" done={t.done}/>)}
-        {tot===0&&<div className="empty"><span className="ico">✅</span><p>Sin tareas esta semana</p></div>}
-      </div>
+      {/* Checklist semanal solo si NO hay servicio activo */}
+      {!srvActivo&&<>
+        <div className="sg"><SC lbl="Tareas esta semana" val={tot}/><SC lbl="Completadas" val={comp} prog={tot?comp/tot:0} valC="#10b981" sub={comp===tot&&tot>0?"¡Al día! ✓":undefined}/><SC lbl="Pendientes" val={tot-comp} valC={tot-comp>0?"#f59e0b":"#10b981"}/></div>
+        <div className="card"><div className="chdr"><span className="ctit">📋 Mis tareas</span><button className="btn bp sm" onClick={()=>setPage("jcheck")}>Ir al checklist →</button></div>
+          {actv.slice(0,6).map(t=><MTask key={t.id} lbl={t.txt} sub={t.zona} done={sj[t.id]?.done}/>)}
+          {jpunt.map(t=><MTask key={t.id} lbl={t.txt} sub="📌 Puntual" done={t.done}/>)}
+          {tot===0&&<div className="empty"><span className="ico">✅</span><p>Sin tareas esta semana</p></div>}
+        </div>
+      </>}
     </div>
 
     {/* Modal nueva jornada */}
     {showNuevaJornada&&<div className="ov"><div className="modal" style={{maxWidth:400,textAlign:"center"}}>
       <div style={{fontSize:36,marginBottom:8}}>🌿</div>
       <h3>Tienes un servicio en curso</h3>
-      <p style={{fontSize:13,color:"#8A8580",marginBottom:20,lineHeight:1.5}}>"{srvActivo?.titulo}" está activo. ¿Empezar la jornada de hoy?</p>
+      <p style={{fontSize:13,color:"#8A8580",marginBottom:20,lineHeight:1.5}}>"{srvActivo?.nombre||srvActivo?.titulo}" está activo. ¿Empezar la jornada de hoy?</p>
       <button className="btn bp" style={{width:"100%",justifyContent:"center",padding:"14px",fontSize:15}} onClick={iniciarJornada} disabled={saving2}>{saving2?"Iniciando…":"▶️ Empezar jornada"}</button>
       <button onClick={()=>setShowNuevaJornada(false)} style={{background:"none",border:"none",color:"#8A8580",cursor:"pointer",width:"100%",textAlign:"center",marginTop:12,fontSize:12,fontFamily:"'DM Sans',sans-serif",padding:"8px"}}>Ahora no</button>
     </div></div>}
@@ -1821,7 +1828,7 @@ function DashJ({perfil,jsem,jpunt,cwk,setPage,tok}){
     {showFinSrv&&<div className="ov"><div className="modal" style={{maxWidth:440,textAlign:"center"}}>
       <div style={{fontSize:36,marginBottom:8}}>✅</div>
       <h3>Completar servicio</h3>
-      <p style={{fontSize:13,color:"#8A8580",marginBottom:16,lineHeight:1.5}}>"{srvActivo?.titulo}" — todas las tareas asignadas completadas.</p>
+      <p style={{fontSize:13,color:"#8A8580",marginBottom:16,lineHeight:1.5}}>"{srvActivo?.nombre||srvActivo?.titulo}" — todas las tareas asignadas completadas.</p>
       <div style={{background:"#F5F3F0",borderRadius:10,padding:"14px",marginBottom:20}}>
         <div style={{fontSize:12,color:"#8A8580"}}>Total acumulado: <strong style={{color:"#EC683E"}}>{fmtHM(totalAcum*60)}</strong></div>
         {srvExtras.length>0&&<div style={{fontSize:12,color:"#EC683E",marginTop:4}}>+ {srvExtras.length} tarea{srvExtras.length>1?"s":""} extra registrada{srvExtras.length>1?"s":""}</div>}
