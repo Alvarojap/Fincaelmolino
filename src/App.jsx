@@ -2267,19 +2267,24 @@ function JardinAdmin({perfil,tok}){
     setSaving(true);
     try{
       const jd=jardineros.find(j=>j.id===srvForm.jardinero_id);
-      const [srv]=await sbPost("jardin_servicios",{
-        nombre:srvForm.nombre,
-        fecha_inicio:srvForm.fecha_inicio,
-        fecha_fin:srvForm.fecha_fin,
-        jardinero_id:srvForm.jardinero_id||null,
-        jardinero_nombre:jd?.nombre||"",
-        estado:"activo",
-        notas:srvForm.notas||null,
-        creado_por:perfil.nombre,
-        modalidad_pago:srvForm.modalidad_pago||"precio_fijo_servicio",
-        precio_fijo_acordado:srvForm.precio_fijo_acordado||null,
-        tarifa_hora_aplicada:srvForm.tarifa_hora_aplicada||null
-      },tok);
+      const resp=await fetch(`${SB_URL}/rest/v1/jardin_servicios`,{
+        method:"POST",
+        headers:{...HDRA(tok),"Prefer":"return=representation","Content-Type":"application/json"},
+        body:JSON.stringify({
+          nombre:srvForm.nombre,
+          fecha_inicio:srvForm.fecha_inicio,
+          fecha_fin:srvForm.fecha_fin,
+          jardinero_id:srvForm.jardinero_id||null,
+          jardinero_nombre:jd?.nombre||"",
+          estado:"activo",
+          notas:srvForm.notas||null,
+          creado_por:perfil.nombre
+        })
+      });
+      const respText=await resp.text();
+      console.error("Respuesta Supabase jardin_servicios:",resp.status,respText);
+      if(!resp.ok)throw new Error(respText);
+      const srv=JSON.parse(respText)[0];
       for(const txt of srvTareas){await sbPost("jardin_servicio_tareas",{servicio_id:srv.id,txt,done:false},tok);}
       const fi=new Date(srvForm.fecha_inicio+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"long"});
       const ff=new Date(srvForm.fecha_fin+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"long"});
