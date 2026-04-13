@@ -254,7 +254,7 @@ function sendPush(title,body,tag="molino"){
   if(swReg?.active)swReg.active.postMessage({type:"NOTIFY",title,body,tag});
   else if(Notification?.permission==="granted"){try{new Notification(title,{body,tag});}catch(_){}}
 }
-async function subscribePush(userId,tok){
+async function subscribePush(userId,tok,role){
   if(!("PushManager"in window))return;
   try{
     const reg=swReady?await swReady:swReg;
@@ -265,10 +265,40 @@ async function subscribePush(userId,tok){
       sub=await swReg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:key});
     }
     const {endpoint,keys}=sub.toJSON();
+    const body={user_id:userId,endpoint,p256dh:keys.p256dh,auth:keys.auth};
+    if(role)body.role=role;
     await fetch(`${SB_URL}/rest/v1/push_subscriptions`,{
       method:"POST",headers:{...HDRA(tok),"Prefer":"resolution=merge-duplicates,return=minimal"},
-      body:JSON.stringify({user_id:userId,endpoint,p256dh:keys.p256dh,auth:keys.auth})
+      body:JSON.stringify(body)
     });
+  }catch(_){}
+}
+async function notificarRoles(roles,titulo,cuerpo,tag,tok){
+  try{
+    // Notify users with matching roles via in-app notifications
+    const usuarios=await sbGet("usuarios",`?select=id,rol`,tok).catch(()=>[]);
+    const targets=usuarios.filter(u=>roles.includes(u.rol));
+    for(const u of targets){
+      await sbPost("notificaciones",{para:u.id,txt:cuerpo},tok).catch(()=>{});
+    }
+    // Local push for current user
+    sendPush(titulo,cuerpo,tag);
+  }catch(_){}
+}
+async function checkNotifDiaria(tok){
+  const hoyStr=new Date().toISOString().split("T")[0];
+  const lsKey=`fm_notif_check_${hoyStr}`;
+  if(localStorage.getItem(lsKey))return;
+  try{
+    const en7=new Date();en7.setDate(en7.getDate()+7);
+    const en7Str=en7.toISOString().split("T")[0];
+    const [reservas,airbnbs]=await Promise.all([
+      sbGet("reservas",`?fecha=gte.${hoyStr}&fecha=lte.${en7Str}&estado=neq.cancelada&estado=neq.finalizada&select=id`,tok).catch(()=>[]),
+      sbGet("reservas_airbnb",`?fecha_entrada=gte.${hoyStr}&fecha_entrada=lte.${en7Str}&select=id`,tok).catch(()=>[]),
+    ]);
+    const total=reservas.length+airbnbs.length;
+    if(total>0)sendPush("📅 Finca El Molino",`Esta semana: ${total} llegada${total>1?"s":""} próxima${total>1?"s":""}`,`resumen-semanal-${hoyStr}`);
+    localStorage.setItem(lsKey,"1");
   }catch(_){}
 }
 
@@ -512,8 +542,8 @@ export default function App() {
           .then(rows=>{
             if(rows[0]){
               setPerfil(rows[0]);
-              subscribePush(s.user.id,s.access_token);
-              if(rows[0].rol==="admin")autoRecurrentes(s.access_token,setToast);
+              subscribePush(s.user.id,s.access_token,rows[0].rol);
+              if(rows[0].rol==="admin"){autoRecurrentes(s.access_token,setToast);checkNotifDiaria(s.access_token);}
             }
           })
           .catch(()=>{});
@@ -529,7 +559,7 @@ export default function App() {
     const rows=await sbGet("usuarios",`?id=eq.${d.user.id}&select=*`,d.access_token);
     if(rows[0])setPerfil(rows[0]);
     setPage("dashboard");
-    askPerm().then(p=>{setPerm(p);if(p==="granted")subscribePush(d.user.id,d.access_token);});
+    askPerm().then(p=>{setPerm(p);if(p==="granted")subscribePush(d.user.id,d.access_token,rows[0]?.rol);});
   };
 
   const logout=async()=>{
@@ -3000,13 +3030,8 @@ function ModalOcupado({fecha,conflictos,tipoAccion,perfil,tok,onCerrar,onForzar}
         tipo_accion:tipoAccion,
         estado:"pendiente",
       },tok);
-      // Notificar a admins
-      const admins=await sbGet("usuarios","?rol=eq.admin&select=id",tok);
-      const msg=`🔒 ${perfil.nombre} solicita ${tipoLbl} el ${fmtFecha}. La fecha está ocupada. Revisa las solicitudes para aprobar o rechazar.`;
-      for(const a of admins){
-        await sbPost("notificaciones",{para:a.id,txt:msg},tok);
-        sendPush("🔒 Solicitud de desbloqueo",msg,"desbloqueo");
-      }
+      const msg=`🔒 ${perfil.nombre} solicita ${tipoLbl} el ${fmtFecha}. La fecha está ocupada.`;
+      await notificarRoles(["admin"],"🔒 Solicitud de desbloqueo",msg,"desbloqueo",tok);
       setEnviado(true);
     }catch(_){}
     setSaving(false);
@@ -3986,6 +4011,8 @@ function Reservas({tok,rol,perfil}){
     await sbPatch("reservas",`id=eq.${id}`,{estado:e,updated_at:new Date().toISOString()},tok);
     const est=ESTADOS.find(s=>s.id===e);
     await addHistorial("reserva",id,`Estado cambiado a: ${est?.lbl||e}`,perfil?.nombre||"Admin",tok);
+    const r=reservas.find(x=>x.id===id);
+    if(r)notificarRoles(["admin","comercial"],`📋 Reserva actualizada`,`${r.nombre}: ${est?.lbl||e}`,"reserva-estado",tok);
     setReservas(prev=>prev.map(r=>r.id===id?{...r,estado:e}:r));
     setSel(p=>p?.id===id?{...p,estado:e}:p);
   };
@@ -4187,6 +4214,10 @@ function NuevaReserva({perfil,tok,setPage}){
       if(!disp.libre){setSaving(false);setBloqueadoR(disp.conflictos);return;}
       const [res]=await sbPost("reservas",{...form,precio:parseFloat(form.precio)||0,creado_por:perfil.id},tok);
       await addHistorial("reserva",res.id,`Reserva creada por ${perfil.nombre}`,perfil.nombre,tok);
+      const en7=new Date();en7.setDate(en7.getDate()+7);
+      if(form.fecha&&form.fecha<=en7.toISOString().split("T")[0]){
+        notificarRoles(["admin","comercial","limpieza","jardinero"],"🎉 Nuevo evento",`${form.nombre} el ${new Date(form.fecha+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"long"})}`,"evento-nuevo",tok);
+      }
       setOk(true);setTimeout(()=>{setOk(false);setPage("reservas");},2000);
       setForm({nombre:"",fecha:"",tipo:"Boda",precio:"",contacto:"",obs:"",estado:"visita"});
     }catch(_){}setSaving(false);
@@ -4258,6 +4289,10 @@ function Visitas({perfil,tok,rol}){
       if(!disp.libre){setSaving(false);setShowForm(false);setBloqueado(disp.conflictos);return;}
       const [v]=await sbPost("visitas",{...form,invitados:parseInt(form.invitados)||null,estado:"pendiente",creado_por:perfil.nombre},tok);
       await addHistorial("visita",v.id,`Visita registrada para el ${new Date(form.fecha+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"long",year:"numeric"})} a las ${form.hora}`,perfil.nombre,tok);
+      const en7=new Date();en7.setDate(en7.getDate()+7);
+      if(form.fecha&&form.fecha<=en7.toISOString().split("T")[0]){
+        notificarRoles(["admin","comercial"],"👁 Nueva visita",`${form.nombre} el ${new Date(form.fecha+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"long"})} a las ${form.hora}`,"visita-nueva",tok);
+      }
       setShowForm(false);setForm(formVacio);await load_();
     }catch(_){}
     setSaving(false);
@@ -4596,6 +4631,11 @@ function ReservasAirbnb({perfil,tok,rol}){
         precio:parseFloat(form.precio)||null,
         creado_por:perfil.nombre,
       },tok);
+      // Notificar si llegada próximos 7 días
+      const en7=new Date();en7.setDate(en7.getDate()+7);
+      if(form.fecha_entrada&&form.fecha_entrada<=en7.toISOString().split("T")[0]){
+        notificarRoles(["admin","limpieza","jardinero"],`🏠 Nueva reserva Airbnb`,`${form.huesped} llega el ${new Date(form.fecha_entrada+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"long"})}`,"airbnb-nueva",tok);
+      }
       setShowForm(false);setForm(formVacio);await load_();
     }catch(_){}
     setSaving(false);
