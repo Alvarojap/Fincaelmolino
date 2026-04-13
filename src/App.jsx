@@ -835,11 +835,6 @@ function FinancialKPIs({tok}){
     setLoad(true);
     try{
       const {desde,hasta}=getRango();
-      // Auto-marcar airbnb pasados como cobrados
-      await fetch(`${SB_URL}/rest/v1/reservas_airbnb?fecha_entrada=lt.${hoyStr}&cobrado=eq.false`,{
-        method:"PATCH",headers:{...HDRA(tok),"Prefer":"return=minimal"},
-        body:JSON.stringify({cobrado:true})
-      });
       const [reservas,airbnbs,gastos,configRows]=await Promise.all([
         sbGet("reservas",`?fecha=gte.${desde}&fecha=lte.${hasta}&select=*`,tok),
         sbGet("reservas_airbnb",`?fecha_entrada=gte.${desde}&fecha_entrada=lte.${hasta}&select=*`,tok),
@@ -1276,7 +1271,34 @@ function AtencionAhora({tok,setPage}){
   </div>;
 }
 
+// ─── AUTO-COBRO AIRBNB ──────────────────────────────────────────────────────
+async function autoCobrarAirbnb(tok){
+  const hoyStr=new Date().toISOString().split("T")[0];
+  const ssKey=`airbnb_autocobro_${hoyStr}`;
+  if(sessionStorage.getItem(ssKey))return;
+  try{
+    const pendientes=await sbGet("reservas_airbnb",`?fecha_entrada=lt.${hoyStr}&cobrado=eq.false&select=*`,tok);
+    if(pendientes.length===0){sessionStorage.setItem(ssKey,"1");return;}
+    const configRows=await sbGet("configuracion","?select=*",tok).catch(()=>[]);
+    const cfg={};configRows.forEach(c=>cfg[c.clave]=c.valor);
+    const comisionPct=parseFloat(cfg.comision_pct)||10;
+    for(const a of pendientes){
+      await sbPatch("reservas_airbnb",`id=eq.${a.id}`,{cobrado:true},tok);
+      const precio=parseFloat(a.precio)||0;
+      if(precio>0){
+        const concepto=`Comisión Airbnb - ${a.huesped}`;
+        const existe=await sbGet("gastos",`?concepto=eq.${encodeURIComponent(concepto)}&select=id`,tok).catch(()=>[]);
+        if(existe.length===0){
+          await sbPost("gastos",{fecha:hoyStr,categoria:"comision",concepto,importe:Math.round(precio*comisionPct/100*100)/100,origen:"auto_comision"},tok).catch(()=>{});
+        }
+      }
+    }
+    sessionStorage.setItem(ssKey,"1");
+  }catch(_){}
+}
+
 function DashA({reservas,jsem,jpunt,cwk,setPage,tok}){
+  useEffect(()=>{autoCobrarAirbnb(tok);},[]);
   const temp=getTemporada();
   const sj={}; jsem.forEach(r=>sj[r.tarea_id]=r);
   const actv=JARDIN_T[temp].filter(t=>tocaSemana({...t,frec:t.frec},cwk));
@@ -3026,6 +3048,10 @@ function Reservas({tok,rol,perfil}){
   const [filtro,setFiltro]=useState("activas");
   const [sel,setSel]=useState(null);
   const [load,setLoad]=useState(true);
+  const [showSeña,setShowSeña]=useState(false);
+  const [señaImporte,setSeñaImporte]=useState("");
+  const [showPagoTotal,setShowPagoTotal]=useState(false);
+  const [cobroSaving,setCobroSaving]=useState(false);
 
   const load_=async()=>{
     const r=await sbGet("reservas","?select=*&order=fecha.asc",tok);
@@ -3053,6 +3079,46 @@ function Reservas({tok,rol,perfil}){
     await sbDelete("reservas",`id=eq.${id}`,tok);
     setReservas(prev=>prev.filter(r=>r.id!==id));
     setSel(null);
+  };
+
+  const registrarSeña=async()=>{
+    if(!sel||cobroSaving||!señaImporte)return;
+    setCobroSaving(true);
+    try{
+      const imp=parseFloat(señaImporte)||0;
+      const hoyStr=new Date().toISOString().split("T")[0];
+      await sbPatch("reservas",`id=eq.${sel.id}`,{seña_importe:imp,seña_cobrada:true,seña_fecha:hoyStr,estado_pago:"seña_cobrada"},tok);
+      await addHistorial("reserva",sel.id,`Seña cobrada: ${imp.toLocaleString("es-ES")}€`,perfil?.nombre||"Admin",tok);
+      const updated={...sel,seña_importe:imp,seña_cobrada:true,seña_fecha:hoyStr,estado_pago:"seña_cobrada"};
+      setReservas(prev=>prev.map(r=>r.id===sel.id?{...r,...updated}:r));
+      setSel(updated);
+      setShowSeña(false);setSeñaImporte("");
+    }catch(_){}
+    setCobroSaving(false);
+  };
+
+  const registrarPagoTotal=async()=>{
+    if(!sel||cobroSaving)return;
+    setCobroSaving(true);
+    try{
+      const hoyStr=new Date().toISOString().split("T")[0];
+      await sbPatch("reservas",`id=eq.${sel.id}`,{saldo_cobrado:true,saldo_fecha:hoyStr,estado_pago:"pagado_completo"},tok);
+      const precioTotal=parseFloat(sel.precio_total)||parseFloat(sel.precio)||0;
+      await addHistorial("reserva",sel.id,`Pago total registrado. Total: ${precioTotal.toLocaleString("es-ES")}€`,perfil?.nombre||"Admin",tok);
+      // Auto-insertar comisión en gastos
+      const configRows=await sbGet("configuracion","?select=*",tok).catch(()=>[]);
+      const cfg={};configRows.forEach(c=>cfg[c.clave]=c.valor);
+      const comisionPct=parseFloat(cfg.comision_pct)||10;
+      const comision=Math.round(precioTotal*comisionPct/100*100)/100;
+      if(comision>0){
+        await sbPost("gastos",{fecha:hoyStr,categoria:"comision",concepto:`Comisión gestor - ${sel.nombre}`,importe:comision,origen:"auto_comision"},tok).catch(()=>{});
+      }
+      const updated={...sel,saldo_cobrado:true,saldo_fecha:hoyStr,estado_pago:"pagado_completo"};
+      setReservas(prev=>prev.map(r=>r.id===sel.id?{...r,...updated}:r));
+      setSel(updated);
+      setShowPagoTotal(false);
+    }catch(_){}
+    setCobroSaving(false);
   };
 
   if(load)return <div className="loading"><div className="spin"/><span>Cargando…</span></div>;
@@ -3115,12 +3181,81 @@ function Reservas({tok,rol,perfil}){
             </div>
             <hr className="div"/>
             <button className="btn br" style={{width:"100%",justifyContent:"center"}} onClick={()=>del(sel.id)}>🗑 Eliminar reserva</button>
+            {/* ── CONTROLES DE COBRO ── */}
+            <hr className="div"/>
+            <div style={{fontSize:10,color:"#5a5e6e",marginBottom:9,textTransform:"uppercase",letterSpacing:1}}>Estado de cobro</div>
+            {(()=>{
+              const ep=sel.estado_pago||"pendiente";
+              const seña=parseFloat(sel.seña_importe)||0;
+              const pt=parseFloat(sel.precio_total)||parseFloat(sel.precio)||0;
+              return <>
+                {/* Badge estado pago */}
+                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
+                  <span className="badge" style={{
+                    background:ep==="pagado_completo"?"rgba(16,185,129,.12)":ep==="seña_cobrada"?"rgba(201,168,76,.12)":"rgba(245,158,11,.12)",
+                    color:ep==="pagado_completo"?"#10b981":ep==="seña_cobrada"?"#c9a84c":"#f59e0b",
+                    border:`1px solid ${ep==="pagado_completo"?"rgba(16,185,129,.3)":ep==="seña_cobrada"?"rgba(201,168,76,.3)":"rgba(245,158,11,.3)"}`
+                  }}>{ep==="pagado_completo"?"✅ Pagado completo":ep==="seña_cobrada"?`💰 Seña cobrada: ${seña.toLocaleString("es-ES")}€`:"⏳ Pendiente de cobro"}</span>
+                </div>
+                {ep==="seña_cobrada"&&<div style={{fontSize:12,color:"#7a7f94",marginBottom:10}}>Saldo pendiente: <strong style={{color:"#f59e0b"}}>{(pt-seña).toLocaleString("es-ES")}€</strong></div>}
+                {sel.seña_fecha&&<div style={{fontSize:11,color:"#5a5e6e",marginBottom:4}}>Seña registrada: {new Date(sel.seña_fecha+"T12:00:00").toLocaleDateString("es-ES")}</div>}
+                {sel.saldo_fecha&&<div style={{fontSize:11,color:"#5a5e6e",marginBottom:4}}>Saldo registrado: {new Date(sel.saldo_fecha+"T12:00:00").toLocaleDateString("es-ES")}</div>}
+                {/* Botón registrar seña */}
+                {(ep==="pendiente"||!sel.estado_pago)&&sel.estado!=="cancelada"&&sel.estado!=="finalizada"&&(
+                  <button className="btn bp" style={{width:"100%",justifyContent:"center",marginTop:6}} onClick={()=>{setSeñaImporte("");setShowSeña(true);}}>💰 Registrar seña cobrada</button>
+                )}
+                {/* Botón registrar pago total */}
+                {ep==="seña_cobrada"&&(
+                  <button className="btn bp" style={{width:"100%",justifyContent:"center",marginTop:6,background:"#10b981"}} onClick={()=>setShowPagoTotal(true)}>✅ Registrar pago total</button>
+                )}
+              </>;
+            })()}
           </>}
           <Historial entidad_tipo="reserva" entidad_id={sel.id} tok={tok} perfil={perfil||{nombre:"Admin"}}/>
           <Documentos entidad_tipo="reserva" entidad_id={sel.id} tok={tok} perfil={perfil||{nombre:"Admin"}}/>
         </div>}
       </div>
     </div>
+    {/* MODAL SEÑA */}
+    {showSeña&&sel&&<div className="ov" onClick={()=>setShowSeña(false)}>
+      <div className="modal" style={{maxWidth:400}} onClick={e=>e.stopPropagation()}>
+        <h3>💰 Registrar seña cobrada</h3>
+        <div style={{background:"rgba(201,168,76,.06)",border:"1px solid rgba(201,168,76,.15)",borderRadius:10,padding:"12px 14px",marginBottom:16}}>
+          <div style={{fontSize:13,color:"#c9a84c",fontWeight:600}}>{sel.nombre}</div>
+          <div style={{fontSize:12,color:"#7a7f94",marginTop:3}}>Precio total: {(parseFloat(sel.precio_total)||parseFloat(sel.precio)||0).toLocaleString("es-ES")}€</div>
+        </div>
+        <div className="fg">
+          <label>Importe de la seña (€) *</label>
+          <input type="number" inputMode="decimal" className="fi" value={señaImporte} onChange={e=>setSeñaImporte(e.target.value)} placeholder="Ej: 1500" autoFocus/>
+        </div>
+        <div className="mft">
+          <button className="btn bg" onClick={()=>setShowSeña(false)}>Cancelar</button>
+          <button className="btn bp" onClick={registrarSeña} disabled={cobroSaving||!señaImporte}>{cobroSaving?"Guardando…":"💰 Confirmar cobro"}</button>
+        </div>
+      </div>
+    </div>}
+    {/* MODAL PAGO TOTAL */}
+    {showPagoTotal&&sel&&<div className="ov" onClick={()=>setShowPagoTotal(false)}>
+      <div className="modal" style={{maxWidth:420}} onClick={e=>e.stopPropagation()}>
+        <h3>✅ Confirmar pago total</h3>
+        <div style={{background:"rgba(201,168,76,.06)",border:"1px solid rgba(201,168,76,.15)",borderRadius:10,padding:"12px 14px",marginBottom:16}}>
+          <div style={{fontSize:13,color:"#c9a84c",fontWeight:600}}>{sel.nombre}</div>
+          {(()=>{const pt=parseFloat(sel.precio_total)||parseFloat(sel.precio)||0;const seña=parseFloat(sel.seña_importe)||0;return <>
+            <div style={{fontSize:12,color:"#7a7f94",marginTop:6}}>Precio total: <strong style={{color:"#e8e6e1"}}>{pt.toLocaleString("es-ES")}€</strong></div>
+            <div style={{fontSize:12,color:"#7a7f94",marginTop:3}}>Seña cobrada: <strong style={{color:"#10b981"}}>−{seña.toLocaleString("es-ES")}€</strong></div>
+            <hr className="div"/>
+            <div style={{fontSize:16,fontWeight:700,color:"#c9a84c"}}>Saldo pendiente: {(pt-seña).toLocaleString("es-ES")}€</div>
+          </>;})()}
+        </div>
+        <div style={{background:"rgba(16,185,129,.06)",border:"1px solid rgba(16,185,129,.15)",borderRadius:8,padding:"10px 12px",marginBottom:14,fontSize:12,color:"#10b981"}}>
+          ✅ Se generará automáticamente el gasto de comisión del gestor
+        </div>
+        <div className="mft">
+          <button className="btn bg" onClick={()=>setShowPagoTotal(false)}>Cancelar</button>
+          <button className="btn bp" style={{background:"#10b981"}} onClick={registrarPagoTotal} disabled={cobroSaving}>{cobroSaving?"Procesando…":"✅ Confirmar pago completo"}</button>
+        </div>
+      </div>
+    </div>}
   </>;
 }
 
