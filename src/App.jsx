@@ -3447,7 +3447,7 @@ function Jardineros({tok,rol}){
   const [jardineros,setJardineros]=useState([]);
   const [load,setLoad]=useState(true);
   const [showJForm,setShowJForm]=useState(false);
-  const [jForm,setJForm]=useState({nombre:"",modalidad:"Fijo mensual",tarifa:"",notas:"",pin:"",pinConfirm:""});
+  const [jForm,setJForm]=useState({nombre:"",modalidad:"Fijo mensual",tarifa_mensual:"",tarifa_hora:"",notas:"",pin:"",pinConfirm:""});
   const [saving,setSaving]=useState(false);
   const [analisis,setAnalisis]=useState(null);
   const [analLoad,setAnalLoad]=useState(false);
@@ -3463,10 +3463,17 @@ function Jardineros({tok,rol}){
     if(!jForm.nombre||!jForm.pin||jForm.pin.length!==4||jForm.pin!==jForm.pinConfirm||saving)return;
     setSaving(true);
     try{
-      const [j]=await sbPost("jardineros",{nombre:jForm.nombre,modalidad:jForm.modalidad,tarifa:parseFloat(jForm.tarifa)||null,notas:jForm.notas||null,activo:true},tok);
+      const [j]=await sbPost("jardineros",{
+        nombre:jForm.nombre,
+        modalidad:jForm.modalidad,
+        tarifa_mensual:jForm.modalidad==="Fijo mensual"?parseFloat(jForm.tarifa_mensual)||null:null,
+        tarifa_hora:jForm.modalidad==="Por horas"?parseFloat(jForm.tarifa_hora)||null:null,
+        activo:true,
+        notas:jForm.notas||null
+      },tok);
       const [op]=await sbPost("operarios",{nombre:jForm.nombre,rol:"jardinero",pin:jForm.pin,referencia_id:j.id,activo:true,avatar:jForm.nombre.slice(0,2).toUpperCase()},tok);
       await sbPatch("jardineros",`id=eq.${j.id}`,{operario_id:op.id},tok).catch(()=>{});
-      setShowJForm(false);setJForm({nombre:"",modalidad:"Fijo mensual",tarifa:"",notas:"",pin:"",pinConfirm:""});await load_();
+      setShowJForm(false);setJForm({nombre:"",modalidad:"Fijo mensual",tarifa_mensual:"",tarifa_hora:"",notas:"",pin:"",pinConfirm:""});await load_();
     }catch(_){}setSaving(false);
   };
   const toggleActivo=async(j)=>{await sbPatch("jardineros",`id=eq.${j.id}`,{activo:!j.activo},tok);await load_();};
@@ -3491,11 +3498,11 @@ function Jardineros({tok,rol}){
   return <>
     <div className="ph"><h2>👷 Jardineros</h2><p>Gestión de jardineros y condiciones</p></div>
     <div className="pb">
-      <div style={{marginBottom:14}}><button className="btn bp" onClick={()=>{setJForm({nombre:"",modalidad:"Fijo mensual",tarifa:"",notas:"",pin:"",pinConfirm:""});setShowJForm(true);}}>➕ Nuevo jardinero</button></div>
+      <div style={{marginBottom:14}}><button className="btn bp" onClick={()=>{setJForm({nombre:"",modalidad:"Fijo mensual",tarifa_mensual:"",tarifa_hora:"",notas:"",pin:"",pinConfirm:""});setShowJForm(true);}}>➕ Nuevo jardinero</button></div>
       {jardineros.length===0?<div className="empty"><span className="ico">🌿</span><p>Sin jardineros registrados</p></div>
       :jardineros.map(j=>{
         const modLbl=j.modalidad||"—";
-        const tarifaLbl=j.tarifa?(j.modalidad==="Fijo mensual"?`${j.tarifa}€/mes`:j.modalidad==="Por horas"?`${j.tarifa}€/h`:`${j.tarifa}€`):"—";
+        const tarifaLbl=j.modalidad==="Fijo mensual"&&j.tarifa_mensual?`${j.tarifa_mensual}€/mes`:j.modalidad==="Por horas"&&j.tarifa_hora?`${j.tarifa_hora}€/h`:"—";
         const abierto=analisis?.id===j.id;
         return <div key={j.id} className="card" style={{marginBottom:10,borderLeft:`3px solid ${j.activo?"#10b981":"#5a5e6e"}`,opacity:j.activo?1:.6}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10}}>
@@ -3537,8 +3544,8 @@ function Jardineros({tok,rol}){
         <h3>🌿 Nuevo jardinero</h3>
         <div className="fg"><label>Nombre *</label><input className="fi" value={jForm.nombre} onChange={e=>setJForm(v=>({...v,nombre:e.target.value}))} placeholder="Ej: Carlos García"/></div>
         <div className="fg"><label>Modalidad</label><select className="fi" value={jForm.modalidad} onChange={e=>setJForm(v=>({...v,modalidad:e.target.value}))}>{MODAL_JARDINERO.map(m=><option key={m}>{m}</option>)}</select></div>
-        {jForm.modalidad==="Fijo mensual"&&<div className="fg"><label>Tarifa mensual (€)</label><input type="number" inputMode="decimal" className="fi" value={jForm.tarifa} onChange={e=>setJForm(v=>({...v,tarifa:e.target.value}))} placeholder="Ej: 800"/></div>}
-        {jForm.modalidad==="Por horas"&&<div className="fg"><label>Tarifa por hora (€)</label><input type="number" inputMode="decimal" className="fi" value={jForm.tarifa} onChange={e=>setJForm(v=>({...v,tarifa:e.target.value}))} placeholder="Ej: 15"/></div>}
+        {jForm.modalidad==="Fijo mensual"&&<div className="fg"><label>Tarifa mensual (€)</label><input type="number" inputMode="decimal" className="fi" value={jForm.tarifa_mensual} onChange={e=>setJForm(v=>({...v,tarifa_mensual:e.target.value}))} placeholder="Ej: 800"/></div>}
+        {jForm.modalidad==="Por horas"&&<div className="fg"><label>Tarifa por hora (€)</label><input type="number" inputMode="decimal" className="fi" value={jForm.tarifa_hora} onChange={e=>setJForm(v=>({...v,tarifa_hora:e.target.value}))} placeholder="Ej: 15"/></div>}
         {jForm.modalidad==="Precio fijo por servicio"&&<div style={{fontSize:12,color:"#8A8580",marginBottom:14,background:"rgba(201,168,76,.06)",borderRadius:8,padding:"10px 12px"}}>El precio se define por cada servicio concreto.</div>}
         <div className="fg"><label>Notas (opcional)</label><textarea className="fi" rows={2} value={jForm.notas} onChange={e=>setJForm(v=>({...v,notas:e.target.value}))} placeholder="Notas…"/></div>
         <hr className="div"/>
