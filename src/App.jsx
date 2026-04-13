@@ -1578,9 +1578,12 @@ function DashJ({perfil,jsem,jpunt,cwk,setPage,tok}){
   const [srvActivo,setSrvActivo]=useState(null);
   const [srvTareas,setSrvTareas]=useState([]);
   const [srvExtras,setSrvExtras]=useState([]);
-  const [jornada,setJornada]=useState(null);
-  const [elapsed,setElapsed]=useState(0);
+  const [jornadaId,setJornadaId]=useState(null);
+  const [jornadaFin,setJornadaFin]=useState(false);
+  const [jornadaDurMin,setJornadaDurMin]=useState(0);
+  const [tiempoJornada,setTiempoJornada]=useState(0);
   const [pausado,setPausado]=useState(false);
+  const [pausasArr,setPausasArr]=useState([]);
   const [saving2,setSaving2]=useState(false);
   const [showFinJornada,setShowFinJornada]=useState(false);
   const [showFinSrv,setShowFinSrv]=useState(false);
@@ -1591,87 +1594,123 @@ function DashJ({perfil,jsem,jpunt,cwk,setPage,tok}){
   const [editExtraNota,setEditExtraNota]=useState("");
   const [editExtraFoto,setEditExtraFoto]=useState(null);
   const hoyStr=new Date().toISOString().split("T")[0];
-  const lsKey=srvActivo?`fm_jornada_inicio_${srvActivo.id}`:`fm_jornada_inicio_${perfil.id}`;
+  const jId=perfil.es_operario?perfil.referencia_id:perfil.id;
 
   const loadSrvActivo=async()=>{
     try{
-      const jId=perfil.es_operario?perfil.referencia_id:perfil.id;
       const srvs=await sbGet("jardin_servicios",`?jardinero_id=eq.${jId}&estado=eq.activo&select=*`,tok).catch(()=>[]);
       if(srvs.length===0){setSrvActivo(null);setSrvTareas([]);setSrvExtras([]);return;}
       const s=srvs[0];setSrvActivo(s);
+      // Tareas
       const allTareas=await sbGet("jardin_servicio_tareas",`?servicio_id=eq.${s.id}&select=*&order=created_at.asc`,tok).catch(()=>[]);
       setSrvTareas(allTareas.filter(t=>!t.añadida_por_jardinero));
       setSrvExtras(allTareas.filter(t=>t.añadida_por_jardinero));
       // Jornada hoy
       const jHoy=await sbGet("jornadas_jardineria",`?servicio_id=eq.${s.id}&fecha=eq.${hoyStr}&select=*`,tok).catch(()=>[]);
       if(jHoy.length>0){
-        setJornada(jHoy[0]);
-        const pausas=jHoy[0].pausas||[];
-        const ultimaPausa=pausas[pausas.length-1];
-        setPausado(!!ultimaPausa&&!ultimaPausa.fin);
-        const lk=`fm_jornada_inicio_${s.id}`;
-        if(!localStorage.getItem(lk))localStorage.setItem(lk,jHoy[0].hora_inicio);
+        const j=jHoy[0];
+        setJornadaId(j.id);setPausasArr(j.pausas||[]);
+        localStorage.setItem(`fm_jornada_id_${s.id}`,String(j.id));
+        if(j.hora_fin){
+          setJornadaFin(true);setJornadaDurMin(j.duracion_minutos||0);
+        }else{
+          setJornadaFin(false);
+          // Recover start timestamp
+          if(!localStorage.getItem(`fm_jornada_inicio_${s.id}`)){
+            // Convert HH:MM to timestamp
+            const [hh,mm]=(j.hora_inicio||"08:00").split(":").map(Number);
+            const d=new Date();d.setHours(hh,mm,0,0);
+            localStorage.setItem(`fm_jornada_inicio_${s.id}`,d.getTime().toString());
+          }
+          const pArr=j.pausas||[];
+          const lastP=pArr[pArr.length-1];
+          setPausado(!!lastP&&!lastP.fin);
+          if(lastP&&!lastP.fin)localStorage.setItem(`fm_jornada_pausado_${s.id}`,String(lastP.inicio));
+        }
       }else{
-        setJornada(null);
-        if(s)setShowNuevaJornada(true);
+        setJornadaId(null);setJornadaFin(false);
+        // Check localStorage for pending jornada
+        const lsIni=localStorage.getItem(`fm_jornada_inicio_${s.id}`);
+        if(!lsIni)setShowNuevaJornada(true);
       }
-    }catch(_){}
+    }catch(e){console.error("loadSrvActivo:",e);}
   };
   useEffect(()=>{if(tok)loadSrvActivo();},[]);
 
-  // Cronómetro
+  // Cronómetro — uses timestamps from localStorage for persistence
   useEffect(()=>{
-    if(!jornada||jornada.hora_fin||!srvActivo)return;
-    const lk=`fm_jornada_inicio_${srvActivo.id}`;
-    const calc=()=>{
-      const ini=localStorage.getItem(lk)||jornada.hora_inicio;
-      if(!ini)return 0;
-      const [h,m]=ini.split(":").map(Number);
-      const iniMs=new Date();iniMs.setHours(h,m,0,0);
-      let totalMs=Date.now()-iniMs.getTime();
-      const pausas=jornada.pausas||[];
-      for(const p of pausas){if(p.inicio&&p.fin)totalMs-=(p.fin-p.inicio);else if(p.inicio&&!p.fin)totalMs-=(Date.now()-p.inicio);}
-      return Math.max(0,Math.floor(totalMs/1000));
+    const sId=srvActivo?.id;
+    if(!sId||jornadaFin)return;
+    const inicio=parseInt(localStorage.getItem(`fm_jornada_inicio_${sId}`)||"0");
+    if(!inicio)return;
+    const calcPausas=()=>{
+      let ms=0;
+      for(const p of pausasArr){
+        if(p.inicio&&p.fin)ms+=(p.fin-p.inicio);
+        else if(p.inicio&&!p.fin)ms+=(Date.now()-p.inicio);
+      }
+      return ms;
     };
-    setElapsed(calc());
-    const iv=setInterval(()=>setElapsed(calc()),1000);
+    const calc=()=>Math.max(0,Math.floor((Date.now()-inicio-calcPausas())/1000));
+    setTiempoJornada(calc());
+    const iv=setInterval(()=>setTiempoJornada(calc()),1000);
     return()=>clearInterval(iv);
-  },[jornada,pausado,srvActivo]);
+  },[srvActivo?.id,jornadaFin,pausado,pausasArr]);
 
   const fmtEl=s=>{const h=Math.floor(s/3600);const m=Math.floor((s%3600)/60);const ss=s%60;return `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(ss).padStart(2,"0")}`;};
   const fmtHM=mins=>{const h=Math.floor(mins/60);const m=Math.round(mins%60);return `${h}h ${m}min`;};
 
   const iniciarJornada=async()=>{
     if(saving2||!srvActivo)return;setSaving2(true);
-    const ahora=new Date();const hi=`${String(ahora.getHours()).padStart(2,"0")}:${String(ahora.getMinutes()).padStart(2,"0")}`;
+    const ahora=new Date();
+    const hi=`${String(ahora.getHours()).padStart(2,"0")}:${String(ahora.getMinutes()).padStart(2,"0")}`;
+    const tsInicio=ahora.getTime();
     try{
-      const [j]=await sbPost("jornadas_jardineria",{servicio_id:srvActivo.id,jardinero_id:perfil.id,fecha:hoyStr,hora_inicio:hi,pausas:[]},tok);
-      setJornada(j);localStorage.setItem(`fm_jornada_inicio_${srvActivo.id}`,hi);setPausado(false);setShowNuevaJornada(false);
-    }catch(_){}setSaving2(false);
+      const [j]=await sbPost("jornadas_jardineria",{servicio_id:srvActivo.id,fecha:hoyStr,hora_inicio:hi,pausas:[]},tok);
+      setJornadaId(j.id);setJornadaFin(false);setPausasArr([]);setPausado(false);
+      localStorage.setItem(`fm_jornada_inicio_${srvActivo.id}`,tsInicio.toString());
+      localStorage.setItem(`fm_jornada_id_${srvActivo.id}`,String(j.id));
+      setShowNuevaJornada(false);
+    }catch(e){console.error("iniciarJornada:",e);}
+    setSaving2(false);
   };
 
   const togglePausa=async()=>{
-    if(!jornada||saving2)return;setSaving2(true);
-    const pausas=[...(jornada.pausas||[])];
-    if(!pausado)pausas.push({inicio:Date.now(),fin:null});
-    else{const last=pausas[pausas.length-1];if(last)last.fin=Date.now();}
-    try{await sbPatch("jornadas_jardineria",`id=eq.${jornada.id}`,{pausas},tok);setJornada(prev=>({...prev,pausas}));setPausado(!pausado);}catch(_){}
+    if(!jornadaId||saving2)return;setSaving2(true);
+    const newPausas=[...pausasArr];
+    if(!pausado){
+      newPausas.push({inicio:Date.now(),fin:null});
+      localStorage.setItem(`fm_jornada_pausado_${srvActivo.id}`,Date.now().toString());
+    }else{
+      const last=newPausas[newPausas.length-1];
+      if(last)last.fin=Date.now();
+      localStorage.removeItem(`fm_jornada_pausado_${srvActivo.id}`);
+    }
+    try{
+      await sbPatch("jornadas_jardineria",`id=eq.${jornadaId}`,{pausas:newPausas},tok);
+      setPausasArr(newPausas);setPausado(!pausado);
+    }catch(_){}
     setSaving2(false);
   };
 
   const terminarJornada=async()=>{
-    if(!jornada||!srvActivo||saving2)return;setSaving2(true);
-    const ahora=new Date();const hf=`${String(ahora.getHours()).padStart(2,"0")}:${String(ahora.getMinutes()).padStart(2,"0")}`;
-    const pausas=[...(jornada.pausas||[])];
-    const last=pausas[pausas.length-1];if(last&&!last.fin)last.fin=Date.now();
-    const durMin=Math.max(0,Math.round(elapsed/60));
+    if(!jornadaId||!srvActivo||saving2)return;setSaving2(true);
+    const ahora=new Date();
+    const hf=`${String(ahora.getHours()).padStart(2,"0")}:${String(ahora.getMinutes()).padStart(2,"0")}`;
+    const newPausas=[...pausasArr];
+    const last=newPausas[newPausas.length-1];
+    if(last&&!last.fin)last.fin=Date.now();
+    const durMin=Math.max(0,Math.round(tiempoJornada/60));
     try{
-      await sbPatch("jornadas_jardineria",`id=eq.${jornada.id}`,{hora_fin:hf,duracion_minutos:durMin,pausas},tok);
+      await sbPatch("jornadas_jardineria",`id=eq.${jornadaId}`,{hora_fin:hf,duracion_minutos:durMin,pausas:newPausas},tok);
       const horasJornada=Math.round(durMin/60*100)/100;
       const prevHoras=parseFloat(srvActivo.horas_totales)||0;
       await sbPatch("jardin_servicios",`id=eq.${srvActivo.id}`,{horas_totales:prevHoras+horasJornada},tok).catch(()=>{});
+      // Cleanup localStorage
       localStorage.removeItem(`fm_jornada_inicio_${srvActivo.id}`);
-      setJornada(prev=>({...prev,hora_fin:hf,duracion_minutos:durMin}));setShowFinJornada(false);
+      localStorage.removeItem(`fm_jornada_id_${srvActivo.id}`);
+      localStorage.removeItem(`fm_jornada_pausado_${srvActivo.id}`);
+      setJornadaFin(true);setJornadaDurMin(durMin);setShowFinJornada(false);
       await loadSrvActivo();
     }catch(_){}setSaving2(false);
   };
@@ -1704,7 +1743,7 @@ function DashJ({perfil,jsem,jpunt,cwk,setPage,tok}){
   const completarServicio=async()=>{
     if(!srvActivo||saving2)return;setSaving2(true);
     try{
-      if(jornada&&!jornada.hora_fin)await terminarJornada();
+      if(jornadaId&&!jornadaFin)await terminarJornada();
       const s=await sbGet("jardin_servicios",`?id=eq.${srvActivo.id}&select=*`,tok).then(r=>r[0]).catch(()=>srvActivo);
       const horasT=parseFloat(s?.horas_totales)||0;
       const mod=s?.modalidad_pago||s?.modalidad||"por_horas";
@@ -1720,6 +1759,8 @@ function DashJ({perfil,jsem,jpunt,cwk,setPage,tok}){
       const msg=`🌿 ${perfil.nombre} ha completado "${srvActivo.nombre||srvActivo.titulo}". Total: ${horasT}h. Coste: ${costeTotal}€.`;
       for(const a of admins){await sbPost("notificaciones",{para:a.id,txt:msg},tok);sendPush("🌿 Finca El Molino",msg,"jardin-srv-fin");}
       localStorage.removeItem(`fm_jornada_inicio_${srvActivo.id}`);
+      localStorage.removeItem(`fm_jornada_id_${srvActivo.id}`);
+      localStorage.removeItem(`fm_jornada_pausado_${srvActivo.id}`);
       setShowFinSrv(false);setSrvActivo(null);setSrvTareas([]);setSrvExtras([]);
     }catch(_){}setSaving2(false);
   };
@@ -1739,19 +1780,19 @@ function DashJ({perfil,jsem,jpunt,cwk,setPage,tok}){
         <div className="prog" style={{marginBottom:14,height:8}}><div className="pfill" style={{width:`${srvTareas.length?(srvTareas.filter(t=>t.done).length/srvTareas.length)*100:0}%`}}/></div>
 
         {/* Cronómetro */}
-        {jornada&&!jornada.hora_fin&&<>
+        {jornadaId&&!jornadaFin&&<>
           <div style={{textAlign:"center",padding:"16px 0",marginBottom:12,background:"#F5F3F0",borderRadius:12}}>
-            <div style={{fontSize:11,color:pausado?"#f59e0b":"#10b981",textTransform:"uppercase",letterSpacing:1,fontWeight:600,marginBottom:6}}>{pausado?"⏸ En pausa":"⏱️ Esta jornada"}</div>
-            <div style={{fontSize:36,fontWeight:700,color:pausado?"#f59e0b":"#c9a84c",fontFamily:"monospace",letterSpacing:2}}>{fmtEl(elapsed)}</div>
+            <div style={{fontSize:11,color:pausado?"#D4A017":"#A6BE59",textTransform:"uppercase",letterSpacing:1,fontWeight:600,marginBottom:6}}>{pausado?"⏸ En pausa":"⏱️ Esta jornada"}</div>
+            <div style={{fontSize:36,fontWeight:700,color:pausado?"#D4A017":"#EC683E",fontFamily:"monospace",letterSpacing:2}}>{fmtEl(tiempoJornada)}</div>
             {totalAcum>0&&<div style={{fontSize:12,color:"#8A8580",marginTop:6}}>📅 Total acumulado: {fmtHM(totalAcum*60)}</div>}
           </div>
           <div style={{display:"flex",gap:8,marginBottom:14}}>
             <button className={`btn ${pausado?"bp":"bg"}`} style={{flex:1,justifyContent:"center",padding:"12px",fontSize:14}} onClick={togglePausa} disabled={saving2}>{pausado?"▶️ Reanudar":"⏸️ Pausar"}</button>
-            <button className="btn" style={{flex:1,justifyContent:"center",padding:"12px",fontSize:14,background:"#6366f1",color:"#fff",border:"none",borderRadius:8,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontWeight:500}} onClick={()=>setShowFinJornada(true)}>🌙 Terminar jornada</button>
+            <button className="btn" style={{flex:1,justifyContent:"center",padding:"12px",fontSize:14,background:"#AFA3FF",color:"#fff",border:"none",borderRadius:100,cursor:"pointer",fontFamily:"'Inter Tight',sans-serif",fontWeight:600}} onClick={()=>setShowFinJornada(true)}>🌙 Terminar jornada</button>
           </div>
         </>}
-        {jornada?.hora_fin&&<div style={{background:"rgba(99,102,241,.08)",border:"1px solid rgba(99,102,241,.2)",borderRadius:10,padding:"10px 14px",marginBottom:12,fontSize:13,color:"#a5b4fc",textAlign:"center"}}>✅ Jornada de hoy completada — {fmtHM(jornada.duracion_minutos||0)}</div>}
-        {!jornada&&!showNuevaJornada&&<button className="btn bp" style={{width:"100%",justifyContent:"center",padding:"14px",fontSize:15,marginBottom:14}} onClick={iniciarJornada} disabled={saving2}>▶️ Iniciar jornada</button>}
+        {jornadaFin&&<div style={{background:"rgba(175,163,255,.08)",border:"1px solid rgba(175,163,255,.2)",borderRadius:12,padding:"10px 14px",marginBottom:12,fontSize:13,color:"#AFA3FF",textAlign:"center"}}>✅ Jornada de hoy completada — {fmtHM(jornadaDurMin||0)}</div>}
+        {!jornadaId&&!jornadaFin&&!showNuevaJornada&&<button className="btn bp" style={{width:"100%",justifyContent:"center",padding:"14px",fontSize:15,marginBottom:14}} onClick={iniciarJornada} disabled={saving2}>▶️ Iniciar jornada</button>}
 
         {/* Checklist tareas asignadas */}
         <div style={{fontSize:11,color:"#EC683E",fontWeight:600,textTransform:"uppercase",letterSpacing:1,marginBottom:6,marginTop:8}}>Tareas asignadas</div>
@@ -1791,7 +1832,7 @@ function DashJ({perfil,jsem,jpunt,cwk,setPage,tok}){
         <button className="btn bg" style={{width:"100%",justifyContent:"center",marginTop:12}} onClick={()=>{setExtraForm({txt:"",zona:"",nota:"",foto_url:null});setShowExtraForm(true);}}>➕ Añadir tarea realizada</button>
 
         {/* Completar servicio */}
-        {tareasAdminOk&&(!jornada||jornada.hora_fin)&&<button className="btn bp" style={{width:"100%",justifyContent:"center",padding:"14px",fontSize:15,marginTop:12,background:"#A6BE59"}} onClick={()=>setShowFinSrv(true)}>✅ Marcar servicio completado</button>}
+        {tareasAdminOk&&(!jornadaId||jornadaFin)&&<button className="btn bp" style={{width:"100%",justifyContent:"center",padding:"14px",fontSize:15,marginTop:12,background:"#A6BE59"}} onClick={()=>setShowFinSrv(true)}>✅ Marcar servicio completado</button>}
       </div>}
 
       {/* Checklist semanal solo si NO hay servicio activo */}
@@ -1818,8 +1859,8 @@ function DashJ({perfil,jsem,jpunt,cwk,setPage,tok}){
     {showFinJornada&&<div className="ov"><div className="modal" style={{maxWidth:400,textAlign:"center"}}>
       <div style={{fontSize:36,marginBottom:8}}>🌙</div>
       <h3>¿Terminas por hoy?</h3>
-      <div style={{fontSize:24,fontWeight:700,color:"#EC683E",fontFamily:"monospace",margin:"16px 0"}}>{fmtEl(elapsed)}</div>
-      <p style={{fontSize:13,color:"#8A8580",marginBottom:20}}>Llevas {fmtHM(Math.round(elapsed/60))}</p>
+      <div style={{fontSize:24,fontWeight:700,color:"#EC683E",fontFamily:"monospace",margin:"16px 0"}}>{fmtEl(tiempoJornada)}</div>
+      <p style={{fontSize:13,color:"#8A8580",marginBottom:20}}>Llevas {fmtHM(Math.round(tiempoJornada/60))}</p>
       <button className="btn bp" style={{width:"100%",justifyContent:"center",padding:"14px",fontSize:15}} onClick={terminarJornada} disabled={saving2}>{saving2?"Guardando…":"✅ Terminar jornada"}</button>
       <button className="btn bg" style={{width:"100%",justifyContent:"center",marginTop:8}} onClick={()=>setShowFinJornada(false)}>Cancelar</button>
     </div></div>}
