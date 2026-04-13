@@ -464,6 +464,33 @@ hr.div{border:none;border-top:1px solid rgba(255,255,255,.06);margin:14px 0}
 `;
 
 
+// ─── AUTO RECURRENTES ────────────────────────────────────────────────────────
+async function autoRecurrentes(tok,setToast){
+  const hoy=new Date();
+  const y=hoy.getFullYear(),m=String(hoy.getMonth()+1).padStart(2,"0");
+  const lsKey=`fm_recurrentes_${y}_${m}`;
+  if(localStorage.getItem(lsKey))return;
+  try{
+    const recurrentes=await sbGet("gastos","?recurrente=eq.true&frecuencia=eq.mensual&select=*",tok);
+    if(recurrentes.length===0){localStorage.setItem(lsKey,"1");return;}
+    const primerDia=`${y}-${m}-01`;
+    const yaExisten=await sbGet("gastos",`?fecha=eq.${primerDia}&origen=eq.auto_recurrente&select=concepto`,tok).catch(()=>[]);
+    const existentes=new Set(yaExisten.map(g=>g.concepto));
+    let insertados=0;
+    for(const g of recurrentes){
+      if(existentes.has(g.concepto))continue;
+      await sbPost("gastos",{fecha:primerDia,categoria:g.categoria,concepto:g.concepto,importe:g.importe,recurrente:false,origen:"auto_recurrente",notas:`Auto-generado desde gasto recurrente`},tok).catch(()=>{});
+      insertados++;
+    }
+    localStorage.setItem(lsKey,"1");
+    if(insertados>0){
+      const mesNombre=MESES[hoy.getMonth()];
+      setToast(`✅ Se han registrado ${insertados} gasto${insertados>1?"s":""} recurrente${insertados>1?"s":""} de ${mesNombre}`);
+      setTimeout(()=>setToast(null),5000);
+    }
+  }catch(_){}
+}
+
 // ─── APP ROOT ─────────────────────────────────────────────────────────────────
 export default function App() {
   const [session,    setSession]    = useState(null);
@@ -472,6 +499,7 @@ export default function App() {
   const [perm,       setPerm]       = useState(typeof Notification!=="undefined"?Notification.permission:"default");
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [authLoad,   setAuthLoad]   = useState(true);
+  const [toast,      setToast]      = useState(null);
 
   useEffect(()=>{
     regSW();
@@ -481,7 +509,13 @@ export default function App() {
         const s=JSON.parse(saved);
         setSession(s);
         sbGet("usuarios",`?id=eq.${s.user.id}&select=*`,s.access_token)
-          .then(rows=>{if(rows[0]){setPerfil(rows[0]);subscribePush(s.user.id,s.access_token);}})
+          .then(rows=>{
+            if(rows[0]){
+              setPerfil(rows[0]);
+              subscribePush(s.user.id,s.access_token);
+              if(rows[0].rol==="admin")autoRecurrentes(s.access_token,setToast);
+            }
+          })
           .catch(()=>{});
       }catch(_){localStorage.removeItem("fm_session");}
     }
@@ -528,6 +562,7 @@ export default function App() {
     chat:        <Chat        {...P}/>,
     notifs:      <Notifs      {...P}/>,
     usuarios:    <Usuarios    {...P}/>,
+    gastos:      <Gastos      {...P}/>,
   };
 
   return <>
@@ -555,6 +590,7 @@ export default function App() {
         {PAGES[page]??<Dashboard {...P}/>}
       </div>
       <MobileNav perfil={perfil} page={page} setPage={setPage} tok={tok}/>
+      {toast&&<div style={{position:"fixed",bottom:80,left:"50%",transform:"translateX(-50%)",background:"#13161f",border:"1px solid rgba(16,185,129,.3)",borderRadius:12,padding:"12px 20px",color:"#10b981",fontSize:13,fontWeight:500,zIndex:9999,boxShadow:"0 8px 32px rgba(0,0,0,.5)",whiteSpace:"nowrap",maxWidth:"90vw"}} onClick={()=>setToast(null)}>{toast}</div>}
     </div>
   </>;
 }
@@ -651,7 +687,7 @@ function Sidebar({perfil,page,setPage,onLogout,inDrawer,onClose}){
       <p className="nav-sec">Comunicación</p>
       <N ico="💬" lbl={isA?"Chat con equipo":"Chat con admin"} id="chat"/>
       <N ico="🔔" lbl="Notificaciones" id="notifs"/>
-      {isA&&<><p className="nav-sec">Admin</p><N ico="👥" lbl="Usuarios" id="usuarios"/></>}
+      {isA&&<><p className="nav-sec">Admin</p><N ico="💸" lbl="Gastos" id="gastos"/><N ico="👥" lbl="Usuarios" id="usuarios"/></>}
     </nav>
     {!inDrawer&&(
       <div className="sb-user">
@@ -2655,6 +2691,166 @@ function Usuarios({tok}){
       <div className="fg"><label>Rol</label><select className="fi" value={form.rol} onChange={e=>setForm(v=>({...v,rol:e.target.value}))}><option value="jardinero">Jardinero</option><option value="limpieza">Limpieza</option><option value="comercial">Comercial</option><option value="admin">Administrador</option></select></div>
       <div className="mft"><button className="btn bg" onClick={()=>setShowAdd(false)}>Cancelar</button><button className="btn bp" onClick={crearUsuario} disabled={saving}>{saving?"Creando…":"Crear usuario"}</button></div>
     </div></div>}
+  </>;
+}
+
+// ─── GASTOS ─────────────────────────────────────────────────────────────────
+const GASTO_CATS=["Personal","Suministros","Consumibles","Material & Reposición","Mantenimiento","Comisión gestor","Otros"];
+const GASTO_AUTO=["auto_comision","auto_limpieza","auto_jardineria","auto_recurrente"];
+
+function Gastos({tok}){
+  const hoy=new Date();
+  const hoyStr=hoy.toISOString().split("T")[0];
+  const mesIni=`${hoy.getFullYear()}-${String(hoy.getMonth()+1).padStart(2,"0")}-01`;
+  const mesFin=(()=>{const ld=new Date(hoy.getFullYear(),hoy.getMonth()+1,0);return ld.toISOString().split("T")[0];})();
+
+  const [gastos,setGastos]=useState([]);
+  const [load,setLoad]=useState(true);
+  const [desde,setDesde]=useState(mesIni);
+  const [hasta,setHasta]=useState(mesFin);
+  const [catFiltro,setCatFiltro]=useState("todas");
+  const [showForm,setShowForm]=useState(false);
+  const [saving,setSaving]=useState(false);
+
+  const formVacio={fecha:hoyStr,categoria:"Personal",concepto:"",importe:"",recurrente:false,frecuencia:"mensual",notas:""};
+  const [form,setForm]=useState(formVacio);
+
+  const load_=async()=>{
+    setLoad(true);
+    try{
+      const g=await sbGet("gastos",`?fecha=gte.${desde}&fecha=lte.${hasta}&select=*&order=fecha.desc,created_at.desc`,tok);
+      setGastos(g);
+    }catch(_){}
+    setLoad(false);
+  };
+  useEffect(()=>{load_();},[desde,hasta]);
+
+  const crear=async()=>{
+    if(!form.concepto||!form.importe||saving)return;
+    setSaving(true);
+    try{
+      await sbPost("gastos",{
+        fecha:form.fecha,categoria:form.categoria,concepto:form.concepto,
+        importe:parseFloat(form.importe)||0,
+        recurrente:form.recurrente,
+        frecuencia:form.recurrente?form.frecuencia:null,
+        notas:form.notas||null,origen:"manual"
+      },tok);
+      setShowForm(false);setForm(formVacio);await load_();
+    }catch(_){}
+    setSaving(false);
+  };
+
+  const eliminar=async g=>{
+    if(!window.confirm(`¿Eliminar "${g.concepto}"?`))return;
+    await sbDelete("gastos",`id=eq.${g.id}`,tok);
+    await load_();
+  };
+
+  const filtrados=catFiltro==="todas"?gastos:gastos.filter(g=>g.categoria===catFiltro);
+  const total=filtrados.reduce((s,g)=>s+(parseFloat(g.importe)||0),0);
+  const cats=[...new Set(gastos.map(g=>g.categoria).filter(Boolean))];
+
+  const periodos=[
+    {lbl:"Este mes",d:mesIni,h:mesFin},
+    {lbl:"Este año",d:`${hoy.getFullYear()}-01-01`,h:`${hoy.getFullYear()}-12-31`},
+    {lbl:"Último trimestre",d:(()=>{const d=new Date(hoy);d.setMonth(d.getMonth()-3);return d.toISOString().split("T")[0];})(),h:hoyStr},
+  ];
+
+  const origenLbl=o=>{
+    if(o==="auto_comision")return "Comisión auto";
+    if(o==="auto_recurrente")return "Recurrente auto";
+    if(o==="auto_limpieza")return "Limpieza auto";
+    if(o==="auto_jardineria")return "Jardinería auto";
+    return null;
+  };
+
+  return <>
+    <div className="ph"><h2>💸 Gastos</h2><p>Control de gastos de la finca</p></div>
+    <div className="pb">
+      {/* FILTROS PERÍODO */}
+      <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:12}}>
+        {periodos.map(p=>(
+          <button key={p.lbl} className={`btn sm${desde===p.d&&hasta===p.h?" bp":" bg"}`} onClick={()=>{setDesde(p.d);setHasta(p.h);}}>{p.lbl}</button>
+        ))}
+      </div>
+      <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap",alignItems:"center"}}>
+        <input type="date" className="fi" value={desde} onChange={e=>setDesde(e.target.value)} style={{flex:1,minWidth:130}}/>
+        <span style={{color:"#5a5e6e",fontSize:12}}>→</span>
+        <input type="date" className="fi" value={hasta} onChange={e=>setHasta(e.target.value)} style={{flex:1,minWidth:130}}/>
+      </div>
+
+      {/* FILTRO CATEGORÍA */}
+      {cats.length>0&&<div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:14}}>
+        <button className={`btn sm${catFiltro==="todas"?" bp":" bg"}`} onClick={()=>setCatFiltro("todas")}>Todas</button>
+        {cats.map(c=><button key={c} className={`btn sm${catFiltro===c?" bp":" bg"}`} onClick={()=>setCatFiltro(c)}>{c}</button>)}
+      </div>}
+
+      {/* TOTAL + BOTÓN */}
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16,gap:12,flexWrap:"wrap"}}>
+        <div style={{background:"rgba(232,85,85,.08)",border:"1px solid rgba(232,85,85,.2)",borderRadius:10,padding:"12px 18px"}}>
+          <div style={{fontSize:10,color:"#e85555",textTransform:"uppercase",letterSpacing:.5}}>Total período</div>
+          <div style={{fontSize:22,fontWeight:700,color:"#e85555",fontFamily:"'Playfair Display',serif"}}>{total.toLocaleString("es-ES",{minimumFractionDigits:0,maximumFractionDigits:2})}€</div>
+          <div style={{fontSize:11,color:"#5a5e6e"}}>{filtrados.length} gasto{filtrados.length!==1?"s":""}</div>
+        </div>
+        <button className="btn bp" onClick={()=>{setForm(formVacio);setShowForm(true);}}>➕ Añadir gasto</button>
+      </div>
+
+      {/* LISTADO */}
+      {load?<div className="loading"><div className="spin"/><span>Cargando…</span></div>
+      :filtrados.length===0?<div className="empty"><span className="ico">💸</span><p>Sin gastos en este período</p></div>
+      :filtrados.map(g=>{
+        const esAuto=GASTO_AUTO.includes(g.origen);
+        const olbl=origenLbl(g.origen);
+        return <div key={g.id} className="card" style={{marginBottom:8,borderLeft:`3px solid ${g.categoria==="Comisión gestor"?"#6366f1":"#e85555"}`}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10}}>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:14,fontWeight:600,color:"#e8e6e1",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{g.concepto}</div>
+              <div style={{display:"flex",gap:6,marginTop:5,flexWrap:"wrap"}}>
+                <span className="badge" style={{background:"rgba(232,85,85,.1)",color:"#e85555"}}>{g.categoria||"Sin categoría"}</span>
+                {g.recurrente&&<span className="badge" style={{background:"rgba(201,168,76,.1)",color:"#c9a84c"}}>🔁 {g.frecuencia||"mensual"}</span>}
+                {olbl&&<span className="badge" style={{background:"rgba(99,102,241,.1)",color:"#a5b4fc"}}>{olbl}</span>}
+              </div>
+              <div style={{fontSize:11,color:"#5a5e6e",marginTop:4}}>📅 {new Date(g.fecha+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"long",year:"numeric"})}</div>
+              {g.notas&&<div style={{fontSize:11,color:"#7a7f94",marginTop:3}}>{g.notas}</div>}
+            </div>
+            <div style={{textAlign:"right",flexShrink:0}}>
+              <div style={{fontSize:18,fontWeight:700,color:"#e85555",fontFamily:"'Playfair Display',serif"}}>{parseFloat(g.importe||0).toLocaleString("es-ES")}€</div>
+              {!esAuto&&<button className="btn br sm" style={{marginTop:6}} onClick={()=>eliminar(g)}>🗑</button>}
+            </div>
+          </div>
+        </div>;
+      })}
+    </div>
+
+    {/* MODAL NUEVO GASTO */}
+    {showForm&&<div className="ov" onClick={()=>setShowForm(false)}>
+      <div className="modal" onClick={e=>e.stopPropagation()}>
+        <h3>💸 Añadir gasto</h3>
+        <div className="g2">
+          <div className="fg"><label>Fecha *</label><input type="date" className="fi" value={form.fecha} onChange={e=>setForm(v=>({...v,fecha:e.target.value}))}/></div>
+          <div className="fg"><label>Categoría</label><select className="fi" value={form.categoria} onChange={e=>setForm(v=>({...v,categoria:e.target.value}))}>{GASTO_CATS.map(c=><option key={c}>{c}</option>)}</select></div>
+        </div>
+        <div className="fg"><label>Concepto *</label><input className="fi" value={form.concepto} onChange={e=>setForm(v=>({...v,concepto:e.target.value}))} placeholder="Ej: Compra de cloro para piscina"/></div>
+        <div className="fg"><label>Importe (€) *</label><input type="number" inputMode="decimal" className="fi" value={form.importe} onChange={e=>setForm(v=>({...v,importe:e.target.value}))} placeholder="0"/></div>
+        <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
+          <div onClick={()=>setForm(v=>({...v,recurrente:!v.recurrente}))}
+            style={{width:22,height:22,borderRadius:6,flexShrink:0,border:`2px solid ${form.recurrente?"#c9a84c":"rgba(255,255,255,.15)"}`,background:form.recurrente?"#c9a84c":"transparent",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:12,color:"#fff",fontWeight:700}}>
+            {form.recurrente?"✓":""}
+          </div>
+          <span style={{fontSize:13,color:"#c9c5b8"}}>¿Es recurrente?</span>
+          {form.recurrente&&<select className="fi" value={form.frecuencia} onChange={e=>setForm(v=>({...v,frecuencia:e.target.value}))} style={{width:"auto",flex:"none",padding:"6px 30px 6px 10px"}}>
+            <option value="mensual">Mensual</option>
+            <option value="anual">Anual</option>
+          </select>}
+        </div>
+        <div className="fg"><label>Notas (opcional)</label><textarea className="fi" rows={2} value={form.notas} onChange={e=>setForm(v=>({...v,notas:e.target.value}))} placeholder="Detalles adicionales…"/></div>
+        <div className="mft">
+          <button className="btn bg" onClick={()=>setShowForm(false)}>Cancelar</button>
+          <button className="btn bp" onClick={crear} disabled={saving||!form.concepto||!form.importe}>{saving?"Guardando…":"💸 Guardar gasto"}</button>
+        </div>
+      </div>
+    </div>}
   </>;
 }
 
