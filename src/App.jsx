@@ -1245,7 +1245,7 @@ function AtencionAhora({tok,setPage}){
           }
         }
         for(const v of visitas){
-          acc.push({tipo:"visita",nombre:v.nombre,fecha:v.fecha,detalle:`Visita ${v.hora?.slice(0,5)||""} · ${v.tipo_evento||""}`.trim()});
+          acc.push({tipo:"visita",nombre:v.nombre,fecha:v.fecha,detalle:`Visita ${v.hora?.slice(0,5)||""} · ${v.tipo_evento||""}`.trim(),esCoord:!!v.es_coordinacion});
         }
         acc.sort((a,b)=>a.fecha.localeCompare(b.fecha));
         setAcciones(acc);
@@ -1291,7 +1291,10 @@ function AtencionAhora({tok,setPage}){
         <div key={`ac-${i}`} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",background:"#0f1117",borderRadius:8,marginBottom:5,cursor:a.tipo==="visita"?"pointer":a.id?"pointer":"default"}} onClick={()=>{if(a.tipo==="visita")setPage("visitas");else if(a.id)setPage("reservas");}}>
           <span style={{fontSize:16,flexShrink:0}}>{a.tipo==="contrato"?"✍️":a.tipo==="seña"?"💰":"👁"}</span>
           <div style={{flex:1,minWidth:0}}>
-            <div style={{fontSize:13,color:"#e8e6e1",fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{a.nombre}</div>
+            <div style={{display:"flex",alignItems:"center",gap:6}}>
+              <div style={{fontSize:13,color:"#e8e6e1",fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",flex:1,minWidth:0}}>{a.nombre}</div>
+              {a.esCoord&&<span style={{fontSize:9,padding:"2px 6px",borderRadius:4,background:"rgba(99,102,241,.15)",color:"#a5b4fc",flexShrink:0,fontWeight:600}}>📋 Coordinación</span>}
+            </div>
             <div style={{fontSize:11,color:"#f59e0b"}}>{a.detalle}</div>
           </div>
           <div style={{fontSize:12,color:"#7a7f94",flexShrink:0}}>📅 {fmtF(a.fecha)}</div>
@@ -4075,6 +4078,91 @@ function Documentos({entidad_tipo,entidad_id,tok,perfil}){
   </div>;
 }
 
+// ─── VISITAS COORDINACIÓN (en detalle reserva) ──────────────────────────────
+const MOTIVOS_COORD=["Catering","DJ","Florista","Decoración","Fotografía","Reconocimiento general","Otro"];
+
+function VisitasCoordinacion({reservaId,reservaNombre,tok,perfil}){
+  const [visitas,setVisitas]=useState([]);
+  const [open,setOpen]=useState(false);
+  const [showForm,setShowForm]=useState(false);
+  const [saving,setSaving]=useState(false);
+  const [load,setLoad]=useState(false);
+  const formVacio={fecha:new Date().toISOString().split("T")[0],hora:"10:00",motivo:"Catering",asistentes:"",notas:""};
+  const [form,setForm]=useState(formVacio);
+
+  const cargar=async()=>{
+    setLoad(true);
+    try{const v=await sbGet("visitas",`?reserva_id=eq.${reservaId}&order=fecha.asc,hora.asc`,tok);setVisitas(v);}catch(_){}
+    setLoad(false);
+  };
+  useEffect(()=>{if(open)cargar();},[open]);
+
+  const crear=async()=>{
+    if(!form.fecha||!form.hora||saving)return;
+    setSaving(true);
+    try{
+      await sbPost("visitas",{
+        nombre:`${reservaNombre} - ${form.motivo}`,
+        fecha:form.fecha,hora:form.hora,
+        tipo_evento:form.motivo,
+        motivo_visita:form.motivo,
+        nota:form.notas?`${form.asistentes?`Asistentes: ${form.asistentes}. `:""}${form.notas}`:form.asistentes||null,
+        telefono:"",email:"",invitados:null,
+        estado:"pendiente",
+        reserva_id:reservaId,
+        es_coordinacion:true,
+        creado_por:perfil.nombre
+      },tok);
+      const fechaFmt=new Date(form.fecha+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"long"});
+      await addHistorial("reserva",reservaId,`Visita de coordinación programada: ${form.motivo} el ${fechaFmt} a las ${form.hora}`,perfil.nombre,tok);
+      setShowForm(false);setForm(formVacio);await cargar();
+    }catch(_){}
+    setSaving(false);
+  };
+
+  return <div style={{marginTop:16,borderTop:"1px solid rgba(255,255,255,.06)",paddingTop:14}}>
+    <button onClick={()=>setOpen(!open)} style={{background:"none",border:"none",cursor:"pointer",color:"#7a7f94",fontSize:13,display:"flex",alignItems:"center",gap:6,padding:0,fontFamily:"'DM Sans',sans-serif",width:"100%",justifyContent:"space-between"}}>
+      <span>📅 Visitas de coordinación {visitas.length>0&&!open?`(${visitas.length})`:""}</span>
+      <span style={{transition:"transform .2s",transform:open?"rotate(90deg)":"none",fontSize:16}}>›</span>
+    </button>
+    {open&&<div style={{marginTop:12}}>
+      {load?<div style={{color:"#5a5e6e",fontSize:13}}>Cargando…</div>
+      :visitas.length===0?<div style={{color:"#3d4155",fontSize:13,fontStyle:"italic",marginBottom:10}}>Sin visitas de coordinación</div>
+      :<div style={{marginBottom:10}}>
+        {visitas.map(v=>{
+          const est=ESTADOS_VISITA[v.estado]||ESTADOS_VISITA.pendiente;
+          return <div key={v.id} style={{display:"flex",alignItems:"flex-start",gap:8,padding:"8px 10px",background:"#0f1117",borderRadius:8,marginBottom:6,borderLeft:`3px solid ${est.col}`}}>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:3}}>
+                <span className="badge" style={{background:"rgba(99,102,241,.1)",color:"#a5b4fc",fontSize:10}}>{v.motivo_visita||v.tipo_evento||"Coordinación"}</span>
+                <span className="badge" style={{background:`${est.col}18`,color:est.col,fontSize:10}}>{est.lbl}</span>
+              </div>
+              <div style={{fontSize:12,color:"#c9c5b8"}}>{new Date(v.fecha+"T12:00:00").toLocaleDateString("es-ES",{weekday:"short",day:"numeric",month:"short"})} · {v.hora?.slice(0,5)||"—"}</div>
+              {v.nota&&<div style={{fontSize:11,color:"#5a5e6e",marginTop:3}}>{v.nota}</div>}
+            </div>
+          </div>;
+        })}
+      </div>}
+      <button className="btn bp sm" onClick={()=>{setForm(formVacio);setShowForm(true);}}>➕ Programar visita</button>
+
+      {showForm&&<div style={{marginTop:12,background:"rgba(201,168,76,.04)",border:"1px solid rgba(201,168,76,.15)",borderRadius:10,padding:"14px"}}>
+        <div style={{fontSize:13,fontWeight:600,color:"#c9a84c",marginBottom:12}}>📅 Nueva visita de coordinación</div>
+        <div style={{display:"flex",gap:8}}>
+          <div className="fg" style={{flex:1}}><label>Fecha *</label><input type="date" className="fi" value={form.fecha} onChange={e=>setForm(v=>({...v,fecha:e.target.value}))}/></div>
+          <div className="fg" style={{flex:1}}><label>Hora *</label><input type="time" className="fi" value={form.hora} onChange={e=>setForm(v=>({...v,hora:e.target.value}))}/></div>
+        </div>
+        <div className="fg"><label>Motivo</label><select className="fi" value={form.motivo} onChange={e=>setForm(v=>({...v,motivo:e.target.value}))}>{MOTIVOS_COORD.map(m=><option key={m}>{m}</option>)}</select></div>
+        <div className="fg"><label>Asistentes</label><input className="fi" value={form.asistentes} onChange={e=>setForm(v=>({...v,asistentes:e.target.value}))} placeholder="Ej: Catering La Huerta — Pedro García"/></div>
+        <div className="fg"><label>Notas</label><textarea className="fi" rows={2} value={form.notas} onChange={e=>setForm(v=>({...v,notas:e.target.value}))} placeholder="Notas adicionales…"/></div>
+        <div style={{display:"flex",gap:6,justifyContent:"flex-end"}}>
+          <button className="btn bg sm" onClick={()=>setShowForm(false)}>Cancelar</button>
+          <button className="btn bp sm" onClick={crear} disabled={saving||!form.fecha||!form.hora}>{saving?"Guardando…":"✓ Programar"}</button>
+        </div>
+      </div>}
+    </div>}
+  </div>;
+}
+
 // ─── RESERVAS ────────────────────────────────────────────────────────────────
 function Reservas({tok,rol,perfil}){
   const isA=rol==="admin";
@@ -4250,6 +4338,7 @@ function Reservas({tok,rol,perfil}){
           </>}
           <Historial entidad_tipo="reserva" entidad_id={sel.id} tok={tok} perfil={perfil||{nombre:"Admin"}}/>
           <Documentos entidad_tipo="reserva" entidad_id={sel.id} tok={tok} perfil={perfil||{nombre:"Admin"}}/>
+          <VisitasCoordinacion reservaId={sel.id} reservaNombre={sel.nombre} tok={tok} perfil={perfil||{nombre:"Admin"}}/>
         </div>}
       </div>
     </div>
@@ -4351,8 +4440,10 @@ function Visitas({perfil,tok,rol}){
   const hoy=new Date().toISOString().split("T")[0];
 
   const [visitas,setVisitas]=useState([]);
+  const [reservasMap,setReservasMap]=useState({});
   const [load,setLoad]=useState(true);
   const [tab,setTab]=useState("proximas");
+  const [filtroTipo,setFiltroTipo]=useState("todas");
   const [showForm,setShowForm]=useState(false);
   const [sel,setSel]=useState(null);
   const [showConvertir,setShowConvertir]=useState(false);
@@ -4366,13 +4457,27 @@ function Visitas({perfil,tok,rol}){
   const [formRes,setFormRes]=useState({fecha_evento:"",precio:"",contacto:"",obs:"",estado:"visita"});
 
   const load_=async()=>{
-    try{const v=await sbGet("visitas","?select=*&order=fecha.asc,hora.asc",tok);setVisitas(v);}catch(_){}
+    try{
+      const v=await sbGet("visitas","?select=*&order=fecha.asc,hora.asc",tok);
+      setVisitas(v);
+      // Load reserva names for coordinacion visitas
+      const coordIds=[...new Set(v.filter(x=>x.es_coordinacion&&x.reserva_id).map(x=>x.reserva_id))];
+      if(coordIds.length>0){
+        const rsvs=await sbGet("reservas",`?id=in.(${coordIds.join(",")})&select=id,nombre`,tok).catch(()=>[]);
+        const m={};rsvs.forEach(r=>m[r.id]=r.nombre);setReservasMap(m);
+      }
+    }catch(_){}
     setLoad(false);
   };
   useEffect(()=>{load_();},[]);
 
-  const proximas=visitas.filter(v=>v.estado==="pendiente");
-  const anteriores=visitas.filter(v=>v.estado!=="pendiente");
+  const filtrarTipo=arr=>{
+    if(filtroTipo==="captacion")return arr.filter(v=>!v.es_coordinacion);
+    if(filtroTipo==="coordinacion")return arr.filter(v=>v.es_coordinacion);
+    return arr;
+  };
+  const proximas=filtrarTipo(visitas.filter(v=>v.estado==="pendiente"));
+  const anteriores=filtrarTipo(visitas.filter(v=>v.estado!=="pendiente"));
 
   const [bloqueado,setBloqueado]=useState(null); // {conflictos}
 
@@ -4397,6 +4502,9 @@ function Visitas({perfil,tok,rol}){
     if(!sel)return;
     await sbPatch("visitas",`id=eq.${sel.id}`,{estado:"realizada"},tok);
     await addHistorial("visita",sel.id,"Visita realizada en la finca",perfil.nombre,tok);
+    if(sel.es_coordinacion&&sel.reserva_id){
+      await addHistorial("reserva",sel.reserva_id,`Visita de coordinación realizada: ${sel.motivo_visita||sel.tipo_evento||"Coordinación"}`,perfil.nombre,tok);
+    }
     setSel(prev=>({...prev,estado:"realizada"}));
     await load_();
   };
@@ -4467,12 +4575,17 @@ function Visitas({perfil,tok,rol}){
       <p>{proximas.length} próximas · {anteriores.length} anteriores</p>
     </div>
     <div className="pb">
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16,gap:12,flexWrap:"wrap"}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12,gap:12,flexWrap:"wrap"}}>
         <div className="tabs" style={{marginBottom:0}}>
           <button className={`tab${tab==="proximas"?" on":""}`} onClick={()=>setTab("proximas")}>📅 Próximas ({proximas.length})</button>
           <button className={`tab${tab==="anteriores"?" on":""}`} onClick={()=>setTab("anteriores")}>📁 Anteriores ({anteriores.length})</button>
         </div>
         {puedeEditar&&<button className="btn bp" onClick={()=>{setForm(formVacio);setShowForm(true);}}>➕ Nueva visita</button>}
+      </div>
+      <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:14}}>
+        {[{id:"todas",lbl:"Todas"},{id:"captacion",lbl:"🔍 Captación"},{id:"coordinacion",lbl:"📋 Coordinación"}].map(f=>(
+          <button key={f.id} className={`btn sm${filtroTipo===f.id?" bp":" bg"}`} onClick={()=>setFiltroTipo(f.id)}>{f.lbl}</button>
+        ))}
       </div>
 
       {lista.length===0&&<div className="empty"><span className="ico">{tab==="proximas"?"📅":"📁"}</span><p>{tab==="proximas"?"No hay visitas programadas":"No hay visitas anteriores"}</p></div>}
@@ -4487,6 +4600,8 @@ function Visitas({perfil,tok,rol}){
               <div style={{fontSize:12,color:"#7a7f94",marginTop:4}}>📅 {fechaFmt} · 🕐 {v.hora?.slice(0,5)||"—"}</div>
               <div style={{display:"flex",gap:6,marginTop:6,flexWrap:"wrap"}}>
                 <span className="badge" style={{background:`${est.col}18`,color:est.col,border:`1px solid ${est.col}30`}}>{est.lbl}</span>
+                {v.es_coordinacion?<span className="badge" style={{background:"rgba(99,102,241,.1)",color:"#a5b4fc",border:"1px solid rgba(99,102,241,.25)"}}>📋 {reservasMap[v.reserva_id]||"Coordinación"}</span>
+                :<span className="badge" style={{background:"rgba(245,158,11,.1)",color:"#f59e0b",border:"1px solid rgba(245,158,11,.25)"}}>🔍 Captación</span>}
                 {v.tipo_evento&&<span className="badge" style={{background:"rgba(201,168,76,.1)",color:"#c9a84c"}}>🎉 {v.tipo_evento}</span>}
                 {v.invitados&&<span className="badge" style={{background:"rgba(255,255,255,.06)",color:"#7a7f94"}}>👥 {v.invitados} inv.</span>}
               </div>
