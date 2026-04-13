@@ -2268,9 +2268,17 @@ function JardinAdmin({perfil,tok}){
     try{
       const jd=jardineros.find(j=>j.id===srvForm.jardinero_id);
       const [srv]=await sbPost("jardin_servicios",{
-        nombre:srvForm.nombre,fecha_inicio:srvForm.fecha_inicio,fecha_fin:srvForm.fecha_fin,
-        jardinero_id:srvForm.jardinero_id,jardinero_nombre:jd?.nombre||"",
-        estado:"activo",notas:srvForm.notas||null,creado_por:perfil.nombre
+        nombre:srvForm.nombre,
+        fecha_inicio:srvForm.fecha_inicio,
+        fecha_fin:srvForm.fecha_fin,
+        jardinero_id:srvForm.jardinero_id||null,
+        jardinero_nombre:jd?.nombre||"",
+        estado:"activo",
+        notas:srvForm.notas||null,
+        creado_por:perfil.nombre,
+        modalidad_pago:srvForm.modalidad_pago||"precio_fijo_servicio",
+        precio_fijo_acordado:srvForm.precio_fijo_acordado||null,
+        tarifa_hora_aplicada:srvForm.tarifa_hora_aplicada||null
       },tok);
       for(const txt of srvTareas){await sbPost("jardin_servicio_tareas",{servicio_id:srv.id,txt,done:false},tok);}
       const fi=new Date(srvForm.fecha_inicio+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"long"});
