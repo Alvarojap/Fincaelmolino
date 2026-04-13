@@ -574,8 +574,28 @@ export default function App() {
   const [authLoad,   setAuthLoad]   = useState(true);
   const [toast,      setToast]      = useState(null);
 
+  const [opDesactivado,setOpDesactivado]=useState(false);
+
   useEffect(()=>{
     regSW();
+    // Check operario session first
+    const opSaved=localStorage.getItem("fm_operario_session");
+    if(opSaved){
+      try{
+        const op=JSON.parse(opSaved);
+        // Verify still active
+        sbGet("operarios",`?id=eq.${op.id}&select=*`).then(rows=>{
+          if(rows[0]&&rows[0].activo){
+            setSession({access_token:SB_KEY});
+            setPerfil({id:op.id,nombre:op.nombre,rol:op.rol,referencia_id:op.referencia_id,es_operario:true,avatar:op.avatar||op.nombre.slice(0,2).toUpperCase()});
+          }else{
+            localStorage.removeItem("fm_operario_session");
+            if(rows[0]&&!rows[0].activo)setOpDesactivado(true);
+          }
+        }).catch(()=>{localStorage.removeItem("fm_operario_session");});
+      }catch(_){localStorage.removeItem("fm_operario_session");}
+      setAuthLoad(false);return;
+    }
     const saved=localStorage.getItem("fm_session");
     if(saved){
       try{
@@ -605,14 +625,23 @@ export default function App() {
     askPerm().then(p=>{setPerm(p);if(p==="granted")subscribePush(d.user.id,d.access_token,rows[0]?.rol);});
   };
 
+  const loginOperario=(op)=>{
+    localStorage.setItem("fm_operario_session",JSON.stringify(op));
+    setSession({access_token:SB_KEY});
+    setPerfil({id:op.id,nombre:op.nombre,rol:op.rol,referencia_id:op.referencia_id,es_operario:true,avatar:op.avatar||op.nombre.slice(0,2).toUpperCase()});
+    setPage("dashboard");setOpDesactivado(false);
+  };
+
   const logout=async()=>{
-    if(session)await authLogout(session.access_token).catch(()=>{});
+    const esOp=perfil?.es_operario;
+    if(!esOp&&session)await authLogout(session.access_token).catch(()=>{});
     localStorage.removeItem("fm_session");
+    localStorage.removeItem("fm_operario_session");
     setSession(null);setPerfil(null);setPage("dashboard");setDrawerOpen(false);
   };
 
   if(authLoad)return <><style>{CSS}</style><div className="loading"><div className="spin"/><span>Cargando…</span></div></>;
-  if(!session||!perfil)return <><style>{CSS}</style><LoginScreen onLogin={login}/></>;
+  if(!session||!perfil)return <><style>{CSS}</style><LoginScreen onLogin={login} onLoginOperario={loginOperario} desactivado={opDesactivado}/></>;
 
   const tok=session.access_token;
   const rol=perfil.rol;
@@ -672,11 +701,19 @@ export default function App() {
 }
 
 // ─── LOGIN ────────────────────────────────────────────────────────────────────
-function LoginScreen({onLogin}){
+function LoginScreen({onLogin,onLoginOperario,desactivado}){
   const [email,setEmail]=useState("");
   const [pass,setPass]=useState("");
   const [err,setErr]=useState("");
   const [load,setLoad]=useState(false);
+  // Operario states
+  const [modo,setModo]=useState("admin"); // "admin" | "seleccion" | "pin"
+  const [operarios,setOperarios]=useState([]);
+  const [selOp,setSelOp]=useState(null);
+  const [pin,setPin]=useState("");
+  const [pinErr,setPinErr]=useState(false);
+  const [opLoad,setOpLoad]=useState(false);
+
   const go=async()=>{
     if(!email||!pass){setErr("Introduce email y contraseña");return;}
     setLoad(true);setErr("");
@@ -684,14 +721,42 @@ function LoginScreen({onLogin}){
     catch(e){setErr(e.message||"Credenciales incorrectas");}
     finally{setLoad(false);}
   };
+
+  const cargarOperarios=async()=>{
+    setOpLoad(true);
+    try{const ops=await sbGet("operarios","?activo=eq.true&select=*&order=nombre.asc");setOperarios(ops);}catch(_){setOperarios([]);}
+    setOpLoad(false);setModo("seleccion");
+  };
+
+  const seleccionarOp=(op)=>{setSelOp(op);setPin("");setPinErr(false);setModo("pin");};
+
+  const addDigit=(d)=>{
+    if(pin.length>=4)return;
+    const newPin=pin+d;
+    setPin(newPin);setPinErr(false);
+    if(newPin.length===4){
+      // Verify
+      if(newPin===selOp.pin){
+        onLoginOperario(selOp);
+      }else{
+        setPinErr(true);
+        setTimeout(()=>{setPin("");setPinErr(false);},600);
+      }
+    }
+  };
+  const delDigit=()=>{setPin(p=>p.slice(0,-1));setPinErr(false);};
+
+  const PinDot=({filled})=><div style={{width:18,height:18,borderRadius:"50%",background:filled?"#1A1A1A":"transparent",border:"2.5px solid "+( pinErr?"#F35757":filled?"#1A1A1A":"#BFBAB4"),transition:"all .15s ease"}}/>;
+
   return <div className="lw"><div className="lbg"/>
-    <div className="lc">
+    {modo==="admin"&&<div className="lc">
       <div className="llo">
         <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:12,marginBottom:8}}>
           <MolinoLogo size={42}/><h1>Finca El Molino</h1>
         </div>
         <p>Sistema de Gestión</p>
       </div>
+      {desactivado&&<div className="alert">Tu acceso ha sido desactivado. Contacta con el administrador.</div>}
       {err&&<div className="alert">{err}</div>}
       <div className="fg"><label>Correo electrónico</label>
         <input className="fi" type="email" inputMode="email" autoComplete="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="tu@email.com"/>
@@ -702,10 +767,52 @@ function LoginScreen({onLogin}){
       <button className="btn bp" style={{width:"100%",justifyContent:"center",marginTop:4}} onClick={go} disabled={load}>
         {load?<><div className="spin" style={{width:16,height:16,borderWidth:2}}/> Entrando…</>:"Entrar →"}
       </button>
-      <p style={{fontSize:11,color:"#8A8580",textAlign:"center",marginTop:16,lineHeight:1.5}}>
-        Usa las credenciales que te ha facilitado el administrador de la finca.
-      </p>
-    </div>
+      <div style={{display:"flex",alignItems:"center",gap:12,margin:"24px 0 16px"}}>
+        <div style={{flex:1,height:1,background:"rgba(0,0,0,.08)"}}/><span style={{fontSize:11,color:"#BFBAB4",fontWeight:600}}>o accede como operario</span><div style={{flex:1,height:1,background:"rgba(0,0,0,.08)"}}/>
+      </div>
+      <button className="btn bg" style={{width:"100%",justifyContent:"center",fontSize:14,padding:"12px"}} onClick={cargarOperarios}>
+        <Icon name="users" size={18} color="#8A8580"/> Soy del equipo
+      </button>
+    </div>}
+
+    {modo==="seleccion"&&<div className="lc" style={{maxWidth:420}}>
+      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:24}}>
+        <button className="btn bg sm" onClick={()=>setModo("admin")}><Icon name="back" size={16}/></button>
+        <div style={{fontSize:18,fontWeight:800,color:"#1A1A1A"}}>Selecciona tu perfil</div>
+      </div>
+      {opLoad?<div className="loading"><div className="spin"/></div>
+      :operarios.length===0?<div style={{textAlign:"center",color:"#8A8580",padding:"20px 0"}}>No hay operarios registrados</div>
+      :<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(110px,1fr))",gap:12}}>
+        {operarios.map(op=>(
+          <button key={op.id} onClick={()=>seleccionarOp(op)} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:8,padding:"18px 12px",background:"#F5F3F0",borderRadius:16,border:"none",cursor:"pointer",transition:"all .15s ease",fontFamily:"'Inter Tight',sans-serif"}}>
+            <div style={{width:52,height:52,borderRadius:"50%",background:"linear-gradient(135deg,#EC683E,#AFA3FF)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,fontWeight:700,color:"#fff"}}>{op.avatar||op.nombre.slice(0,2).toUpperCase()}</div>
+            <div style={{fontSize:13,fontWeight:600,color:"#1A1A1A",textAlign:"center"}}>{op.nombre}</div>
+            <span className="badge" style={{background:op.rol==="jardinero"?"rgba(166,190,89,.15)":"rgba(175,163,255,.15)",color:op.rol==="jardinero"?"#6B8A20":"#7B6FCC",fontSize:10}}>{op.rol==="jardinero"?"Jardinero":"Limpieza"}</span>
+          </button>
+        ))}
+      </div>}
+    </div>}
+
+    {modo==="pin"&&selOp&&<div className="lc" style={{maxWidth:340,textAlign:"center"}}>
+      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:24}}>
+        <button className="btn bg sm" onClick={()=>setModo("seleccion")}><Icon name="back" size={16}/></button>
+        <div style={{fontSize:16,fontWeight:700,color:"#1A1A1A"}}>{selOp.nombre}</div>
+      </div>
+      <div style={{width:60,height:60,borderRadius:"50%",background:"linear-gradient(135deg,#EC683E,#AFA3FF)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,fontWeight:700,color:"#fff",margin:"0 auto 16px"}}>{selOp.avatar||selOp.nombre.slice(0,2).toUpperCase()}</div>
+      <div style={{fontSize:14,color:"#8A8580",marginBottom:20}}>Introduce tu PIN</div>
+      <div style={{display:"flex",justifyContent:"center",gap:14,marginBottom:28,animation:pinErr?"shake .3s ease":"none"}}>
+        {[0,1,2,3].map(i=><PinDot key={i} filled={pin.length>i}/>)}
+      </div>
+      <style>{`@keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-8px)}40%,80%{transform:translateX(8px)}}`}</style>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,maxWidth:240,margin:"0 auto"}}>
+        {[1,2,3,4,5,6,7,8,9,null,0,"del"].map((d,i)=>(
+          d===null?<div key={i}/>:
+          <button key={i} onClick={()=>d==="del"?delDigit():addDigit(String(d))} style={{width:64,height:64,borderRadius:16,border:"none",background:d==="del"?"transparent":"#F5F3F0",cursor:"pointer",fontSize:d==="del"?16:24,fontWeight:700,color:"#1A1A1A",fontFamily:"'Inter Tight',sans-serif",display:"flex",alignItems:"center",justifyContent:"center",transition:"all .1s ease",margin:"0 auto"}}>
+            {d==="del"?<Icon name="back" size={20} color="#8A8580"/>:d}
+          </button>
+        ))}
+      </div>
+    </div>}
   </div>;
 }
 
@@ -1484,7 +1591,8 @@ function DashJ({perfil,jsem,jpunt,cwk,setPage,tok}){
 
   const loadSrvActivo=async()=>{
     try{
-      const srvs=await sbGet("servicios_jardineria",`?estado=eq.en_curso&jardinero_id=eq.${perfil.id}&select=*`,tok).catch(()=>[]);
+      const jId=perfil.es_operario?perfil.referencia_id:perfil.id;
+      const srvs=await sbGet("servicios_jardineria",`?estado=eq.en_curso&jardinero_id=eq.${jId}&select=*`,tok).catch(()=>[]);
       if(srvs.length===0){setSrvActivo(null);setSrvTareas([]);setSrvExtras([]);return;}
       const s=srvs[0];setSrvActivo(s);
       // Tareas from jardin_servicio_tareas
@@ -3241,9 +3349,14 @@ function Notifs({perfil,tok,rol}){
 
 // ─── USUARIOS ────────────────────────────────────────────────────────────────
 function Usuarios({tok}){
-  const [usuarios,setUsuarios]=useState([]);const [load,setLoad]=useState(true);const [showAdd,setShowAdd]=useState(false);
+  const [usuarios,setUsuarios]=useState([]);const [operarios,setOperarios]=useState([]);const [load,setLoad]=useState(true);const [showAdd,setShowAdd]=useState(false);
   const [form,setForm]=useState({email:"",password:"",nombre:"",rol:"jardinero"});const [saving,setSaving]=useState(false);const [err,setErr]=useState("");
-  useEffect(()=>{sbGet("usuarios","?select=*&order=rol.asc",tok).then(setUsuarios).catch(()=>{}).finally(()=>setLoad(false));},[]);
+  const [showPinModal,setShowPinModal]=useState(null);const [newPin,setNewPin]=useState("");const [newPinConfirm,setNewPinConfirm]=useState("");
+  const loadAll=async()=>{
+    const [u,o]=await Promise.all([sbGet("usuarios","?select=*&order=rol.asc",tok).catch(()=>[]),sbGet("operarios","?select=*&order=nombre.asc",tok).catch(()=>[])]);
+    setUsuarios(u);setOperarios(o);setLoad(false);
+  };
+  useEffect(()=>{loadAll();},[]);
   const crearUsuario=async()=>{
     if(!form.email||!form.password||!form.nombre||saving)return;setSaving(true);setErr("");
     try{
@@ -3251,7 +3364,7 @@ function Usuarios({tok}){
       const d=await r.json();if(!r.ok)throw new Error(d.message||"Error al crear usuario");
       await sbPost("usuarios",{id:d.id,nombre:form.nombre,rol:form.rol,avatar:form.nombre.slice(0,2).toUpperCase()},tok);
       setShowAdd(false);setForm({email:"",password:"",nombre:"",rol:"jardinero"});
-      const u=await sbGet("usuarios","?select=*&order=rol.asc",tok);setUsuarios(u);
+      await loadAll();
     }catch(e){setErr(e.message||"Error");}setSaving(false);
   };
   const RL={admin:"Administrador",jardinero:"Jardinero",limpieza:"Limpieza",comercial:"Comercial"};
@@ -3279,6 +3392,47 @@ function Usuarios({tok}){
       <div className="fg"><label>Rol</label><select className="fi" value={form.rol} onChange={e=>setForm(v=>({...v,rol:e.target.value}))}><option value="jardinero">Jardinero</option><option value="limpieza">Limpieza</option><option value="comercial">Comercial</option><option value="admin">Administrador</option></select></div>
       <div className="mft"><button className="btn bg" onClick={()=>setShowAdd(false)}>Cancelar</button><button className="btn bp" onClick={crearUsuario} disabled={saving}>{saving?"Creando…":"Crear usuario"}</button></div>
     </div></div>}
+
+    {/* OPERARIOS */}
+    {operarios.length>0&&<>
+      <div style={{fontSize:11,color:"#EC683E",textTransform:"uppercase",letterSpacing:1,fontWeight:700,marginTop:28,marginBottom:14}}>Operarios (acceso por PIN)</div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(250px,1fr))",gap:14}}>
+        {operarios.map(o=>{
+          const rc=o.rol==="jardinero"?"#A6BE59":"#AFA3FF";
+          return <div key={o.id} className="card">
+            <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:12}}>
+              <div style={{width:44,height:44,borderRadius:"50%",background:`${rc}20`,border:`2px solid ${rc}40`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:700,color:rc,flexShrink:0}}>{o.avatar||o.nombre.slice(0,2).toUpperCase()}</div>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:14,fontWeight:600,color:"#1A1A1A"}}>{o.nombre}</div>
+                <div style={{display:"flex",gap:6,marginTop:3}}>
+                  <span className="badge" style={{background:`${rc}15`,color:rc}}>{o.rol==="jardinero"?"Jardinero":"Limpieza"}</span>
+                  <span className="badge" style={{background:o.activo?"rgba(166,190,89,.1)":"rgba(243,87,87,.1)",color:o.activo?"#A6BE59":"#F35757"}}>{o.activo?"Activo":"Inactivo"}</span>
+                </div>
+              </div>
+            </div>
+            <div style={{display:"flex",gap:6}}>
+              <button className="btn bg sm" style={{flex:1}} onClick={async()=>{await sbPatch("operarios",`id=eq.${o.id}`,{activo:!o.activo},tok);await loadAll();}}>{o.activo?"Desactivar":"Activar"}</button>
+              <button className="btn bg sm" onClick={()=>{setShowPinModal(o);setNewPin("");setNewPinConfirm("");}}>Cambiar PIN</button>
+            </div>
+          </div>;
+        })}
+      </div>
+    </>}
+
+    {/* MODAL CAMBIAR PIN */}
+    {showPinModal&&<div className="ov" onClick={()=>setShowPinModal(null)}><div className="modal" style={{maxWidth:360}} onClick={e=>e.stopPropagation()}>
+      <h3>Cambiar PIN</h3>
+      <div style={{fontSize:13,color:"#8A8580",marginBottom:16}}>{showPinModal.nombre}</div>
+      <div className="g2">
+        <div className="fg"><label>Nuevo PIN *</label><input className="fi" type="text" inputMode="numeric" maxLength={4} value={newPin} onChange={e=>setNewPin(e.target.value.replace(/\D/g,"").slice(0,4))} placeholder="0000" style={{textAlign:"center",fontSize:20,letterSpacing:8}}/></div>
+        <div className="fg"><label>Confirmar *</label><input className="fi" type="text" inputMode="numeric" maxLength={4} value={newPinConfirm} onChange={e=>setNewPinConfirm(e.target.value.replace(/\D/g,"").slice(0,4))} placeholder="0000" style={{textAlign:"center",fontSize:20,letterSpacing:8}}/></div>
+      </div>
+      {newPin&&newPinConfirm&&newPin!==newPinConfirm&&<div style={{fontSize:12,color:"#F35757",marginBottom:10}}>No coinciden</div>}
+      <div className="mft">
+        <button className="btn bg" onClick={()=>setShowPinModal(null)}>Cancelar</button>
+        <button className="btn bp" disabled={newPin.length!==4||newPin!==newPinConfirm} onClick={async()=>{await sbPatch("operarios",`id=eq.${showPinModal.id}`,{pin:newPin},tok);setShowPinModal(null);}}>Guardar</button>
+      </div>
+    </div></div>}
   </>;
 }
 
@@ -3290,7 +3444,7 @@ function Jardineros({tok,rol}){
   const [jardineros,setJardineros]=useState([]);
   const [load,setLoad]=useState(true);
   const [showJForm,setShowJForm]=useState(false);
-  const [jForm,setJForm]=useState({nombre:"",modalidad:"Fijo mensual",tarifa:"",notas:""});
+  const [jForm,setJForm]=useState({nombre:"",modalidad:"Fijo mensual",tarifa:"",notas:"",pin:"",pinConfirm:""});
   const [saving,setSaving]=useState(false);
   const [analisis,setAnalisis]=useState(null);
   const [analLoad,setAnalLoad]=useState(false);
@@ -3303,10 +3457,13 @@ function Jardineros({tok,rol}){
   useEffect(()=>{load_();},[]);
 
   const crearJardinero=async()=>{
-    if(!jForm.nombre||saving)return;setSaving(true);
+    if(!jForm.nombre||!jForm.pin||jForm.pin.length!==4||jForm.pin!==jForm.pinConfirm||saving)return;
+    setSaving(true);
     try{
-      await sbPost("jardineros",{nombre:jForm.nombre,modalidad:jForm.modalidad,tarifa:parseFloat(jForm.tarifa)||null,notas:jForm.notas||null,activo:true},tok);
-      setShowJForm(false);setJForm({nombre:"",modalidad:"Fijo mensual",tarifa:"",notas:""});await load_();
+      const [j]=await sbPost("jardineros",{nombre:jForm.nombre,modalidad:jForm.modalidad,tarifa:parseFloat(jForm.tarifa)||null,notas:jForm.notas||null,activo:true},tok);
+      const [op]=await sbPost("operarios",{nombre:jForm.nombre,rol:"jardinero",pin:jForm.pin,referencia_id:j.id,activo:true,avatar:jForm.nombre.slice(0,2).toUpperCase()},tok);
+      await sbPatch("jardineros",`id=eq.${j.id}`,{operario_id:op.id},tok).catch(()=>{});
+      setShowJForm(false);setJForm({nombre:"",modalidad:"Fijo mensual",tarifa:"",notas:"",pin:"",pinConfirm:""});await load_();
     }catch(_){}setSaving(false);
   };
   const toggleActivo=async(j)=>{await sbPatch("jardineros",`id=eq.${j.id}`,{activo:!j.activo},tok);await load_();};
@@ -3381,7 +3538,14 @@ function Jardineros({tok,rol}){
         {jForm.modalidad==="Por horas"&&<div className="fg"><label>Tarifa por hora (€)</label><input type="number" inputMode="decimal" className="fi" value={jForm.tarifa} onChange={e=>setJForm(v=>({...v,tarifa:e.target.value}))} placeholder="Ej: 15"/></div>}
         {jForm.modalidad==="Precio fijo por servicio"&&<div style={{fontSize:12,color:"#8A8580",marginBottom:14,background:"rgba(201,168,76,.06)",borderRadius:8,padding:"10px 12px"}}>El precio se define por cada servicio concreto.</div>}
         <div className="fg"><label>Notas (opcional)</label><textarea className="fi" rows={2} value={jForm.notas} onChange={e=>setJForm(v=>({...v,notas:e.target.value}))} placeholder="Notas…"/></div>
-        <div className="mft"><button className="btn bg" onClick={()=>setShowJForm(false)}>Cancelar</button><button className="btn bp" onClick={crearJardinero} disabled={saving||!jForm.nombre}>{saving?"Guardando…":"🌿 Crear"}</button></div>
+        <hr className="div"/>
+        <div style={{fontSize:12,color:"#EC683E",fontWeight:700,marginBottom:10,textTransform:"uppercase",letterSpacing:.5}}>Acceso por PIN</div>
+        <div className="g2">
+          <div className="fg"><label>PIN (4 dígitos) *</label><input className="fi" type="text" inputMode="numeric" maxLength={4} value={jForm.pin} onChange={e=>setJForm(v=>({...v,pin:e.target.value.replace(/\D/g,"").slice(0,4)}))} placeholder="0000" style={{textAlign:"center",fontSize:20,letterSpacing:8}}/></div>
+          <div className="fg"><label>Confirmar PIN *</label><input className="fi" type="text" inputMode="numeric" maxLength={4} value={jForm.pinConfirm} onChange={e=>setJForm(v=>({...v,pinConfirm:e.target.value.replace(/\D/g,"").slice(0,4)}))} placeholder="0000" style={{textAlign:"center",fontSize:20,letterSpacing:8}}/></div>
+        </div>
+        {jForm.pin&&jForm.pinConfirm&&jForm.pin!==jForm.pinConfirm&&<div style={{fontSize:12,color:"#F35757",marginBottom:10}}>Los PINs no coinciden</div>}
+        <div className="mft"><button className="btn bg" onClick={()=>setShowJForm(false)}>Cancelar</button><button className="btn bp" onClick={crearJardinero} disabled={saving||!jForm.nombre||jForm.pin.length!==4||jForm.pin!==jForm.pinConfirm}>{saving?"Guardando…":"🌿 Crear"}</button></div>
       </div>
     </div>}
   </>;
@@ -3393,7 +3557,7 @@ function LimpiadorasPage({tok,rol}){
   const [limpiadoras,setLimpiadoras]=useState([]);
   const [load,setLoad]=useState(true);
   const [showForm,setShowForm]=useState(false);
-  const [form,setForm]=useState({nombre:"",modalidad:"por_horas",tarifa_hora:"",notas:""});
+  const [form,setForm]=useState({nombre:"",modalidad:"por_horas",tarifa_hora:"",notas:"",pin:"",pinConfirm:""});
   const [saving,setSaving]=useState(false);
   const [anal,setAnal]=useState(null);
   const [analLoad,setAnalLoad]=useState(false);
@@ -3406,10 +3570,13 @@ function LimpiadorasPage({tok,rol}){
   useEffect(()=>{load_();},[]);
 
   const crear=async()=>{
-    if(!form.nombre||saving)return;setSaving(true);
+    if(!form.nombre||!form.pin||form.pin.length!==4||form.pin!==form.pinConfirm||saving)return;
+    setSaving(true);
     try{
-      await sbPost("limpiadoras",{nombre:form.nombre,modalidad:form.modalidad,tarifa_hora:form.modalidad==="por_horas"?parseFloat(form.tarifa_hora)||null:null,notas:form.notas||null,activa:true},tok);
-      setShowForm(false);setForm({nombre:"",modalidad:"por_horas",tarifa_hora:"",notas:""});await load_();
+      const [l]=await sbPost("limpiadoras",{nombre:form.nombre,modalidad:form.modalidad,tarifa_hora:form.modalidad==="por_horas"?parseFloat(form.tarifa_hora)||null:null,notas:form.notas||null,activa:true},tok);
+      const [op]=await sbPost("operarios",{nombre:form.nombre,rol:"limpieza",pin:form.pin,referencia_id:l.id,activo:true,avatar:form.nombre.slice(0,2).toUpperCase()},tok);
+      await sbPatch("limpiadoras",`id=eq.${l.id}`,{operario_id:op.id},tok).catch(()=>{});
+      setShowForm(false);setForm({nombre:"",modalidad:"por_horas",tarifa_hora:"",notas:"",pin:"",pinConfirm:""});await load_();
     }catch(_){}setSaving(false);
   };
   const toggleActiva=async l=>{await sbPatch("limpiadoras",`id=eq.${l.id}`,{activa:!l.activa},tok);await load_();};
@@ -3481,7 +3648,14 @@ function LimpiadorasPage({tok,rol}){
         </select></div>
         {form.modalidad==="por_horas"&&<div className="fg"><label>Tarifa €/hora</label><input type="number" inputMode="decimal" className="fi" value={form.tarifa_hora} onChange={e=>setForm(v=>({...v,tarifa_hora:e.target.value}))} placeholder="Ej: 12"/></div>}
         <div className="fg"><label>Notas (opcional)</label><textarea className="fi" rows={2} value={form.notas} onChange={e=>setForm(v=>({...v,notas:e.target.value}))} placeholder="Notas…"/></div>
-        <div className="mft"><button className="btn bg" onClick={()=>setShowForm(false)}>Cancelar</button><button className="btn bp" onClick={crear} disabled={saving||!form.nombre}>{saving?"Guardando…":"🧹 Crear"}</button></div>
+        <hr className="div"/>
+        <div style={{fontSize:12,color:"#EC683E",fontWeight:700,marginBottom:10,textTransform:"uppercase",letterSpacing:.5}}>Acceso por PIN</div>
+        <div className="g2">
+          <div className="fg"><label>PIN (4 dígitos) *</label><input className="fi" type="text" inputMode="numeric" maxLength={4} value={form.pin} onChange={e=>setForm(v=>({...v,pin:e.target.value.replace(/\D/g,"").slice(0,4)}))} placeholder="0000" style={{textAlign:"center",fontSize:20,letterSpacing:8}}/></div>
+          <div className="fg"><label>Confirmar PIN *</label><input className="fi" type="text" inputMode="numeric" maxLength={4} value={form.pinConfirm} onChange={e=>setForm(v=>({...v,pinConfirm:e.target.value.replace(/\D/g,"").slice(0,4)}))} placeholder="0000" style={{textAlign:"center",fontSize:20,letterSpacing:8}}/></div>
+        </div>
+        {form.pin&&form.pinConfirm&&form.pin!==form.pinConfirm&&<div style={{fontSize:12,color:"#F35757",marginBottom:10}}>Los PINs no coinciden</div>}
+        <div className="mft"><button className="btn bg" onClick={()=>setShowForm(false)}>Cancelar</button><button className="btn bp" onClick={crear} disabled={saving||!form.nombre||form.pin.length!==4||form.pin!==form.pinConfirm}>{saving?"Guardando…":"🧹 Crear"}</button></div>
       </div>
     </div>}
   </>;
