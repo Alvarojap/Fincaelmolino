@@ -1128,6 +1128,154 @@ function FinancialCharts({tok}){
   </>;
 }
 
+// ─── ATENCIÓN AHORA ─────────────────────────────────────────────────────────
+function AtencionAhora({tok,setPage}){
+  const [llegadas,setLlegadas]=useState([]);
+  const [acciones,setAcciones]=useState([]);
+  const [solicitudes,setSolicitudes]=useState([]);
+  const [srvLimp,setSrvLimp]=useState([]);
+  const [srvJard,setSrvJard]=useState([]);
+  const [load,setLoad]=useState(true);
+
+  useEffect(()=>{
+    (async()=>{
+      try{
+        const hoy=new Date();
+        const hoyStr=hoy.toISOString().split("T")[0];
+        const en7=new Date(hoy);en7.setDate(en7.getDate()+7);
+        const en7Str=en7.toISOString().split("T")[0];
+        const ACTIVOS=["visita","pendiente_contrato","contrato_firmado","reserva_pagada","precio_total"];
+
+        const [airbnbs,reservas,visitas,sols,sLimp,sJard]=await Promise.all([
+          sbGet("reservas_airbnb",`?fecha_entrada=gte.${hoyStr}&fecha_entrada=lte.${en7Str}&select=*`,tok),
+          sbGet("reservas",`?fecha=gte.${hoyStr}&fecha=lte.${en7Str}&select=*`,tok),
+          sbGet("visitas",`?fecha=gte.${hoyStr}&fecha=lte.${en7Str}&estado=eq.pendiente&select=*`,tok).catch(()=>[]),
+          sbGet("solicitudes_desbloqueo","?estado=eq.pendiente&select=*&order=created_at.desc",tok).catch(()=>[]),
+          sbGet("servicios","?select=*",tok).catch(()=>[]),
+          sbGet("jardin_servicios","?estado=eq.activo&select=*",tok).catch(()=>[]),
+        ]);
+
+        // Llegadas
+        const ll=[];
+        for(const a of airbnbs){
+          const noches=Math.round((new Date(a.fecha_salida)-new Date(a.fecha_entrada))/(86400000));
+          ll.push({tipo:"airbnb",nombre:a.huesped,fecha:a.fecha_entrada,detalle:`${noches} noche${noches!==1?"s":""}${a.personas?` · ${a.personas} pers.`:""}`});
+        }
+        for(const r of reservas.filter(r=>ACTIVOS.includes(r.estado))){
+          ll.push({tipo:"evento",nombre:r.nombre,fecha:r.fecha,detalle:r.tipo||"Evento"});
+        }
+        ll.sort((a,b)=>a.fecha.localeCompare(b.fecha));
+        setLlegadas(ll);
+
+        // Acciones requeridas
+        const acc=[];
+        const todasRes=await sbGet("reservas","?select=*",tok);
+        for(const r of todasRes){
+          if(r.estado==="cancelada"||r.estado==="finalizada")continue;
+          if(!r.contrato_firmado){
+            acc.push({tipo:"contrato",nombre:r.nombre,fecha:r.fecha,detalle:"Contrato pendiente de firma",id:r.id});
+          }else if(r.estado==="contrato_firmado"&&!r.seña_cobrada){
+            acc.push({tipo:"seña",nombre:r.nombre,fecha:r.fecha,detalle:"Señal pendiente de cobro",id:r.id});
+          }
+        }
+        for(const v of visitas){
+          acc.push({tipo:"visita",nombre:v.nombre,fecha:v.fecha,detalle:`Visita ${v.hora?.slice(0,5)||""} · ${v.tipo_evento||""}`.trim()});
+        }
+        acc.sort((a,b)=>a.fecha.localeCompare(b.fecha));
+        setAcciones(acc);
+
+        setSolicitudes(sols);
+        setSrvLimp(sLimp.filter(s=>s.estado==="en_curso"));
+        setSrvJard(sJard);
+      }catch(e){console.error("AtencionAhora:",e);}
+      setLoad(false);
+    })();
+  },[]);
+
+  if(load)return <div style={{display:"flex",alignItems:"center",gap:8,justifyContent:"center",padding:"20px 0",color:"#5a5e6e",fontSize:13}}><div className="spin" style={{width:16,height:16,borderWidth:2}}/>Cargando…</div>;
+
+  const totalItems=llegadas.length+acciones.length+solicitudes.length+srvLimp.length+srvJard.length;
+  if(totalItems===0)return null;
+
+  const fmtF=f=>new Date(f+"T12:00:00").toLocaleDateString("es-ES",{weekday:"short",day:"numeric",month:"short"});
+  const tagStyle=(bg,col)=>({display:"inline-block",fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:4,background:bg,color:col,letterSpacing:.5,flexShrink:0});
+
+  return <div className="card" style={{marginBottom:16}}>
+    <div className="chdr"><span className="ctit">⚡ Atención ahora</span><span className="badge" style={{background:"rgba(232,85,85,.1)",color:"#e85555",border:"1px solid rgba(232,85,85,.2)"}}>{totalItems}</span></div>
+
+    {/* LLEGADAS */}
+    {llegadas.length>0&&<>
+      <div style={{fontSize:11,color:"#c9a84c",fontWeight:600,textTransform:"uppercase",letterSpacing:1,marginBottom:8,marginTop:4}}>🏠 Próximas llegadas esta semana</div>
+      {llegadas.map((l,i)=>(
+        <div key={`ll-${i}`} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",background:"#0f1117",borderRadius:8,marginBottom:5}}>
+          <span style={l.tipo==="airbnb"?tagStyle("rgba(16,185,129,.15)","#10b981"):tagStyle("rgba(99,102,241,.15)","#a5b4fc")}>{l.tipo==="airbnb"?"AIRBNB":"EVENTO"}</span>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontSize:13,color:"#e8e6e1",fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{l.nombre}</div>
+            <div style={{fontSize:11,color:"#5a5e6e"}}>{l.detalle}</div>
+          </div>
+          <div style={{fontSize:12,color:"#7a7f94",flexShrink:0}}>📅 {fmtF(l.fecha)}</div>
+        </div>
+      ))}
+    </>}
+
+    {/* ACCIONES */}
+    {acciones.length>0&&<>
+      <div style={{fontSize:11,color:"#f59e0b",fontWeight:600,textTransform:"uppercase",letterSpacing:1,marginBottom:8,marginTop:llegadas.length>0?16:4}}>📋 Requieren acción</div>
+      {acciones.map((a,i)=>(
+        <div key={`ac-${i}`} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",background:"#0f1117",borderRadius:8,marginBottom:5,cursor:a.tipo==="visita"?"pointer":a.id?"pointer":"default"}} onClick={()=>{if(a.tipo==="visita")setPage("visitas");else if(a.id)setPage("reservas");}}>
+          <span style={{fontSize:16,flexShrink:0}}>{a.tipo==="contrato"?"✍️":a.tipo==="seña"?"💰":"👁"}</span>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontSize:13,color:"#e8e6e1",fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{a.nombre}</div>
+            <div style={{fontSize:11,color:"#f59e0b"}}>{a.detalle}</div>
+          </div>
+          <div style={{fontSize:12,color:"#7a7f94",flexShrink:0}}>📅 {fmtF(a.fecha)}</div>
+        </div>
+      ))}
+    </>}
+
+    {/* SOLICITUDES */}
+    {solicitudes.length>0&&<>
+      <div style={{fontSize:11,color:"#e85555",fontWeight:600,textTransform:"uppercase",letterSpacing:1,marginBottom:8,marginTop:(llegadas.length+acciones.length)>0?16:4}}>🔓 Solicitudes de desbloqueo</div>
+      {solicitudes.map(s=>{
+        const fF=new Date(s.fecha+"T12:00:00").toLocaleDateString("es-ES",{weekday:"short",day:"numeric",month:"short"});
+        return <div key={s.id} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",background:"#0f1117",borderRadius:8,marginBottom:5,cursor:"pointer"}} onClick={()=>setPage("notifs")}>
+          <span style={{fontSize:16,flexShrink:0}}>🔒</span>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontSize:13,color:"#e8e6e1",fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{s.solicitado_por}</div>
+            <div style={{fontSize:11,color:"#e85555"}}>{s.motivo||"Solicitud de desbloqueo"}</div>
+          </div>
+          <div style={{fontSize:12,color:"#7a7f94",flexShrink:0}}>📅 {fF}</div>
+        </div>;
+      })}
+    </>}
+
+    {/* SERVICIOS ACTIVOS */}
+    {(srvLimp.length>0||srvJard.length>0)&&<>
+      <div style={{fontSize:11,color:"#6366f1",fontWeight:600,textTransform:"uppercase",letterSpacing:1,marginBottom:8,marginTop:(llegadas.length+acciones.length+solicitudes.length)>0?16:4}}>🧹 Servicios activos</div>
+      {srvLimp.map(s=>(
+        <div key={`sl-${s.id}`} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",background:"#0f1117",borderRadius:8,marginBottom:5,cursor:"pointer"}} onClick={()=>setPage("limpieza")}>
+          <span style={tagStyle("rgba(99,102,241,.15)","#a5b4fc")}>LIMPIEZA</span>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontSize:13,color:"#e8e6e1",fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>🧹 {s.nombre}</div>
+            <div style={{fontSize:11,color:"#5a5e6e"}}>📅 {new Date(s.fecha).toLocaleDateString("es-ES",{day:"numeric",month:"short"})}</div>
+          </div>
+        </div>
+      ))}
+      {srvJard.map(s=>{
+        const fi=new Date(s.fecha_inicio+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"});
+        const ff=new Date(s.fecha_fin+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"});
+        return <div key={`sj-${s.id}`} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",background:"#0f1117",borderRadius:8,marginBottom:5,cursor:"pointer"}} onClick={()=>setPage("jadmin")}>
+          <span style={tagStyle("rgba(16,185,129,.15)","#10b981")}>JARDÍN</span>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontSize:13,color:"#e8e6e1",fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>🌿 {s.nombre}</div>
+            <div style={{fontSize:11,color:"#5a5e6e"}}>📅 {fi} – {ff}{s.jardinero_nombre?` · 👤 ${s.jardinero_nombre}`:""}</div>
+          </div>
+        </div>;
+      })}
+    </>}
+  </div>;
+}
+
 function DashA({reservas,jsem,jpunt,cwk,setPage,tok}){
   const temp=getTemporada();
   const sj={}; jsem.forEach(r=>sj[r.tarea_id]=r);
@@ -1148,6 +1296,7 @@ function DashA({reservas,jsem,jpunt,cwk,setPage,tok}){
       </div>
       <FinancialKPIs tok={tok}/>
       <FinancialCharts tok={tok}/>
+      <AtencionAhora tok={tok} setPage={setPage}/>
       {prox&&<div className="card" style={{marginBottom:16,borderLeft:"3px solid #c9a84c"}}>
         <div style={{fontSize:10,color:"#5a5e6e",textTransform:"uppercase",letterSpacing:1,marginBottom:7}}>PRÓXIMO EVENTO</div>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:12}}>
