@@ -314,6 +314,35 @@ function MolinoLogo({size=22}){
   </svg>;
 }
 
+// ─── ICON COMPONENT ──────────────────────────────────────────────────────────
+const ICON_PATHS={
+  dashboard:`<path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>`,
+  garden:`<path d="M12 22V12m0 0C12 7 7 4 3 6m9 6c0-5 5-8 9-6"/><path d="M7 17c0-3 2.2-5 5-5s5 2 5 5"/>`,
+  cleaning:`<path d="M9 21h6m-3-4v4"/><path d="M12 3a6 6 0 016 6c0 3-2 5-4 7H8c-2-2-4-4-4-7a6 6 0 016-6z"/>`,
+  calendar:`<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>`,
+  reservations:`<path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>`,
+  visits:`<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>`,
+  airbnb:`<path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>`,
+  chat:`<path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>`,
+  notifications:`<path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/>`,
+  users:`<path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/>`,
+  settings:`<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9c.26.46.4.98.42 1.51"/>`,
+  expenses:`<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/>`,
+  gardeners:`<path d="M12 22V12m0 0c0-4-4-7-8-5m8 5c0-4 4-7 8-5"/><circle cx="12" cy="5" r="3"/>`,
+  incidencias:`<path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>`,
+  check:`<polyline points="20 6 9 17 4 12"/>`,
+  plus:`<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>`,
+  new_res:`<path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/>`,
+  limpiadoras:`<circle cx="12" cy="7" r="4"/><path d="M5.5 21a6.5 6.5 0 0113 0"/>`,
+  logout:`<path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>`,
+  menu:`<line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/>`,
+  close:`<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>`,
+  back:`<polyline points="15 18 9 12 15 6"/>`,
+};
+function Icon({name,size=20,color="currentColor",sw=1.8}){
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" style={{display:"inline-block",verticalAlign:"middle",flexShrink:0}} dangerouslySetInnerHTML={{__html:ICON_PATHS[name]||""}}/>;
+}
+
 // ─── CSS ─────────────────────────────────────────────────────────────────────
 const CSS=`
 @import url('https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&display=swap');
@@ -378,15 +407,16 @@ textarea.fi{resize:vertical;min-height:72px;line-height:1.5}
 select.fi{cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%238A8580' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center;padding-right:38px}
 .mft{display:flex;gap:8px;justify-content:flex-end;margin-top:20px;padding-top:18px;border-top:1px solid rgba(0,0,0,.06)}
 .ov{position:fixed;inset:0;background:rgba(0,0,0,.4);backdrop-filter:blur(10px);z-index:1000;display:flex;align-items:center;justify-content:center;padding:16px}
-@keyframes modalIn{from{opacity:0;transform:scale(.95)}to{opacity:1;transform:scale(1)}}
+@keyframes modalIn{from{opacity:0;transform:scale(.94) translateY(8px)}to{opacity:1;transform:scale(1) translateY(0)}}
 @keyframes modalSlideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
-.modal{background:#FFFFFF;border:none;border-radius:24px;padding:30px;width:100%;max-width:500px;max-height:90vh;overflow-y:auto;box-shadow:0 12px 48px rgba(0,0,0,.12);animation:modalIn .2s ease}
+.modal{background:#FFFFFF;border:none;border-radius:24px;padding:30px;width:100%;max-width:500px;max-height:90vh;overflow-y:auto;box-shadow:0 12px 48px rgba(0,0,0,.12);animation:modalIn .22s cubic-bezier(.34,1.56,.64,1)}
 .modal h3{font-family:'Inter Tight',sans-serif;font-size:20px;color:#1A1A1A;font-weight:800;margin-bottom:22px}
 .cli{display:flex;align-items:flex-start;gap:12px;padding:14px;border-radius:14px;border:none;background:#FFFFFF;margin-bottom:6px;box-shadow:0 1px 4px rgba(0,0,0,.04);transition:all .15s ease}
 .cli.done{opacity:.65;background:#F5FFF0}
 .chk{width:28px;height:28px;border-radius:8px;flex-shrink:0;border:2.5px solid #BFBAB4;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s cubic-bezier(.4,0,.2,1);margin-top:1px}
 .chk:hover{border-color:#A6BE59}
-.chk.on{background:#A6BE59;border-color:#A6BE59;transform:scale(1.05)}
+.chk.on{background:#A6BE59;border-color:#A6BE59;animation:chkPop .2s ease}
+@keyframes chkPop{0%{transform:scale(1)}50%{transform:scale(1.2)}100%{transform:scale(1)}}
 .chk.on::after{content:"✓";color:#fff;font-size:14px;font-weight:800}
 .tz{display:inline-block;font-size:10px;padding:3px 8px;border-radius:100px;background:rgba(236,104,62,.08);color:#EC683E;margin-bottom:4px;font-weight:700}
 .tl{font-size:14px;color:#1A1A1A;line-height:1.5;font-weight:500}
@@ -451,8 +481,11 @@ hr.div{border:none;border-top:1px solid rgba(0,0,0,.06);margin:16px 0}
 .llo{text-align:center;margin-bottom:32px}
 .llo h1{font-family:'Inter Tight',sans-serif;font-size:28px;color:#EC683E;font-weight:800}
 .llo p{font-size:10px;color:#8A8580;margin-top:8px;text-transform:uppercase;letter-spacing:2px;font-weight:600}
-.rc{background:#FFFFFF;border:none;border-radius:16px;padding:18px 20px;margin-bottom:10px;cursor:pointer;transition:all .15s ease;border-left:3px solid transparent;box-shadow:0 1px 6px rgba(0,0,0,.04)}
-.rc:hover{transform:translateY(-1px);box-shadow:0 4px 16px rgba(0,0,0,.08)}
+.rc{background:#FFFFFF;border:none;border-radius:16px;padding:18px 20px;margin-bottom:10px;cursor:pointer;transition:all .18s ease;border-left:3px solid transparent;box-shadow:0 1px 6px rgba(0,0,0,.04)}
+.rc:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.10)}
+.rc:active{transform:scale(.98)}
+.detail-panel{animation:panelIn .22s ease}
+@keyframes panelIn{from{opacity:0;transform:translateX(16px)}to{opacity:1;transform:translateX(0)}}
 .spin{display:inline-block;width:18px;height:18px;border:2.5px solid rgba(236,104,62,.15);border-top-color:#EC683E;border-radius:50%;animation:spin .6s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
 .loading{display:flex;align-items:center;justify-content:center;min-height:200px;color:#8A8580;gap:10px;font-size:14px;font-weight:500}
@@ -482,7 +515,7 @@ hr.div{border:none;border-top:1px solid rgba(0,0,0,.06);margin:16px 0}
   .tabs{overflow-x:auto;-webkit-overflow-scrolling:touch;flex-wrap:nowrap;scrollbar-width:none;margin-bottom:16px}
   .tabs::-webkit-scrollbar{display:none}.tab{padding:9px 18px;font-size:13px;flex-shrink:0}
   .ov{padding:0;align-items:flex-end}
-  .modal{border-radius:24px 24px 0 0;max-height:92vh;padding:24px 18px 36px;max-width:100%;width:100%;animation:modalSlideUp .28s ease}
+  .modal{border-radius:24px 24px 0 0;max-height:92vh;padding:24px 18px 36px;max-width:100%;width:100%;animation:modalSlideUp .28s cubic-bezier(.34,1.56,.64,1)}
   .modal h3{font-size:19px;margin-bottom:18px}
   .modal .btn{min-height:52px;font-size:15px}
   .chat-list-col{display:none}
@@ -617,7 +650,7 @@ export default function App() {
           <MolinoLogo size={22}/>
           <span className="mob-top-title">Finca El Molino</span>
         </div>
-        <button className="mob-menu-btn" onClick={()=>setDrawerOpen(true)}>☰</button>
+        <button className="mob-menu-btn" onClick={()=>setDrawerOpen(true)}><Icon name="menu" size={22}/></button>
       </div>
       {drawerOpen&&<div className="drawer-overlay" onClick={()=>setDrawerOpen(false)}/>}
       <div className={`drawer${drawerOpen?" open":""}`}>
@@ -682,23 +715,24 @@ function Sidebar({perfil,page,setPage,onLogout,inDrawer,onClose}){
   const isA=rol==="admin",isJ=rol==="jardinero",isL=rol==="limpieza",isC=rol==="comercial";
   const RL={admin:"Administrador",jardinero:"Jardinero",limpieza:"Limpieza",comercial:"Comercial"};
   const av=perfil.avatar||perfil.nombre.slice(0,2).toUpperCase();
-  const N=({ico,lbl,id,badge})=>(
-    <div className="nw">
-      <button className={`nb${page===id?" on":""}`} onClick={()=>setPage(id)}>
-        <span className="nb-ico">{ico}</span>{lbl}
+  const N=({ico,lbl,id,badge})=>{
+    const on=page===id;
+    return <div className="nw">
+      <button className={`nb${on?" on":""}`} onClick={()=>setPage(id)}>
+        <span className="nb-ico">{typeof ico==="string"&&ico.length<=2?ico:<Icon name={ico} size={18} color={on?"#FFFFFF":"#8A8580"}/>}</span>{lbl}
       </button>
       {badge>0&&<span className="nb-badge">{badge>9?"9+":badge}</span>}
-    </div>
-  );
+    </div>;
+  };
   return <aside className="sb">
     {inDrawer?(
       <div className="drawer-user-card">
-        <div className="av" style={{width:42,height:42,fontSize:14}}>{av}</div>
+        <div className="av" style={{width:44,height:44,fontSize:14}}>{av}</div>
         <div style={{flex:1,minWidth:0}}>
-          <div style={{fontSize:14,fontWeight:600,color:"#1A1A1A",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{perfil.nombre}</div>
-          <div style={{fontSize:11,color:"#EC683E",marginTop:2}}>{RL[rol]}</div>
+          <div style={{fontSize:15,fontWeight:700,color:"#1A1A1A",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{perfil.nombre}</div>
+          <div style={{fontSize:11,color:"#EC683E",marginTop:2,fontWeight:600}}>{RL[rol]}</div>
         </div>
-        <button className="drawer-close" onClick={onClose}>✕</button>
+        <button className="drawer-close" onClick={onClose}><Icon name="close" size={20} color="#8A8580"/></button>
       </div>
     ):(
       <div className="sb-logo">
@@ -709,30 +743,30 @@ function Sidebar({perfil,page,setPage,onLogout,inDrawer,onClose}){
       </div>
     )}
     <nav className="sb-nav">
-      <N ico="📊" lbl="Panel principal" id="dashboard"/>
+      <N ico="dashboard" lbl="Panel principal" id="dashboard"/>
       {(isA||isJ)&&<><p className="nav-sec">Jardín</p>
-        <N ico="✅" lbl={isA?"Checklist jardín":"Mi checklist"} id="jcheck"/>
-        {isA&&<N ico="🌿" lbl="Gestión jardín" id="jadmin"/>}
-        {isA&&<N ico="⚠️" lbl="Incidencias" id="incidencias"/>}
-        {isA&&<N ico="👷" lbl="Jardineros" id="jardineros"/>}
-        {isJ&&<N ico="📅" lbl="Calendario" id="cal-jardin"/>}
+        <N ico="check" lbl={isA?"Checklist jardín":"Mi checklist"} id="jcheck"/>
+        {isA&&<N ico="garden" lbl="Gestión jardín" id="jadmin"/>}
+        {isA&&<N ico="incidencias" lbl="Incidencias" id="incidencias"/>}
+        {isA&&<N ico="gardeners" lbl="Jardineros" id="jardineros"/>}
+        {isJ&&<N ico="calendar" lbl="Calendario" id="cal-jardin"/>}
       </>}
       {(isA||isL)&&<><p className="nav-sec">Limpieza</p>
-        <N ico="🧹" lbl={isA?"Gestión limpieza":"Mi servicio"} id="limpieza"/>
-        {isA&&<N ico="👩" lbl="Limpiadoras" id="limpiadoras"/>}
-        {isL&&<N ico="📅" lbl="Calendario" id="cal-limp"/>}
+        <N ico="cleaning" lbl={isA?"Gestión limpieza":"Mi servicio"} id="limpieza"/>
+        {isA&&<N ico="limpiadoras" lbl="Limpiadoras" id="limpiadoras"/>}
+        {isL&&<N ico="calendar" lbl="Calendario" id="cal-limp"/>}
       </>}
       {(isA||isC)&&<><p className="nav-sec">Reservas</p>
-        <N ico="📅" lbl="Calendario" id="calendario"/>
-        <N ico="📋" lbl="Reservas" id="reservas"/>
-        {isA&&<N ico="➕" lbl="Nueva reserva" id="nueva-res"/>}
-        <N ico="👁" lbl="Visitas" id="visitas"/>
-        {isA&&<N ico="🏠" lbl="Airbnb" id="airbnb"/>}
+        <N ico="calendar" lbl="Calendario" id="calendario"/>
+        <N ico="reservations" lbl="Reservas" id="reservas"/>
+        {isA&&<N ico="new_res" lbl="Nueva reserva" id="nueva-res"/>}
+        <N ico="visits" lbl="Visitas" id="visitas"/>
+        {isA&&<N ico="airbnb" lbl="Airbnb" id="airbnb"/>}
       </>}
       <p className="nav-sec">Comunicación</p>
-      <N ico="💬" lbl={isA?"Chat con equipo":"Chat con admin"} id="chat"/>
-      <N ico="🔔" lbl="Notificaciones" id="notifs"/>
-      {isA&&<><p className="nav-sec">Admin</p><N ico="💸" lbl="Gastos" id="gastos"/><N ico="👥" lbl="Usuarios" id="usuarios"/><N ico="⚙️" lbl="Ajustes" id="ajustes"/></>}
+      <N ico="chat" lbl={isA?"Chat con equipo":"Chat con admin"} id="chat"/>
+      <N ico="notifications" lbl="Notificaciones" id="notifs"/>
+      {isA&&<><p className="nav-sec">Admin</p><N ico="expenses" lbl="Gastos" id="gastos"/><N ico="users" lbl="Usuarios" id="usuarios"/><N ico="settings" lbl="Ajustes" id="ajustes"/></>}
     </nav>
     {!inDrawer&&(
       <div className="sb-user">
@@ -741,7 +775,7 @@ function Sidebar({perfil,page,setPage,onLogout,inDrawer,onClose}){
           <div className="uname">{perfil.nombre}</div>
           <div className="urole">{RL[rol]}</div>
         </div>
-        <button className="logout-btn" onClick={onLogout} title="Cerrar sesión">⏻</button>
+        <button className="logout-btn" onClick={onLogout} title="Cerrar sesión"><Icon name="logout" size={18}/></button>
       </div>
     )}
     {inDrawer&&(
@@ -772,24 +806,25 @@ function MobileNav({perfil,page,setPage,tok}){
     return()=>clearInterval(t);
   },[page,tok]);
 
-  const items=[{ico:"📊",lbl:"Inicio",id:"dashboard"}];
-  if(isA||isJ)items.push({ico:"✅",lbl:isA?"Jardín":"Checklist",id:isA?"jadmin":"jcheck"});
-  if(isJ)items.push({ico:"📅",lbl:"Calendario",id:"cal-jardin"});
-  if(isA)items.push({ico:"⚠️",lbl:"Incidencias",id:"incidencias"});
-  if(isA||isL)items.push({ico:"🧹",lbl:"Limpieza",id:"limpieza"});
-  if(!isA&&!isJ&&!isL)items.push({ico:"📅",lbl:"Calendario",id:"calendario"});
-  if(!isA&&!isJ&&!isL)items.push({ico:"📋",lbl:"Reservas",id:"reservas"});
-  if(!isA&&!isJ&&!isL)items.push({ico:"👁",lbl:"Visitas",id:"visitas"});
-  items.push({ico:"💬",lbl:"Chat",id:"chat",badge:chatBadge});
-  items.push({ico:"🔔",lbl:"Avisos",id:"notifs"});
+  const items=[{ico:"dashboard",lbl:"Inicio",id:"dashboard"}];
+  if(isA||isJ)items.push({ico:isA?"garden":"check",lbl:isA?"Jardín":"Checklist",id:isA?"jadmin":"jcheck"});
+  if(isJ)items.push({ico:"calendar",lbl:"Calendario",id:"cal-jardin"});
+  if(isA)items.push({ico:"incidencias",lbl:"Incidencias",id:"incidencias"});
+  if(isA||isL)items.push({ico:"cleaning",lbl:"Limpieza",id:"limpieza"});
+  if(!isA&&!isJ&&!isL)items.push({ico:"calendar",lbl:"Calendario",id:"calendario"});
+  if(!isA&&!isJ&&!isL)items.push({ico:"reservations",lbl:"Reservas",id:"reservas"});
+  if(!isA&&!isJ&&!isL)items.push({ico:"visits",lbl:"Visitas",id:"visitas"});
+  items.push({ico:"chat",lbl:"Chat",id:"chat",badge:chatBadge});
+  items.push({ico:"notifications",lbl:"Avisos",id:"notifs"});
   const shown=items.slice(0,5);
 
   return <nav className="mob-bar">
     <div className="mob-bar-inner">
-      {shown.map(it=>(
-        <button key={it.id} className={`mob-btn${page===it.id?" on":""}`} onClick={()=>setPage(it.id)}>
+      {shown.map(it=>{
+        const on=page===it.id;
+        return <button key={it.id} className={`mob-btn${on?" on":""}`} onClick={()=>setPage(it.id)}>
           <span className="mico">
-            {it.ico}
+            <Icon name={it.ico} size={22} color={on?"#fff":"#BFBAB4"}/>
             {(it.badge||0)>0&&(
               <span style={{position:"absolute",top:-4,right:-8,background:"#F35757",color:"#fff",borderRadius:20,padding:"1px 5px",fontSize:9,fontWeight:700,minWidth:14,textAlign:"center",lineHeight:"14px"}}>
                 {it.badge>9?"9+":it.badge}
@@ -797,8 +832,8 @@ function MobileNav({perfil,page,setPage,tok}){
             )}
           </span>
           <span>{it.lbl}</span>
-        </button>
-      ))}
+        </button>;
+      })}
     </div>
   </nav>;
 }
@@ -4298,7 +4333,7 @@ function Reservas({tok,rol,perfil}){
             ?<div className="empty"><span className="ico">📋</span><p>Sin reservas en esta categoría</p></div>
             :lista.map(r=><RCard key={r.id} r={r}/>)}
         </div>
-        {sel&&<div className="card" style={{position:"sticky",top:20}}>
+        {sel&&<div className="card detail-panel" style={{position:"sticky",top:20}}>
           <div style={{display:"flex",justifyContent:"space-between",marginBottom:16,gap:8}}>
             <div style={{minWidth:0}}><div style={{fontSize:18,fontWeight:700,color:"#1A1A1A",fontFamily:"'Inter Tight',sans-serif"}}>{sel.nombre}</div><SBadge e={sel.estado}/></div>
             <button className="btn bg sm" style={{flexShrink:0}} onClick={()=>setSel(null)}>✕</button>
