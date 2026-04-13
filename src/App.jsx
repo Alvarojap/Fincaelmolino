@@ -563,6 +563,7 @@ export default function App() {
     notifs:      <Notifs      {...P}/>,
     usuarios:    <Usuarios    {...P}/>,
     gastos:      <Gastos      {...P}/>,
+    jardineros:  <Jardineros  {...P}/>,
   };
 
   return <>
@@ -687,7 +688,7 @@ function Sidebar({perfil,page,setPage,onLogout,inDrawer,onClose}){
       <p className="nav-sec">Comunicación</p>
       <N ico="💬" lbl={isA?"Chat con equipo":"Chat con admin"} id="chat"/>
       <N ico="🔔" lbl="Notificaciones" id="notifs"/>
-      {isA&&<><p className="nav-sec">Admin</p><N ico="💸" lbl="Gastos" id="gastos"/><N ico="👥" lbl="Usuarios" id="usuarios"/></>}
+      {isA&&<><p className="nav-sec">Admin</p><N ico="💸" lbl="Gastos" id="gastos"/><N ico="🌿" lbl="Jardineros" id="jardineros"/><N ico="👥" lbl="Usuarios" id="usuarios"/></>}
     </nav>
     {!inDrawer&&(
       <div className="sb-user">
@@ -2816,6 +2817,296 @@ function Usuarios({tok}){
       <div className="fg"><label>Rol</label><select className="fi" value={form.rol} onChange={e=>setForm(v=>({...v,rol:e.target.value}))}><option value="jardinero">Jardinero</option><option value="limpieza">Limpieza</option><option value="comercial">Comercial</option><option value="admin">Administrador</option></select></div>
       <div className="mft"><button className="btn bg" onClick={()=>setShowAdd(false)}>Cancelar</button><button className="btn bp" onClick={crearUsuario} disabled={saving}>{saving?"Creando…":"Crear usuario"}</button></div>
     </div></div>}
+  </>;
+}
+
+// ─── JARDINEROS ─────────────────────────────────────────────────────────────
+const MODAL_JARDINERO=["Fijo mensual","Por horas","Precio fijo por servicio"];
+
+function Jardineros({tok,rol}){
+  if(rol!=="admin")return null;
+  const [tab,setTab]=useState("jardineros");
+  const [jardineros,setJardineros]=useState([]);
+  const [servicios,setServicios]=useState([]);
+  const [load,setLoad]=useState(true);
+  // Jardinero form
+  const [showJForm,setShowJForm]=useState(false);
+  const [jForm,setJForm]=useState({nombre:"",modalidad:"Fijo mensual",tarifa:"",notas:""});
+  const [saving,setSaving]=useState(false);
+  // Análisis
+  const [analisis,setAnalisis]=useState(null);
+  const [analLoad,setAnalLoad]=useState(false);
+  const [analData,setAnalData]=useState(null);
+  // Servicio form
+  const [showSForm,setShowSForm]=useState(false);
+  const sFormVacio={jardinero_id:"",titulo:"",descripcion:"",modalidad:"",tarifa_hora:"",importe_fijo:"",fecha_inicio:new Date().toISOString().split("T")[0],tareas:[]};
+  const [sForm,setSForm]=useState(sFormVacio);
+  const [nuevaTarea,setNuevaTarea]=useState("");
+  // Servicio tabs
+  const [srvTab,setSrvTab]=useState("activos");
+
+  const load_=async()=>{
+    try{
+      const [j,s]=await Promise.all([
+        sbGet("jardineros","?select=*&order=nombre.asc",tok),
+        sbGet("servicios_jardineria","?select=*&order=created_at.desc",tok),
+      ]);
+      setJardineros(j);setServicios(s);
+    }catch(_){}
+    setLoad(false);
+  };
+  useEffect(()=>{load_();},[]);
+
+  const crearJardinero=async()=>{
+    if(!jForm.nombre||saving)return;
+    setSaving(true);
+    try{
+      await sbPost("jardineros",{
+        nombre:jForm.nombre,modalidad:jForm.modalidad,
+        tarifa:parseFloat(jForm.tarifa)||null,
+        notas:jForm.notas||null,activo:true
+      },tok);
+      setShowJForm(false);setJForm({nombre:"",modalidad:"Fijo mensual",tarifa:"",notas:""});
+      await load_();
+    }catch(_){}
+    setSaving(false);
+  };
+
+  const toggleActivo=async(j)=>{
+    await sbPatch("jardineros",`id=eq.${j.id}`,{activo:!j.activo},tok);
+    await load_();
+  };
+
+  const verAnalisis=async(j)=>{
+    if(analisis?.id===j.id){setAnalisis(null);return;}
+    setAnalisis(j);setAnalLoad(true);setAnalData(null);
+    try{
+      const hoy=new Date();
+      const añoActual=hoy.getFullYear();
+      const mesActual=String(hoy.getMonth()+1).padStart(2,"0");
+      const jornadas=await sbGet("jornadas_jardineria",`?jardinero_id=eq.${j.id}&fecha=gte.${añoActual}-01-01&select=*`,tok).catch(()=>[]);
+      // Mes actual
+      const jorMes=jornadas.filter(x=>x.fecha?.slice(5,7)===mesActual);
+      const horasMes=jorMes.reduce((s,x)=>s+(parseFloat(x.horas)||0),0);
+      const costeMes=jorMes.reduce((s,x)=>s+(parseFloat(x.coste)||0),0);
+      // Año
+      const horasAño=jornadas.reduce((s,x)=>s+(parseFloat(x.horas)||0),0);
+      const costeAño=jornadas.reduce((s,x)=>s+(parseFloat(x.coste)||0),0);
+      const euroHoraReal=horasAño>0?Math.round(costeAño/horasAño*100)/100:0;
+      // Barras por mes
+      const barras=Array.from({length:12},(_,i)=>{
+        const m=String(i+1).padStart(2,"0");
+        const h=jornadas.filter(x=>x.fecha?.slice(5,7)===m).reduce((s,x)=>s+(parseFloat(x.horas)||0),0);
+        return {name:MESES_CORTO[i],horas:Math.round(h*10)/10};
+      });
+      setAnalData({horasMes:Math.round(horasMes*10)/10,costeMes:Math.round(costeMes),horasAño:Math.round(horasAño*10)/10,costeAño:Math.round(costeAño),euroHoraReal,barras});
+    }catch(_){}
+    setAnalLoad(false);
+  };
+
+  const selJardinero=(id)=>{
+    const j=jardineros.find(x=>String(x.id)===String(id));
+    setSForm(prev=>({...prev,jardinero_id:id,modalidad:j?.modalidad||"Por horas",tarifa_hora:j?.modalidad==="Por horas"?String(j?.tarifa||""):""}));
+  };
+
+  const addTareaSrv=()=>{if(!nuevaTarea.trim())return;setSForm(prev=>({...prev,tareas:[...prev.tareas,nuevaTarea.trim()]}));setNuevaTarea("");};
+  const removeTareaSrv=i=>setSForm(prev=>({...prev,tareas:prev.tareas.filter((_,idx)=>idx!==i)}));
+
+  const crearServicio=async()=>{
+    if(!sForm.jardinero_id||!sForm.titulo||saving)return;
+    setSaving(true);
+    try{
+      const j=jardineros.find(x=>String(x.id)===String(sForm.jardinero_id));
+      await sbPost("servicios_jardineria",{
+        jardinero_id:sForm.jardinero_id,
+        jardinero_nombre:j?.nombre||"",
+        titulo:sForm.titulo,
+        descripcion:sForm.descripcion||null,
+        modalidad:sForm.modalidad,
+        tarifa_hora:sForm.modalidad==="Por horas"?parseFloat(sForm.tarifa_hora)||null:null,
+        importe_fijo:sForm.modalidad==="Precio fijo por servicio"?parseFloat(sForm.importe_fijo)||null:null,
+        fecha_inicio:sForm.fecha_inicio,
+        tareas:sForm.tareas,
+        estado:"activo"
+      },tok);
+      setShowSForm(false);setSForm(sFormVacio);setNuevaTarea("");await load_();
+    }catch(_){}
+    setSaving(false);
+  };
+
+  const finalizarSrv=async id=>{await sbPatch("servicios_jardineria",`id=eq.${id}`,{estado:"finalizado"},tok);await load_();};
+
+  if(load)return <div className="loading"><div className="spin"/><span>Cargando…</span></div>;
+
+  const srvsActivos=servicios.filter(s=>s.estado==="activo");
+  const srvsFinalizados=servicios.filter(s=>s.estado!=="activo");
+
+  return <>
+    <div className="ph"><h2>🌿 Jardineros</h2><p>Gestión de jardineros y servicios</p></div>
+    <div className="pb">
+      <div className="tabs">
+        <button className={`tab${tab==="jardineros"?" on":""}`} onClick={()=>setTab("jardineros")}>👤 Jardineros ({jardineros.length})</button>
+        <button className={`tab${tab==="servicios"?" on":""}`} onClick={()=>setTab("servicios")}>📋 Servicios ({servicios.length})</button>
+      </div>
+
+      {/* ── TAB JARDINEROS ── */}
+      {tab==="jardineros"&&<>
+        <div style={{marginBottom:14}}><button className="btn bp" onClick={()=>{setJForm({nombre:"",modalidad:"Fijo mensual",tarifa:"",notas:""});setShowJForm(true);}}>➕ Nuevo jardinero</button></div>
+        {jardineros.length===0?<div className="empty"><span className="ico">🌿</span><p>Sin jardineros registrados</p></div>
+        :jardineros.map(j=>{
+          const modLbl=j.modalidad||"—";
+          const tarifaLbl=j.tarifa?(j.modalidad==="Fijo mensual"?`${j.tarifa}€/mes`:j.modalidad==="Por horas"?`${j.tarifa}€/h`:`${j.tarifa}€`):"—";
+          const abierto=analisis?.id===j.id;
+          return <div key={j.id} className="card" style={{marginBottom:10,borderLeft:`3px solid ${j.activo?"#10b981":"#5a5e6e"}`,opacity:j.activo?1:.6}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10}}>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:15,fontWeight:600,color:"#e8e6e1",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{j.nombre}</div>
+                <div style={{display:"flex",gap:6,marginTop:5,flexWrap:"wrap"}}>
+                  <span className="badge" style={{background:"rgba(201,168,76,.1)",color:"#c9a84c"}}>{modLbl}</span>
+                  <span className="badge" style={{background:"rgba(255,255,255,.06)",color:"#7a7f94"}}>{tarifaLbl}</span>
+                  <span className="badge" style={{background:j.activo?"rgba(16,185,129,.1)":"rgba(107,114,128,.1)",color:j.activo?"#10b981":"#6b7280"}}>{j.activo?"Activo":"Inactivo"}</span>
+                </div>
+                {j.notas&&<div style={{fontSize:11,color:"#5a5e6e",marginTop:4}}>{j.notas}</div>}
+              </div>
+              <div style={{display:"flex",gap:6,flexShrink:0}}>
+                <button className="btn bg sm" onClick={()=>verAnalisis(j)}>{abierto?"▲ Cerrar":"📊 Análisis"}</button>
+                <button className="btn bg sm" onClick={()=>toggleActivo(j)}>{j.activo?"Desactivar":"Activar"}</button>
+              </div>
+            </div>
+            {/* ANÁLISIS (solo admin, nunca en DOM para otros roles) */}
+            {abierto&&<div style={{marginTop:14,paddingTop:14,borderTop:"1px solid rgba(255,255,255,.06)"}}>
+              {analLoad?<div style={{color:"#5a5e6e",fontSize:13,padding:"8px 0"}}>Cargando análisis…</div>
+              :analData?<>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(120px,1fr))",gap:8,marginBottom:14}}>
+                  <div style={{background:"#0f1117",borderRadius:8,padding:"10px 12px"}}>
+                    <div style={{fontSize:10,color:"#5a5e6e"}}>HORAS ESTE MES</div>
+                    <div style={{fontSize:18,fontWeight:700,color:"#c9a84c",marginTop:3}}>{analData.horasMes}h</div>
+                  </div>
+                  <div style={{background:"#0f1117",borderRadius:8,padding:"10px 12px"}}>
+                    <div style={{fontSize:10,color:"#5a5e6e"}}>COSTE ESTE MES</div>
+                    <div style={{fontSize:18,fontWeight:700,color:"#e85555",marginTop:3}}>{analData.costeMes}€</div>
+                  </div>
+                  <div style={{background:"#0f1117",borderRadius:8,padding:"10px 12px"}}>
+                    <div style={{fontSize:10,color:"#5a5e6e"}}>HORAS ESTE AÑO</div>
+                    <div style={{fontSize:18,fontWeight:700,color:"#c9a84c",marginTop:3}}>{analData.horasAño}h</div>
+                  </div>
+                  <div style={{background:"#0f1117",borderRadius:8,padding:"10px 12px"}}>
+                    <div style={{fontSize:10,color:"#5a5e6e"}}>COSTE ESTE AÑO</div>
+                    <div style={{fontSize:18,fontWeight:700,color:"#e85555",marginTop:3}}>{analData.costeAño}€</div>
+                  </div>
+                  <div style={{background:"#0f1117",borderRadius:8,padding:"10px 12px"}}>
+                    <div style={{fontSize:10,color:"#5a5e6e"}}>💡 €/HORA REAL</div>
+                    <div style={{fontSize:18,fontWeight:700,color:"#6366f1",marginTop:3}}>{analData.euroHoraReal>0?`${analData.euroHoraReal}€`:"—"}</div>
+                  </div>
+                </div>
+                <div style={{fontSize:11,color:"#c9a84c",fontWeight:600,textTransform:"uppercase",letterSpacing:1,marginBottom:8}}>Horas por mes</div>
+                <div style={{width:"100%",height:140}}>
+                  <ResponsiveContainer>
+                    <BarChart data={analData.barras} margin={{top:5,right:5,left:-20,bottom:5}}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,.06)"/>
+                      <XAxis dataKey="name" tick={{fontSize:9,fill:"#5a5e6e"}} axisLine={false} tickLine={false}/>
+                      <YAxis tick={{fontSize:9,fill:"#5a5e6e"}} axisLine={false} tickLine={false}/>
+                      <Tooltip contentStyle={{background:"#13161f",border:"1px solid rgba(201,168,76,.25)",borderRadius:8,fontSize:12}} formatter={v=>[`${v}h`]}/>
+                      <Bar dataKey="horas" fill="#c9a84c" radius={[3,3,0,0]}/>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </>:<div style={{color:"#5a5e6e",fontSize:13}}>Sin datos de jornadas</div>}
+            </div>}
+          </div>;
+        })}
+      </>}
+
+      {/* ── TAB SERVICIOS ── */}
+      {tab==="servicios"&&<>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14,gap:12,flexWrap:"wrap"}}>
+          <div className="tabs" style={{marginBottom:0}}>
+            <button className={`tab${srvTab==="activos"?" on":""}`} onClick={()=>setSrvTab("activos")}>🟢 Activos ({srvsActivos.length})</button>
+            <button className={`tab${srvTab==="finalizados"?" on":""}`} onClick={()=>setSrvTab("finalizados")}>✅ Finalizados ({srvsFinalizados.length})</button>
+          </div>
+          <button className="btn bp" onClick={()=>{setSForm(sFormVacio);setNuevaTarea("");setShowSForm(true);}}>➕ Nuevo servicio</button>
+        </div>
+        {(srvTab==="activos"?srvsActivos:srvsFinalizados).length===0
+          ?<div className="empty"><span className="ico">📋</span><p>Sin servicios {srvTab}</p></div>
+          :(srvTab==="activos"?srvsActivos:srvsFinalizados).map(s=>{
+            const modLbl=s.modalidad||"—";
+            const costeLbl=s.modalidad==="Por horas"&&s.tarifa_hora?`${s.tarifa_hora}€/h`:s.modalidad==="Precio fijo por servicio"&&s.importe_fijo?`${parseFloat(s.importe_fijo).toLocaleString("es-ES")}€ fijo`:s.modalidad==="Fijo mensual"?"Fijo mensual":"—";
+            return <div key={s.id} className="card" style={{marginBottom:10,borderLeft:`3px solid ${s.estado==="activo"?"#10b981":"#6b7280"}`}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10}}>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:15,fontWeight:600,color:"#e8e6e1",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{s.titulo}</div>
+                  <div style={{display:"flex",gap:6,marginTop:5,flexWrap:"wrap"}}>
+                    <span className="badge" style={{background:"rgba(16,185,129,.1)",color:"#10b981"}}>👤 {s.jardinero_nombre}</span>
+                    <span className="badge" style={{background:"rgba(201,168,76,.1)",color:"#c9a84c"}}>{modLbl}</span>
+                    <span className="badge" style={{background:"rgba(255,255,255,.06)",color:"#7a7f94"}}>{costeLbl}</span>
+                  </div>
+                  {s.descripcion&&<div style={{fontSize:12,color:"#7a7f94",marginTop:5}}>{s.descripcion}</div>}
+                  {s.fecha_inicio&&<div style={{fontSize:11,color:"#5a5e6e",marginTop:3}}>📅 Inicio: {new Date(s.fecha_inicio+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short",year:"numeric"})}</div>}
+                  {Array.isArray(s.tareas)&&s.tareas.length>0&&<div style={{marginTop:8}}>
+                    {s.tareas.map((t,i)=><div key={i} style={{display:"flex",alignItems:"center",gap:6,padding:"4px 0",fontSize:12,color:"#c9c5b8"}}>
+                      <span style={{color:"#c9a84c",fontSize:11,flexShrink:0}}>{i+1}.</span>{t}
+                    </div>)}
+                  </div>}
+                </div>
+                {s.estado==="activo"&&<button className="btn bp sm" style={{flexShrink:0}} onClick={()=>finalizarSrv(s.id)}>✅ Finalizar</button>}
+              </div>
+            </div>;
+          })}
+      </>}
+    </div>
+
+    {/* MODAL NUEVO JARDINERO */}
+    {showJForm&&<div className="ov" onClick={()=>setShowJForm(false)}>
+      <div className="modal" onClick={e=>e.stopPropagation()}>
+        <h3>🌿 Nuevo jardinero</h3>
+        <div className="fg"><label>Nombre *</label><input className="fi" value={jForm.nombre} onChange={e=>setJForm(v=>({...v,nombre:e.target.value}))} placeholder="Ej: Carlos García"/></div>
+        <div className="fg"><label>Modalidad</label><select className="fi" value={jForm.modalidad} onChange={e=>setJForm(v=>({...v,modalidad:e.target.value}))}>{MODAL_JARDINERO.map(m=><option key={m}>{m}</option>)}</select></div>
+        {jForm.modalidad==="Fijo mensual"&&<div className="fg"><label>Tarifa mensual (€)</label><input type="number" inputMode="decimal" className="fi" value={jForm.tarifa} onChange={e=>setJForm(v=>({...v,tarifa:e.target.value}))} placeholder="Ej: 800"/></div>}
+        {jForm.modalidad==="Por horas"&&<div className="fg"><label>Tarifa por hora (€)</label><input type="number" inputMode="decimal" className="fi" value={jForm.tarifa} onChange={e=>setJForm(v=>({...v,tarifa:e.target.value}))} placeholder="Ej: 15"/></div>}
+        {jForm.modalidad==="Precio fijo por servicio"&&<div style={{fontSize:12,color:"#7a7f94",marginBottom:14,background:"rgba(201,168,76,.06)",borderRadius:8,padding:"10px 12px"}}>El precio se define por cada servicio concreto.</div>}
+        <div className="fg"><label>Notas (opcional)</label><textarea className="fi" rows={2} value={jForm.notas} onChange={e=>setJForm(v=>({...v,notas:e.target.value}))} placeholder="Notas sobre el jardinero…"/></div>
+        <div className="mft"><button className="btn bg" onClick={()=>setShowJForm(false)}>Cancelar</button><button className="btn bp" onClick={crearJardinero} disabled={saving||!jForm.nombre}>{saving?"Guardando…":"🌿 Crear jardinero"}</button></div>
+      </div>
+    </div>}
+
+    {/* MODAL NUEVO SERVICIO */}
+    {showSForm&&<div className="ov" onClick={()=>setShowSForm(false)}>
+      <div className="modal" style={{maxHeight:"90vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
+        <h3>📋 Nuevo servicio de jardinería</h3>
+        <div className="fg"><label>Jardinero *</label>
+          <select className="fi" value={sForm.jardinero_id} onChange={e=>selJardinero(e.target.value)}>
+            <option value="">Seleccionar…</option>
+            {jardineros.filter(j=>j.activo).map(j=><option key={j.id} value={j.id}>{j.nombre} ({j.modalidad})</option>)}
+          </select>
+        </div>
+        <div className="fg"><label>Título *</label><input className="fi" value={sForm.titulo} onChange={e=>setSForm(v=>({...v,titulo:e.target.value}))} placeholder="Ej: Mantenimiento semanal abril"/></div>
+        <div className="fg"><label>Descripción</label><textarea className="fi" rows={2} value={sForm.descripcion} onChange={e=>setSForm(v=>({...v,descripcion:e.target.value}))} placeholder="Detalles del servicio…"/></div>
+        {sForm.jardinero_id&&<>
+          <div className="fg"><label>Modalidad de pago</label>
+            <select className="fi" value={sForm.modalidad} onChange={e=>setSForm(v=>({...v,modalidad:e.target.value}))}>{MODAL_JARDINERO.map(m=><option key={m}>{m}</option>)}</select>
+          </div>
+          {sForm.modalidad==="Por horas"&&<div className="fg"><label>Tarifa €/hora</label><input type="number" inputMode="decimal" className="fi" value={sForm.tarifa_hora} onChange={e=>setSForm(v=>({...v,tarifa_hora:e.target.value}))} placeholder="Ej: 15"/></div>}
+          {sForm.modalidad==="Precio fijo por servicio"&&<div className="fg"><label>Importe total acordado (€)</label><input type="number" inputMode="decimal" className="fi" value={sForm.importe_fijo} onChange={e=>setSForm(v=>({...v,importe_fijo:e.target.value}))} placeholder="Ej: 500"/></div>}
+          {sForm.modalidad==="Fijo mensual"&&<div style={{fontSize:12,color:"#7a7f94",marginBottom:14,background:"rgba(201,168,76,.06)",borderRadius:8,padding:"10px 12px"}}>El jardinero tiene tarifa fija mensual. El coste se gestiona automáticamente.</div>}
+        </>}
+        <div className="fg"><label>Fecha inicio prevista</label><input type="date" className="fi" value={sForm.fecha_inicio} onChange={e=>setSForm(v=>({...v,fecha_inicio:e.target.value}))}/></div>
+        <div className="fg">
+          <label>Tareas ({sForm.tareas.length})</label>
+          <div style={{display:"flex",gap:8}}>
+            <input className="fi" style={{flex:1}} value={nuevaTarea} onChange={e=>setNuevaTarea(e.target.value)} placeholder="Escribir tarea…" onKeyDown={e=>{if(e.key==="Enter"){e.preventDefault();addTareaSrv();}}}/>
+            <button className="btn bp sm" onClick={addTareaSrv} style={{flexShrink:0}}>+</button>
+          </div>
+          {sForm.tareas.length>0&&<div style={{marginTop:8}}>
+            {sForm.tareas.map((t,i)=><div key={i} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 10px",background:"rgba(255,255,255,.03)",borderRadius:8,marginBottom:4}}>
+              <span style={{color:"#c9a84c",fontSize:12,flexShrink:0}}>{i+1}.</span>
+              <span style={{flex:1,fontSize:13,color:"#c9c5b8"}}>{t}</span>
+              <button onClick={()=>removeTareaSrv(i)} style={{background:"none",border:"none",color:"#e85555",cursor:"pointer",fontSize:15,padding:"0 4px"}}>×</button>
+            </div>)}
+          </div>}
+        </div>
+        <div className="mft"><button className="btn bg" onClick={()=>setShowSForm(false)}>Cancelar</button><button className="btn bp" onClick={crearServicio} disabled={saving||!sForm.jardinero_id||!sForm.titulo}>{saving?"Creando…":"📋 Crear servicio"}</button></div>
+      </div>
+    </div>}
   </>;
 }
 
