@@ -835,7 +835,7 @@ function FinancialKPIs({tok}){
     try{
       const {desde,hasta}=getRango();
       // Auto-marcar airbnb pasados como cobrados
-      await fetch(`${SB_URL}/rest/v1/reservas_airbnb?fecha_inicio=lt.${hoyStr}&cobrado=eq.false`,{
+      await fetch(`${SB_URL}/rest/v1/reservas_airbnb?fecha_entrada=lt.${hoyStr}&cobrado=eq.false`,{
         method:"PATCH",headers:{...HDRA(tok),"Prefer":"return=minimal"},
         body:JSON.stringify({cobrado:true})
       });
@@ -861,7 +861,7 @@ function FinancialKPIs({tok}){
         if(r.seña_cobrada)cobradoEventos+=seña;
         if(r.saldo_cobrado)cobradoEventos+=(precioTotal-seña);
       }
-      const cobradoAirbnb=airbnbs.filter(a=>a.cobrado||a.fecha_inicio<hoyStr).reduce((s,a)=>s+(parseFloat(a.precio)||0),0);
+      const cobradoAirbnb=airbnbs.filter(a=>a.cobrado||a.fecha_entrada<hoyStr).reduce((s,a)=>s+(parseFloat(a.precio)||0),0);
       const yaCobrado=cobradoEventos+cobradoAirbnb;
 
       // Pendiente de cobro
