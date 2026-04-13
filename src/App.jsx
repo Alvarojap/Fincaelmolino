@@ -594,6 +594,7 @@ export default function App() {
     usuarios:    <Usuarios    {...P}/>,
     gastos:      <Gastos      {...P}/>,
     jardineros:  <Jardineros  {...P}/>,
+    ajustes:     <Ajustes     {...P}/>,
     limpiadoras:  <LimpiadorasPage {...P}/>,
   };
 
@@ -721,7 +722,7 @@ function Sidebar({perfil,page,setPage,onLogout,inDrawer,onClose}){
       <p className="nav-sec">Comunicación</p>
       <N ico="💬" lbl={isA?"Chat con equipo":"Chat con admin"} id="chat"/>
       <N ico="🔔" lbl="Notificaciones" id="notifs"/>
-      {isA&&<><p className="nav-sec">Admin</p><N ico="💸" lbl="Gastos" id="gastos"/><N ico="👥" lbl="Usuarios" id="usuarios"/></>}
+      {isA&&<><p className="nav-sec">Admin</p><N ico="💸" lbl="Gastos" id="gastos"/><N ico="👥" lbl="Usuarios" id="usuarios"/><N ico="⚙️" lbl="Ajustes" id="ajustes"/></>}
     </nav>
     {!inDrawer&&(
       <div className="sb-user">
@@ -3595,6 +3596,100 @@ function Gastos({tok}){
         </div>
       </div>
     </div>}
+  </>;
+}
+
+// ─── AJUSTES ────────────────────────────────────────────────────────────────
+const CONFIG_FIELDS=[
+  {clave:"tarifa_hora_limpiadora",label:"Tarifa hora limpiadora",desc:"€/hora para cálculo automático",type:"number",placeholder:"Ej: 12"},
+  {clave:"tarifa_hora_jardinero",label:"Tarifa hora jardinero",desc:"€/hora referencia",type:"number",placeholder:"Ej: 15"},
+  {clave:"comision_pct",label:"Comisión gestor (%)",desc:"% sobre facturación, default 10",type:"number",placeholder:"10"},
+  {clave:"facturacion_2025",label:"Facturación total 2025 (€)",desc:"Dato histórico para comparativa anual",type:"number",placeholder:"Ej: 50000"},
+];
+
+function Ajustes({tok,rol}){
+  if(rol!=="admin")return null;
+  const [valores,setValores]=useState({});
+  const [load,setLoad]=useState(true);
+  const [savingKey,setSavingKey]=useState(null);
+  const [feedback,setFeedback]=useState({});
+  const [notifPerm,setNotifPerm]=useState(typeof Notification!=="undefined"?Notification.permission:"default");
+
+  useEffect(()=>{
+    (async()=>{
+      try{
+        const rows=await sbGet("configuracion","?select=*",tok);
+        const v={};rows.forEach(r=>v[r.clave]=r.valor||"");
+        setValores(v);
+      }catch(_){}
+      setLoad(false);
+    })();
+  },[]);
+
+  const guardar=async(clave)=>{
+    setSavingKey(clave);setFeedback(prev=>({...prev,[clave]:null}));
+    try{
+      const valor=valores[clave]||"";
+      // Upsert: try patch first, then insert
+      const existing=await sbGet("configuracion",`?clave=eq.${clave}&select=id`,tok).catch(()=>[]);
+      if(existing.length>0){
+        await sbPatch("configuracion",`clave=eq.${clave}`,{valor},tok);
+      }else{
+        await sbPost("configuracion",{clave,valor},tok);
+      }
+      setFeedback(prev=>({...prev,[clave]:"ok"}));
+      setTimeout(()=>setFeedback(prev=>({...prev,[clave]:null})),2000);
+    }catch(_){
+      setFeedback(prev=>({...prev,[clave]:"error"}));
+      setTimeout(()=>setFeedback(prev=>({...prev,[clave]:null})),3000);
+    }
+    setSavingKey(null);
+  };
+
+  const activarNotifs=async()=>{
+    const p=await askPerm();
+    setNotifPerm(p);
+  };
+
+  if(load)return <div className="loading"><div className="spin"/><span>Cargando…</span></div>;
+
+  return <>
+    <div className="ph"><h2>⚙️ Ajustes</h2><p>Configuración del sistema</p></div>
+    <div className="pb" style={{maxWidth:600}}>
+      {/* CONFIGURACIÓN FINANCIERA */}
+      <div className="card" style={{marginBottom:16}}>
+        <div className="chdr"><span className="ctit">💰 Configuración financiera</span></div>
+        {CONFIG_FIELDS.map(f=>(
+          <div key={f.clave} style={{marginBottom:16,paddingBottom:16,borderBottom:"1px solid rgba(255,255,255,.06)"}}>
+            <div className="fg" style={{marginBottom:8}}>
+              <label>{f.label}</label>
+              <div style={{fontSize:11,color:"#5a5e6e",marginBottom:6}}>{f.desc}</div>
+              <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                <input type={f.type} inputMode={f.type==="number"?"decimal":"text"} className="fi" value={valores[f.clave]||""} onChange={e=>setValores(prev=>({...prev,[f.clave]:e.target.value}))} placeholder={f.placeholder} style={{flex:1}}/>
+                <button className="btn bp sm" style={{flexShrink:0}} onClick={()=>guardar(f.clave)} disabled={savingKey===f.clave}>
+                  {savingKey===f.clave?"…":"Guardar"}
+                </button>
+              </div>
+            </div>
+            {feedback[f.clave]==="ok"&&<div style={{fontSize:12,color:"#10b981",marginTop:4}}>✅ Guardado</div>}
+            {feedback[f.clave]==="error"&&<div style={{fontSize:12,color:"#e85555",marginTop:4}}>❌ Error al guardar</div>}
+          </div>
+        ))}
+      </div>
+
+      {/* NOTIFICACIONES */}
+      <div className="card">
+        <div className="chdr"><span className="ctit">🔔 Notificaciones</span></div>
+        <div style={{display:"flex",alignItems:"center",gap:12,padding:"12px 0"}}>
+          <span style={{fontSize:24}}>{notifPerm==="granted"?"✅":"⚠️"}</span>
+          <div style={{flex:1}}>
+            <div style={{fontSize:14,fontWeight:500,color:notifPerm==="granted"?"#10b981":"#f59e0b"}}>{notifPerm==="granted"?"Notificaciones activas":"Notificaciones desactivadas"}</div>
+            <div style={{fontSize:12,color:"#5a5e6e",marginTop:2}}>{notifPerm==="granted"?"Recibirás avisos en este dispositivo":"Activa las notificaciones para recibir avisos de la finca"}</div>
+          </div>
+          {notifPerm!=="granted"&&<button className="btn bp" onClick={activarNotifs}>Activar</button>}
+        </div>
+      </div>
+    </div>
   </>;
 }
 
