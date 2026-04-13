@@ -1382,44 +1382,47 @@ function DashJ({perfil,jsem,jpunt,cwk,setPage,tok}){
   const actv=JARDIN_T[temp].filter(t=>tocaSemana({...t,frec:t.frec},cwk));
   const tot=actv.length+jpunt.length;
   const comp=actv.filter(t=>sj[t.id]?.done).length+jpunt.filter(t=>t.done).length;
+  const isA=false; // jardinero view, never admin
 
-  // Servicio activo de jardinería
+  // Servicio activo
   const [srvActivo,setSrvActivo]=useState(null);
   const [srvTareas,setSrvTareas]=useState([]);
-  const [jornada,setJornada]=useState(null); // jornada hoy
+  const [srvExtras,setSrvExtras]=useState([]);
+  const [jornada,setJornada]=useState(null);
   const [elapsed,setElapsed]=useState(0);
   const [pausado,setPausado]=useState(false);
   const [saving2,setSaving2]=useState(false);
   const [showFinJornada,setShowFinJornada]=useState(false);
   const [showFinSrv,setShowFinSrv]=useState(false);
   const [showNuevaJornada,setShowNuevaJornada]=useState(false);
+  const [showExtraForm,setShowExtraForm]=useState(false);
+  const [extraForm,setExtraForm]=useState({txt:"",zona:"",nota:"",foto_url:null});
+  const [editExtraId,setEditExtraId]=useState(null);
+  const [editExtraNota,setEditExtraNota]=useState("");
+  const [editExtraFoto,setEditExtraFoto]=useState(null);
   const hoyStr=new Date().toISOString().split("T")[0];
-  const lsKey=`fm_jornada_inicio_${perfil.id}`;
+  const lsKey=srvActivo?`fm_jornada_inicio_${srvActivo.id}`:`fm_jornada_inicio_${perfil.id}`;
 
   const loadSrvActivo=async()=>{
     try{
       const srvs=await sbGet("servicios_jardineria",`?estado=eq.en_curso&jardinero_id=eq.${perfil.id}&select=*`,tok).catch(()=>[]);
-      if(srvs.length===0){setSrvActivo(null);return;}
+      if(srvs.length===0){setSrvActivo(null);setSrvTareas([]);setSrvExtras([]);return;}
       const s=srvs[0];setSrvActivo(s);
-      // Tareas (stored as jsonb array or separate table)
-      if(Array.isArray(s.tareas)&&s.tareas.length>0){
-        // If tareas is simple string array, convert to objects
-        const tareasObj=s.tareas.map((t,i)=>typeof t==="string"?{idx:i,txt:t,done:false}:t);
-        // Load completion state from tareas_completadas jsonb
-        const completadas=s.tareas_completadas||[];
-        setSrvTareas(tareasObj.map(t=>({...t,done:completadas.includes(t.idx!==undefined?t.idx:t.txt)})));
-      }
-      // Jornada de hoy
+      // Tareas from jardin_servicio_tareas
+      const allTareas=await sbGet("jardin_servicio_tareas",`?servicio_id=eq.${s.id}&select=*&order=created_at.asc`,tok).catch(()=>[]);
+      setSrvTareas(allTareas.filter(t=>!t.añadida_por_jardinero));
+      setSrvExtras(allTareas.filter(t=>t.añadida_por_jardinero));
+      // Jornada hoy
       const jHoy=await sbGet("jornadas_jardineria",`?servicio_id=eq.${s.id}&fecha=eq.${hoyStr}&select=*`,tok).catch(()=>[]);
       if(jHoy.length>0){
         setJornada(jHoy[0]);
         const pausas=jHoy[0].pausas||[];
         const ultimaPausa=pausas[pausas.length-1];
-        setPausado(ultimaPausa&&!ultimaPausa.fin?true:false);
-        if(!localStorage.getItem(lsKey))localStorage.setItem(lsKey,jHoy[0].hora_inicio);
+        setPausado(!!ultimaPausa&&!ultimaPausa.fin);
+        const lk=`fm_jornada_inicio_${s.id}`;
+        if(!localStorage.getItem(lk))localStorage.setItem(lk,jHoy[0].hora_inicio);
       }else{
         setJornada(null);
-        // Si hay servicio en curso pero no jornada hoy → preguntar
         if(s)setShowNuevaJornada(true);
       }
     }catch(_){}
@@ -1428,105 +1431,107 @@ function DashJ({perfil,jsem,jpunt,cwk,setPage,tok}){
 
   // Cronómetro
   useEffect(()=>{
-    if(!jornada||jornada.hora_fin)return;
+    if(!jornada||jornada.hora_fin||!srvActivo)return;
+    const lk=`fm_jornada_inicio_${srvActivo.id}`;
     const calc=()=>{
-      const ini=localStorage.getItem(lsKey)||jornada.hora_inicio;
+      const ini=localStorage.getItem(lk)||jornada.hora_inicio;
       if(!ini)return 0;
       const [h,m]=ini.split(":").map(Number);
       const iniMs=new Date();iniMs.setHours(h,m,0,0);
       let totalMs=Date.now()-iniMs.getTime();
-      // Descontar pausas
       const pausas=jornada.pausas||[];
-      for(const p of pausas){
-        if(p.inicio&&p.fin)totalMs-=(p.fin-p.inicio);
-        else if(p.inicio&&!p.fin)totalMs-=(Date.now()-p.inicio);
-      }
+      for(const p of pausas){if(p.inicio&&p.fin)totalMs-=(p.fin-p.inicio);else if(p.inicio&&!p.fin)totalMs-=(Date.now()-p.inicio);}
       return Math.max(0,Math.floor(totalMs/1000));
     };
     setElapsed(calc());
     const iv=setInterval(()=>setElapsed(calc()),1000);
     return()=>clearInterval(iv);
-  },[jornada,pausado]);
+  },[jornada,pausado,srvActivo]);
 
-  const fmtElapsed=s=>{const h=Math.floor(s/3600);const m=Math.floor((s%3600)/60);const ss=s%60;return `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(ss).padStart(2,"0")}`;};
+  const fmtEl=s=>{const h=Math.floor(s/3600);const m=Math.floor((s%3600)/60);const ss=s%60;return `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(ss).padStart(2,"0")}`;};
   const fmtHM=mins=>{const h=Math.floor(mins/60);const m=Math.round(mins%60);return `${h}h ${m}min`;};
 
   const iniciarJornada=async()=>{
     if(saving2||!srvActivo)return;setSaving2(true);
-    const ahora=new Date();
-    const hi=`${String(ahora.getHours()).padStart(2,"0")}:${String(ahora.getMinutes()).padStart(2,"0")}`;
+    const ahora=new Date();const hi=`${String(ahora.getHours()).padStart(2,"0")}:${String(ahora.getMinutes()).padStart(2,"0")}`;
     try{
       const [j]=await sbPost("jornadas_jardineria",{servicio_id:srvActivo.id,jardinero_id:perfil.id,fecha:hoyStr,hora_inicio:hi,pausas:[]},tok);
-      setJornada(j);localStorage.setItem(lsKey,hi);setPausado(false);setShowNuevaJornada(false);
-    }catch(_){}
-    setSaving2(false);
+      setJornada(j);localStorage.setItem(`fm_jornada_inicio_${srvActivo.id}`,hi);setPausado(false);setShowNuevaJornada(false);
+    }catch(_){}setSaving2(false);
   };
 
   const togglePausa=async()=>{
     if(!jornada||saving2)return;setSaving2(true);
     const pausas=[...(jornada.pausas||[])];
-    if(!pausado){pausas.push({inicio:Date.now(),fin:null});}
+    if(!pausado)pausas.push({inicio:Date.now(),fin:null});
     else{const last=pausas[pausas.length-1];if(last)last.fin=Date.now();}
-    try{
-      await sbPatch("jornadas_jardineria",`id=eq.${jornada.id}`,{pausas},tok);
-      setJornada(prev=>({...prev,pausas}));setPausado(!pausado);
-    }catch(_){}
+    try{await sbPatch("jornadas_jardineria",`id=eq.${jornada.id}`,{pausas},tok);setJornada(prev=>({...prev,pausas}));setPausado(!pausado);}catch(_){}
     setSaving2(false);
   };
 
   const terminarJornada=async()=>{
-    if(!jornada||saving2)return;setSaving2(true);
-    const ahora=new Date();
-    const hf=`${String(ahora.getHours()).padStart(2,"0")}:${String(ahora.getMinutes()).padStart(2,"0")}`;
-    // Cerrar pausa abierta
+    if(!jornada||!srvActivo||saving2)return;setSaving2(true);
+    const ahora=new Date();const hf=`${String(ahora.getHours()).padStart(2,"0")}:${String(ahora.getMinutes()).padStart(2,"0")}`;
     const pausas=[...(jornada.pausas||[])];
-    const last=pausas[pausas.length-1];
-    if(last&&!last.fin)last.fin=Date.now();
+    const last=pausas[pausas.length-1];if(last&&!last.fin)last.fin=Date.now();
     const durMin=Math.max(0,Math.round(elapsed/60));
     try{
       await sbPatch("jornadas_jardineria",`id=eq.${jornada.id}`,{hora_fin:hf,duracion_minutos:durMin,pausas},tok);
-      // Update horas_totales on servicio
       const horasJornada=Math.round(durMin/60*100)/100;
       const prevHoras=parseFloat(srvActivo.horas_totales)||0;
       await sbPatch("servicios_jardineria",`id=eq.${srvActivo.id}`,{horas_totales:prevHoras+horasJornada},tok).catch(()=>{});
-      localStorage.removeItem(lsKey);
+      localStorage.removeItem(`fm_jornada_inicio_${srvActivo.id}`);
       setJornada(prev=>({...prev,hora_fin:hf,duracion_minutos:durMin}));setShowFinJornada(false);
       await loadSrvActivo();
-    }catch(_){}
+    }catch(_){}setSaving2(false);
+  };
+
+  const toggleTarea=async(id,cur)=>{
+    if(!srvActivo||saving2)return;setSaving2(true);
+    try{await sbPatch("jardin_servicio_tareas",`id=eq.${id}`,{done:!cur,completado_por:!cur?perfil.nombre:null,completado_ts:!cur?new Date().toISOString():null},tok);await loadSrvActivo();}catch(_){}
     setSaving2(false);
   };
 
-  const toggleTareaSrv=async(idx)=>{
-    if(!srvActivo||saving2)return;setSaving2(true);
-    const newTareas=srvTareas.map(t=>t.idx===idx?{...t,done:!t.done}:t);
-    setSrvTareas(newTareas);
-    const completadas=newTareas.filter(t=>t.done).map(t=>t.idx);
-    try{await sbPatch("servicios_jardineria",`id=eq.${srvActivo.id}`,{tareas_completadas:completadas},tok);}catch(_){}
+  const addExtra=async()=>{
+    if(!extraForm.txt.trim()||!srvActivo||saving2)return;setSaving2(true);
+    try{
+      await sbPost("jardin_servicio_tareas",{servicio_id:srvActivo.id,txt:extraForm.txt.trim(),zona:extraForm.zona||null,done:true,es_extra:true,añadida_por_jardinero:true,completado_por:perfil.nombre,completado_ts:new Date().toISOString(),nota:extraForm.nota||null,foto_url:extraForm.foto_url||null},tok);
+      setExtraForm({txt:"",zona:"",nota:"",foto_url:null});setShowExtraForm(false);await loadSrvActivo();
+    }catch(_){}setSaving2(false);
+  };
+
+  const delExtra=async id=>{
+    if(!window.confirm("¿Eliminar esta tarea extra?"))return;
+    await sbDelete("jardin_servicio_tareas",`id=eq.${id}`,tok);await loadSrvActivo();
+  };
+
+  const saveEditExtra=async()=>{
+    if(!editExtraId||saving2)return;setSaving2(true);
+    try{await sbPatch("jardin_servicio_tareas",`id=eq.${editExtraId}`,{nota:editExtraNota||null,foto_url:editExtraFoto||null},tok);setEditExtraId(null);await loadSrvActivo();}catch(_){}
     setSaving2(false);
   };
 
   const completarServicio=async()=>{
     if(!srvActivo||saving2)return;setSaving2(true);
     try{
-      // Cerrar jornada si está abierta
       if(jornada&&!jornada.hora_fin)await terminarJornada();
-      const horasT=parseFloat(srvActivo.horas_totales)||0;
-      const mod=srvActivo.modalidad||"por_horas";
+      const s=await sbGet("servicios_jardineria",`?id=eq.${srvActivo.id}&select=*`,tok).then(r=>r[0]).catch(()=>srvActivo);
+      const horasT=parseFloat(s?.horas_totales)||0;
+      const mod=s?.modalidad_pago||s?.modalidad||"por_horas";
       let costeTotal=0;
-      if(mod==="por_horas")costeTotal=Math.round(horasT*(parseFloat(srvActivo.tarifa_hora)||0)*100)/100;
-      else if(mod==="precio_fijo_servicio")costeTotal=parseFloat(srvActivo.importe_fijo)||0;
+      if(mod==="por_horas")costeTotal=Math.round(horasT*(parseFloat(s?.tarifa_hora_aplicada)||parseFloat(s?.tarifa_hora)||0)*100)/100;
+      else if(mod==="precio_fijo_servicio")costeTotal=parseFloat(s?.precio_fijo_acordado)||parseFloat(s?.importe_fijo)||0;
       const costeHoraReal=horasT>0?Math.round(costeTotal/horasT*100)/100:0;
-      await sbPatch("servicios_jardineria",`id=eq.${srvActivo.id}`,{estado:"finalizado",coste_total:costeTotal,coste_hora_real:costeHoraReal},tok);
-      // Notificar admin
+      await sbPatch("servicios_jardineria",`id=eq.${srvActivo.id}`,{estado:"finalizado",fecha_fin:hoyStr,coste_total:costeTotal,coste_hora_real:costeHoraReal},tok);
       const admins=await sbGet("usuarios","?rol=eq.admin&select=id",tok);
-      const msg=`🌿 ${perfil.nombre} ha completado el servicio "${srvActivo.titulo}". Total: ${horasT}h. Coste: ${costeTotal}€.`;
+      const msg=`🌿 ${perfil.nombre} ha completado "${srvActivo.titulo}". Total: ${horasT}h. Coste: ${costeTotal}€.`;
       for(const a of admins){await sbPost("notificaciones",{para:a.id,txt:msg},tok);sendPush("🌿 Finca El Molino",msg,"jardin-srv-fin");}
-      localStorage.removeItem(lsKey);setShowFinSrv(false);setSrvActivo(null);
-    }catch(_){}
-    setSaving2(false);
+      localStorage.removeItem(`fm_jornada_inicio_${srvActivo.id}`);
+      setShowFinSrv(false);setSrvActivo(null);setSrvTareas([]);setSrvExtras([]);
+    }catch(_){}setSaving2(false);
   };
 
-  const todasTareasOk=srvTareas.length>0&&srvTareas.every(t=>t.done);
+  const tareasAdminOk=srvTareas.length>0&&srvTareas.every(t=>t.done);
   const totalAcum=parseFloat(srvActivo?.horas_totales||0);
 
   return <>
@@ -1535,14 +1540,14 @@ function DashJ({perfil,jsem,jpunt,cwk,setPage,tok}){
       {/* SERVICIO ACTIVO */}
       {srvActivo&&<div className="card" style={{marginBottom:16,border:"1px solid rgba(16,185,129,.3)",background:"rgba(16,185,129,.04)"}}>
         <div className="chdr"><span className="ctit">🌿 Servicio activo</span></div>
-        <div style={{fontSize:16,fontWeight:600,color:"#e8e6e1",marginBottom:6}}>{srvActivo.titulo}</div>
-        <div style={{fontSize:12,color:"#7a7f94",marginBottom:12}}>Tareas: {srvTareas.filter(t=>t.done).length} de {srvTareas.length} completadas</div>
+        <div style={{fontSize:16,fontWeight:600,color:"#e8e6e1",marginBottom:4}}>{srvActivo.titulo}</div>
+        <div style={{fontSize:12,color:"#7a7f94",marginBottom:12}}>Tareas: {srvTareas.filter(t=>t.done).length} de {srvTareas.length} completadas{srvExtras.length>0?` + ${srvExtras.length} extra`:""}</div>
 
         {/* Cronómetro */}
         {jornada&&!jornada.hora_fin&&<>
           <div style={{textAlign:"center",padding:"16px 0",marginBottom:12,background:"#0f1117",borderRadius:12}}>
             <div style={{fontSize:11,color:pausado?"#f59e0b":"#10b981",textTransform:"uppercase",letterSpacing:1,fontWeight:600,marginBottom:6}}>{pausado?"⏸ En pausa":"⏱️ Esta jornada"}</div>
-            <div style={{fontSize:36,fontWeight:700,color:pausado?"#f59e0b":"#c9a84c",fontFamily:"monospace",letterSpacing:2}}>{fmtElapsed(elapsed)}</div>
+            <div style={{fontSize:36,fontWeight:700,color:pausado?"#f59e0b":"#c9a84c",fontFamily:"monospace",letterSpacing:2}}>{fmtEl(elapsed)}</div>
             {totalAcum>0&&<div style={{fontSize:12,color:"#5a5e6e",marginTop:6}}>📅 Total acumulado: {fmtHM(totalAcum*60)}</div>}
           </div>
           <div style={{display:"flex",gap:8,marginBottom:14}}>
@@ -1553,14 +1558,45 @@ function DashJ({perfil,jsem,jpunt,cwk,setPage,tok}){
         {jornada?.hora_fin&&<div style={{background:"rgba(99,102,241,.08)",border:"1px solid rgba(99,102,241,.2)",borderRadius:10,padding:"10px 14px",marginBottom:12,fontSize:13,color:"#a5b4fc",textAlign:"center"}}>✅ Jornada de hoy completada — {fmtHM(jornada.duracion_minutos||0)}</div>}
         {!jornada&&!showNuevaJornada&&<button className="btn bp" style={{width:"100%",justifyContent:"center",padding:"14px",fontSize:15,marginBottom:14}} onClick={iniciarJornada} disabled={saving2}>▶️ Iniciar jornada</button>}
 
-        {/* Checklist */}
-        {srvTareas.map(t=><div key={t.idx} className={`cli${t.done?" done":""}`} style={{marginBottom:4}}>
-          <div className={`chk${t.done?" on":""}`} onClick={()=>toggleTareaSrv(t.idx)} style={{cursor:"pointer"}}/>
-          <div style={{flex:1,minWidth:0}}><div className={`tl${t.done?" done":""}`}>{t.txt}</div></div>
+        {/* Checklist tareas asignadas */}
+        <div style={{fontSize:11,color:"#c9a84c",fontWeight:600,textTransform:"uppercase",letterSpacing:1,marginBottom:6,marginTop:8}}>Tareas asignadas</div>
+        {srvTareas.map(t=><div key={t.id} className={`cli${t.done?" done":""}`} style={{marginBottom:4}}>
+          <div className={`chk${t.done?" on":""}`} onClick={()=>toggleTarea(t.id,t.done)} style={{cursor:"pointer"}}/>
+          <div style={{flex:1,minWidth:0}}>
+            {t.zona&&<span className="tz">{t.zona}</span>}
+            <div className={`tl${t.done?" done":""}`}>{t.txt}</div>
+            {t.done&&<div className="tm">✓ {t.completado_por} · {fmtDT(t.completado_ts)}</div>}
+            {t.nota&&<div className="nbox">📝 {t.nota}</div>}
+            {t.foto_url&&<img src={t.foto_url} alt="" className="pthumb"/>}
+          </div>
         </div>)}
 
+        {/* Tareas extra del jardinero */}
+        {srvExtras.length>0&&<>
+          <div style={{fontSize:11,color:"#c9a84c",fontWeight:600,textTransform:"uppercase",letterSpacing:1,marginBottom:6,marginTop:16}}>➕ Tareas adicionales</div>
+          {srvExtras.map(t=><div key={t.id} className="cli done" style={{marginBottom:4}}>
+            <span style={{fontSize:17,flexShrink:0}}>✅</span>
+            <div style={{flex:1,minWidth:0}}>
+              <span className="badge" style={{background:"rgba(201,168,76,.12)",color:"#c9a84c",fontSize:10,marginBottom:3,display:"inline-block"}}>➕ Extra</span>
+              {t.zona&&<span className="tz" style={{marginLeft:4}}>{t.zona}</span>}
+              <div className="tl done">{t.txt}</div>
+              <div className="tm">✓ {t.completado_por} · {fmtDT(t.completado_ts)}</div>
+              {t.nota&&<div className="nbox">📝 {t.nota}</div>}
+              {t.foto_url&&<img src={t.foto_url} alt="" className="pthumb"/>}
+              {t.resp_admin&&<div className="rbox">✅ Admin: {t.resp_admin}</div>}
+            </div>
+            <div style={{display:"flex",flexDirection:"column",gap:4,flexShrink:0}}>
+              <span className="ibtn" onClick={()=>{setEditExtraId(t.id);setEditExtraNota(t.nota||"");setEditExtraFoto(t.foto_url||null);}}>✏️</span>
+              <span className="ibtn" style={{background:"rgba(232,85,85,.1)",color:"#e85555",borderColor:"rgba(232,85,85,.2)"}} onClick={()=>delExtra(t.id)}>🗑</span>
+            </div>
+          </div>)}
+        </>}
+
+        {/* Botón añadir extra */}
+        <button className="btn bg" style={{width:"100%",justifyContent:"center",marginTop:12}} onClick={()=>{setExtraForm({txt:"",zona:"",nota:"",foto_url:null});setShowExtraForm(true);}}>➕ Añadir tarea realizada</button>
+
         {/* Completar servicio */}
-        {todasTareasOk&&(!jornada||jornada.hora_fin)&&<button className="btn bp" style={{width:"100%",justifyContent:"center",padding:"14px",fontSize:15,marginTop:12,background:"#10b981"}} onClick={()=>setShowFinSrv(true)}>✅ Marcar servicio completado</button>}
+        {tareasAdminOk&&(!jornada||jornada.hora_fin)&&<button className="btn bp" style={{width:"100%",justifyContent:"center",padding:"14px",fontSize:15,marginTop:12,background:"#10b981"}} onClick={()=>setShowFinSrv(true)}>✅ Marcar servicio completado</button>}
       </div>}
 
       <div className="sg"><SC lbl="Tareas esta semana" val={tot}/><SC lbl="Completadas" val={comp} prog={tot?comp/tot:0} valC="#10b981" sub={comp===tot&&tot>0?"¡Al día! ✓":undefined}/><SC lbl="Pendientes" val={tot-comp} valC={tot-comp>0?"#f59e0b":"#10b981"}/></div>
@@ -1584,7 +1620,7 @@ function DashJ({perfil,jsem,jpunt,cwk,setPage,tok}){
     {showFinJornada&&<div className="ov"><div className="modal" style={{maxWidth:400,textAlign:"center"}}>
       <div style={{fontSize:36,marginBottom:8}}>🌙</div>
       <h3>¿Terminas por hoy?</h3>
-      <div style={{fontSize:24,fontWeight:700,color:"#c9a84c",fontFamily:"monospace",margin:"16px 0"}}>{fmtElapsed(elapsed)}</div>
+      <div style={{fontSize:24,fontWeight:700,color:"#c9a84c",fontFamily:"monospace",margin:"16px 0"}}>{fmtEl(elapsed)}</div>
       <p style={{fontSize:13,color:"#7a7f94",marginBottom:20}}>Llevas {fmtHM(Math.round(elapsed/60))}</p>
       <button className="btn bp" style={{width:"100%",justifyContent:"center",padding:"14px",fontSize:15}} onClick={terminarJornada} disabled={saving2}>{saving2?"Guardando…":"✅ Terminar jornada"}</button>
       <button className="btn bg" style={{width:"100%",justifyContent:"center",marginTop:8}} onClick={()=>setShowFinJornada(false)}>Cancelar</button>
@@ -1594,13 +1630,32 @@ function DashJ({perfil,jsem,jpunt,cwk,setPage,tok}){
     {showFinSrv&&<div className="ov"><div className="modal" style={{maxWidth:440,textAlign:"center"}}>
       <div style={{fontSize:36,marginBottom:8}}>✅</div>
       <h3>Completar servicio</h3>
-      <p style={{fontSize:13,color:"#7a7f94",marginBottom:16,lineHeight:1.5}}>"{srvActivo?.titulo}" — todas las tareas completadas.</p>
+      <p style={{fontSize:13,color:"#7a7f94",marginBottom:16,lineHeight:1.5}}>"{srvActivo?.titulo}" — todas las tareas asignadas completadas.</p>
       <div style={{background:"#0f1117",borderRadius:10,padding:"14px",marginBottom:20}}>
-        <div style={{fontSize:12,color:"#5a5e6e",marginBottom:6}}>Total acumulado: <strong style={{color:"#c9a84c"}}>{fmtHM(totalAcum*60)}</strong></div>
+        <div style={{fontSize:12,color:"#5a5e6e"}}>Total acumulado: <strong style={{color:"#c9a84c"}}>{fmtHM(totalAcum*60)}</strong></div>
+        {srvExtras.length>0&&<div style={{fontSize:12,color:"#c9a84c",marginTop:4}}>+ {srvExtras.length} tarea{srvExtras.length>1?"s":""} extra registrada{srvExtras.length>1?"s":""}</div>}
       </div>
       <button className="btn bp" style={{width:"100%",justifyContent:"center",padding:"14px",fontSize:15,background:"#10b981"}} onClick={completarServicio} disabled={saving2}>{saving2?"Finalizando…":"✅ Confirmar y notificar al admin"}</button>
       <button className="btn bg" style={{width:"100%",justifyContent:"center",marginTop:8}} onClick={()=>setShowFinSrv(false)}>Cancelar</button>
     </div></div>}
+
+    {/* Modal tarea extra */}
+    {showExtraForm&&<div className="ov" onClick={()=>setShowExtraForm(false)}><div className="modal" onClick={e=>e.stopPropagation()}>
+      <h3>➕ Tarea realizada</h3>
+      <div className="fg"><label>Descripción *</label><input className="fi" value={extraForm.txt} onChange={e=>setExtraForm(v=>({...v,txt:e.target.value}))} placeholder="Ej: Limpieza de canalones" autoFocus/></div>
+      <div className="fg"><label>Zona (opcional)</label><input className="fi" value={extraForm.zona} onChange={e=>setExtraForm(v=>({...v,zona:e.target.value}))} placeholder="Ej: Tejado"/></div>
+      <div className="fg"><label>Foto (opcional)</label>
+        <label className="pbtn">{extraForm.foto_url?"📷 Cambiar foto":"📷 Hacer foto o subir imagen"}
+          <input type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={async e=>{const f=e.target.files[0];if(!f)return;try{const url=await uploadFoto(f,tok);setExtraForm(v=>({...v,foto_url:url}));}catch(_){const r=new FileReader();r.onload=ev=>setExtraForm(v=>({...v,foto_url:ev.target.result}));r.readAsDataURL(f);}}}/>
+        </label>
+        {extraForm.foto_url&&<><img src={extraForm.foto_url} alt="" className="pprev"/><button className="btn br sm" style={{marginTop:8}} onClick={()=>setExtraForm(v=>({...v,foto_url:null}))}>🗑 Quitar</button></>}
+      </div>
+      <div className="fg"><label>Comentario (opcional)</label><textarea className="fi" rows={2} value={extraForm.nota} onChange={e=>setExtraForm(v=>({...v,nota:e.target.value}))} placeholder="Notas…"/></div>
+      <div className="mft"><button className="btn bg" onClick={()=>setShowExtraForm(false)}>Cancelar</button><button className="btn bp" onClick={addExtra} disabled={saving2||!extraForm.txt.trim()}>{saving2?"Guardando…":"✅ Registrar"}</button></div>
+    </div></div>}
+
+    {/* Modal editar extra */}
+    {editExtraId&&<NotaModal nota={editExtraNota} setNota={setEditExtraNota} foto={editExtraFoto} setFoto={setEditExtraFoto} onSave={saveEditExtra} onClose={()=>setEditExtraId(null)} tok={tok}/>}
   </>;
 }
 function DashL({perfil,setPage}){
@@ -2100,10 +2155,14 @@ function JardinAdmin({perfil,tok}){
                 {tareas.map(t=><div key={t.id} className={`cli${t.done?" done":""}`} style={{padding:"8px 0"}}>
                   <span style={{fontSize:17,flexShrink:0}}>{t.done?"✅":"⬜"}</span>
                   <div style={{flex:1,minWidth:0}}>
+                    {t.añadida_por_jardinero&&<span className="badge" style={{background:"rgba(201,168,76,.12)",color:"#c9a84c",fontSize:10,marginBottom:3,display:"inline-block"}}>👷 Añadida por jardinero</span>}
+                    {t.es_extra&&!t.añadida_por_jardinero&&<span className="badge" style={{background:"rgba(201,168,76,.12)",color:"#c9a84c",fontSize:10,marginBottom:3,display:"inline-block"}}>➕ Extra</span>}
                     <div className="tl">{t.txt}</div>
+                    {t.zona&&<div className="tm" style={{color:"#c9a84c"}}>{t.zona}</div>}
                     {t.done?<div className="tm">✓ {t.completado_por} · {fmtDT(t.completado_ts)}</div>:<div className="tm" style={{color:"#e85555"}}>⏳ Pendiente</div>}
                     {t.nota&&<div className="nbox">📝 {t.nota}</div>}
                     {t.foto_url&&<img src={t.foto_url} alt="" className="pthumb"/>}
+                    {t.resp_admin&&<div className="rbox">✅ Admin: {t.resp_admin}</div>}
                   </div>
                 </div>)}
               </div>
