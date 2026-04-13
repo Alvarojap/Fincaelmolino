@@ -564,6 +564,7 @@ export default function App() {
     usuarios:    <Usuarios    {...P}/>,
     gastos:      <Gastos      {...P}/>,
     jardineros:  <Jardineros  {...P}/>,
+    limpiadoras:  <LimpiadorasPage {...P}/>,
   };
 
   return <>
@@ -672,10 +673,12 @@ function Sidebar({perfil,page,setPage,onLogout,inDrawer,onClose}){
         <N ico="✅" lbl={isA?"Checklist jardín":"Mi checklist"} id="jcheck"/>
         {isA&&<N ico="🌿" lbl="Gestión jardín" id="jadmin"/>}
         {isA&&<N ico="⚠️" lbl="Incidencias" id="incidencias"/>}
+        {isA&&<N ico="👷" lbl="Jardineros" id="jardineros"/>}
         {isJ&&<N ico="📅" lbl="Calendario" id="cal-jardin"/>}
       </>}
       {(isA||isL)&&<><p className="nav-sec">Limpieza</p>
         <N ico="🧹" lbl={isA?"Gestión limpieza":"Mi servicio"} id="limpieza"/>
+        {isA&&<N ico="👩" lbl="Limpiadoras" id="limpiadoras"/>}
         {isL&&<N ico="📅" lbl="Calendario" id="cal-limp"/>}
       </>}
       {(isA||isC)&&<><p className="nav-sec">Reservas</p>
@@ -688,7 +691,7 @@ function Sidebar({perfil,page,setPage,onLogout,inDrawer,onClose}){
       <p className="nav-sec">Comunicación</p>
       <N ico="💬" lbl={isA?"Chat con equipo":"Chat con admin"} id="chat"/>
       <N ico="🔔" lbl="Notificaciones" id="notifs"/>
-      {isA&&<><p className="nav-sec">Admin</p><N ico="💸" lbl="Gastos" id="gastos"/><N ico="🌿" lbl="Jardineros" id="jardineros"/><N ico="👥" lbl="Usuarios" id="usuarios"/></>}
+      {isA&&<><p className="nav-sec">Admin</p><N ico="💸" lbl="Gastos" id="gastos"/><N ico="👥" lbl="Usuarios" id="usuarios"/></>}
     </nav>
     {!inDrawer&&(
       <div className="sb-user">
@@ -1990,7 +1993,7 @@ function JardinAdmin({perfil,tok}){
       sbGet("jardin_puntual",`?semana=eq.${cwk}&select=*`,tok),
       sbGet("jardin_frecuencias","?select=*",tok),
       sbGet("jardin_servicios","?select=*,jardin_servicio_tareas(*)&order=created_at.desc",tok),
-      sbGet("usuarios","?rol=eq.jardinero&select=id,nombre",tok),
+      sbGet("jardineros","?activo=eq.true&select=id,nombre",tok).catch(()=>[]),
     ]);
     setJsem(js);setJpunt(jp);const fm={}; jf.forEach(x=>fm[x.tarea_id]=x.frecuencia); setJfrec(fm);
     setSrvs(sv);setJardineros(jds);setLoad(false);
@@ -2158,10 +2161,13 @@ function JardinAdmin({perfil,tok}){
         <div className="fg" style={{flex:1}}><label>Fecha inicio *</label><input className="fi" type="date" value={srvForm.fecha_inicio} onChange={e=>setSrvForm(v=>({...v,fecha_inicio:e.target.value}))}/></div>
         <div className="fg" style={{flex:1}}><label>Fecha fin *</label><input className="fi" type="date" value={srvForm.fecha_fin} onChange={e=>setSrvForm(v=>({...v,fecha_fin:e.target.value}))}/></div>
       </div>
-      <div className="fg"><label>Jardinero asignado *</label><select className="fi" value={srvForm.jardinero_id} onChange={e=>setSrvForm(v=>({...v,jardinero_id:e.target.value}))}>
-        <option value="">Seleccionar jardinero…</option>
-        {jardineros.map(j=><option key={j.id} value={j.id}>{j.nombre}</option>)}
-      </select></div>
+      <div className="fg"><label>Jardinero asignado *</label>
+        {jardineros.length===0?<div style={{fontSize:12,color:"#f59e0b",background:"rgba(245,158,11,.06)",borderRadius:8,padding:"10px 12px"}}>⚠️ Añade jardineros en el módulo Jardineros antes de crear servicios</div>
+        :<select className="fi" value={srvForm.jardinero_id} onChange={e=>setSrvForm(v=>({...v,jardinero_id:e.target.value}))}>
+          <option value="">Seleccionar jardinero…</option>
+          {jardineros.map(j=><option key={j.id} value={j.id}>{j.nombre}</option>)}
+        </select>}
+      </div>
       <div className="fg"><label>Notas (opcional)</label><textarea className="fi" rows={2} value={srvForm.notas} onChange={e=>setSrvForm(v=>({...v,notas:e.target.value}))} placeholder="Instrucciones adicionales…"/></div>
       <div className="fg">
         <label>Tareas ({srvTareas.length})</label>
@@ -2564,56 +2570,7 @@ function Limpieza({perfil,tok,rol}){
   return <>
     <div className="ph"><h2>{isA?"Gestión limpieza":"Mi servicio"}</h2></div>
     <div className="pb">
-      {isA&&<div className="tabs" style={{marginBottom:14}}>
-        <button className={`tab${limpTab==="servicios"?" on":""}`} onClick={()=>setLimpTab("servicios")}>🧹 Servicios</button>
-        <button className={`tab${limpTab==="limpiadoras"?" on":""}`} onClick={()=>setLimpTab("limpiadoras")}>👤 Limpiadoras ({limpiadoras.length})</button>
-      </div>}
-
-      {/* ── TAB LIMPIADORAS (solo admin) ── */}
-      {isA&&limpTab==="limpiadoras"&&<>
-        <div style={{marginBottom:14}}><button className="btn bp" onClick={()=>{setLForm({nombre:"",modalidad:"por_horas",tarifa_hora:"",notas:""});setShowLForm(true);}}>➕ Nueva limpiadora</button></div>
-        {limpiadoras.length===0?<div className="empty"><span className="ico">🧹</span><p>Sin limpiadoras registradas</p></div>
-        :limpiadoras.map(l=>{
-          const modLbl={por_horas:"Por horas",precio_fijo_servicio:"Precio fijo",permuta:"Permuta"}[l.modalidad]||l.modalidad;
-          const tarifaLbl=l.tarifa_hora&&l.modalidad==="por_horas"?`${l.tarifa_hora}€/h`:"—";
-          const abierto=analLimp?.id===l.id;
-          return <div key={l.id} className="card" style={{marginBottom:10,borderLeft:`3px solid ${l.activa?"#6366f1":"#5a5e6e"}`,opacity:l.activa?1:.6}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10}}>
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{fontSize:15,fontWeight:600,color:"#e8e6e1"}}>{l.nombre}</div>
-                <div style={{display:"flex",gap:6,marginTop:5,flexWrap:"wrap"}}>
-                  <span className="badge" style={{background:"rgba(99,102,241,.1)",color:"#a5b4fc"}}>{modLbl}</span>
-                  <span className="badge" style={{background:"rgba(255,255,255,.06)",color:"#7a7f94"}}>{tarifaLbl}</span>
-                  <span className="badge" style={{background:l.activa?"rgba(16,185,129,.1)":"rgba(107,114,128,.1)",color:l.activa?"#10b981":"#6b7280"}}>{l.activa?"Activa":"Inactiva"}</span>
-                </div>
-                {l.notas&&<div style={{fontSize:11,color:"#5a5e6e",marginTop:4}}>{l.notas}</div>}
-              </div>
-              <div style={{display:"flex",gap:6,flexShrink:0}}>
-                <button className="btn bg sm" onClick={()=>verAnalLimp(l)}>{abierto?"▲":"📊"}</button>
-                <button className="btn bg sm" onClick={()=>toggleLimpActiva(l)}>{l.activa?"Desactivar":"Activar"}</button>
-              </div>
-            </div>
-            {abierto&&<div style={{marginTop:14,paddingTop:14,borderTop:"1px solid rgba(255,255,255,.06)"}}>
-              {analLLoad?<div style={{color:"#5a5e6e",fontSize:13}}>Cargando…</div>
-              :analLData?<>
-                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(120px,1fr))",gap:8,marginBottom:10}}>
-                  <div style={{background:"#0f1117",borderRadius:8,padding:"10px 12px"}}><div style={{fontSize:10,color:"#5a5e6e"}}>SERVICIOS AÑO</div><div style={{fontSize:18,fontWeight:700,color:"#c9a84c",marginTop:3}}>{analLData.totalSrvs}</div></div>
-                  <div style={{background:"#0f1117",borderRadius:8,padding:"10px 12px"}}><div style={{fontSize:10,color:"#5a5e6e"}}>HORAS TOTAL</div><div style={{fontSize:18,fontWeight:700,color:"#c9a84c",marginTop:3}}>{analLData.horasTotal}h</div></div>
-                  <div style={{background:"#0f1117",borderRadius:8,padding:"10px 12px"}}><div style={{fontSize:10,color:"#5a5e6e"}}>COSTE TOTAL</div><div style={{fontSize:18,fontWeight:700,color:"#e85555",marginTop:3}}>{analLData.costeTotal}€</div></div>
-                  <div style={{background:"#0f1117",borderRadius:8,padding:"10px 12px"}}><div style={{fontSize:10,color:"#5a5e6e"}}>💡 €/HORA REAL</div><div style={{fontSize:18,fontWeight:700,color:"#6366f1",marginTop:3}}>{analLData.euroHoraReal>0?`${analLData.euroHoraReal}€`:"—"}</div></div>
-                </div>
-                {analLData.permutas.length>0&&<div style={{marginTop:8}}>
-                  <div style={{fontSize:10,color:"#c9a84c",fontWeight:600,textTransform:"uppercase",letterSpacing:.5,marginBottom:6}}>Permutas</div>
-                  {analLData.permutas.map((p,i)=><div key={i} style={{fontSize:12,color:"#7a7f94",padding:"4px 0"}}>🔄 {p}</div>)}
-                </div>}
-              </>:<div style={{color:"#5a5e6e",fontSize:13}}>Sin datos</div>}
-            </div>}
-          </div>;
-        })}
-      </>}
-
-      {/* ── TAB SERVICIOS ── */}
-      {(isA?limpTab==="servicios":true)&&<div className="g2" style={{alignItems:"flex-start"}}>
+      <div className="g2" style={{alignItems:"flex-start"}}>
         {/* LISTA SERVICIOS */}
         <div>
           <div className="chdr" style={{marginBottom:12}}>
@@ -2717,7 +2674,7 @@ function Limpieza({perfil,tok,rol}){
             ))}
           </>}
         </div>}
-      </div>}
+      </div>
     </div>
 
     {/* MODAL NUEVO SERVICIO */}
@@ -2757,23 +2714,6 @@ function Limpieza({perfil,tok,rol}){
         <div className="fg"><label>Descripción</label><input className="fi" value={newE.txt} onChange={e=>setNewE(v=>({...v,txt:e.target.value}))} placeholder="Ej: Limpiar terraza exterior"/></div>
         <div className="fg"><label>Zona</label><input className="fi" value={newE.zona} onChange={e=>setNewE(v=>({...v,zona:e.target.value}))} placeholder="Ej: Exterior"/></div>
         <div className="mft"><button className="btn bg" onClick={()=>setShowEx(false)}>Cancelar</button><button className="btn bp" onClick={addExtra} disabled={saving}>Añadir</button></div>
-      </div>
-    </div>}
-
-    {/* MODAL NUEVA LIMPIADORA */}
-    {showLForm&&<div className="ov" onClick={()=>setShowLForm(false)}>
-      <div className="modal" onClick={e=>e.stopPropagation()}>
-        <h3>🧹 Nueva limpiadora</h3>
-        <div className="fg"><label>Nombre *</label><input className="fi" value={lForm.nombre} onChange={e=>setLForm(v=>({...v,nombre:e.target.value}))} placeholder="Ej: María López"/></div>
-        <div className="fg"><label>Modalidad</label><select className="fi" value={lForm.modalidad} onChange={e=>setLForm(v=>({...v,modalidad:e.target.value}))}>
-          <option value="por_horas">Por horas</option>
-          <option value="precio_fijo_servicio">Precio fijo por servicio</option>
-          <option value="permuta">Permuta</option>
-        </select></div>
-        {lForm.modalidad==="por_horas"&&<div className="fg"><label>Tarifa €/hora</label><input type="number" inputMode="decimal" className="fi" value={lForm.tarifa_hora} onChange={e=>setLForm(v=>({...v,tarifa_hora:e.target.value}))} placeholder="Ej: 12"/></div>}
-        {lForm.modalidad==="permuta"&&<div style={{fontSize:12,color:"#7a7f94",marginBottom:14,background:"rgba(201,168,76,.06)",borderRadius:8,padding:"10px 12px"}}>El acuerdo de permuta se define por cada servicio.</div>}
-        <div className="fg"><label>Notas (opcional)</label><textarea className="fi" rows={2} value={lForm.notas} onChange={e=>setLForm(v=>({...v,notas:e.target.value}))} placeholder="Notas…"/></div>
-        <div className="mft"><button className="btn bg" onClick={()=>setShowLForm(false)}>Cancelar</button><button className="btn bp" onClick={crearLimpiadora} disabled={saving||!lForm.nombre}>{saving?"Guardando…":"🧹 Crear"}</button></div>
       </div>
     </div>}
 
@@ -3214,258 +3154,91 @@ const MODAL_JARDINERO=["Fijo mensual","Por horas","Precio fijo por servicio"];
 
 function Jardineros({tok,rol}){
   if(rol!=="admin")return null;
-  const [tab,setTab]=useState("jardineros");
   const [jardineros,setJardineros]=useState([]);
-  const [servicios,setServicios]=useState([]);
   const [load,setLoad]=useState(true);
-  // Jardinero form
   const [showJForm,setShowJForm]=useState(false);
   const [jForm,setJForm]=useState({nombre:"",modalidad:"Fijo mensual",tarifa:"",notas:""});
   const [saving,setSaving]=useState(false);
-  // Análisis
   const [analisis,setAnalisis]=useState(null);
   const [analLoad,setAnalLoad]=useState(false);
   const [analData,setAnalData]=useState(null);
-  // Servicio form
-  const [showSForm,setShowSForm]=useState(false);
-  const sFormVacio={jardinero_id:"",titulo:"",descripcion:"",modalidad:"",tarifa_hora:"",importe_fijo:"",fecha_inicio:new Date().toISOString().split("T")[0],tareas:[]};
-  const [sForm,setSForm]=useState(sFormVacio);
-  const [nuevaTarea,setNuevaTarea]=useState("");
-  // Servicio tabs
-  const [srvTab,setSrvTab]=useState("activos");
 
   const load_=async()=>{
-    try{
-      const [j,s]=await Promise.all([
-        sbGet("jardineros","?select=*&order=nombre.asc",tok),
-        sbGet("servicios_jardineria","?select=*&order=created_at.desc",tok),
-      ]);
-      setJardineros(j);setServicios(s);
-    }catch(_){}
+    try{const j=await sbGet("jardineros","?select=*&order=nombre.asc",tok);setJardineros(j);}catch(_){}
     setLoad(false);
   };
   useEffect(()=>{load_();},[]);
 
   const crearJardinero=async()=>{
-    if(!jForm.nombre||saving)return;
-    setSaving(true);
+    if(!jForm.nombre||saving)return;setSaving(true);
     try{
-      await sbPost("jardineros",{
-        nombre:jForm.nombre,modalidad:jForm.modalidad,
-        tarifa:parseFloat(jForm.tarifa)||null,
-        notas:jForm.notas||null,activo:true
-      },tok);
-      setShowJForm(false);setJForm({nombre:"",modalidad:"Fijo mensual",tarifa:"",notas:""});
-      await load_();
-    }catch(_){}
-    setSaving(false);
+      await sbPost("jardineros",{nombre:jForm.nombre,modalidad:jForm.modalidad,tarifa:parseFloat(jForm.tarifa)||null,notas:jForm.notas||null,activo:true},tok);
+      setShowJForm(false);setJForm({nombre:"",modalidad:"Fijo mensual",tarifa:"",notas:""});await load_();
+    }catch(_){}setSaving(false);
   };
-
-  const toggleActivo=async(j)=>{
-    await sbPatch("jardineros",`id=eq.${j.id}`,{activo:!j.activo},tok);
-    await load_();
-  };
-
+  const toggleActivo=async(j)=>{await sbPatch("jardineros",`id=eq.${j.id}`,{activo:!j.activo},tok);await load_();};
   const verAnalisis=async(j)=>{
     if(analisis?.id===j.id){setAnalisis(null);return;}
     setAnalisis(j);setAnalLoad(true);setAnalData(null);
     try{
-      const hoy=new Date();
-      const añoActual=hoy.getFullYear();
-      const mesActual=String(hoy.getMonth()+1).padStart(2,"0");
+      const hoy=new Date();const añoActual=hoy.getFullYear();const mesActual=String(hoy.getMonth()+1).padStart(2,"0");
       const jornadas=await sbGet("jornadas_jardineria",`?jardinero_id=eq.${j.id}&fecha=gte.${añoActual}-01-01&select=*`,tok).catch(()=>[]);
-      // Mes actual
       const jorMes=jornadas.filter(x=>x.fecha?.slice(5,7)===mesActual);
       const horasMes=jorMes.reduce((s,x)=>s+(parseFloat(x.horas)||0),0);
       const costeMes=jorMes.reduce((s,x)=>s+(parseFloat(x.coste)||0),0);
-      // Año
       const horasAño=jornadas.reduce((s,x)=>s+(parseFloat(x.horas)||0),0);
       const costeAño=jornadas.reduce((s,x)=>s+(parseFloat(x.coste)||0),0);
       const euroHoraReal=horasAño>0?Math.round(costeAño/horasAño*100)/100:0;
-      // Barras por mes
-      const barras=Array.from({length:12},(_,i)=>{
-        const m=String(i+1).padStart(2,"0");
-        const h=jornadas.filter(x=>x.fecha?.slice(5,7)===m).reduce((s,x)=>s+(parseFloat(x.horas)||0),0);
-        return {name:MESES_CORTO[i],horas:Math.round(h*10)/10};
-      });
+      const barras=Array.from({length:12},(_,i)=>{const m=String(i+1).padStart(2,"0");const h=jornadas.filter(x=>x.fecha?.slice(5,7)===m).reduce((s,x)=>s+(parseFloat(x.horas)||0),0);return {name:MESES_CORTO[i],horas:Math.round(h*10)/10};});
       setAnalData({horasMes:Math.round(horasMes*10)/10,costeMes:Math.round(costeMes),horasAño:Math.round(horasAño*10)/10,costeAño:Math.round(costeAño),euroHoraReal,barras});
-    }catch(_){}
-    setAnalLoad(false);
-  };
-
-  const selJardinero=(id)=>{
-    const j=jardineros.find(x=>String(x.id)===String(id));
-    setSForm(prev=>({...prev,jardinero_id:id,modalidad:j?.modalidad||"Por horas",tarifa_hora:j?.modalidad==="Por horas"?String(j?.tarifa||""):""}));
-  };
-
-  const addTareaSrv=()=>{if(!nuevaTarea.trim())return;setSForm(prev=>({...prev,tareas:[...prev.tareas,nuevaTarea.trim()]}));setNuevaTarea("");};
-  const removeTareaSrv=i=>setSForm(prev=>({...prev,tareas:prev.tareas.filter((_,idx)=>idx!==i)}));
-
-  const crearServicio=async()=>{
-    if(!sForm.jardinero_id||!sForm.titulo||saving)return;
-    setSaving(true);
-    try{
-      const j=jardineros.find(x=>String(x.id)===String(sForm.jardinero_id));
-      await sbPost("servicios_jardineria",{
-        jardinero_id:sForm.jardinero_id,
-        jardinero_nombre:j?.nombre||"",
-        titulo:sForm.titulo,
-        descripcion:sForm.descripcion||null,
-        modalidad:sForm.modalidad,
-        tarifa_hora:sForm.modalidad==="Por horas"?parseFloat(sForm.tarifa_hora)||null:null,
-        importe_fijo:sForm.modalidad==="Precio fijo por servicio"?parseFloat(sForm.importe_fijo)||null:null,
-        fecha_inicio:sForm.fecha_inicio,
-        tareas:sForm.tareas,
-        estado:"activo"
-      },tok);
-      setShowSForm(false);setSForm(sFormVacio);setNuevaTarea("");await load_();
-    }catch(_){}
-    setSaving(false);
-  };
-
-  const [showFinSrvAdmin,setShowFinSrvAdmin]=useState(null);
-  const [finSaving,setFinSaving]=useState(false);
-
-  const finalizarSrv=async(id,registrarGasto=false)=>{
-    setFinSaving(true);
-    try{
-      const s=servicios.find(x=>x.id===id);
-      const horasT=parseFloat(s?.horas_totales)||0;
-      const mod=s?.modalidad||"por_horas";
-      let costeTotal=0;
-      if(mod==="por_horas")costeTotal=Math.round(horasT*(parseFloat(s?.tarifa_hora)||0)*100)/100;
-      else if(mod==="precio_fijo_servicio")costeTotal=parseFloat(s?.importe_fijo)||0;
-      const costeHoraReal=horasT>0?Math.round(costeTotal/horasT*100)/100:0;
-      await sbPatch("servicios_jardineria",`id=eq.${id}`,{estado:"finalizado",coste_total:costeTotal,coste_hora_real:costeHoraReal},tok);
-      if(registrarGasto&&costeTotal>0){
-        const hoyStr=new Date().toISOString().split("T")[0];
-        await sbPost("gastos",{fecha:hoyStr,categoria:"Personal",concepto:`Jardinería - ${s?.titulo||"Servicio"}`,importe:costeTotal,origen:"auto_jardineria"},tok).catch(()=>{});
-      }
-      setShowFinSrvAdmin(null);await load_();
-    }catch(_){}
-    setFinSaving(false);
+    }catch(_){}setAnalLoad(false);
   };
 
   if(load)return <div className="loading"><div className="spin"/><span>Cargando…</span></div>;
-
-  const srvsActivos=servicios.filter(s=>s.estado==="activo"||s.estado==="en_curso");
-  const srvsFinalizados=servicios.filter(s=>s.estado!=="activo");
-
   return <>
-    <div className="ph"><h2>🌿 Jardineros</h2><p>Gestión de jardineros y servicios</p></div>
+    <div className="ph"><h2>👷 Jardineros</h2><p>Gestión de jardineros y condiciones</p></div>
     <div className="pb">
-      <div className="tabs">
-        <button className={`tab${tab==="jardineros"?" on":""}`} onClick={()=>setTab("jardineros")}>👤 Jardineros ({jardineros.length})</button>
-        <button className={`tab${tab==="servicios"?" on":""}`} onClick={()=>setTab("servicios")}>📋 Servicios ({servicios.length})</button>
-      </div>
-
-      {/* ── TAB JARDINEROS ── */}
-      {tab==="jardineros"&&<>
-        <div style={{marginBottom:14}}><button className="btn bp" onClick={()=>{setJForm({nombre:"",modalidad:"Fijo mensual",tarifa:"",notas:""});setShowJForm(true);}}>➕ Nuevo jardinero</button></div>
-        {jardineros.length===0?<div className="empty"><span className="ico">🌿</span><p>Sin jardineros registrados</p></div>
-        :jardineros.map(j=>{
-          const modLbl=j.modalidad||"—";
-          const tarifaLbl=j.tarifa?(j.modalidad==="Fijo mensual"?`${j.tarifa}€/mes`:j.modalidad==="Por horas"?`${j.tarifa}€/h`:`${j.tarifa}€`):"—";
-          const abierto=analisis?.id===j.id;
-          return <div key={j.id} className="card" style={{marginBottom:10,borderLeft:`3px solid ${j.activo?"#10b981":"#5a5e6e"}`,opacity:j.activo?1:.6}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10}}>
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{fontSize:15,fontWeight:600,color:"#e8e6e1",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{j.nombre}</div>
-                <div style={{display:"flex",gap:6,marginTop:5,flexWrap:"wrap"}}>
-                  <span className="badge" style={{background:"rgba(201,168,76,.1)",color:"#c9a84c"}}>{modLbl}</span>
-                  <span className="badge" style={{background:"rgba(255,255,255,.06)",color:"#7a7f94"}}>{tarifaLbl}</span>
-                  <span className="badge" style={{background:j.activo?"rgba(16,185,129,.1)":"rgba(107,114,128,.1)",color:j.activo?"#10b981":"#6b7280"}}>{j.activo?"Activo":"Inactivo"}</span>
-                </div>
-                {j.notas&&<div style={{fontSize:11,color:"#5a5e6e",marginTop:4}}>{j.notas}</div>}
+      <div style={{marginBottom:14}}><button className="btn bp" onClick={()=>{setJForm({nombre:"",modalidad:"Fijo mensual",tarifa:"",notas:""});setShowJForm(true);}}>➕ Nuevo jardinero</button></div>
+      {jardineros.length===0?<div className="empty"><span className="ico">🌿</span><p>Sin jardineros registrados</p></div>
+      :jardineros.map(j=>{
+        const modLbl=j.modalidad||"—";
+        const tarifaLbl=j.tarifa?(j.modalidad==="Fijo mensual"?`${j.tarifa}€/mes`:j.modalidad==="Por horas"?`${j.tarifa}€/h`:`${j.tarifa}€`):"—";
+        const abierto=analisis?.id===j.id;
+        return <div key={j.id} className="card" style={{marginBottom:10,borderLeft:`3px solid ${j.activo?"#10b981":"#5a5e6e"}`,opacity:j.activo?1:.6}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10}}>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:15,fontWeight:600,color:"#e8e6e1",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{j.nombre}</div>
+              <div style={{display:"flex",gap:6,marginTop:5,flexWrap:"wrap"}}>
+                <span className="badge" style={{background:"rgba(201,168,76,.1)",color:"#c9a84c"}}>{modLbl}</span>
+                <span className="badge" style={{background:"rgba(255,255,255,.06)",color:"#7a7f94"}}>{tarifaLbl}</span>
+                <span className="badge" style={{background:j.activo?"rgba(16,185,129,.1)":"rgba(107,114,128,.1)",color:j.activo?"#10b981":"#6b7280"}}>{j.activo?"Activo":"Inactivo"}</span>
               </div>
-              <div style={{display:"flex",gap:6,flexShrink:0}}>
-                <button className="btn bg sm" onClick={()=>verAnalisis(j)}>{abierto?"▲ Cerrar":"📊 Análisis"}</button>
-                <button className="btn bg sm" onClick={()=>toggleActivo(j)}>{j.activo?"Desactivar":"Activar"}</button>
-              </div>
+              {j.notas&&<div style={{fontSize:11,color:"#5a5e6e",marginTop:4}}>{j.notas}</div>}
             </div>
-            {/* ANÁLISIS (solo admin, nunca en DOM para otros roles) */}
-            {abierto&&<div style={{marginTop:14,paddingTop:14,borderTop:"1px solid rgba(255,255,255,.06)"}}>
-              {analLoad?<div style={{color:"#5a5e6e",fontSize:13,padding:"8px 0"}}>Cargando análisis…</div>
-              :analData?<>
-                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(120px,1fr))",gap:8,marginBottom:14}}>
-                  <div style={{background:"#0f1117",borderRadius:8,padding:"10px 12px"}}>
-                    <div style={{fontSize:10,color:"#5a5e6e"}}>HORAS ESTE MES</div>
-                    <div style={{fontSize:18,fontWeight:700,color:"#c9a84c",marginTop:3}}>{analData.horasMes}h</div>
-                  </div>
-                  <div style={{background:"#0f1117",borderRadius:8,padding:"10px 12px"}}>
-                    <div style={{fontSize:10,color:"#5a5e6e"}}>COSTE ESTE MES</div>
-                    <div style={{fontSize:18,fontWeight:700,color:"#e85555",marginTop:3}}>{analData.costeMes}€</div>
-                  </div>
-                  <div style={{background:"#0f1117",borderRadius:8,padding:"10px 12px"}}>
-                    <div style={{fontSize:10,color:"#5a5e6e"}}>HORAS ESTE AÑO</div>
-                    <div style={{fontSize:18,fontWeight:700,color:"#c9a84c",marginTop:3}}>{analData.horasAño}h</div>
-                  </div>
-                  <div style={{background:"#0f1117",borderRadius:8,padding:"10px 12px"}}>
-                    <div style={{fontSize:10,color:"#5a5e6e"}}>COSTE ESTE AÑO</div>
-                    <div style={{fontSize:18,fontWeight:700,color:"#e85555",marginTop:3}}>{analData.costeAño}€</div>
-                  </div>
-                  <div style={{background:"#0f1117",borderRadius:8,padding:"10px 12px"}}>
-                    <div style={{fontSize:10,color:"#5a5e6e"}}>💡 €/HORA REAL</div>
-                    <div style={{fontSize:18,fontWeight:700,color:"#6366f1",marginTop:3}}>{analData.euroHoraReal>0?`${analData.euroHoraReal}€`:"—"}</div>
-                  </div>
-                </div>
-                <div style={{fontSize:11,color:"#c9a84c",fontWeight:600,textTransform:"uppercase",letterSpacing:1,marginBottom:8}}>Horas por mes</div>
-                <div style={{width:"100%",height:140}}>
-                  <ResponsiveContainer>
-                    <BarChart data={analData.barras} margin={{top:5,right:5,left:-20,bottom:5}}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,.06)"/>
-                      <XAxis dataKey="name" tick={{fontSize:9,fill:"#5a5e6e"}} axisLine={false} tickLine={false}/>
-                      <YAxis tick={{fontSize:9,fill:"#5a5e6e"}} axisLine={false} tickLine={false}/>
-                      <Tooltip contentStyle={{background:"#13161f",border:"1px solid rgba(201,168,76,.25)",borderRadius:8,fontSize:12}} formatter={v=>[`${v}h`]}/>
-                      <Bar dataKey="horas" fill="#c9a84c" radius={[3,3,0,0]}/>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </>:<div style={{color:"#5a5e6e",fontSize:13}}>Sin datos de jornadas</div>}
-            </div>}
-          </div>;
-        })}
-      </>}
-
-      {/* ── TAB SERVICIOS ── */}
-      {tab==="servicios"&&<>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14,gap:12,flexWrap:"wrap"}}>
-          <div className="tabs" style={{marginBottom:0}}>
-            <button className={`tab${srvTab==="activos"?" on":""}`} onClick={()=>setSrvTab("activos")}>🟢 Activos ({srvsActivos.length})</button>
-            <button className={`tab${srvTab==="finalizados"?" on":""}`} onClick={()=>setSrvTab("finalizados")}>✅ Finalizados ({srvsFinalizados.length})</button>
+            <div style={{display:"flex",gap:6,flexShrink:0}}>
+              <button className="btn bg sm" onClick={()=>verAnalisis(j)}>{abierto?"▲ Cerrar":"📊 Análisis"}</button>
+              <button className="btn bg sm" onClick={()=>toggleActivo(j)}>{j.activo?"Desactivar":"Activar"}</button>
+            </div>
           </div>
-          <button className="btn bp" onClick={()=>{setSForm(sFormVacio);setNuevaTarea("");setShowSForm(true);}}>➕ Nuevo servicio</button>
-        </div>
-        {(srvTab==="activos"?srvsActivos:srvsFinalizados).length===0
-          ?<div className="empty"><span className="ico">📋</span><p>Sin servicios {srvTab}</p></div>
-          :(srvTab==="activos"?srvsActivos:srvsFinalizados).map(s=>{
-            const modLbl=s.modalidad||"—";
-            const costeLbl=s.modalidad==="Por horas"&&s.tarifa_hora?`${s.tarifa_hora}€/h`:s.modalidad==="Precio fijo por servicio"&&s.importe_fijo?`${parseFloat(s.importe_fijo).toLocaleString("es-ES")}€ fijo`:s.modalidad==="Fijo mensual"?"Fijo mensual":"—";
-            return <div key={s.id} className="card" style={{marginBottom:10,borderLeft:`3px solid ${s.estado==="activo"?"#10b981":"#6b7280"}`}}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10}}>
-                <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontSize:15,fontWeight:600,color:"#e8e6e1",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{s.titulo}</div>
-                  <div style={{display:"flex",gap:6,marginTop:5,flexWrap:"wrap"}}>
-                    <span className="badge" style={{background:"rgba(16,185,129,.1)",color:"#10b981"}}>👤 {s.jardinero_nombre}</span>
-                    <span className="badge" style={{background:"rgba(201,168,76,.1)",color:"#c9a84c"}}>{modLbl}</span>
-                    <span className="badge" style={{background:"rgba(255,255,255,.06)",color:"#7a7f94"}}>{costeLbl}</span>
-                  </div>
-                  {s.descripcion&&<div style={{fontSize:12,color:"#7a7f94",marginTop:5}}>{s.descripcion}</div>}
-                  {s.fecha_inicio&&<div style={{fontSize:11,color:"#5a5e6e",marginTop:3}}>📅 Inicio: {new Date(s.fecha_inicio+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short",year:"numeric"})}</div>}
-                  {Array.isArray(s.tareas)&&s.tareas.length>0&&<div style={{marginTop:8}}>
-                    {s.tareas.map((t,i)=><div key={i} style={{display:"flex",alignItems:"center",gap:6,padding:"4px 0",fontSize:12,color:"#c9c5b8"}}>
-                      <span style={{color:"#c9a84c",fontSize:11,flexShrink:0}}>{i+1}.</span>{t}
-                    </div>)}
-                  </div>}
-                </div>
-                {(s.estado==="activo"||s.estado==="en_curso")&&<button className="btn bp sm" style={{flexShrink:0}} onClick={()=>setShowFinSrvAdmin(s)}>✅ Finalizar</button>}
+          {abierto&&<div style={{marginTop:14,paddingTop:14,borderTop:"1px solid rgba(255,255,255,.06)"}}>
+            {analLoad?<div style={{color:"#5a5e6e",fontSize:13}}>Cargando…</div>
+            :analData?<>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(120px,1fr))",gap:8,marginBottom:14}}>
+                {[{l:"HORAS ESTE MES",v:`${analData.horasMes}h`,c:"#c9a84c"},{l:"COSTE ESTE MES",v:`${analData.costeMes}€`,c:"#e85555"},{l:"HORAS ESTE AÑO",v:`${analData.horasAño}h`,c:"#c9a84c"},{l:"COSTE ESTE AÑO",v:`${analData.costeAño}€`,c:"#e85555"},{l:"💡 €/HORA REAL",v:analData.euroHoraReal>0?`${analData.euroHoraReal}€`:"—",c:"#6366f1"}].map(x=>(
+                  <div key={x.l} style={{background:"#0f1117",borderRadius:8,padding:"10px 12px"}}><div style={{fontSize:10,color:"#5a5e6e"}}>{x.l}</div><div style={{fontSize:18,fontWeight:700,color:x.c,marginTop:3}}>{x.v}</div></div>
+                ))}
               </div>
-            </div>;
-          })}
-      </>}
+              <div style={{fontSize:11,color:"#c9a84c",fontWeight:600,textTransform:"uppercase",letterSpacing:1,marginBottom:8}}>Horas por mes</div>
+              <div style={{width:"100%",height:140}}>
+                <ResponsiveContainer><BarChart data={analData.barras} margin={{top:5,right:5,left:-20,bottom:5}}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,.06)"/><XAxis dataKey="name" tick={{fontSize:9,fill:"#5a5e6e"}} axisLine={false} tickLine={false}/><YAxis tick={{fontSize:9,fill:"#5a5e6e"}} axisLine={false} tickLine={false}/><Tooltip contentStyle={{background:"#13161f",border:"1px solid rgba(201,168,76,.25)",borderRadius:8,fontSize:12}} formatter={v=>[`${v}h`]}/><Bar dataKey="horas" fill="#c9a84c" radius={[3,3,0,0]}/>
+                </BarChart></ResponsiveContainer>
+              </div>
+            </>:<div style={{color:"#5a5e6e",fontSize:13}}>Sin datos de jornadas</div>}
+          </div>}
+        </div>;
+      })}
     </div>
-
-    {/* MODAL NUEVO JARDINERO */}
     {showJForm&&<div className="ov" onClick={()=>setShowJForm(false)}>
       <div className="modal" onClick={e=>e.stopPropagation()}>
         <h3>🌿 Nuevo jardinero</h3>
@@ -3474,76 +3247,108 @@ function Jardineros({tok,rol}){
         {jForm.modalidad==="Fijo mensual"&&<div className="fg"><label>Tarifa mensual (€)</label><input type="number" inputMode="decimal" className="fi" value={jForm.tarifa} onChange={e=>setJForm(v=>({...v,tarifa:e.target.value}))} placeholder="Ej: 800"/></div>}
         {jForm.modalidad==="Por horas"&&<div className="fg"><label>Tarifa por hora (€)</label><input type="number" inputMode="decimal" className="fi" value={jForm.tarifa} onChange={e=>setJForm(v=>({...v,tarifa:e.target.value}))} placeholder="Ej: 15"/></div>}
         {jForm.modalidad==="Precio fijo por servicio"&&<div style={{fontSize:12,color:"#7a7f94",marginBottom:14,background:"rgba(201,168,76,.06)",borderRadius:8,padding:"10px 12px"}}>El precio se define por cada servicio concreto.</div>}
-        <div className="fg"><label>Notas (opcional)</label><textarea className="fi" rows={2} value={jForm.notas} onChange={e=>setJForm(v=>({...v,notas:e.target.value}))} placeholder="Notas sobre el jardinero…"/></div>
-        <div className="mft"><button className="btn bg" onClick={()=>setShowJForm(false)}>Cancelar</button><button className="btn bp" onClick={crearJardinero} disabled={saving||!jForm.nombre}>{saving?"Guardando…":"🌿 Crear jardinero"}</button></div>
+        <div className="fg"><label>Notas (opcional)</label><textarea className="fi" rows={2} value={jForm.notas} onChange={e=>setJForm(v=>({...v,notas:e.target.value}))} placeholder="Notas…"/></div>
+        <div className="mft"><button className="btn bg" onClick={()=>setShowJForm(false)}>Cancelar</button><button className="btn bp" onClick={crearJardinero} disabled={saving||!jForm.nombre}>{saving?"Guardando…":"🌿 Crear"}</button></div>
       </div>
     </div>}
+  </>;
+}
 
-    {/* MODAL NUEVO SERVICIO */}
-    {showSForm&&<div className="ov" onClick={()=>setShowSForm(false)}>
-      <div className="modal" style={{maxHeight:"90vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
-        <h3>📋 Nuevo servicio de jardinería</h3>
-        <div className="fg"><label>Jardinero *</label>
-          <select className="fi" value={sForm.jardinero_id} onChange={e=>selJardinero(e.target.value)}>
-            <option value="">Seleccionar…</option>
-            {jardineros.filter(j=>j.activo).map(j=><option key={j.id} value={j.id}>{j.nombre} ({j.modalidad})</option>)}
-          </select>
-        </div>
-        <div className="fg"><label>Título *</label><input className="fi" value={sForm.titulo} onChange={e=>setSForm(v=>({...v,titulo:e.target.value}))} placeholder="Ej: Mantenimiento semanal abril"/></div>
-        <div className="fg"><label>Descripción</label><textarea className="fi" rows={2} value={sForm.descripcion} onChange={e=>setSForm(v=>({...v,descripcion:e.target.value}))} placeholder="Detalles del servicio…"/></div>
-        {sForm.jardinero_id&&<>
-          <div className="fg"><label>Modalidad de pago</label>
-            <select className="fi" value={sForm.modalidad} onChange={e=>setSForm(v=>({...v,modalidad:e.target.value}))}>{MODAL_JARDINERO.map(m=><option key={m}>{m}</option>)}</select>
+// ─── LIMPIADORAS PAGE ────────────────────────────────────────────────────────
+function LimpiadorasPage({tok,rol}){
+  if(rol!=="admin")return null;
+  const [limpiadoras,setLimpiadoras]=useState([]);
+  const [load,setLoad]=useState(true);
+  const [showForm,setShowForm]=useState(false);
+  const [form,setForm]=useState({nombre:"",modalidad:"por_horas",tarifa_hora:"",notas:""});
+  const [saving,setSaving]=useState(false);
+  const [anal,setAnal]=useState(null);
+  const [analLoad,setAnalLoad]=useState(false);
+  const [analData,setAnalData]=useState(null);
+
+  const load_=async()=>{
+    try{const l=await sbGet("limpiadoras","?select=*&order=nombre.asc",tok);setLimpiadoras(l);}catch(_){}
+    setLoad(false);
+  };
+  useEffect(()=>{load_();},[]);
+
+  const crear=async()=>{
+    if(!form.nombre||saving)return;setSaving(true);
+    try{
+      await sbPost("limpiadoras",{nombre:form.nombre,modalidad:form.modalidad,tarifa_hora:form.modalidad==="por_horas"?parseFloat(form.tarifa_hora)||null:null,notas:form.notas||null,activa:true},tok);
+      setShowForm(false);setForm({nombre:"",modalidad:"por_horas",tarifa_hora:"",notas:""});await load_();
+    }catch(_){}setSaving(false);
+  };
+  const toggleActiva=async l=>{await sbPatch("limpiadoras",`id=eq.${l.id}`,{activa:!l.activa},tok);await load_();};
+  const verAnal=async l=>{
+    if(anal?.id===l.id){setAnal(null);return;}
+    setAnal(l);setAnalLoad(true);setAnalData(null);
+    try{
+      const añoActual=new Date().getFullYear();
+      const srvs=await sbGet("servicios",`?limpiadora_id=eq.${l.id}&fecha=gte.${añoActual}-01-01&select=*`,tok).catch(()=>[]);
+      let horasT=0,costeT=0;const permutas=[];
+      for(const s of srvs){
+        if(s.hora_inicio&&s.hora_fin){const [h1,m1]=s.hora_inicio.split(":").map(Number);const [h2,m2]=s.hora_fin.split(":").map(Number);horasT+=Math.max(0,(h2+m2/60)-(h1+m1/60));}
+        costeT+=parseFloat(s.coste_calculado)||0;
+        if(s.modalidad_pago==="permuta")permutas.push(s.permuta_descripcion||`Permuta - ${s.nombre}`);
+      }
+      setAnalData({totalSrvs:srvs.length,horasTotal:Math.round(horasT*10)/10,costeTotal:Math.round(costeT),euroHoraReal:horasT>0?Math.round(costeT/horasT*100)/100:0,permutas});
+    }catch(_){}setAnalLoad(false);
+  };
+
+  if(load)return <div className="loading"><div className="spin"/><span>Cargando…</span></div>;
+  return <>
+    <div className="ph"><h2>👩 Limpiadoras</h2><p>Gestión de limpiadoras y condiciones</p></div>
+    <div className="pb">
+      <div style={{marginBottom:14}}><button className="btn bp" onClick={()=>{setForm({nombre:"",modalidad:"por_horas",tarifa_hora:"",notas:""});setShowForm(true);}}>➕ Nueva limpiadora</button></div>
+      {limpiadoras.length===0?<div className="empty"><span className="ico">🧹</span><p>Sin limpiadoras registradas</p></div>
+      :limpiadoras.map(l=>{
+        const modLbl={por_horas:"Por horas",precio_fijo_servicio:"Precio fijo",permuta:"Permuta"}[l.modalidad]||l.modalidad;
+        const tarifaLbl=l.tarifa_hora&&l.modalidad==="por_horas"?`${l.tarifa_hora}€/h`:"—";
+        const abierto=anal?.id===l.id;
+        return <div key={l.id} className="card" style={{marginBottom:10,borderLeft:`3px solid ${l.activa?"#6366f1":"#5a5e6e"}`,opacity:l.activa?1:.6}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10}}>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:15,fontWeight:600,color:"#e8e6e1"}}>{l.nombre}</div>
+              <div style={{display:"flex",gap:6,marginTop:5,flexWrap:"wrap"}}>
+                <span className="badge" style={{background:"rgba(99,102,241,.1)",color:"#a5b4fc"}}>{modLbl}</span>
+                <span className="badge" style={{background:"rgba(255,255,255,.06)",color:"#7a7f94"}}>{tarifaLbl}</span>
+                <span className="badge" style={{background:l.activa?"rgba(16,185,129,.1)":"rgba(107,114,128,.1)",color:l.activa?"#10b981":"#6b7280"}}>{l.activa?"Activa":"Inactiva"}</span>
+              </div>
+              {l.notas&&<div style={{fontSize:11,color:"#5a5e6e",marginTop:4}}>{l.notas}</div>}
+            </div>
+            <div style={{display:"flex",gap:6,flexShrink:0}}>
+              <button className="btn bg sm" onClick={()=>verAnal(l)}>{abierto?"▲":"📊"}</button>
+              <button className="btn bg sm" onClick={()=>toggleActiva(l)}>{l.activa?"Desactivar":"Activar"}</button>
+            </div>
           </div>
-          {sForm.modalidad==="Por horas"&&<div className="fg"><label>Tarifa €/hora</label><input type="number" inputMode="decimal" className="fi" value={sForm.tarifa_hora} onChange={e=>setSForm(v=>({...v,tarifa_hora:e.target.value}))} placeholder="Ej: 15"/></div>}
-          {sForm.modalidad==="Precio fijo por servicio"&&<div className="fg"><label>Importe total acordado (€)</label><input type="number" inputMode="decimal" className="fi" value={sForm.importe_fijo} onChange={e=>setSForm(v=>({...v,importe_fijo:e.target.value}))} placeholder="Ej: 500"/></div>}
-          {sForm.modalidad==="Fijo mensual"&&<div style={{fontSize:12,color:"#7a7f94",marginBottom:14,background:"rgba(201,168,76,.06)",borderRadius:8,padding:"10px 12px"}}>El jardinero tiene tarifa fija mensual. El coste se gestiona automáticamente.</div>}
-        </>}
-        <div className="fg"><label>Fecha inicio prevista</label><input type="date" className="fi" value={sForm.fecha_inicio} onChange={e=>setSForm(v=>({...v,fecha_inicio:e.target.value}))}/></div>
-        <div className="fg">
-          <label>Tareas ({sForm.tareas.length})</label>
-          <div style={{display:"flex",gap:8}}>
-            <input className="fi" style={{flex:1}} value={nuevaTarea} onChange={e=>setNuevaTarea(e.target.value)} placeholder="Escribir tarea…" onKeyDown={e=>{if(e.key==="Enter"){e.preventDefault();addTareaSrv();}}}/>
-            <button className="btn bp sm" onClick={addTareaSrv} style={{flexShrink:0}}>+</button>
-          </div>
-          {sForm.tareas.length>0&&<div style={{marginTop:8}}>
-            {sForm.tareas.map((t,i)=><div key={i} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 10px",background:"rgba(255,255,255,.03)",borderRadius:8,marginBottom:4}}>
-              <span style={{color:"#c9a84c",fontSize:12,flexShrink:0}}>{i+1}.</span>
-              <span style={{flex:1,fontSize:13,color:"#c9c5b8"}}>{t}</span>
-              <button onClick={()=>removeTareaSrv(i)} style={{background:"none",border:"none",color:"#e85555",cursor:"pointer",fontSize:15,padding:"0 4px"}}>×</button>
-            </div>)}
+          {abierto&&<div style={{marginTop:14,paddingTop:14,borderTop:"1px solid rgba(255,255,255,.06)"}}>
+            {analLoad?<div style={{color:"#5a5e6e",fontSize:13}}>Cargando…</div>
+            :analData?<>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(120px,1fr))",gap:8,marginBottom:10}}>
+                {[{l:"SERVICIOS AÑO",v:analData.totalSrvs,c:"#c9a84c"},{l:"HORAS TOTAL",v:`${analData.horasTotal}h`,c:"#c9a84c"},{l:"COSTE TOTAL",v:`${analData.costeTotal}€`,c:"#e85555"},{l:"💡 €/HORA REAL",v:analData.euroHoraReal>0?`${analData.euroHoraReal}€`:"—",c:"#6366f1"}].map(x=>(
+                  <div key={x.l} style={{background:"#0f1117",borderRadius:8,padding:"10px 12px"}}><div style={{fontSize:10,color:"#5a5e6e"}}>{x.l}</div><div style={{fontSize:18,fontWeight:700,color:x.c,marginTop:3}}>{x.v}</div></div>
+                ))}
+              </div>
+              {analData.permutas.length>0&&<div style={{marginTop:8}}>
+                <div style={{fontSize:10,color:"#c9a84c",fontWeight:600,textTransform:"uppercase",letterSpacing:.5,marginBottom:6}}>Permutas</div>
+                {analData.permutas.map((p,i)=><div key={i} style={{fontSize:12,color:"#7a7f94",padding:"4px 0"}}>🔄 {p}</div>)}
+              </div>}
+            </>:<div style={{color:"#5a5e6e",fontSize:13}}>Sin datos</div>}
           </div>}
-        </div>
-        <div className="mft"><button className="btn bg" onClick={()=>setShowSForm(false)}>Cancelar</button><button className="btn bp" onClick={crearServicio} disabled={saving||!sForm.jardinero_id||!sForm.titulo}>{saving?"Creando…":"📋 Crear servicio"}</button></div>
-      </div>
-    </div>}
-
-    {/* MODAL FINALIZAR SERVICIO ADMIN */}
-    {showFinSrvAdmin&&<div className="ov" onClick={()=>setShowFinSrvAdmin(null)}>
-      <div className="modal" style={{maxWidth:440}} onClick={e=>e.stopPropagation()}>
-        <h3>✅ Finalizar servicio</h3>
-        {(()=>{
-          const s=showFinSrvAdmin;
-          const horasT=parseFloat(s.horas_totales)||0;
-          const mod=s.modalidad||"por_horas";
-          let costeTotal=0;
-          if(mod==="por_horas")costeTotal=Math.round(horasT*(parseFloat(s.tarifa_hora)||0)*100)/100;
-          else if(mod==="precio_fijo_servicio")costeTotal=parseFloat(s.importe_fijo)||0;
-          return <>
-            <div style={{background:"rgba(201,168,76,.06)",border:"1px solid rgba(201,168,76,.15)",borderRadius:10,padding:"14px",marginBottom:16}}>
-              <div style={{fontSize:14,fontWeight:600,color:"#c9a84c",marginBottom:6}}>{s.titulo}</div>
-              <div style={{fontSize:13,color:"#c9c5b8"}}>👤 {s.jardinero_nombre} · ⏱ {horasT}h</div>
-              <div style={{fontSize:16,fontWeight:700,color:"#e8e6e1",marginTop:8}}>Coste: {costeTotal.toLocaleString("es-ES")}€</div>
-              {horasT>0&&<div style={{fontSize:12,color:"#6366f1",marginTop:3}}>💡 €/hora real: {(costeTotal/horasT).toFixed(2)}€</div>}
-            </div>
-            <div style={{fontSize:13,color:"#7a7f94",marginBottom:16}}>¿Registrar {costeTotal}€ como gasto de jardinería?</div>
-            <div style={{display:"flex",flexDirection:"column",gap:8}}>
-              <button className="btn bp" style={{width:"100%",justifyContent:"center",padding:"12px",fontSize:14}} onClick={()=>finalizarSrv(s.id,true)} disabled={finSaving}>{finSaving?"Procesando…":"✅ Finalizar y registrar gasto"}</button>
-              <button className="btn bg" style={{width:"100%",justifyContent:"center"}} onClick={()=>finalizarSrv(s.id,false)} disabled={finSaving}>Finalizar sin registrar gasto</button>
-              <button className="btn bg" style={{width:"100%",justifyContent:"center"}} onClick={()=>setShowFinSrvAdmin(null)}>Cancelar</button>
-            </div>
-          </>;
-        })()}
+        </div>;
+      })}
+    </div>
+    {showForm&&<div className="ov" onClick={()=>setShowForm(false)}>
+      <div className="modal" onClick={e=>e.stopPropagation()}>
+        <h3>🧹 Nueva limpiadora</h3>
+        <div className="fg"><label>Nombre *</label><input className="fi" value={form.nombre} onChange={e=>setForm(v=>({...v,nombre:e.target.value}))} placeholder="Ej: María López"/></div>
+        <div className="fg"><label>Modalidad</label><select className="fi" value={form.modalidad} onChange={e=>setForm(v=>({...v,modalidad:e.target.value}))}>
+          <option value="por_horas">Por horas</option><option value="precio_fijo_servicio">Precio fijo por servicio</option><option value="permuta">Permuta</option>
+        </select></div>
+        {form.modalidad==="por_horas"&&<div className="fg"><label>Tarifa €/hora</label><input type="number" inputMode="decimal" className="fi" value={form.tarifa_hora} onChange={e=>setForm(v=>({...v,tarifa_hora:e.target.value}))} placeholder="Ej: 12"/></div>}
+        <div className="fg"><label>Notas (opcional)</label><textarea className="fi" rows={2} value={form.notas} onChange={e=>setForm(v=>({...v,notas:e.target.value}))} placeholder="Notas…"/></div>
+        <div className="mft"><button className="btn bg" onClick={()=>setShowForm(false)}>Cancelar</button><button className="btn bp" onClick={crear} disabled={saving||!form.nombre}>{saving?"Guardando…":"🧹 Crear"}</button></div>
       </div>
     </div>}
   </>;
