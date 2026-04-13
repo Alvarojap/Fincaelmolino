@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, ComposedChart, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 
 // ─── SUPABASE ────────────────────────────────────────────────────────────────
 const SB_URL = "https://bqubxkuuyohuatdothwx.supabase.co";
@@ -948,6 +949,185 @@ function FinancialKPIs({tok}){
   </div>;
 }
 
+// ─── FINANCIAL CHARTS ───────────────────────────────────────────────────────
+const MESES_CORTO=["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
+const CHART_COLORS={facturacion:"#c9a84c",cobrado:"#10b981",gastos:"#e85555",beneficio:"#6366f1",eventos:"#c9a84c",airbnb:"#10b981",prev:"#7a7f94"};
+const ChartTooltipStyle={contentStyle:{background:"#13161f",border:"1px solid rgba(201,168,76,.25)",borderRadius:10,fontSize:12,color:"#c9c5b8"},itemStyle:{color:"#c9c5b8"},labelStyle:{color:"#c9a84c",fontWeight:600,marginBottom:4}};
+const fmtK=v=>v>=1000?`${(v/1000).toFixed(v>=10000?0:1)}k`:`${v}`;
+
+function FinancialCharts({tok}){
+  const hoy=new Date();
+  const añoActual=hoy.getFullYear();
+  const hoyStr=hoy.toISOString().split("T")[0];
+  const [monthly,setMonthly]=useState([]);
+  const [weekly,setWeekly]=useState([]);
+  const [pie,setPie]=useState([]);
+  const [prev2025,setPrev2025]=useState(0);
+  const [vista,setVista]=useState("mes");
+  const [load,setLoad]=useState(true);
+
+  useEffect(()=>{
+    (async()=>{
+      try{
+        const desde=`${añoActual}-01-01`,hasta=`${añoActual}-12-31`;
+        const [reservas,airbnbs,gastos,configRows]=await Promise.all([
+          sbGet("reservas",`?fecha=gte.${desde}&fecha=lte.${hasta}&select=*`,tok),
+          sbGet("reservas_airbnb",`?fecha_entrada=gte.${desde}&fecha_entrada=lte.${hasta}&select=*`,tok),
+          sbGet("gastos",`?fecha=gte.${desde}&fecha=lte.${hasta}&select=*`,tok).catch(()=>[]),
+          sbGet("configuracion","?select=*",tok).catch(()=>[]),
+        ]);
+        const cfg={};configRows.forEach(c=>cfg[c.clave]=c.valor);
+        const f2025=parseFloat(cfg.facturacion_2025)||0;
+        setPrev2025(f2025);
+
+        // ── Datos mensuales ──
+        const mData=MESES_CORTO.map((lbl,i)=>{
+          const m=String(i+1).padStart(2,"0");
+          const rM=reservas.filter(r=>r.fecha?.slice(5,7)===m);
+          const aM=airbnbs.filter(a=>a.fecha_entrada?.slice(5,7)===m);
+          const gM=gastos.filter(g=>g.fecha?.slice(5,7)===m);
+          const fact=rM.reduce((s,r)=>s+(parseFloat(r.precio_total)||parseFloat(r.precio)||0),0)
+                    +aM.reduce((s,a)=>s+(parseFloat(a.precio)||0),0);
+          let cob=0;
+          for(const r of rM){
+            const seña=parseFloat(r.seña_importe)||0;
+            const pt=parseFloat(r.precio_total)||parseFloat(r.precio)||0;
+            if(r.seña_cobrada)cob+=seña;
+            if(r.saldo_cobrado)cob+=(pt-seña);
+          }
+          cob+=aM.filter(a=>a.cobrado||a.fecha_entrada<hoyStr).reduce((s,a)=>s+(parseFloat(a.precio)||0),0);
+          const gst=gM.reduce((s,g)=>s+(parseFloat(g.importe)||0),0);
+          return {name:lbl,facturacion:Math.round(fact),cobrado:Math.round(cob),gastos:Math.round(gst),beneficio:Math.round(cob-gst),prev2025:f2025>0?Math.round(f2025/12):0};
+        });
+        setMonthly(mData);
+
+        // ── Datos semanales ──
+        const wMap={};
+        const d0=new Date(añoActual,0,1);
+        while(d0.getFullYear()===añoActual){
+          const wk=wkKey(d0);
+          if(!wMap[wk])wMap[wk]={name:`S${wk.split("-W")[1]}`,facturacion:0,cobrado:0,gastos:0,beneficio:0};
+          d0.setDate(d0.getDate()+1);
+        }
+        for(const r of reservas){
+          const w=wkKey(new Date(r.fecha+"T12:00:00"));
+          if(wMap[w]){
+            wMap[w].facturacion+=parseFloat(r.precio_total)||parseFloat(r.precio)||0;
+            const seña=parseFloat(r.seña_importe)||0;
+            const pt=parseFloat(r.precio_total)||parseFloat(r.precio)||0;
+            if(r.seña_cobrada)wMap[w].cobrado+=seña;
+            if(r.saldo_cobrado)wMap[w].cobrado+=(pt-seña);
+          }
+        }
+        for(const a of airbnbs){
+          const w=wkKey(new Date(a.fecha_entrada+"T12:00:00"));
+          if(wMap[w]){
+            wMap[w].facturacion+=parseFloat(a.precio)||0;
+            if(a.cobrado||a.fecha_entrada<hoyStr)wMap[w].cobrado+=parseFloat(a.precio)||0;
+          }
+        }
+        for(const g of gastos){
+          const w=wkKey(new Date(g.fecha+"T12:00:00"));
+          if(wMap[w])wMap[w].gastos+=parseFloat(g.importe)||0;
+        }
+        const wData=Object.values(wMap).map(w=>({...w,facturacion:Math.round(w.facturacion),cobrado:Math.round(w.cobrado),gastos:Math.round(w.gastos),beneficio:Math.round(w.cobrado-w.gastos)}));
+        setWeekly(wData);
+
+        // ── Pie data ──
+        const totalEventos=reservas.reduce((s,r)=>s+(parseFloat(r.precio_total)||parseFloat(r.precio)||0),0);
+        const totalAirbnb=airbnbs.reduce((s,a)=>s+(parseFloat(a.precio)||0),0);
+        setPie([{name:"Eventos",value:Math.round(totalEventos)},{name:"Airbnb",value:Math.round(totalAirbnb)}]);
+      }catch(e){console.error("Charts error:",e);}
+      setLoad(false);
+    })();
+  },[]);
+
+  if(load)return <div style={{display:"flex",alignItems:"center",gap:8,justifyContent:"center",padding:"20px 0",color:"#5a5e6e",fontSize:13}}><div className="spin" style={{width:16,height:16,borderWidth:2}}/>Cargando gráficas…</div>;
+
+  const chartData=vista==="mes"?monthly:weekly;
+  const pieTotal=pie.reduce((s,p)=>s+p.value,0);
+
+  return <>
+    {/* GRÁFICA 1 — Evolución mensual/semanal */}
+    <div className="card" style={{marginBottom:16}}>
+      <div className="chdr">
+        <span className="ctit">📊 Evolución {añoActual}</span>
+        <div style={{display:"flex",gap:4}}>
+          <button className={`btn sm${vista==="mes"?" bp":" bg"}`} onClick={()=>setVista("mes")}>Mes</button>
+          <button className={`btn sm${vista==="semana"?" bp":" bg"}`} onClick={()=>setVista("semana")}>Semana</button>
+        </div>
+      </div>
+      <div style={{width:"100%",height:280}}>
+        <ResponsiveContainer>
+          <ComposedChart data={chartData} margin={{top:5,right:5,left:-15,bottom:5}}>
+            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,.06)"/>
+            <XAxis dataKey="name" tick={{fontSize:10,fill:"#5a5e6e"}} axisLine={{stroke:"rgba(255,255,255,.08)"}} tickLine={false} interval={vista==="semana"?3:"preserveStartEnd"}/>
+            <YAxis tick={{fontSize:10,fill:"#5a5e6e"}} axisLine={false} tickLine={false} tickFormatter={fmtK}/>
+            <Tooltip {...ChartTooltipStyle} formatter={(v,n)=>[`${v.toLocaleString("es-ES")}€`,n]}/>
+            <Legend wrapperStyle={{fontSize:11,paddingTop:8}}/>
+            <Bar dataKey="facturacion" name="Facturación" fill={CHART_COLORS.facturacion} radius={[3,3,0,0]} barSize={vista==="semana"?4:undefined}/>
+            <Bar dataKey="cobrado" name="Cobrado" fill={CHART_COLORS.cobrado} radius={[3,3,0,0]} barSize={vista==="semana"?4:undefined}/>
+            <Bar dataKey="gastos" name="Gastos" fill={CHART_COLORS.gastos} radius={[3,3,0,0]} barSize={vista==="semana"?4:undefined}/>
+            <Line type="monotone" dataKey="beneficio" name="Beneficio" stroke={CHART_COLORS.beneficio} strokeWidth={2} dot={vista==="mes"?{r:3,fill:CHART_COLORS.beneficio}:false}/>
+          </ComposedChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+
+    {/* GRÁFICA 2 — Comparativa anual (solo si hay dato 2025) */}
+    {prev2025>0&&(
+      <div className="card" style={{marginBottom:16}}>
+        <div className="chdr"><span className="ctit">📈 Comparativa {añoActual-1} vs {añoActual}</span></div>
+        <div style={{width:"100%",height:240}}>
+          <ResponsiveContainer>
+            <LineChart data={monthly} margin={{top:5,right:5,left:-15,bottom:5}}>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,.06)"/>
+              <XAxis dataKey="name" tick={{fontSize:10,fill:"#5a5e6e"}} axisLine={{stroke:"rgba(255,255,255,.08)"}} tickLine={false}/>
+              <YAxis tick={{fontSize:10,fill:"#5a5e6e"}} axisLine={false} tickLine={false} tickFormatter={fmtK}/>
+              <Tooltip {...ChartTooltipStyle} formatter={(v,n)=>[`${v.toLocaleString("es-ES")}€`,n]}/>
+              <Legend wrapperStyle={{fontSize:11,paddingTop:8}}/>
+              <Line type="monotone" dataKey="prev2025" name={`${añoActual-1} (proy.)`} stroke={CHART_COLORS.prev} strokeWidth={2} strokeDasharray="6 3" dot={{r:3,fill:CHART_COLORS.prev}}/>
+              <Line type="monotone" dataKey="facturacion" name={`${añoActual}`} stroke={CHART_COLORS.facturacion} strokeWidth={2} dot={{r:3,fill:CHART_COLORS.facturacion}}/>
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+    )}
+
+    {/* GRÁFICA 3 — Desglose por fuente */}
+    {pieTotal>0&&(
+      <div className="card" style={{marginBottom:16}}>
+        <div className="chdr"><span className="ctit">🍩 Ingresos por fuente</span></div>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:24,flexWrap:"wrap"}}>
+          <div style={{width:180,height:180}}>
+            <ResponsiveContainer>
+              <PieChart>
+                <Pie data={pie} cx="50%" cy="50%" innerRadius={45} outerRadius={75} dataKey="value" strokeWidth={0} label={({name,percent})=>`${name} ${(percent*100).toFixed(0)}%`} labelLine={false}>
+                  <Cell fill={CHART_COLORS.eventos}/>
+                  <Cell fill={CHART_COLORS.airbnb}/>
+                </Pie>
+                <Tooltip {...ChartTooltipStyle} formatter={(v)=>[`${v.toLocaleString("es-ES")}€`]}/>
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+          <div style={{display:"flex",flexDirection:"column",gap:10}}>
+            {pie.map((p,i)=>(
+              <div key={p.name} style={{display:"flex",alignItems:"center",gap:10}}>
+                <div style={{width:12,height:12,borderRadius:3,background:i===0?CHART_COLORS.eventos:CHART_COLORS.airbnb,flexShrink:0}}/>
+                <div>
+                  <div style={{fontSize:13,color:"#c9c5b8",fontWeight:500}}>{p.name}</div>
+                  <div style={{fontSize:16,fontWeight:700,color:i===0?CHART_COLORS.eventos:CHART_COLORS.airbnb,fontFamily:"'Playfair Display',serif"}}>{p.value.toLocaleString("es-ES")}€</div>
+                  <div style={{fontSize:11,color:"#5a5e6e"}}>{pieTotal>0?((p.value/pieTotal)*100).toFixed(1):0}%</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    )}
+  </>;
+}
+
 function DashA({reservas,jsem,jpunt,cwk,setPage,tok}){
   const temp=getTemporada();
   const sj={}; jsem.forEach(r=>sj[r.tarea_id]=r);
@@ -967,6 +1147,7 @@ function DashA({reservas,jsem,jpunt,cwk,setPage,tok}){
         <SC lbl="Incidencias" val={inc} valC={inc>0?"#f59e0b":undefined} sub={inc>0?"⚠️ Ver panel":"Sin incidencias"} onClick={()=>setPage("incidencias")}/>
       </div>
       <FinancialKPIs tok={tok}/>
+      <FinancialCharts tok={tok}/>
       {prox&&<div className="card" style={{marginBottom:16,borderLeft:"3px solid #c9a84c"}}>
         <div style={{fontSize:10,color:"#5a5e6e",textTransform:"uppercase",letterSpacing:1,marginBottom:7}}>PRÓXIMO EVENTO</div>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:12}}>
