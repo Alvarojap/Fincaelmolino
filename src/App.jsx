@@ -2064,6 +2064,12 @@ function Limpieza({perfil,tok,rol}){
   const [finalMode,setFinalMode]=useState(null);
   const [finalNota,setFinalNota]=useState("");
   const [finalSaving,setFinalSaving]=useState(false);
+  // Paso hora fin
+  const [finalStep,setFinalStep]=useState("check"); // "check" | "hora"
+  const [horaFin,setHoraFin]=useState("");
+  const [tarifaHora,setTarifaHora]=useState(0);
+  const [horasCalc,setHorasCalc]=useState(0);
+  const [costeCalc,setCosteCalc]=useState(0);
 
   const loadSrvs=async()=>{
     const s=await sbGet("servicios","?select=*&order=fecha.desc",tok);
@@ -2107,7 +2113,7 @@ function Limpieza({perfil,tok,rol}){
     const yaVerif=srv?.verificado;
     const todas=updated.every(t=>t.done);
     if(todas&&!yaVerif&&!isA){
-      setFinalCheck({});setFinalMode(null);setFinalNota("");setShowFinal(true);
+      setFinalCheck({});setFinalMode(null);setFinalNota("");setFinalStep("check");setShowFinal(true);
     }
     setSaving(false);
   };
@@ -2125,33 +2131,131 @@ function Limpieza({perfil,tok,rol}){
   };
   const openN=t=>{setNota(t.nota||"");setFoto(t.foto_url||null);setNotaM(t);};
 
+  const prepararPasoHora=async()=>{
+    // Transición de checklist OK al paso de hora
+    const ahora=new Date();
+    const hfDefault=`${String(ahora.getHours()).padStart(2,"0")}:${String(ahora.getMinutes()).padStart(2,"0")}`;
+    setHoraFin(hfDefault);
+    // Leer tarifa
+    let tarifa=0;
+    try{
+      const cfgRows=await sbGet("configuracion","?select=*",tok).catch(()=>[]);
+      const cfg={};cfgRows.forEach(c=>cfg[c.clave]=c.valor);
+      tarifa=parseFloat(cfg.tarifa_hora_limpiadora)||0;
+    }catch(_){}
+    setTarifaHora(tarifa);
+    // Calcular horas
+    const srv_=servicios.find(s=>s.id===actId);
+    const horaInicioStr=srv_?.hora_inicio||null;
+    const createdAt=srv_?.created_at||null;
+    let hIni=null;
+    if(horaInicioStr){
+      const [h,m]=(horaInicioStr.includes(":"))?horaInicioStr.split(":").map(Number):[0,0];
+      hIni=h+m/60;
+    }else if(createdAt){
+      const d=new Date(createdAt);
+      hIni=d.getHours()+d.getMinutes()/60;
+    }
+    const [hfH,hfM]=hfDefault.split(":").map(Number);
+    const hFin=hfH+hfM/60;
+    const horas=hIni!==null?Math.max(0,Math.round((hFin-hIni)*100)/100):0;
+    setHorasCalc(horas);
+    setCosteCalc(tarifa>0?Math.round(horas*tarifa*100)/100:0);
+    setFinalStep("hora");
+  };
+
+  const recalcHora=(newHoraFin)=>{
+    setHoraFin(newHoraFin);
+    const srv_=servicios.find(s=>s.id===actId);
+    const horaInicioStr=srv_?.hora_inicio||null;
+    const createdAt=srv_?.created_at||null;
+    let hIni=null;
+    if(horaInicioStr){
+      const [h,m]=horaInicioStr.split(":").map(Number);
+      hIni=h+m/60;
+    }else if(createdAt){
+      const d=new Date(createdAt);
+      hIni=d.getHours()+d.getMinutes()/60;
+    }
+    const [hfH,hfM]=newHoraFin.split(":").map(Number);
+    const hFin=hfH+hfM/60;
+    const horas=hIni!==null?Math.max(0,Math.round((hFin-hIni)*100)/100):0;
+    setHorasCalc(horas);
+    setCosteCalc(tarifaHora>0?Math.round(horas*tarifaHora*100)/100:0);
+  };
+
   const guardarFinal=async(modo)=>{
     if(finalSaving)return;
+    if(modo==="ok"){
+      await prepararPasoHora();
+      return;
+    }
     if(modo==="incidencia"&&!finalNota.trim())return;
     setFinalSaving(true);
     try{
-      const notaFinal=modo==="ok"
-        ?`✅ Verificado OK · ${new Date().toLocaleString("es-ES")}`
-        :`⚠️ Con incidencias: ${finalNota}`;
+      const notaFinal=`⚠️ Con incidencias: ${finalNota}`;
       await sbPatch("servicios",`id=eq.${actId}`,{
         verificado:true,
-        verificado_ok:modo==="ok",
+        verificado_ok:false,
         verificado_nota:notaFinal,
         verificado_por:perfil.nombre,
         verificado_ts:new Date().toISOString(),
       },tok);
       const admins=await sbGet("usuarios","?rol=eq.admin&select=id",tok);
       const srv=servicios.find(s=>s.id===actId);
-      const emoji=modo==="ok"?"✅":"⚠️";
-      const msg=modo==="ok"
-        ?`${emoji} ${perfil.nombre} ha verificado el servicio "${srv?.nombre}". Todo listo.`
-        :`${emoji} ${perfil.nombre} ha cerrado "${srv?.nombre}" con incidencias: "${finalNota}"`;
+      const msg=`⚠️ ${perfil.nombre} ha cerrado "${srv?.nombre}" con incidencias: "${finalNota}"`;
       for(const a of admins){
         await sbPost("notificaciones",{para:a.id,txt:msg},tok);
         sendPush("🌾 Finca El Molino",msg,"limpieza-verificacion");
       }
       await loadSrvs();
-      setShowFinal(false);
+      setShowFinal(false);setFinalStep("check");
+    }catch(_){}
+    setFinalSaving(false);
+  };
+
+  const confirmarConHora=async()=>{
+    if(finalSaving)return;
+    setFinalSaving(true);
+    try{
+      const hoyStr=new Date().toISOString().split("T")[0];
+      const notaFinal=`✅ Verificado OK · ${new Date().toLocaleString("es-ES")} · ${horasCalc}h`;
+      const patchData={
+        verificado:true,
+        verificado_ok:true,
+        verificado_nota:notaFinal,
+        verificado_por:perfil.nombre,
+        verificado_ts:new Date().toISOString(),
+        hora_fin:horaFin,
+        coste_calculado:costeCalc||null,
+        tarifa_hora_aplicada:tarifaHora||null,
+      };
+      await sbPatch("servicios",`id=eq.${actId}`,patchData,tok).catch(()=>{
+        // Si campos no existen, reintentar sin ellos
+        return sbPatch("servicios",`id=eq.${actId}`,{verificado:true,verificado_ok:true,verificado_nota:notaFinal,verificado_por:perfil.nombre,verificado_ts:new Date().toISOString()},tok);
+      });
+      // Insertar gasto si tarifa configurada
+      if(tarifaHora>0&&costeCalc>0){
+        const srv_=servicios.find(s=>s.id===actId);
+        const fechaFmt=new Date(srv_?.fecha+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"});
+        await sbPost("gastos",{
+          fecha:hoyStr,
+          categoria:"Personal",
+          concepto:`Limpieza - ${srv_?.nombre||"Servicio"} - ${fechaFmt}`,
+          importe:costeCalc,
+          origen:"auto_limpieza"
+        },tok).catch(()=>{});
+      }
+      const admins=await sbGet("usuarios","?rol=eq.admin&select=id",tok);
+      const srv=servicios.find(s=>s.id===actId);
+      const costoTxt=tarifaHora>0?` (${horasCalc}h × ${tarifaHora}€ = ${costeCalc}€)`:"";
+      const msg=`✅ ${perfil.nombre} ha verificado el servicio "${srv?.nombre}". Todo listo.${costoTxt}`;
+      for(const a of admins){
+        await sbPost("notificaciones",{para:a.id,txt:msg},tok);
+        sendPush("🌾 Finca El Molino",msg,"limpieza-verificacion");
+      }
+      await loadSrvs();
+      setShowFinal(false);setFinalStep("check");
     }catch(_){}
     setFinalSaving(false);
   };
@@ -2221,7 +2325,7 @@ function Limpieza({perfil,tok,rol}){
           {/* Botón verificación si todo hecho y no verificado */}
           {!isA&&todoHecho&&!yaVerif&&(
             <div style={{marginBottom:14}}>
-              <button className="btn bp" style={{width:"100%",justifyContent:"center",fontSize:15,padding:"12px"}} onClick={()=>{setFinalCheck({});setFinalMode(null);setFinalNota("");setShowFinal(true);}}>
+              <button className="btn bp" style={{width:"100%",justifyContent:"center",fontSize:15,padding:"12px"}} onClick={()=>{setFinalCheck({});setFinalMode(null);setFinalNota("");setFinalStep("check");setShowFinal(true);}}>
                 ✅ Abrir verificación final del servicio
               </button>
             </div>
@@ -2306,7 +2410,7 @@ function Limpieza({perfil,tok,rol}){
             </div>
           )}
 
-          {finalMode==="ok"&&<>
+          {finalMode==="ok"&&finalStep==="check"&&<>
             <div style={{fontSize:12,color:"#c9a84c",fontWeight:600,marginBottom:12,textTransform:"uppercase",letterSpacing:1}}>✅ Marca cada punto antes de confirmar</div>
             {LIMP_CF.map(item=>(
               <div key={item.id} onClick={()=>setFinalCheck(prev=>({...prev,[item.id]:!prev[item.id]}))}
@@ -2317,7 +2421,28 @@ function Limpieza({perfil,tok,rol}){
             ))}
             <div style={{display:"flex",gap:8,marginTop:16}}>
               <button className="btn bg" style={{flex:1,justifyContent:"center"}} onClick={()=>setFinalMode(null)}>← Volver</button>
-              <button className="btn bp" style={{flex:2,justifyContent:"center",padding:"12px",fontSize:15}} onClick={()=>guardarFinal("ok")} disabled={finalSaving}>{finalSaving?"Guardando…":"✅ Servicio terminado y verificado"}</button>
+              <button className="btn bp" style={{flex:2,justifyContent:"center",padding:"12px",fontSize:15}} onClick={()=>guardarFinal("ok")} disabled={finalSaving}>✅ Servicio terminado y verificado</button>
+            </div>
+          </>}
+          {finalMode==="ok"&&finalStep==="hora"&&<>
+            <div style={{textAlign:"center",marginBottom:16}}>
+              <div style={{fontSize:28,marginBottom:6}}>🕐</div>
+              <div style={{fontFamily:"'Playfair Display',serif",fontSize:18,color:"#e8e6e1",marginBottom:4}}>¿A qué hora has terminado?</div>
+            </div>
+            <div className="fg">
+              <label>Hora de finalización</label>
+              <input type="time" className="fi" value={horaFin} onChange={e=>recalcHora(e.target.value)} style={{fontSize:18,textAlign:"center",padding:"12px"}}/>
+            </div>
+            {horasCalc>0&&<div style={{background:"rgba(201,168,76,.06)",border:"1px solid rgba(201,168,76,.15)",borderRadius:10,padding:"14px 16px",marginBottom:14}}>
+              <div style={{fontSize:13,color:"#c9c5b8",marginBottom:6}}>⏱ Has trabajado <strong style={{color:"#c9a84c"}}>{horasCalc} horas</strong></div>
+              {tarifaHora>0?<>
+                <div style={{fontSize:14,color:"#e8e6e1"}}>Coste del servicio: <strong>{horasCalc}</strong> × <strong>{tarifaHora}€/h</strong> = <strong style={{color:"#c9a84c",fontSize:18}}>{costeCalc}€</strong></div>
+              </>:<div style={{fontSize:12,color:"#f59e0b",marginTop:4}}>⚠️ Configura la tarifa por hora en Ajustes para calcular el coste automáticamente</div>}
+            </div>}
+            {horasCalc===0&&<div style={{background:"rgba(245,158,11,.06)",border:"1px solid rgba(245,158,11,.15)",borderRadius:8,padding:"10px 12px",marginBottom:14,fontSize:12,color:"#f59e0b"}}>No se ha podido calcular la duración. Puedes continuar igualmente.</div>}
+            <div style={{display:"flex",gap:8,marginTop:8}}>
+              <button className="btn bg" style={{flex:1,justifyContent:"center"}} onClick={()=>setFinalStep("check")}>← Volver</button>
+              <button className="btn bp" style={{flex:2,justifyContent:"center",padding:"12px",fontSize:15}} onClick={confirmarConHora} disabled={finalSaving}>{finalSaving?"Guardando…":"✅ Confirmar y cerrar servicio"}</button>
             </div>
           </>}
 
@@ -2330,7 +2455,7 @@ function Limpieza({perfil,tok,rol}){
             </div>
           </>}
 
-          <button onClick={()=>setShowFinal(false)} style={{background:"none",border:"none",color:"#5a5e6e",cursor:"pointer",width:"100%",textAlign:"center",marginTop:16,fontSize:12,fontFamily:"'DM Sans',sans-serif",padding:"8px"}}>Cerrar y decidir más tarde</button>
+          <button onClick={()=>{setShowFinal(false);setFinalStep("check");}} style={{background:"none",border:"none",color:"#5a5e6e",cursor:"pointer",width:"100%",textAlign:"center",marginTop:16,fontSize:12,fontFamily:"'DM Sans',sans-serif",padding:"8px"}}>Cerrar y decidir más tarde</button>
         </div>
       </div>
     )}
