@@ -841,7 +841,7 @@ function FinancialKPIs({tok}){
       });
       const [reservas,airbnbs,gastos,configRows]=await Promise.all([
         sbGet("reservas",`?fecha=gte.${desde}&fecha=lte.${hasta}&select=*`,tok),
-        sbGet("reservas_airbnb",`?fecha_inicio=gte.${desde}&fecha_inicio=lte.${hasta}&select=*`,tok),
+        sbGet("reservas_airbnb",`?fecha_entrada=gte.${desde}&fecha_entrada=lte.${hasta}&select=*`,tok),
         sbGet("gastos",`?fecha=gte.${desde}&fecha=lte.${hasta}&select=*`,tok).catch(()=>[]),
         sbGet("configuracion","?select=*",tok).catch(()=>[]),
       ]);
