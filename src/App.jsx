@@ -802,9 +802,153 @@ function Dashboard({perfil,tok,setPage,rol}){
   if(rol==="jardinero")return <DashJ perfil={perfil} jsem={jsem} jpunt={jpunt} cwk={cwk} setPage={setPage}/>;
   if(rol==="limpieza") return <DashL perfil={perfil} setPage={setPage}/>;
   if(rol==="comercial")return <DashC perfil={perfil} reservas={reservas} setPage={setPage}/>;
-  return <DashA reservas={reservas} jsem={jsem} jpunt={jpunt} cwk={cwk} setPage={setPage}/>;
+  return <DashA reservas={reservas} jsem={jsem} jpunt={jpunt} cwk={cwk} setPage={setPage} tok={tok}/>;
 }
-function DashA({reservas,jsem,jpunt,cwk,setPage}){
+// ─── FINANCIAL KPIs ─────────────────────────────────────────────────────────
+function FinancialKPIs({tok}){
+  const hoy=new Date();
+  const hoyStr=hoy.toISOString().split("T")[0];
+  const añoActual=hoy.getFullYear();
+  const [periodo,setPeriodo]=useState("año");
+  const [rangoDesde,setRangoDesde]=useState(hoyStr);
+  const [rangoHasta,setRangoHasta]=useState(hoyStr);
+  const [data,setData]=useState(null);
+  const [load,setLoad]=useState(true);
+
+  const getRango=()=>{
+    if(periodo==="año") return {desde:`${añoActual}-01-01`,hasta:`${añoActual}-12-31`};
+    if(periodo==="mes"){
+      const m=String(hoy.getMonth()+1).padStart(2,"0");
+      const lastDay=new Date(añoActual,hoy.getMonth()+1,0).getDate();
+      return {desde:`${añoActual}-${m}-01`,hasta:`${añoActual}-${m}-${String(lastDay).padStart(2,"0")}`};
+    }
+    if(periodo==="semana"){
+      const d=new Date(hoy);const day=d.getDay();const diff=d.getDate()-day+(day===0?-6:1);
+      const lunes=new Date(d.setDate(diff));const domingo=new Date(lunes);domingo.setDate(lunes.getDate()+6);
+      return {desde:lunes.toISOString().split("T")[0],hasta:domingo.toISOString().split("T")[0]};
+    }
+    return {desde:rangoDesde,hasta:rangoHasta};
+  };
+
+  const cargar=async()=>{
+    setLoad(true);
+    try{
+      const {desde,hasta}=getRango();
+      // Auto-marcar airbnb pasados como cobrados
+      await fetch(`${SB_URL}/rest/v1/reservas_airbnb?fecha_inicio=lt.${hoyStr}&cobrado=eq.false`,{
+        method:"PATCH",headers:{...HDRA(tok),"Prefer":"return=minimal"},
+        body:JSON.stringify({cobrado:true})
+      });
+      const [reservas,airbnbs,gastos,configRows]=await Promise.all([
+        sbGet("reservas",`?fecha=gte.${desde}&fecha=lte.${hasta}&select=*`,tok),
+        sbGet("reservas_airbnb",`?fecha_entrada=gte.${desde}&fecha_entrada=lte.${hasta}&select=*`,tok),
+        sbGet("gastos",`?fecha=gte.${desde}&fecha=lte.${hasta}&select=*`,tok).catch(()=>[]),
+        sbGet("configuracion","?select=*",tok).catch(()=>[]),
+      ]);
+      const cfg={};configRows.forEach(c=>cfg[c.clave]=c.valor);
+      const comisionPct=parseFloat(cfg.comision_pct)||10;
+
+      // Facturación proyectada
+      const factEventos=reservas.reduce((s,r)=>s+(parseFloat(r.precio_total)||parseFloat(r.precio)||0),0);
+      const factAirbnb=airbnbs.reduce((s,a)=>s+(parseFloat(a.precio)||0),0);
+      const facturacion=factEventos+factAirbnb;
+
+      // Ya cobrado
+      let cobradoEventos=0;
+      for(const r of reservas){
+        const seña=parseFloat(r.seña_importe)||0;
+        const precioTotal=parseFloat(r.precio_total)||parseFloat(r.precio)||0;
+        if(r.seña_cobrada)cobradoEventos+=seña;
+        if(r.saldo_cobrado)cobradoEventos+=(precioTotal-seña);
+      }
+      const cobradoAirbnb=airbnbs.filter(a=>a.cobrado||a.fecha_inicio<hoyStr).reduce((s,a)=>s+(parseFloat(a.precio)||0),0);
+      const yaCobrado=cobradoEventos+cobradoAirbnb;
+
+      // Pendiente de cobro
+      const pendiente=facturacion-yaCobrado;
+
+      // Gastos reales
+      const gastosReales=gastos.reduce((s,g)=>s+(parseFloat(g.importe)||0),0);
+
+      // Gastos proyectados año
+      let gastosProyectados=gastosReales;
+      if(periodo==="año"){
+        const mesActual=hoy.getMonth()+1;
+        const mesesRestantes=12-mesActual;
+        const gastosRecurrentes=gastos.filter(g=>g.recurrente);
+        if(gastosRecurrentes.length>0&&mesActual>0){
+          const mediaRecurrente=gastosRecurrentes.reduce((s,g)=>s+(parseFloat(g.importe)||0),0)/mesActual;
+          gastosProyectados=gastosReales+(mediaRecurrente*mesesRestantes);
+        }
+      }
+
+      // Beneficio estimado
+      const beneficio=yaCobrado-gastosReales;
+
+      // Comisión gestor
+      const comision=facturacion*(comisionPct/100);
+
+      setData({facturacion,yaCobrado,pendiente,gastosReales,gastosProyectados,beneficio,comision,comisionPct,desde,hasta});
+    }catch(e){console.error("KPI error:",e);setData(null);}
+    setLoad(false);
+  };
+
+  useEffect(()=>{cargar();},[periodo,rangoDesde,rangoHasta]);
+
+  const fmt=v=>`${v.toLocaleString("es-ES",{minimumFractionDigits:0,maximumFractionDigits:0})}€`;
+
+  return <div className="card" style={{marginBottom:16}}>
+    <div className="chdr"><span className="ctit">💰 KPIs financieros</span></div>
+    <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:14}}>
+      {[{id:"año",lbl:"Este año"},{id:"mes",lbl:"Este mes"},{id:"semana",lbl:"Esta semana"},{id:"rango",lbl:"Rango"}].map(p=>(
+        <button key={p.id} className={`btn sm${periodo===p.id?" bp":" bg"}`} onClick={()=>setPeriodo(p.id)}>{p.lbl}</button>
+      ))}
+    </div>
+    {periodo==="rango"&&(
+      <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap",alignItems:"center"}}>
+        <input type="date" className="fi" value={rangoDesde} onChange={e=>setRangoDesde(e.target.value)} style={{flex:1,minWidth:130}}/>
+        <span style={{color:"#5a5e6e",fontSize:12}}>→</span>
+        <input type="date" className="fi" value={rangoHasta} onChange={e=>setRangoHasta(e.target.value)} style={{flex:1,minWidth:130}}/>
+      </div>
+    )}
+    {load?<div style={{display:"flex",alignItems:"center",gap:8,justifyContent:"center",padding:"20px 0",color:"#5a5e6e",fontSize:13}}><div className="spin" style={{width:16,height:16,borderWidth:2}}/>Calculando…</div>
+    :data?<>
+      {data.desde&&<div style={{fontSize:11,color:"#5a5e6e",marginBottom:12}}>📅 {new Date(data.desde+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"})} – {new Date(data.hasta+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short",year:"numeric"})}</div>}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(140px,1fr))",gap:10}}>
+        <div style={{background:"#0f1117",borderRadius:10,padding:"12px 14px",borderLeft:"3px solid #c9a84c"}}>
+          <div style={{fontSize:10,color:"#7a7f94",textTransform:"uppercase",letterSpacing:.5}}>Facturación proyectada</div>
+          <div style={{fontSize:20,fontWeight:700,color:"#c9a84c",marginTop:5,fontFamily:"'Playfair Display',serif"}}>{fmt(data.facturacion)}</div>
+        </div>
+        <div style={{background:"#0f1117",borderRadius:10,padding:"12px 14px",borderLeft:"3px solid #10b981"}}>
+          <div style={{fontSize:10,color:"#7a7f94",textTransform:"uppercase",letterSpacing:.5}}>Ya cobrado</div>
+          <div style={{fontSize:20,fontWeight:700,color:"#10b981",marginTop:5,fontFamily:"'Playfair Display',serif"}}>{fmt(data.yaCobrado)}</div>
+        </div>
+        <div style={{background:"#0f1117",borderRadius:10,padding:"12px 14px",borderLeft:`3px solid ${data.pendiente>0?"#f59e0b":"#10b981"}`}}>
+          <div style={{fontSize:10,color:"#7a7f94",textTransform:"uppercase",letterSpacing:.5}}>Pendiente de cobro</div>
+          <div style={{fontSize:20,fontWeight:700,color:data.pendiente>0?"#f59e0b":"#10b981",marginTop:5,fontFamily:"'Playfair Display',serif"}}>{fmt(data.pendiente)}</div>
+        </div>
+        <div style={{background:"#0f1117",borderRadius:10,padding:"12px 14px",borderLeft:"3px solid #e85555"}}>
+          <div style={{fontSize:10,color:"#7a7f94",textTransform:"uppercase",letterSpacing:.5}}>Gastos reales</div>
+          <div style={{fontSize:20,fontWeight:700,color:"#e85555",marginTop:5,fontFamily:"'Playfair Display',serif"}}>{fmt(data.gastosReales)}</div>
+        </div>
+        <div style={{background:"#0f1117",borderRadius:10,padding:"12px 14px",borderLeft:"3px solid #e85555",opacity:.8}}>
+          <div style={{fontSize:10,color:"#7a7f94",textTransform:"uppercase",letterSpacing:.5}}>Gastos proyectados año</div>
+          <div style={{fontSize:20,fontWeight:700,color:"#e85555",marginTop:5,fontFamily:"'Playfair Display',serif"}}>{fmt(data.gastosProyectados)}</div>
+        </div>
+        <div style={{background:"#0f1117",borderRadius:10,padding:"12px 14px",borderLeft:`3px solid ${data.beneficio>=0?"#10b981":"#e85555"}`}}>
+          <div style={{fontSize:10,color:"#7a7f94",textTransform:"uppercase",letterSpacing:.5}}>Beneficio estimado</div>
+          <div style={{fontSize:20,fontWeight:700,color:data.beneficio>=0?"#10b981":"#e85555",marginTop:5,fontFamily:"'Playfair Display',serif"}}>{fmt(data.beneficio)}</div>
+        </div>
+        <div style={{background:"#0f1117",borderRadius:10,padding:"12px 14px",borderLeft:"3px solid #6366f1"}}>
+          <div style={{fontSize:10,color:"#7a7f94",textTransform:"uppercase",letterSpacing:.5}}>Comisión gestor ({data.comisionPct}%)</div>
+          <div style={{fontSize:20,fontWeight:700,color:"#6366f1",marginTop:5,fontFamily:"'Playfair Display',serif"}}>{fmt(data.comision)}</div>
+        </div>
+      </div>
+    </>:<div style={{color:"#5a5e6e",fontSize:13,padding:"16px 0",textAlign:"center"}}>No se pudieron cargar los datos</div>}
+  </div>;
+}
+
+function DashA({reservas,jsem,jpunt,cwk,setPage,tok}){
   const temp=getTemporada();
   const sj={}; jsem.forEach(r=>sj[r.tarea_id]=r);
   const actv=JARDIN_T[temp].filter(t=>tocaSemana({...t,frec:t.frec},cwk));
@@ -822,6 +966,7 @@ function DashA({reservas,jsem,jpunt,cwk,setPage}){
         <SC lbl="Jardín esta semana" val={`${comp}/${tot}`} prog={tot?comp/tot:0}/>
         <SC lbl="Incidencias" val={inc} valC={inc>0?"#f59e0b":undefined} sub={inc>0?"⚠️ Ver panel":"Sin incidencias"} onClick={()=>setPage("incidencias")}/>
       </div>
+      <FinancialKPIs tok={tok}/>
       {prox&&<div className="card" style={{marginBottom:16,borderLeft:"3px solid #c9a84c"}}>
         <div style={{fontSize:10,color:"#5a5e6e",textTransform:"uppercase",letterSpacing:1,marginBottom:7}}>PRÓXIMO EVENTO</div>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:12}}>
