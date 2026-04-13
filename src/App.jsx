@@ -305,155 +305,155 @@ async function checkNotifDiaria(tok){
 // ─── LOGO ────────────────────────────────────────────────────────────────────
 function MolinoLogo({size=22}){
   return <svg width={size} height={size} viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" style={{display:"inline-block",verticalAlign:"middle",flexShrink:0}}>
-    <path d="M42 100 L58 100 L55 55 L45 55 Z" fill="#c9a84c" opacity=".9"/>
-    <circle cx="50" cy="52" r="6" fill="#c9a84c"/>
-    <path d="M50 46 C48 36 44 20 46 8 C47 4 53 4 54 8 C56 20 52 36 50 46Z" fill="#c9a84c"/>
-    <path d="M56 52 C66 50 82 46 94 48 C98 49 98 55 94 56 C82 58 66 54 56 52Z" fill="#c9a84c" opacity=".85"/>
-    <path d="M50 58 C52 68 56 84 54 96 C53 100 47 100 46 96 C44 84 48 68 50 58Z" fill="#c9a84c" opacity=".7"/>
-    <path d="M44 52 C34 54 18 58 6 56 C2 55 2 49 6 48 C18 46 34 50 44 52Z" fill="#c9a84c" opacity=".55"/>
+    <path d="M42 100 L58 100 L55 55 L45 55 Z" fill="#EC683E" opacity=".9"/>
+    <circle cx="50" cy="52" r="6" fill="#EC683E"/>
+    <path d="M50 46 C48 36 44 20 46 8 C47 4 53 4 54 8 C56 20 52 36 50 46Z" fill="#EC683E"/>
+    <path d="M56 52 C66 50 82 46 94 48 C98 49 98 55 94 56 C82 58 66 54 56 52Z" fill="#EC683E" opacity=".85"/>
+    <path d="M50 58 C52 68 56 84 54 96 C53 100 47 100 46 96 C44 84 48 68 50 58Z" fill="#EC683E" opacity=".7"/>
+    <path d="M44 52 C34 54 18 58 6 56 C2 55 2 49 6 48 C18 46 34 50 44 52Z" fill="#EC683E" opacity=".55"/>
   </svg>;
 }
 
 // ─── CSS ─────────────────────────────────────────────────────────────────────
 const CSS=`
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&display=swap');
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html{height:100%}
-body{font-family:'DM Sans',sans-serif;background:#0f1117;color:#e8e6e1;min-height:100vh;-webkit-tap-highlight-color:transparent}
-::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:#13161f}::-webkit-scrollbar-thumb{background:#c9a84c;border-radius:2px}
+body{font-family:'Inter Tight',sans-serif;background:#ECEAE5;color:#1A1A1A;min-height:100vh;-webkit-tap-highlight-color:transparent}
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:#F0EDE8}::-webkit-scrollbar-thumb{background:#EC683E;border-radius:2px}
 .app{display:flex;min-height:100vh;min-height:100dvh}
 .main{flex:1;min-width:0;display:flex;flex-direction:column;overflow-x:hidden}
-.sb{width:248px;min-width:248px;background:#13161f;border-right:1px solid rgba(201,168,76,.15);display:flex;flex-direction:column;position:sticky;top:0;height:100vh;height:100dvh;overflow-y:auto;flex-shrink:0}
-.sb-logo{padding:20px 18px 15px;border-bottom:1px solid rgba(201,168,76,.1)}
-.sb-logo h1{font-family:'Playfair Display',serif;font-size:17px;color:#c9a84c;margin-top:2px}
-.sb-logo p{font-size:10px;color:#5a5e6e;margin-top:2px;text-transform:uppercase;letter-spacing:1.5px}
+.sb{width:248px;min-width:248px;background:#FFFFFF;border-right:1px solid rgba(0,0,0,.06);display:flex;flex-direction:column;position:sticky;top:0;height:100vh;height:100dvh;overflow-y:auto;flex-shrink:0}
+.sb-logo{padding:20px 18px 15px;border-bottom:1px solid rgba(0,0,0,.06)}
+.sb-logo h1{font-family:'Inter Tight',sans-serif;font-size:17px;color:#EC683E;font-weight:800;margin-top:2px}
+.sb-logo p{font-size:10px;color:#BFBAB4;margin-top:2px;text-transform:uppercase;letter-spacing:1.5px}
 .sb-nav{flex:1;padding:10px 8px;overflow-y:auto}
-.nav-sec{font-size:10px;color:#3d4155;text-transform:uppercase;letter-spacing:2px;padding:10px 11px 5px;margin-top:4px}
+.nav-sec{font-size:10px;color:#BFBAB4;text-transform:uppercase;letter-spacing:2px;padding:10px 11px 5px;margin-top:4px}
 .nw{position:relative}
-.nb{display:flex;align-items:center;gap:9px;padding:9px 11px;border-radius:8px;cursor:pointer;font-size:13px;color:#7a7f94;transition:all .15s;border:none;background:none;width:100%;text-align:left;font-family:'DM Sans',sans-serif;margin-bottom:2px}
-.nb:hover{background:rgba(201,168,76,.06);color:#c9c5b8}
-.nb.on{background:rgba(201,168,76,.12);color:#c9a84c;font-weight:500}
+.nb{display:flex;align-items:center;gap:9px;padding:9px 11px;border-radius:12px;cursor:pointer;font-size:13px;color:#8A8580;transition:all .15s;border:none;background:none;width:100%;text-align:left;font-family:'Inter Tight',sans-serif;font-weight:500;margin-bottom:2px}
+.nb:hover{background:#F5F3F0;color:#1A1A1A}
+.nb.on{background:#EC683E;color:#FFFFFF;font-weight:600}
 .nb-ico{font-size:15px;width:20px;text-align:center;flex-shrink:0}
-.nb-badge{position:absolute;top:6px;right:8px;background:#e85555;color:#fff;border-radius:20px;padding:1px 6px;font-size:10px;font-weight:700;min-width:16px;text-align:center;pointer-events:none}
-.sb-user{padding:13px 14px;border-top:1px solid rgba(201,168,76,.1);display:flex;align-items:center;gap:10px;flex-shrink:0}
-.av{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#c9a84c,#8b6914);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;flex-shrink:0}
-.uname{font-size:12px;font-weight:500;color:#c9c5b8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.urole{font-size:10px;color:#5a5e6e;text-transform:capitalize;margin-top:1px}
-.logout-btn{background:none;border:none;cursor:pointer;color:#5a5e6e;font-size:16px;padding:4px;transition:color .2s;flex-shrink:0;line-height:1}
-.logout-btn:hover{color:#e85555}
-.mob-top{display:none;position:sticky;top:0;z-index:150;background:#13161f;border-bottom:1px solid rgba(201,168,76,.12);padding:0 16px;height:52px;align-items:center;justify-content:space-between}
-.mob-top-title{font-family:'Playfair Display',serif;font-size:15px;color:#c9a84c}
-.mob-menu-btn{background:none;border:none;color:#c9c5b8;font-size:24px;cursor:pointer;padding:6px;display:flex;align-items:center;justify-content:center;border-radius:8px;line-height:1}
-.drawer-overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:300;backdrop-filter:blur(2px)}
-.drawer{position:fixed;left:0;top:0;bottom:0;width:min(280px,85vw);background:#13161f;z-index:400;display:flex;flex-direction:column;overflow-y:auto;transform:translateX(-100%);transition:transform .24s cubic-bezier(.4,0,.2,1);box-shadow:6px 0 32px rgba(0,0,0,.5)}
+.nb-badge{position:absolute;top:6px;right:8px;background:#F35757;color:#fff;border-radius:20px;padding:1px 6px;font-size:10px;font-weight:700;min-width:16px;text-align:center;pointer-events:none}
+.sb-user{padding:13px 14px;border-top:1px solid rgba(0,0,0,.06);display:flex;align-items:center;gap:10px;flex-shrink:0}
+.av{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#EC683E,#AFA3FF);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;flex-shrink:0}
+.uname{font-size:12px;font-weight:600;color:#1A1A1A;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.urole{font-size:10px;color:#8A8580;text-transform:capitalize;margin-top:1px}
+.logout-btn{background:none;border:none;cursor:pointer;color:#8A8580;font-size:16px;padding:4px;transition:color .2s;flex-shrink:0;line-height:1}
+.logout-btn:hover{color:#F35757}
+.mob-top{display:none;position:sticky;top:0;z-index:150;background:#FFFFFF;border-bottom:1px solid rgba(0,0,0,.06);padding:0 16px;height:52px;align-items:center;justify-content:space-between}
+.mob-top-title{font-family:'Inter Tight',sans-serif;font-size:15px;color:#EC683E;font-weight:800}
+.mob-menu-btn{background:none;border:none;color:#1A1A1A;font-size:24px;cursor:pointer;padding:6px;display:flex;align-items:center;justify-content:center;border-radius:8px;line-height:1}
+.drawer-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:300;backdrop-filter:blur(8px)}
+.drawer{position:fixed;left:0;top:0;bottom:0;width:min(280px,85vw);background:#FFFFFF;z-index:400;display:flex;flex-direction:column;overflow-y:auto;transform:translateX(-100%);transition:transform .24s cubic-bezier(.4,0,.2,1);box-shadow:6px 0 32px rgba(0,0,0,.1)}
 .drawer.open{transform:translateX(0)}
-.mob-bar{display:none;position:fixed;bottom:0;left:0;right:0;z-index:200;background:#13161f;border-top:1px solid rgba(201,168,76,.15);padding:6px 8px;padding-bottom:max(6px,env(safe-area-inset-bottom))}
+.mob-bar{display:none;position:fixed;bottom:0;left:0;right:0;z-index:200;background:#FFFFFF;border-top:1px solid rgba(0,0,0,.06);padding:6px 8px;padding-bottom:max(6px,env(safe-area-inset-bottom))}
 .mob-bar-inner{display:flex;justify-content:space-around;align-items:center}
-.mob-btn{display:flex;flex-direction:column;align-items:center;gap:3px;padding:5px 8px;border:none;background:none;cursor:pointer;color:#5a5e6e;font-size:10px;font-family:'DM Sans',sans-serif;border-radius:10px;transition:color .15s;min-width:48px;position:relative;-webkit-tap-highlight-color:transparent}
-.mob-btn.on{color:#c9a84c}
+.mob-btn{display:flex;flex-direction:column;align-items:center;gap:3px;padding:5px 8px;border:none;background:none;cursor:pointer;color:#8A8580;font-size:10px;font-family:'Inter Tight',sans-serif;border-radius:10px;transition:color .15s;min-width:48px;position:relative;-webkit-tap-highlight-color:transparent}
+.mob-btn.on{color:#EC683E}
 .mob-btn.on .mico{transform:scale(1.1)}
 .mico{font-size:22px;line-height:1;transition:transform .15s;display:inline-block;position:relative}
-.ph{padding:26px 32px 20px;border-bottom:1px solid rgba(255,255,255,.05);flex-shrink:0}
-.ph h2{font-family:'Playfair Display',serif;font-size:24px;color:#e8e6e1;font-weight:400}
-.ph p{color:#5a5e6e;font-size:13px;margin-top:4px}
+.ph{padding:26px 32px 20px;flex-shrink:0}
+.ph h2{font-family:'Inter Tight',sans-serif;font-size:28px;color:#1A1A1A;font-weight:800}
+.ph p{color:#8A8580;font-size:13px;margin-top:4px}
 .pb{padding:24px 32px}
-.card{background:#13161f;border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:20px}
-.cal-card{background:#13161f;border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:16px}
+.card{background:#FFFFFF;border:none;border-radius:18px;padding:20px;box-shadow:0 2px 12px rgba(0,0,0,.06)}
+.cal-card{background:#FFFFFF;border:none;border-radius:18px;padding:16px;box-shadow:0 2px 12px rgba(0,0,0,.06)}
 .chdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;gap:8px}
-.ctit{font-size:14px;font-weight:600;color:#c9c5b8}
-.btn{padding:8px 16px;border-radius:8px;border:none;cursor:pointer;font-size:13px;font-weight:500;font-family:'DM Sans',sans-serif;transition:all .15s;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
-.bp{background:#c9a84c;color:#0f1117}.bp:hover{background:#dbb95e}
-.bg{background:rgba(255,255,255,.06);color:#c9c5b8;border:1px solid rgba(255,255,255,.1)}.bg:hover{background:rgba(255,255,255,.1)}
-.br{background:rgba(232,85,85,.12);color:#e85555;border:1px solid rgba(232,85,85,.2)}.br:hover{background:rgba(232,85,85,.2)}
+.ctit{font-size:14px;font-weight:700;color:#1A1A1A}
+.btn{padding:8px 16px;border-radius:100px;border:none;cursor:pointer;font-size:13px;font-weight:600;font-family:'Inter Tight',sans-serif;transition:all .15s;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.bp{background:#1A1A1A;color:#FFFFFF}.bp:hover{background:#EC683E}
+.bg{background:#F0EDE8;color:#1A1A1A;border:none}.bg:hover{background:#E5E1DB}
+.br{background:#FEE8E8;color:#F35757;border:none}.br:hover{background:#FDCECE}
 .sm{padding:6px 12px;font-size:12px}
 .fg{margin-bottom:14px}
-.fg label{display:block;font-size:10px;color:#7a7f94;margin-bottom:6px;text-transform:uppercase;letter-spacing:.8px}
-.fi{width:100%;padding:10px 13px;border-radius:8px;border:1px solid rgba(255,255,255,.1);background:#0f1117;color:#e8e6e1;font-size:14px;font-family:'DM Sans',sans-serif;outline:none;transition:border-color .2s;-webkit-appearance:none;appearance:none}
-.fi:focus{border-color:rgba(201,168,76,.5)}
-.fi::placeholder{color:#3d4155}
+.fg label{display:block;font-size:11px;color:#8A8580;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px;font-weight:600}
+.fi{width:100%;padding:10px 13px;border-radius:12px;border:1.5px solid transparent;background:#F5F3F0;color:#1A1A1A;font-size:14px;font-family:'Inter Tight',sans-serif;outline:none;transition:all .2s;-webkit-appearance:none;appearance:none}
+.fi:focus{border-color:#EC683E;background:#FFFFFF}
+.fi::placeholder{color:#BFBAB4}
 textarea.fi{resize:vertical;min-height:72px;line-height:1.5}
-select.fi{cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%235a5e6e' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:36px}
-.mft{display:flex;gap:8px;justify-content:flex-end;margin-top:18px;padding-top:16px;border-top:1px solid rgba(255,255,255,.06)}
-.ov{position:fixed;inset:0;background:rgba(0,0,0,.78);backdrop-filter:blur(4px);z-index:1000;display:flex;align-items:center;justify-content:center;padding:16px}
-.modal{background:#13161f;border:1px solid rgba(201,168,76,.2);border-radius:14px;padding:28px;width:100%;max-width:500px;max-height:90vh;overflow-y:auto}
-.modal h3{font-family:'Playfair Display',serif;font-size:20px;color:#e8e6e1;margin-bottom:20px}
-.cli{display:flex;align-items:flex-start;gap:10px;padding:12px;border-radius:10px;border:1px solid rgba(255,255,255,.05);background:#0f1117;margin-bottom:6px}
-.cli.done{opacity:.6;background:rgba(16,185,129,.04);border-color:rgba(16,185,129,.12)}
-.chk{width:22px;height:22px;border-radius:6px;flex-shrink:0;border:2px solid rgba(255,255,255,.15);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;margin-top:1px}
-.chk.on{background:#10b981;border-color:#10b981}
+select.fi{cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%238A8580' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:36px}
+.mft{display:flex;gap:8px;justify-content:flex-end;margin-top:18px;padding-top:16px;border-top:1px solid rgba(0,0,0,.06)}
+.ov{position:fixed;inset:0;background:rgba(0,0,0,.4);backdrop-filter:blur(8px);z-index:1000;display:flex;align-items:center;justify-content:center;padding:16px}
+.modal{background:#FFFFFF;border:none;border-radius:24px;padding:28px;width:100%;max-width:500px;max-height:90vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,.12)}
+.modal h3{font-family:'Inter Tight',sans-serif;font-size:20px;color:#1A1A1A;font-weight:800;margin-bottom:20px}
+.cli{display:flex;align-items:flex-start;gap:10px;padding:12px;border-radius:12px;border:none;background:#F5F3F0;margin-bottom:6px}
+.cli.done{opacity:.6;background:rgba(166,190,89,.08)}
+.chk{width:22px;height:22px;border-radius:6px;flex-shrink:0;border:2px solid #BFBAB4;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;margin-top:1px}
+.chk.on{background:#A6BE59;border-color:#A6BE59}
 .chk.on::after{content:"✓";color:#fff;font-size:12px;font-weight:700}
-.tz{display:inline-block;font-size:10px;padding:2px 7px;border-radius:20px;background:rgba(201,168,76,.1);color:#c9a84c;margin-bottom:3px}
-.tl{font-size:13px;color:#c9c5b8;line-height:1.4}
-.tl.done{text-decoration:line-through;color:#5a5e6e}
-.tm{font-size:11px;color:#5a5e6e;margin-top:2px;line-height:1.4}
-.nbox{background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.15);border-radius:7px;padding:8px 11px;margin-top:6px;font-size:12px;color:#d4a843;line-height:1.4}
-.rbox{background:rgba(16,185,129,.06);border:1px solid rgba(16,185,129,.18);border-radius:7px;padding:8px 11px;margin-top:6px;font-size:12px;color:#10b981;line-height:1.4}
-.ibtn{display:inline-flex;align-items:center;gap:4px;background:rgba(245,158,11,.1);color:#f59e0b;border:1px solid rgba(245,158,11,.2);border-radius:20px;padding:4px 9px;font-size:11px;cursor:pointer;white-space:nowrap;transition:background .15s;flex-shrink:0;font-family:'DM Sans',sans-serif}
-.ibtn:hover{background:rgba(245,158,11,.18)}
-.pbtn{display:flex;align-items:center;justify-content:center;gap:7px;padding:11px 16px;border-radius:8px;cursor:pointer;background:rgba(201,168,76,.07);color:#c9a84c;border:1px dashed rgba(201,168,76,.3);font-size:14px;font-family:'DM Sans',sans-serif;font-weight:500;transition:background .2s;width:100%}
-.pbtn:hover{background:rgba(201,168,76,.13)}
-.pprev{width:100%;max-height:220px;object-fit:cover;border-radius:8px;margin-top:10px}
-.pthumb{max-width:100%;max-height:160px;border-radius:8px;object-fit:cover;margin-top:6px;display:block}
+.tz{display:inline-block;font-size:10px;padding:2px 7px;border-radius:100px;background:rgba(236,104,62,.08);color:#EC683E;margin-bottom:3px;font-weight:600}
+.tl{font-size:13px;color:#1A1A1A;line-height:1.4}
+.tl.done{text-decoration:line-through;color:#BFBAB4}
+.tm{font-size:11px;color:#8A8580;margin-top:2px;line-height:1.4}
+.nbox{background:rgba(236,210,39,.08);border:none;border-radius:10px;padding:8px 11px;margin-top:6px;font-size:12px;color:#8A7020;line-height:1.4}
+.rbox{background:rgba(166,190,89,.08);border:none;border-radius:10px;padding:8px 11px;margin-top:6px;font-size:12px;color:#6B8A20;line-height:1.4}
+.ibtn{display:inline-flex;align-items:center;gap:4px;background:#F0EDE8;color:#EC683E;border:none;border-radius:100px;padding:4px 9px;font-size:11px;cursor:pointer;white-space:nowrap;transition:background .15s;flex-shrink:0;font-family:'Inter Tight',sans-serif;font-weight:600}
+.ibtn:hover{background:#E5E1DB}
+.pbtn{display:flex;align-items:center;justify-content:center;gap:7px;padding:11px 16px;border-radius:12px;cursor:pointer;background:#F5F3F0;color:#EC683E;border:1.5px dashed #BFBAB4;font-size:14px;font-family:'Inter Tight',sans-serif;font-weight:600;transition:background .2s;width:100%}
+.pbtn:hover{background:#ECEAE5}
+.pprev{width:100%;max-height:220px;object-fit:cover;border-radius:12px;margin-top:10px}
+.pthumb{max-width:100%;max-height:160px;border-radius:12px;object-fit:cover;margin-top:6px;display:block}
 .sg{display:grid;grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:12px;margin-bottom:20px}
-.sc{background:#13161f;border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:16px}
-.sl{font-size:10px;color:#5a5e6e;text-transform:uppercase;letter-spacing:1px;line-height:1.3}
-.sv{font-size:24px;font-weight:700;color:#e8e6e1;margin-top:5px;font-family:'Playfair Display',serif}
-.ss{font-size:11px;color:#c9a84c;margin-top:3px}
-.prog{height:5px;background:rgba(255,255,255,.07);border-radius:3px;overflow:hidden;margin-top:8px}
-.pfill{height:100%;border-radius:3px;background:linear-gradient(90deg,#c9a84c,#10b981);transition:width .4s}
+.sc{background:#FFFFFF;border:none;border-radius:18px;padding:16px;box-shadow:0 2px 12px rgba(0,0,0,.06)}
+.sl{font-size:10px;color:#8A8580;text-transform:uppercase;letter-spacing:.5px;line-height:1.3;font-weight:600}
+.sv{font-size:28px;font-weight:800;color:#1A1A1A;margin-top:5px;font-family:'Inter Tight',sans-serif}
+.ss{font-size:11px;color:#EC683E;margin-top:3px;font-weight:600}
+.prog{height:5px;background:#F0EDE8;border-radius:3px;overflow:hidden;margin-top:8px}
+.pfill{height:100%;border-radius:3px;background:linear-gradient(90deg,#EC683E,#AFA3FF);transition:width .4s}
 .g2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-hr.div{border:none;border-top:1px solid rgba(255,255,255,.06);margin:14px 0}
-.badge{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:500}
-.empty{text-align:center;padding:40px 20px;color:#5a5e6e}
+hr.div{border:none;border-top:1px solid rgba(0,0,0,.06);margin:14px 0}
+.badge{display:inline-block;padding:2px 9px;border-radius:100px;font-size:11px;font-weight:600}
+.empty{text-align:center;padding:40px 20px;color:#8A8580}
 .empty .ico{font-size:36px;margin-bottom:8px;display:block}
-.alert{padding:10px 13px;border-radius:8px;font-size:13px;margin-bottom:14px;background:rgba(232,85,85,.1);color:#e85555;border:1px solid rgba(232,85,85,.2)}
-.tabs{display:flex;gap:3px;background:#0f1117;padding:3px;border-radius:9px;margin-bottom:18px}
-.tab{padding:8px 14px;border-radius:7px;cursor:pointer;font-size:12px;color:#7a7f94;transition:all .15s;border:none;background:none;font-family:'DM Sans',sans-serif;font-weight:500;white-space:nowrap}
-.tab.on{background:#13161f;color:#c9a84c;border:1px solid rgba(201,168,76,.2)}
+.alert{padding:10px 13px;border-radius:12px;font-size:13px;margin-bottom:14px;background:#FEE8E8;color:#F35757;border:none}
+.tabs{display:flex;gap:3px;background:#F0EDE8;padding:3px;border-radius:12px;margin-bottom:18px}
+.tab{padding:8px 14px;border-radius:10px;cursor:pointer;font-size:12px;color:#8A8580;transition:all .15s;border:none;background:none;font-family:'Inter Tight',sans-serif;font-weight:600;white-space:nowrap}
+.tab.on{background:#FFFFFF;color:#1A1A1A;box-shadow:0 1px 4px rgba(0,0,0,.08)}
 .cg{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-top:10px}
-.ch{text-align:center;font-size:10px;color:#5a5e6e;padding:5px 0;text-transform:uppercase;letter-spacing:.5px}
-.cd{aspect-ratio:1;border-radius:7px;border:1px solid rgba(255,255,255,.04);display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:12px;cursor:pointer;transition:all .15s;background:#0f1117}
-.cd:hover{border-color:rgba(201,168,76,.3);background:rgba(201,168,76,.05)}
+.ch{text-align:center;font-size:10px;color:#8A8580;padding:5px 0;text-transform:uppercase;letter-spacing:.5px;font-weight:600}
+.cd{aspect-ratio:1;border-radius:10px;border:1.5px solid transparent;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:12px;cursor:pointer;transition:all .15s;background:#F5F3F0;color:#1A1A1A}
+.cd:hover{border-color:#EC683E;background:rgba(236,104,62,.05)}
 .cd.empty{background:transparent;border-color:transparent;cursor:default}
-.cd.today{border-color:rgba(201,168,76,.5);color:#c9a84c;font-weight:600}
-.cd.hasev{background:rgba(99,102,241,.12);border-color:rgba(99,102,241,.3)}
-.cd.sel{border-color:#c9a84c;background:rgba(201,168,76,.08)}
+.cd.today{border-color:#EC683E;color:#EC683E;font-weight:700}
+.cd.hasev{background:rgba(175,163,255,.15);border-color:rgba(175,163,255,.4)}
+.cd.sel{border-color:#EC683E;background:rgba(236,104,62,.08)}
 .cdot{width:5px;height:5px;border-radius:50%;margin-top:2px}
 .cnav{display:flex;align-items:center;gap:12px;margin-bottom:10px}
-.cnav button{background:none;border:none;color:#c9a84c;cursor:pointer;font-size:20px;padding:4px 8px;border-radius:6px;line-height:1}
-.cnav button:hover{background:rgba(201,168,76,.1)}
-.cmon{font-family:'Playfair Display',serif;font-size:18px;color:#e8e6e1}
-.cu{display:flex;align-items:center;gap:9px;padding:12px 14px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.04);transition:background .12s;position:relative}
-.cu:hover{background:rgba(255,255,255,.03)}
-.cu.on{background:rgba(201,168,76,.08)}
-.msgs{flex:1;overflow-y:auto;padding:14px 18px;display:flex;flex-direction:column;gap:8px}
+.cnav button{background:none;border:none;color:#EC683E;cursor:pointer;font-size:20px;padding:4px 8px;border-radius:6px;line-height:1}
+.cnav button:hover{background:rgba(236,104,62,.08)}
+.cmon{font-family:'Inter Tight',sans-serif;font-size:18px;color:#1A1A1A;font-weight:800}
+.cu{display:flex;align-items:center;gap:9px;padding:12px 14px;cursor:pointer;border-bottom:1px solid rgba(0,0,0,.06);transition:background .12s;position:relative}
+.cu:hover{background:#F5F3F0}
+.cu.on{background:rgba(236,104,62,.06)}
+.msgs{flex:1;overflow-y:auto;padding:14px 18px;display:flex;flex-direction:column;gap:8px;background:#ECEAE5}
 .bub{max-width:72%;padding:10px 14px;border-radius:14px;font-size:13px;line-height:1.5;word-break:break-word}
-.bub.me{align-self:flex-end;background:#c9a84c;color:#0f1117;border-bottom-right-radius:3px}
-.bub.them{align-self:flex-start;background:#1e2130;border:1px solid rgba(255,255,255,.08);color:#c9c5b8;border-bottom-left-radius:3px}
+.bub.me{align-self:flex-end;background:#1A1A1A;color:#FFFFFF;border-bottom-right-radius:3px}
+.bub.them{align-self:flex-start;background:#FFFFFF;border:none;color:#1A1A1A;border-bottom-left-radius:3px;box-shadow:0 1px 4px rgba(0,0,0,.06)}
 .bmeta{font-size:10px;opacity:.5;margin-top:4px}
-.nitem{display:flex;gap:10px;padding:13px 16px;border-bottom:1px solid rgba(255,255,255,.05)}
-.nitem.unread{background:rgba(201,168,76,.04);border-left:2px solid #c9a84c}
-.ndot{width:7px;height:7px;border-radius:50%;background:#c9a84c;flex-shrink:0;margin-top:5px}
-.ndot.read{background:#3d4155}
-.pbanner{background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.25);border-radius:9px;padding:11px 16px;margin:12px 32px 0;display:flex;align-items:center;justify-content:space-between;gap:10px}
-.pbanner span{font-size:13px;color:#a5b4fc}
-.lw{min-height:100vh;min-height:100dvh;display:flex;align-items:center;justify-content:center;background:#0f1117;position:relative;overflow:hidden;padding:16px}
-.lbg{position:absolute;inset:0;opacity:.025;background-image:repeating-linear-gradient(0deg,transparent,transparent 40px,rgba(201,168,76,1) 40px,rgba(201,168,76,1) 41px),repeating-linear-gradient(90deg,transparent,transparent 40px,rgba(201,168,76,1) 40px,rgba(201,168,76,1) 41px)}
-.lc{background:#13161f;border:1px solid rgba(201,168,76,.2);border-radius:18px;padding:40px 34px;width:100%;max-width:380px;position:relative}
+.nitem{display:flex;gap:10px;padding:13px 16px;border-bottom:1px solid rgba(0,0,0,.06)}
+.nitem.unread{background:rgba(236,104,62,.04);border-left:2px solid #EC683E}
+.ndot{width:7px;height:7px;border-radius:50%;background:#EC683E;flex-shrink:0;margin-top:5px}
+.ndot.read{background:#BFBAB4}
+.pbanner{background:rgba(127,178,255,.1);border:none;border-radius:12px;padding:11px 16px;margin:12px 32px 0;display:flex;align-items:center;justify-content:space-between;gap:10px}
+.pbanner span{font-size:13px;color:#5A8AD4}
+.lw{min-height:100vh;min-height:100dvh;display:flex;align-items:center;justify-content:center;background:#ECEAE5;position:relative;overflow:hidden;padding:16px}
+.lbg{position:absolute;inset:0;opacity:.03;background-image:repeating-linear-gradient(0deg,transparent,transparent 40px,rgba(236,104,62,1) 40px,rgba(236,104,62,1) 41px),repeating-linear-gradient(90deg,transparent,transparent 40px,rgba(236,104,62,1) 40px,rgba(236,104,62,1) 41px)}
+.lc{background:#FFFFFF;border:none;border-radius:24px;padding:40px 34px;width:100%;max-width:380px;position:relative;box-shadow:0 8px 40px rgba(0,0,0,.08)}
 .llo{text-align:center;margin-bottom:28px}
-.llo h1{font-family:'Playfair Display',serif;font-size:26px;color:#c9a84c}
-.llo p{font-size:10px;color:#5a5e6e;margin-top:6px;text-transform:uppercase;letter-spacing:2px}
-.rc{background:#0f1117;border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:15px 17px;margin-bottom:8px;cursor:pointer;transition:all .15s;border-left:3px solid transparent}
-.rc:hover{background:rgba(201,168,76,.03)}
-.spin{display:inline-block;width:18px;height:18px;border:2px solid rgba(201,168,76,.2);border-top-color:#c9a84c;border-radius:50%;animation:spin .6s linear infinite}
+.llo h1{font-family:'Inter Tight',sans-serif;font-size:26px;color:#EC683E;font-weight:800}
+.llo p{font-size:10px;color:#8A8580;margin-top:6px;text-transform:uppercase;letter-spacing:2px;font-weight:600}
+.rc{background:#FFFFFF;border:none;border-radius:14px;padding:15px 17px;margin-bottom:8px;cursor:pointer;transition:all .15s;border-left:3px solid transparent;box-shadow:0 1px 6px rgba(0,0,0,.04)}
+.rc:hover{background:#F5F3F0}
+.spin{display:inline-block;width:18px;height:18px;border:2px solid rgba(236,104,62,.2);border-top-color:#EC683E;border-radius:50%;animation:spin .6s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
-.loading{display:flex;align-items:center;justify-content:center;min-height:200px;color:#5a5e6e;gap:10px;font-size:14px}
-.drawer-user-card{padding:20px 16px 16px;border-bottom:1px solid rgba(201,168,76,.12);display:flex;align-items:center;gap:12px;background:linear-gradient(135deg,rgba(201,168,76,.08),rgba(201,168,76,.02));flex-shrink:0}
-.drawer-close{background:none;border:none;color:#5a5e6e;font-size:20px;cursor:pointer;padding:4px;margin-left:auto;border-radius:6px;line-height:1;flex-shrink:0}
-.drawer-close:hover{color:#c9c5b8;background:rgba(255,255,255,.05)}
-.chat-list-col{width:220px;flex-shrink:0;border-right:1px solid rgba(255,255,255,.06);overflow-y:auto;display:flex;flex-direction:column}
+.loading{display:flex;align-items:center;justify-content:center;min-height:200px;color:#8A8580;gap:10px;font-size:14px}
+.drawer-user-card{padding:20px 16px 16px;border-bottom:1px solid rgba(0,0,0,.06);display:flex;align-items:center;gap:12px;background:linear-gradient(135deg,rgba(236,104,62,.06),rgba(175,163,255,.04));flex-shrink:0}
+.drawer-close{background:none;border:none;color:#8A8580;font-size:20px;cursor:pointer;padding:4px;margin-left:auto;border-radius:6px;line-height:1;flex-shrink:0}
+.drawer-close:hover{color:#1A1A1A;background:#F5F3F0}
+.chat-list-col{width:220px;flex-shrink:0;border-right:1px solid rgba(0,0,0,.06);overflow-y:auto;display:flex;flex-direction:column;background:#FFFFFF}
 .chat-area{flex:1;display:flex;flex-direction:column;min-width:0;min-height:0}
-.chdr2{padding:12px 18px;border-bottom:1px solid rgba(255,255,255,.06);display:flex;align-items:center;gap:10px;flex-shrink:0}
+.chdr2{padding:12px 18px;border-bottom:1px solid rgba(0,0,0,.06);display:flex;align-items:center;gap:10px;flex-shrink:0;background:#FFFFFF}
 @media (min-width:769px){
   .mob-top,.mob-bar,.drawer,.drawer-overlay,.mob-back{display:none!important}
   .chat-mobile-wrap{display:none!important}
@@ -462,27 +462,27 @@ hr.div{border:none;border-top:1px solid rgba(255,255,255,.06);margin:14px 0}
   .app>.sb{display:none!important;width:0!important;min-width:0!important;overflow:hidden!important}
   .mob-top{display:flex}.mob-bar{display:block}
   .app{flex-direction:column}.main{width:100%;flex:1;overflow-x:hidden}
-  .ph{padding:16px 16px 13px}.ph h2{font-size:20px}
+  .ph{padding:16px 16px 13px}.ph h2{font-size:22px}
   .pb{padding:14px 12px 96px}
   .g2{grid-template-columns:1fr;gap:12px}
   .sg{grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
-  .sv{font-size:20px}.sc{padding:13px}
-  .card{padding:14px;border-radius:10px}.chdr{margin-bottom:13px}
+  .sv{font-size:22px}.sc{padding:13px}
+  .card{padding:14px;border-radius:14px}.chdr{margin-bottom:13px}
   .cli{padding:13px 11px}.chk{width:26px;height:26px;border-radius:7px}.tl{font-size:14px}
   .btn{font-size:14px;padding:10px 16px}.sm{padding:8px 12px;font-size:12px}
   .tabs{overflow-x:auto;-webkit-overflow-scrolling:touch;flex-wrap:nowrap;scrollbar-width:none;margin-bottom:14px}
   .tabs::-webkit-scrollbar{display:none}.tab{padding:8px 16px;font-size:13px;flex-shrink:0}
   .ov{padding:0;align-items:flex-end}
-  .modal{border-radius:20px 20px 0 0;max-height:92vh;padding:20px 16px 32px;max-width:100%;width:100%}
+  .modal{border-radius:24px 24px 0 0;max-height:92vh;padding:20px 16px 32px;max-width:100%;width:100%}
   .modal h3{font-size:18px;margin-bottom:16px}
   .chat-list-col{display:none}
   .chat-area{display:flex;flex-direction:column;height:calc(100dvh - 52px - 64px);overflow:hidden;position:relative}
   .msgs{padding:12px 14px;padding-bottom:80px}
   .bub{max-width:85%;font-size:14px}
-  .chat-inp-wrap{position:absolute;bottom:0;left:0;right:0;background:#13161f;border-top:1px solid rgba(255,255,255,.1);padding:10px 12px;padding-bottom:max(10px,env(safe-area-inset-bottom));z-index:10}
-  .cal-card{padding:12px 10px!important;border-radius:10px!important}
+  .chat-inp-wrap{position:absolute;bottom:0;left:0;right:0;background:#FFFFFF;border-top:1px solid rgba(0,0,0,.06);padding:10px 12px;padding-bottom:max(10px,env(safe-area-inset-bottom));z-index:10}
+  .cal-card{padding:12px 10px!important;border-radius:14px!important}
   .cg{gap:2px;margin-top:8px}
-  .cd{aspect-ratio:unset!important;height:36px;border-radius:5px;font-size:11px;min-width:0}
+  .cd{aspect-ratio:unset!important;height:36px;border-radius:7px;font-size:11px;min-width:0}
   .cdot{width:4px;height:4px;margin-top:1px}
   .ch{font-size:9px;padding:3px 0;letter-spacing:0}.cmon{font-size:15px}.cnav{margin-bottom:8px}
   .pbanner{margin:10px 16px 0;padding:10px 12px}.pbanner span{font-size:12px}
@@ -490,7 +490,7 @@ hr.div{border:none;border-top:1px solid rgba(255,255,255,.06);margin:14px 0}
   .chat-desktop-only{display:none!important}
   .chat-mobile-wrap{display:flex;flex-direction:column;height:calc(100dvh - 52px - 64px);overflow:hidden}
 }
-@media (max-width:400px){.sg{grid-template-columns:1fr 1fr}.sv{font-size:18px}.ph h2{font-size:18px}.mob-btn{min-width:44px;font-size:9px}.mico{font-size:20px}}
+@media (max-width:400px){.sg{grid-template-columns:1fr 1fr}.sv{font-size:20px}.ph h2{font-size:20px}.mob-btn{min-width:44px;font-size:9px}.mico{font-size:20px}}
 `;
 
 
@@ -623,7 +623,7 @@ export default function App() {
         {PAGES[page]??<Dashboard {...P}/>}
       </div>
       <MobileNav perfil={perfil} page={page} setPage={setPage} tok={tok}/>
-      {toast&&<div style={{position:"fixed",bottom:80,left:"50%",transform:"translateX(-50%)",background:"#13161f",border:"1px solid rgba(16,185,129,.3)",borderRadius:12,padding:"12px 20px",color:"#10b981",fontSize:13,fontWeight:500,zIndex:9999,boxShadow:"0 8px 32px rgba(0,0,0,.5)",whiteSpace:"nowrap",maxWidth:"90vw"}} onClick={()=>setToast(null)}>{toast}</div>}
+      {toast&&<div style={{position:"fixed",bottom:80,left:"50%",transform:"translateX(-50%)",background:"#FFFFFF",border:"1px solid rgba(16,185,129,.3)",borderRadius:12,padding:"12px 20px",color:"#A6BE59",fontSize:13,fontWeight:500,zIndex:9999,boxShadow:"0 8px 32px rgba(0,0,0,.5)",whiteSpace:"nowrap",maxWidth:"90vw"}} onClick={()=>setToast(null)}>{toast}</div>}
     </div>
   </>;
 }
@@ -659,7 +659,7 @@ function LoginScreen({onLogin}){
       <button className="btn bp" style={{width:"100%",justifyContent:"center",marginTop:4}} onClick={go} disabled={load}>
         {load?<><div className="spin" style={{width:16,height:16,borderWidth:2}}/> Entrando…</>:"Entrar →"}
       </button>
-      <p style={{fontSize:11,color:"#5a5e6e",textAlign:"center",marginTop:16,lineHeight:1.5}}>
+      <p style={{fontSize:11,color:"#8A8580",textAlign:"center",marginTop:16,lineHeight:1.5}}>
         Usa las credenciales que te ha facilitado el administrador de la finca.
       </p>
     </div>
@@ -685,8 +685,8 @@ function Sidebar({perfil,page,setPage,onLogout,inDrawer,onClose}){
       <div className="drawer-user-card">
         <div className="av" style={{width:42,height:42,fontSize:14}}>{av}</div>
         <div style={{flex:1,minWidth:0}}>
-          <div style={{fontSize:14,fontWeight:600,color:"#e8e6e1",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{perfil.nombre}</div>
-          <div style={{fontSize:11,color:"#c9a84c",marginTop:2}}>{RL[rol]}</div>
+          <div style={{fontSize:14,fontWeight:600,color:"#1A1A1A",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{perfil.nombre}</div>
+          <div style={{fontSize:11,color:"#EC683E",marginTop:2}}>{RL[rol]}</div>
         </div>
         <button className="drawer-close" onClick={onClose}>✕</button>
       </div>
@@ -781,7 +781,7 @@ function MobileNav({perfil,page,setPage,tok}){
           <span className="mico">
             {it.ico}
             {(it.badge||0)>0&&(
-              <span style={{position:"absolute",top:-4,right:-8,background:"#e85555",color:"#fff",borderRadius:20,padding:"1px 5px",fontSize:9,fontWeight:700,minWidth:14,textAlign:"center",lineHeight:"14px"}}>
+              <span style={{position:"absolute",top:-4,right:-8,background:"#F35757",color:"#fff",borderRadius:20,padding:"1px 5px",fontSize:9,fontWeight:700,minWidth:14,textAlign:"center",lineHeight:"14px"}}>
                 {it.badge>9?"9+":it.badge}
               </span>
             )}
@@ -812,7 +812,7 @@ function MTask({lbl,sub,done}){
     <span style={{fontSize:16,flexShrink:0}}>{done?"✅":"⬜"}</span>
     <div style={{flex:1,minWidth:0}}>
       <div style={{fontSize:13,color:done?"#5a5e6e":"#c9c5b8",textDecoration:done?"line-through":"none",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{lbl}</div>
-      {sub&&<div style={{fontSize:11,color:"#5a5e6e"}}>{sub}</div>}
+      {sub&&<div style={{fontSize:11,color:"#8A8580"}}>{sub}</div>}
     </div>
   </div>;
 }
@@ -974,51 +974,51 @@ function FinancialKPIs({tok}){
     {periodo==="rango"&&(
       <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap",alignItems:"center"}}>
         <input type="date" className="fi" value={rangoDesde} onChange={e=>setRangoDesde(e.target.value)} style={{flex:1,minWidth:130}}/>
-        <span style={{color:"#5a5e6e",fontSize:12}}>→</span>
+        <span style={{color:"#8A8580",fontSize:12}}>→</span>
         <input type="date" className="fi" value={rangoHasta} onChange={e=>setRangoHasta(e.target.value)} style={{flex:1,minWidth:130}}/>
       </div>
     )}
-    {load?<div style={{display:"flex",alignItems:"center",gap:8,justifyContent:"center",padding:"20px 0",color:"#5a5e6e",fontSize:13}}><div className="spin" style={{width:16,height:16,borderWidth:2}}/>Calculando…</div>
+    {load?<div style={{display:"flex",alignItems:"center",gap:8,justifyContent:"center",padding:"20px 0",color:"#8A8580",fontSize:13}}><div className="spin" style={{width:16,height:16,borderWidth:2}}/>Calculando…</div>
     :data?<>
-      {data.desde&&<div style={{fontSize:11,color:"#5a5e6e",marginBottom:12}}>📅 {new Date(data.desde+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"})} – {new Date(data.hasta+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short",year:"numeric"})}</div>}
+      {data.desde&&<div style={{fontSize:11,color:"#8A8580",marginBottom:12}}>📅 {new Date(data.desde+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"})} – {new Date(data.hasta+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short",year:"numeric"})}</div>}
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(140px,1fr))",gap:10}}>
-        <div style={{background:"#0f1117",borderRadius:10,padding:"12px 14px",borderLeft:"3px solid #c9a84c"}}>
-          <div style={{fontSize:10,color:"#7a7f94",textTransform:"uppercase",letterSpacing:.5}}>Facturación proyectada</div>
-          <div style={{fontSize:20,fontWeight:700,color:"#c9a84c",marginTop:5,fontFamily:"'Playfair Display',serif"}}>{fmt(data.facturacion)}</div>
+        <div style={{background:"#EC683E",borderRadius:18,padding:20}}>
+          <div style={{fontSize:10,color:"rgba(255,255,255,.7)",textTransform:"uppercase",letterSpacing:.5,fontWeight:600}}>Facturación proyectada</div>
+          <div style={{fontSize:22,fontWeight:800,color:"#fff",marginTop:5}}>{fmt(data.facturacion)}</div>
         </div>
-        <div style={{background:"#0f1117",borderRadius:10,padding:"12px 14px",borderLeft:"3px solid #10b981"}}>
-          <div style={{fontSize:10,color:"#7a7f94",textTransform:"uppercase",letterSpacing:.5}}>Ya cobrado</div>
-          <div style={{fontSize:20,fontWeight:700,color:"#10b981",marginTop:5,fontFamily:"'Playfair Display',serif"}}>{fmt(data.yaCobrado)}</div>
+        <div style={{background:"#A6BE59",borderRadius:18,padding:20}}>
+          <div style={{fontSize:10,color:"rgba(255,255,255,.7)",textTransform:"uppercase",letterSpacing:.5,fontWeight:600}}>Ya cobrado</div>
+          <div style={{fontSize:22,fontWeight:800,color:"#fff",marginTop:5}}>{fmt(data.yaCobrado)}</div>
         </div>
-        <div style={{background:"#0f1117",borderRadius:10,padding:"12px 14px",borderLeft:`3px solid ${data.pendiente>0?"#f59e0b":"#10b981"}`}}>
-          <div style={{fontSize:10,color:"#7a7f94",textTransform:"uppercase",letterSpacing:.5}}>Pendiente de cobro</div>
-          <div style={{fontSize:20,fontWeight:700,color:data.pendiente>0?"#f59e0b":"#10b981",marginTop:5,fontFamily:"'Playfair Display',serif"}}>{fmt(data.pendiente)}</div>
+        <div style={{background:"#ECD227",borderRadius:18,padding:20}}>
+          <div style={{fontSize:10,color:"rgba(0,0,0,.5)",textTransform:"uppercase",letterSpacing:.5,fontWeight:600}}>Pendiente de cobro</div>
+          <div style={{fontSize:22,fontWeight:800,color:"#1A1A1A",marginTop:5}}>{fmt(data.pendiente)}</div>
         </div>
-        <div style={{background:"#0f1117",borderRadius:10,padding:"12px 14px",borderLeft:"3px solid #e85555"}}>
-          <div style={{fontSize:10,color:"#7a7f94",textTransform:"uppercase",letterSpacing:.5}}>Gastos reales</div>
-          <div style={{fontSize:20,fontWeight:700,color:"#e85555",marginTop:5,fontFamily:"'Playfair Display',serif"}}>{fmt(data.gastosReales)}</div>
+        <div style={{background:"#F35757",borderRadius:18,padding:20}}>
+          <div style={{fontSize:10,color:"rgba(255,255,255,.7)",textTransform:"uppercase",letterSpacing:.5,fontWeight:600}}>Gastos reales</div>
+          <div style={{fontSize:22,fontWeight:800,color:"#fff",marginTop:5}}>{fmt(data.gastosReales)}</div>
         </div>
-        <div style={{background:"#0f1117",borderRadius:10,padding:"12px 14px",borderLeft:"3px solid #e85555",opacity:.8}}>
-          <div style={{fontSize:10,color:"#7a7f94",textTransform:"uppercase",letterSpacing:.5}}>Gastos proyectados año</div>
-          <div style={{fontSize:20,fontWeight:700,color:"#e85555",marginTop:5,fontFamily:"'Playfair Display',serif"}}>{fmt(data.gastosProyectados)}</div>
+        <div style={{background:"#F35757",borderRadius:18,padding:20,opacity:.8}}>
+          <div style={{fontSize:10,color:"rgba(255,255,255,.7)",textTransform:"uppercase",letterSpacing:.5,fontWeight:600}}>Gastos proyectados año</div>
+          <div style={{fontSize:22,fontWeight:800,color:"#fff",marginTop:5}}>{fmt(data.gastosProyectados)}</div>
         </div>
-        <div style={{background:"#0f1117",borderRadius:10,padding:"12px 14px",borderLeft:`3px solid ${data.beneficio>=0?"#10b981":"#e85555"}`}}>
-          <div style={{fontSize:10,color:"#7a7f94",textTransform:"uppercase",letterSpacing:.5}}>Beneficio estimado</div>
-          <div style={{fontSize:20,fontWeight:700,color:data.beneficio>=0?"#10b981":"#e85555",marginTop:5,fontFamily:"'Playfair Display',serif"}}>{fmt(data.beneficio)}</div>
+        <div style={{background:"#AFA3FF",borderRadius:18,padding:20}}>
+          <div style={{fontSize:10,color:"rgba(0,0,0,.5)",textTransform:"uppercase",letterSpacing:.5,fontWeight:600}}>Beneficio estimado</div>
+          <div style={{fontSize:22,fontWeight:800,color:"#1A1A1A",marginTop:5}}>{fmt(data.beneficio)}</div>
         </div>
-        <div style={{background:"#0f1117",borderRadius:10,padding:"12px 14px",borderLeft:"3px solid #6366f1"}}>
-          <div style={{fontSize:10,color:"#7a7f94",textTransform:"uppercase",letterSpacing:.5}}>Comisión gestor ({data.comisionPct}%)</div>
-          <div style={{fontSize:20,fontWeight:700,color:"#6366f1",marginTop:5,fontFamily:"'Playfair Display',serif"}}>{fmt(data.comision)}</div>
+        <div style={{background:"#7FB2FF",borderRadius:18,padding:20}}>
+          <div style={{fontSize:10,color:"rgba(0,0,0,.5)",textTransform:"uppercase",letterSpacing:.5,fontWeight:600}}>Comisión gestor ({data.comisionPct}%)</div>
+          <div style={{fontSize:22,fontWeight:800,color:"#1A1A1A",marginTop:5}}>{fmt(data.comision)}</div>
         </div>
       </div>
-    </>:<div style={{color:"#5a5e6e",fontSize:13,padding:"16px 0",textAlign:"center"}}>No se pudieron cargar los datos</div>}
+    </>:<div style={{color:"#8A8580",fontSize:13,padding:"16px 0",textAlign:"center"}}>No se pudieron cargar los datos</div>}
   </div>;
 }
 
 // ─── FINANCIAL CHARTS ───────────────────────────────────────────────────────
 const MESES_CORTO=["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
 const CHART_COLORS={facturacion:"#c9a84c",cobrado:"#10b981",gastos:"#e85555",beneficio:"#6366f1",eventos:"#c9a84c",airbnb:"#10b981",prev:"#7a7f94"};
-const ChartTooltipStyle={contentStyle:{background:"#13161f",border:"1px solid rgba(201,168,76,.25)",borderRadius:10,fontSize:12,color:"#c9c5b8"},itemStyle:{color:"#c9c5b8"},labelStyle:{color:"#c9a84c",fontWeight:600,marginBottom:4}};
+const ChartTooltipStyle={contentStyle:{background:"#FFFFFF",border:"1px solid rgba(201,168,76,.25)",borderRadius:10,fontSize:12,color:"#1A1A1A"},itemStyle:{color:"#1A1A1A"},labelStyle:{color:"#EC683E",fontWeight:600,marginBottom:4}};
 const fmtK=v=>v>=1000?`${(v/1000).toFixed(v>=10000?0:1)}k`:`${v}`;
 
 function FinancialCharts({tok}){
@@ -1108,7 +1108,7 @@ function FinancialCharts({tok}){
     })();
   },[]);
 
-  if(load)return <div style={{display:"flex",alignItems:"center",gap:8,justifyContent:"center",padding:"20px 0",color:"#5a5e6e",fontSize:13}}><div className="spin" style={{width:16,height:16,borderWidth:2}}/>Cargando gráficas…</div>;
+  if(load)return <div style={{display:"flex",alignItems:"center",gap:8,justifyContent:"center",padding:"20px 0",color:"#8A8580",fontSize:13}}><div className="spin" style={{width:16,height:16,borderWidth:2}}/>Cargando gráficas…</div>;
 
   const chartData=vista==="mes"?monthly:weekly;
   const pieTotal=pie.reduce((s,p)=>s+p.value,0);
@@ -1181,9 +1181,9 @@ function FinancialCharts({tok}){
               <div key={p.name} style={{display:"flex",alignItems:"center",gap:10}}>
                 <div style={{width:12,height:12,borderRadius:3,background:i===0?CHART_COLORS.eventos:CHART_COLORS.airbnb,flexShrink:0}}/>
                 <div>
-                  <div style={{fontSize:13,color:"#c9c5b8",fontWeight:500}}>{p.name}</div>
-                  <div style={{fontSize:16,fontWeight:700,color:i===0?CHART_COLORS.eventos:CHART_COLORS.airbnb,fontFamily:"'Playfair Display',serif"}}>{p.value.toLocaleString("es-ES")}€</div>
-                  <div style={{fontSize:11,color:"#5a5e6e"}}>{pieTotal>0?((p.value/pieTotal)*100).toFixed(1):0}%</div>
+                  <div style={{fontSize:13,color:"#1A1A1A",fontWeight:500}}>{p.name}</div>
+                  <div style={{fontSize:16,fontWeight:700,color:i===0?CHART_COLORS.eventos:CHART_COLORS.airbnb,fontFamily:"'Inter Tight',sans-serif"}}>{p.value.toLocaleString("es-ES")}€</div>
+                  <div style={{fontSize:11,color:"#8A8580"}}>{pieTotal>0?((p.value/pieTotal)*100).toFixed(1):0}%</div>
                 </div>
               </div>
             ))}
@@ -1258,7 +1258,7 @@ function AtencionAhora({tok,setPage}){
     })();
   },[]);
 
-  if(load)return <div style={{display:"flex",alignItems:"center",gap:8,justifyContent:"center",padding:"20px 0",color:"#5a5e6e",fontSize:13}}><div className="spin" style={{width:16,height:16,borderWidth:2}}/>Cargando…</div>;
+  if(load)return <div style={{display:"flex",alignItems:"center",gap:8,justifyContent:"center",padding:"20px 0",color:"#8A8580",fontSize:13}}><div className="spin" style={{width:16,height:16,borderWidth:2}}/>Cargando…</div>;
 
   const totalItems=llegadas.length+acciones.length+solicitudes.length+srvLimp.length+srvJard.length;
   if(totalItems===0)return null;
@@ -1267,53 +1267,53 @@ function AtencionAhora({tok,setPage}){
   const tagStyle=(bg,col)=>({display:"inline-block",fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:4,background:bg,color:col,letterSpacing:.5,flexShrink:0});
 
   return <div className="card" style={{marginBottom:16}}>
-    <div className="chdr"><span className="ctit">⚡ Atención ahora</span><span className="badge" style={{background:"rgba(232,85,85,.1)",color:"#e85555",border:"1px solid rgba(232,85,85,.2)"}}>{totalItems}</span></div>
+    <div className="chdr"><span className="ctit">⚡ Atención ahora</span><span className="badge" style={{background:"rgba(232,85,85,.1)",color:"#F35757",border:"1px solid rgba(232,85,85,.2)"}}>{totalItems}</span></div>
 
     {/* LLEGADAS */}
     {llegadas.length>0&&<>
-      <div style={{fontSize:11,color:"#c9a84c",fontWeight:600,textTransform:"uppercase",letterSpacing:1,marginBottom:8,marginTop:4}}>🏠 Próximas llegadas esta semana</div>
+      <div style={{fontSize:11,color:"#EC683E",fontWeight:600,textTransform:"uppercase",letterSpacing:1,marginBottom:8,marginTop:4}}>🏠 Próximas llegadas esta semana</div>
       {llegadas.map((l,i)=>(
-        <div key={`ll-${i}`} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",background:"#0f1117",borderRadius:8,marginBottom:5}}>
+        <div key={`ll-${i}`} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",background:"#F5F3F0",borderRadius:8,marginBottom:5}}>
           <span style={l.tipo==="airbnb"?tagStyle("rgba(16,185,129,.15)","#10b981"):tagStyle("rgba(99,102,241,.15)","#a5b4fc")}>{l.tipo==="airbnb"?"AIRBNB":"EVENTO"}</span>
           <div style={{flex:1,minWidth:0}}>
-            <div style={{fontSize:13,color:"#e8e6e1",fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{l.nombre}</div>
-            <div style={{fontSize:11,color:"#5a5e6e"}}>{l.detalle}</div>
+            <div style={{fontSize:13,color:"#1A1A1A",fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{l.nombre}</div>
+            <div style={{fontSize:11,color:"#8A8580"}}>{l.detalle}</div>
           </div>
-          <div style={{fontSize:12,color:"#7a7f94",flexShrink:0}}>📅 {fmtF(l.fecha)}</div>
+          <div style={{fontSize:12,color:"#8A8580",flexShrink:0}}>📅 {fmtF(l.fecha)}</div>
         </div>
       ))}
     </>}
 
     {/* ACCIONES */}
     {acciones.length>0&&<>
-      <div style={{fontSize:11,color:"#f59e0b",fontWeight:600,textTransform:"uppercase",letterSpacing:1,marginBottom:8,marginTop:llegadas.length>0?16:4}}>📋 Requieren acción</div>
+      <div style={{fontSize:11,color:"#D4A017",fontWeight:600,textTransform:"uppercase",letterSpacing:1,marginBottom:8,marginTop:llegadas.length>0?16:4}}>📋 Requieren acción</div>
       {acciones.map((a,i)=>(
-        <div key={`ac-${i}`} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",background:"#0f1117",borderRadius:8,marginBottom:5,cursor:a.tipo==="visita"?"pointer":a.id?"pointer":"default"}} onClick={()=>{if(a.tipo==="visita")setPage("visitas");else if(a.id)setPage("reservas");}}>
+        <div key={`ac-${i}`} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",background:"#F5F3F0",borderRadius:8,marginBottom:5,cursor:a.tipo==="visita"?"pointer":a.id?"pointer":"default"}} onClick={()=>{if(a.tipo==="visita")setPage("visitas");else if(a.id)setPage("reservas");}}>
           <span style={{fontSize:16,flexShrink:0}}>{a.tipo==="contrato"?"✍️":a.tipo==="seña"?"💰":"👁"}</span>
           <div style={{flex:1,minWidth:0}}>
             <div style={{display:"flex",alignItems:"center",gap:6}}>
-              <div style={{fontSize:13,color:"#e8e6e1",fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",flex:1,minWidth:0}}>{a.nombre}</div>
+              <div style={{fontSize:13,color:"#1A1A1A",fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",flex:1,minWidth:0}}>{a.nombre}</div>
               {a.esCoord&&<span style={{fontSize:9,padding:"2px 6px",borderRadius:4,background:"rgba(99,102,241,.15)",color:"#a5b4fc",flexShrink:0,fontWeight:600}}>📋 Coordinación</span>}
             </div>
-            <div style={{fontSize:11,color:"#f59e0b"}}>{a.detalle}</div>
+            <div style={{fontSize:11,color:"#D4A017"}}>{a.detalle}</div>
           </div>
-          <div style={{fontSize:12,color:"#7a7f94",flexShrink:0}}>📅 {fmtF(a.fecha)}</div>
+          <div style={{fontSize:12,color:"#8A8580",flexShrink:0}}>📅 {fmtF(a.fecha)}</div>
         </div>
       ))}
     </>}
 
     {/* SOLICITUDES */}
     {solicitudes.length>0&&<>
-      <div style={{fontSize:11,color:"#e85555",fontWeight:600,textTransform:"uppercase",letterSpacing:1,marginBottom:8,marginTop:(llegadas.length+acciones.length)>0?16:4}}>🔓 Solicitudes de desbloqueo</div>
+      <div style={{fontSize:11,color:"#F35757",fontWeight:600,textTransform:"uppercase",letterSpacing:1,marginBottom:8,marginTop:(llegadas.length+acciones.length)>0?16:4}}>🔓 Solicitudes de desbloqueo</div>
       {solicitudes.map(s=>{
         const fF=new Date(s.fecha+"T12:00:00").toLocaleDateString("es-ES",{weekday:"short",day:"numeric",month:"short"});
-        return <div key={s.id} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",background:"#0f1117",borderRadius:8,marginBottom:5,cursor:"pointer"}} onClick={()=>setPage("notifs")}>
+        return <div key={s.id} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",background:"#F5F3F0",borderRadius:8,marginBottom:5,cursor:"pointer"}} onClick={()=>setPage("notifs")}>
           <span style={{fontSize:16,flexShrink:0}}>🔒</span>
           <div style={{flex:1,minWidth:0}}>
-            <div style={{fontSize:13,color:"#e8e6e1",fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{s.solicitado_por}</div>
-            <div style={{fontSize:11,color:"#e85555"}}>{s.motivo||"Solicitud de desbloqueo"}</div>
+            <div style={{fontSize:13,color:"#1A1A1A",fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{s.solicitado_por}</div>
+            <div style={{fontSize:11,color:"#F35757"}}>{s.motivo||"Solicitud de desbloqueo"}</div>
           </div>
-          <div style={{fontSize:12,color:"#7a7f94",flexShrink:0}}>📅 {fF}</div>
+          <div style={{fontSize:12,color:"#8A8580",flexShrink:0}}>📅 {fF}</div>
         </div>;
       })}
     </>}
@@ -1322,22 +1322,22 @@ function AtencionAhora({tok,setPage}){
     {(srvLimp.length>0||srvJard.length>0)&&<>
       <div style={{fontSize:11,color:"#6366f1",fontWeight:600,textTransform:"uppercase",letterSpacing:1,marginBottom:8,marginTop:(llegadas.length+acciones.length+solicitudes.length)>0?16:4}}>🧹 Servicios activos</div>
       {srvLimp.map(s=>(
-        <div key={`sl-${s.id}`} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",background:"#0f1117",borderRadius:8,marginBottom:5,cursor:"pointer"}} onClick={()=>setPage("limpieza")}>
+        <div key={`sl-${s.id}`} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",background:"#F5F3F0",borderRadius:8,marginBottom:5,cursor:"pointer"}} onClick={()=>setPage("limpieza")}>
           <span style={tagStyle("rgba(99,102,241,.15)","#a5b4fc")}>LIMPIEZA</span>
           <div style={{flex:1,minWidth:0}}>
-            <div style={{fontSize:13,color:"#e8e6e1",fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>🧹 {s.nombre}</div>
-            <div style={{fontSize:11,color:"#5a5e6e"}}>📅 {new Date(s.fecha).toLocaleDateString("es-ES",{day:"numeric",month:"short"})}</div>
+            <div style={{fontSize:13,color:"#1A1A1A",fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>🧹 {s.nombre}</div>
+            <div style={{fontSize:11,color:"#8A8580"}}>📅 {new Date(s.fecha).toLocaleDateString("es-ES",{day:"numeric",month:"short"})}</div>
           </div>
         </div>
       ))}
       {srvJard.map(s=>{
         const fi=new Date(s.fecha_inicio+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"});
         const ff=new Date(s.fecha_fin+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"});
-        return <div key={`sj-${s.id}`} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",background:"#0f1117",borderRadius:8,marginBottom:5,cursor:"pointer"}} onClick={()=>setPage("jadmin")}>
+        return <div key={`sj-${s.id}`} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",background:"#F5F3F0",borderRadius:8,marginBottom:5,cursor:"pointer"}} onClick={()=>setPage("jadmin")}>
           <span style={tagStyle("rgba(16,185,129,.15)","#10b981")}>JARDÍN</span>
           <div style={{flex:1,minWidth:0}}>
-            <div style={{fontSize:13,color:"#e8e6e1",fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>🌿 {s.nombre}</div>
-            <div style={{fontSize:11,color:"#5a5e6e"}}>📅 {fi} – {ff}{s.jardinero_nombre?` · 👤 ${s.jardinero_nombre}`:""}</div>
+            <div style={{fontSize:13,color:"#1A1A1A",fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>🌿 {s.nombre}</div>
+            <div style={{fontSize:11,color:"#8A8580"}}>📅 {fi} – {ff}{s.jardinero_nombre?` · 👤 ${s.jardinero_nombre}`:""}</div>
           </div>
         </div>;
       })}
@@ -1394,17 +1394,17 @@ function DashA({reservas,jsem,jpunt,cwk,setPage,tok}){
       <FinancialCharts tok={tok}/>
       <AtencionAhora tok={tok} setPage={setPage}/>
       {prox&&<div className="card" style={{marginBottom:16,borderLeft:"3px solid #c9a84c"}}>
-        <div style={{fontSize:10,color:"#5a5e6e",textTransform:"uppercase",letterSpacing:1,marginBottom:7}}>PRÓXIMO EVENTO</div>
+        <div style={{fontSize:10,color:"#8A8580",textTransform:"uppercase",letterSpacing:1,marginBottom:7}}>PRÓXIMO EVENTO</div>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:12}}>
-          <div><div style={{fontSize:16,fontWeight:600,color:"#e8e6e1"}}>{prox.nombre}</div><div style={{fontSize:12,color:"#7a7f94",marginTop:4}}>📅 {new Date(prox.fecha).toLocaleDateString("es-ES",{weekday:"long",year:"numeric",month:"long",day:"numeric"})}</div></div>
-          <div style={{textAlign:"right",flexShrink:0}}><div style={{fontSize:18,fontWeight:700,color:"#c9a84c"}}>{parseFloat(prox.precio||0).toLocaleString("es-ES")}€</div><SBadge e={prox.estado}/></div>
+          <div><div style={{fontSize:16,fontWeight:600,color:"#1A1A1A"}}>{prox.nombre}</div><div style={{fontSize:12,color:"#8A8580",marginTop:4}}>📅 {new Date(prox.fecha).toLocaleDateString("es-ES",{weekday:"long",year:"numeric",month:"long",day:"numeric"})}</div></div>
+          <div style={{textAlign:"right",flexShrink:0}}><div style={{fontSize:18,fontWeight:700,color:"#EC683E"}}>{parseFloat(prox.precio||0).toLocaleString("es-ES")}€</div><SBadge e={prox.estado}/></div>
         </div>
       </div>}
       <div className="g2">
         <div className="card"><div className="chdr"><span className="ctit">🌿 Jardín esta semana</span><button className="btn bg sm" onClick={()=>setPage("jcheck")}>Ver</button></div>{actv.slice(0,5).map(t=><MTask key={t.id} lbl={t.txt} done={sj[t.id]?.done}/>)}</div>
         <div className="card"><div className="chdr"><span className="ctit">📅 Próximas reservas</span><button className="btn bg sm" onClick={()=>setPage("reservas")}>Ver</button></div>
-          {reservas.length===0?<div style={{fontSize:12,color:"#5a5e6e"}}>Sin reservas registradas</div>
-            :reservas.slice(0,5).map(r=><div key={r.id} style={{padding:"8px 0",borderBottom:"1px solid rgba(255,255,255,.04)",display:"flex",justifyContent:"space-between",alignItems:"center",gap:8}}><div style={{minWidth:0}}><div style={{fontSize:13,color:"#c9c5b8",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.nombre}</div><div style={{fontSize:11,color:"#5a5e6e"}}>{new Date(r.fecha).toLocaleDateString("es-ES")}</div></div><SBadge e={r.estado}/></div>)}
+          {reservas.length===0?<div style={{fontSize:12,color:"#8A8580"}}>Sin reservas registradas</div>
+            :reservas.slice(0,5).map(r=><div key={r.id} style={{padding:"8px 0",borderBottom:"1px solid rgba(255,255,255,.04)",display:"flex",justifyContent:"space-between",alignItems:"center",gap:8}}><div style={{minWidth:0}}><div style={{fontSize:13,color:"#1A1A1A",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.nombre}</div><div style={{fontSize:11,color:"#8A8580"}}>{new Date(r.fecha).toLocaleDateString("es-ES")}</div></div><SBadge e={r.estado}/></div>)}
         </div>
       </div>
     </div>
@@ -1574,15 +1574,15 @@ function DashJ({perfil,jsem,jpunt,cwk,setPage,tok}){
       {/* SERVICIO ACTIVO */}
       {srvActivo&&<div className="card" style={{marginBottom:16,border:"1px solid rgba(16,185,129,.3)",background:"rgba(16,185,129,.04)"}}>
         <div className="chdr"><span className="ctit">🌿 Servicio activo</span></div>
-        <div style={{fontSize:16,fontWeight:600,color:"#e8e6e1",marginBottom:4}}>{srvActivo.titulo}</div>
-        <div style={{fontSize:12,color:"#7a7f94",marginBottom:12}}>Tareas: {srvTareas.filter(t=>t.done).length} de {srvTareas.length} completadas{srvExtras.length>0?` + ${srvExtras.length} extra`:""}</div>
+        <div style={{fontSize:16,fontWeight:600,color:"#1A1A1A",marginBottom:4}}>{srvActivo.titulo}</div>
+        <div style={{fontSize:12,color:"#8A8580",marginBottom:12}}>Tareas: {srvTareas.filter(t=>t.done).length} de {srvTareas.length} completadas{srvExtras.length>0?` + ${srvExtras.length} extra`:""}</div>
 
         {/* Cronómetro */}
         {jornada&&!jornada.hora_fin&&<>
-          <div style={{textAlign:"center",padding:"16px 0",marginBottom:12,background:"#0f1117",borderRadius:12}}>
+          <div style={{textAlign:"center",padding:"16px 0",marginBottom:12,background:"#F5F3F0",borderRadius:12}}>
             <div style={{fontSize:11,color:pausado?"#f59e0b":"#10b981",textTransform:"uppercase",letterSpacing:1,fontWeight:600,marginBottom:6}}>{pausado?"⏸ En pausa":"⏱️ Esta jornada"}</div>
             <div style={{fontSize:36,fontWeight:700,color:pausado?"#f59e0b":"#c9a84c",fontFamily:"monospace",letterSpacing:2}}>{fmtEl(elapsed)}</div>
-            {totalAcum>0&&<div style={{fontSize:12,color:"#5a5e6e",marginTop:6}}>📅 Total acumulado: {fmtHM(totalAcum*60)}</div>}
+            {totalAcum>0&&<div style={{fontSize:12,color:"#8A8580",marginTop:6}}>📅 Total acumulado: {fmtHM(totalAcum*60)}</div>}
           </div>
           <div style={{display:"flex",gap:8,marginBottom:14}}>
             <button className={`btn ${pausado?"bp":"bg"}`} style={{flex:1,justifyContent:"center",padding:"12px",fontSize:14}} onClick={togglePausa} disabled={saving2}>{pausado?"▶️ Reanudar":"⏸️ Pausar"}</button>
@@ -1593,7 +1593,7 @@ function DashJ({perfil,jsem,jpunt,cwk,setPage,tok}){
         {!jornada&&!showNuevaJornada&&<button className="btn bp" style={{width:"100%",justifyContent:"center",padding:"14px",fontSize:15,marginBottom:14}} onClick={iniciarJornada} disabled={saving2}>▶️ Iniciar jornada</button>}
 
         {/* Checklist tareas asignadas */}
-        <div style={{fontSize:11,color:"#c9a84c",fontWeight:600,textTransform:"uppercase",letterSpacing:1,marginBottom:6,marginTop:8}}>Tareas asignadas</div>
+        <div style={{fontSize:11,color:"#EC683E",fontWeight:600,textTransform:"uppercase",letterSpacing:1,marginBottom:6,marginTop:8}}>Tareas asignadas</div>
         {srvTareas.map(t=><div key={t.id} className={`cli${t.done?" done":""}`} style={{marginBottom:4}}>
           <div className={`chk${t.done?" on":""}`} onClick={()=>toggleTarea(t.id,t.done)} style={{cursor:"pointer"}}/>
           <div style={{flex:1,minWidth:0}}>
@@ -1607,11 +1607,11 @@ function DashJ({perfil,jsem,jpunt,cwk,setPage,tok}){
 
         {/* Tareas extra del jardinero */}
         {srvExtras.length>0&&<>
-          <div style={{fontSize:11,color:"#c9a84c",fontWeight:600,textTransform:"uppercase",letterSpacing:1,marginBottom:6,marginTop:16}}>➕ Tareas adicionales</div>
+          <div style={{fontSize:11,color:"#EC683E",fontWeight:600,textTransform:"uppercase",letterSpacing:1,marginBottom:6,marginTop:16}}>➕ Tareas adicionales</div>
           {srvExtras.map(t=><div key={t.id} className="cli done" style={{marginBottom:4}}>
             <span style={{fontSize:17,flexShrink:0}}>✅</span>
             <div style={{flex:1,minWidth:0}}>
-              <span className="badge" style={{background:"rgba(201,168,76,.12)",color:"#c9a84c",fontSize:10,marginBottom:3,display:"inline-block"}}>➕ Extra</span>
+              <span className="badge" style={{background:"rgba(201,168,76,.12)",color:"#EC683E",fontSize:10,marginBottom:3,display:"inline-block"}}>➕ Extra</span>
               {t.zona&&<span className="tz" style={{marginLeft:4}}>{t.zona}</span>}
               <div className="tl done">{t.txt}</div>
               <div className="tm">✓ {t.completado_por} · {fmtDT(t.completado_ts)}</div>
@@ -1621,7 +1621,7 @@ function DashJ({perfil,jsem,jpunt,cwk,setPage,tok}){
             </div>
             <div style={{display:"flex",flexDirection:"column",gap:4,flexShrink:0}}>
               <span className="ibtn" onClick={()=>{setEditExtraId(t.id);setEditExtraNota(t.nota||"");setEditExtraFoto(t.foto_url||null);}}>✏️</span>
-              <span className="ibtn" style={{background:"rgba(232,85,85,.1)",color:"#e85555",borderColor:"rgba(232,85,85,.2)"}} onClick={()=>delExtra(t.id)}>🗑</span>
+              <span className="ibtn" style={{background:"rgba(232,85,85,.1)",color:"#F35757",borderColor:"rgba(232,85,85,.2)"}} onClick={()=>delExtra(t.id)}>🗑</span>
             </div>
           </div>)}
         </>}
@@ -1630,7 +1630,7 @@ function DashJ({perfil,jsem,jpunt,cwk,setPage,tok}){
         <button className="btn bg" style={{width:"100%",justifyContent:"center",marginTop:12}} onClick={()=>{setExtraForm({txt:"",zona:"",nota:"",foto_url:null});setShowExtraForm(true);}}>➕ Añadir tarea realizada</button>
 
         {/* Completar servicio */}
-        {tareasAdminOk&&(!jornada||jornada.hora_fin)&&<button className="btn bp" style={{width:"100%",justifyContent:"center",padding:"14px",fontSize:15,marginTop:12,background:"#10b981"}} onClick={()=>setShowFinSrv(true)}>✅ Marcar servicio completado</button>}
+        {tareasAdminOk&&(!jornada||jornada.hora_fin)&&<button className="btn bp" style={{width:"100%",justifyContent:"center",padding:"14px",fontSize:15,marginTop:12,background:"#A6BE59"}} onClick={()=>setShowFinSrv(true)}>✅ Marcar servicio completado</button>}
       </div>}
 
       <div className="sg"><SC lbl="Tareas esta semana" val={tot}/><SC lbl="Completadas" val={comp} prog={tot?comp/tot:0} valC="#10b981" sub={comp===tot&&tot>0?"¡Al día! ✓":undefined}/><SC lbl="Pendientes" val={tot-comp} valC={tot-comp>0?"#f59e0b":"#10b981"}/></div>
@@ -1645,17 +1645,17 @@ function DashJ({perfil,jsem,jpunt,cwk,setPage,tok}){
     {showNuevaJornada&&<div className="ov"><div className="modal" style={{maxWidth:400,textAlign:"center"}}>
       <div style={{fontSize:36,marginBottom:8}}>🌿</div>
       <h3>Tienes un servicio en curso</h3>
-      <p style={{fontSize:13,color:"#7a7f94",marginBottom:20,lineHeight:1.5}}>"{srvActivo?.titulo}" está activo. ¿Empezar la jornada de hoy?</p>
+      <p style={{fontSize:13,color:"#8A8580",marginBottom:20,lineHeight:1.5}}>"{srvActivo?.titulo}" está activo. ¿Empezar la jornada de hoy?</p>
       <button className="btn bp" style={{width:"100%",justifyContent:"center",padding:"14px",fontSize:15}} onClick={iniciarJornada} disabled={saving2}>{saving2?"Iniciando…":"▶️ Empezar jornada"}</button>
-      <button onClick={()=>setShowNuevaJornada(false)} style={{background:"none",border:"none",color:"#5a5e6e",cursor:"pointer",width:"100%",textAlign:"center",marginTop:12,fontSize:12,fontFamily:"'DM Sans',sans-serif",padding:"8px"}}>Ahora no</button>
+      <button onClick={()=>setShowNuevaJornada(false)} style={{background:"none",border:"none",color:"#8A8580",cursor:"pointer",width:"100%",textAlign:"center",marginTop:12,fontSize:12,fontFamily:"'DM Sans',sans-serif",padding:"8px"}}>Ahora no</button>
     </div></div>}
 
     {/* Modal terminar jornada */}
     {showFinJornada&&<div className="ov"><div className="modal" style={{maxWidth:400,textAlign:"center"}}>
       <div style={{fontSize:36,marginBottom:8}}>🌙</div>
       <h3>¿Terminas por hoy?</h3>
-      <div style={{fontSize:24,fontWeight:700,color:"#c9a84c",fontFamily:"monospace",margin:"16px 0"}}>{fmtEl(elapsed)}</div>
-      <p style={{fontSize:13,color:"#7a7f94",marginBottom:20}}>Llevas {fmtHM(Math.round(elapsed/60))}</p>
+      <div style={{fontSize:24,fontWeight:700,color:"#EC683E",fontFamily:"monospace",margin:"16px 0"}}>{fmtEl(elapsed)}</div>
+      <p style={{fontSize:13,color:"#8A8580",marginBottom:20}}>Llevas {fmtHM(Math.round(elapsed/60))}</p>
       <button className="btn bp" style={{width:"100%",justifyContent:"center",padding:"14px",fontSize:15}} onClick={terminarJornada} disabled={saving2}>{saving2?"Guardando…":"✅ Terminar jornada"}</button>
       <button className="btn bg" style={{width:"100%",justifyContent:"center",marginTop:8}} onClick={()=>setShowFinJornada(false)}>Cancelar</button>
     </div></div>}
@@ -1664,12 +1664,12 @@ function DashJ({perfil,jsem,jpunt,cwk,setPage,tok}){
     {showFinSrv&&<div className="ov"><div className="modal" style={{maxWidth:440,textAlign:"center"}}>
       <div style={{fontSize:36,marginBottom:8}}>✅</div>
       <h3>Completar servicio</h3>
-      <p style={{fontSize:13,color:"#7a7f94",marginBottom:16,lineHeight:1.5}}>"{srvActivo?.titulo}" — todas las tareas asignadas completadas.</p>
-      <div style={{background:"#0f1117",borderRadius:10,padding:"14px",marginBottom:20}}>
-        <div style={{fontSize:12,color:"#5a5e6e"}}>Total acumulado: <strong style={{color:"#c9a84c"}}>{fmtHM(totalAcum*60)}</strong></div>
-        {srvExtras.length>0&&<div style={{fontSize:12,color:"#c9a84c",marginTop:4}}>+ {srvExtras.length} tarea{srvExtras.length>1?"s":""} extra registrada{srvExtras.length>1?"s":""}</div>}
+      <p style={{fontSize:13,color:"#8A8580",marginBottom:16,lineHeight:1.5}}>"{srvActivo?.titulo}" — todas las tareas asignadas completadas.</p>
+      <div style={{background:"#F5F3F0",borderRadius:10,padding:"14px",marginBottom:20}}>
+        <div style={{fontSize:12,color:"#8A8580"}}>Total acumulado: <strong style={{color:"#EC683E"}}>{fmtHM(totalAcum*60)}</strong></div>
+        {srvExtras.length>0&&<div style={{fontSize:12,color:"#EC683E",marginTop:4}}>+ {srvExtras.length} tarea{srvExtras.length>1?"s":""} extra registrada{srvExtras.length>1?"s":""}</div>}
       </div>
-      <button className="btn bp" style={{width:"100%",justifyContent:"center",padding:"14px",fontSize:15,background:"#10b981"}} onClick={completarServicio} disabled={saving2}>{saving2?"Finalizando…":"✅ Confirmar y notificar al admin"}</button>
+      <button className="btn bp" style={{width:"100%",justifyContent:"center",padding:"14px",fontSize:15,background:"#A6BE59"}} onClick={completarServicio} disabled={saving2}>{saving2?"Finalizando…":"✅ Confirmar y notificar al admin"}</button>
       <button className="btn bg" style={{width:"100%",justifyContent:"center",marginTop:8}} onClick={()=>setShowFinSrv(false)}>Cancelar</button>
     </div></div>}
 
@@ -1698,7 +1698,7 @@ function DashL({perfil,setPage}){
     <div className="pb"><div className="g2">
       {[{ico:"🧹",t:"Mi servicio",s:"Checklist limpieza",id:"limpieza"},{ico:"📅",t:"Calendario",s:"Próximos eventos",id:"cal-limp"}].map(it=>(
         <button key={it.id} className="card" style={{cursor:"pointer",textAlign:"left",border:"1px solid rgba(201,168,76,.15)"}} onClick={()=>setPage(it.id)}>
-          <div style={{fontSize:28,marginBottom:8}}>{it.ico}</div><div style={{fontSize:14,fontWeight:600,color:"#c9c5b8"}}>{it.t}</div><div style={{fontSize:12,color:"#5a5e6e",marginTop:3}}>{it.s}</div>
+          <div style={{fontSize:28,marginBottom:8}}>{it.ico}</div><div style={{fontSize:14,fontWeight:600,color:"#1A1A1A"}}>{it.t}</div><div style={{fontSize:12,color:"#8A8580",marginTop:3}}>{it.s}</div>
         </button>))}
     </div></div>
   </>;
@@ -1711,7 +1711,7 @@ function DashC({perfil,reservas,setPage}){
       <div className="sg"><SC lbl="Reservas activas" val={reservas.filter(r=>["visita","pendiente_contrato","contrato_firmado","reserva_pagada","precio_total"].includes(r.estado)).length} sub="en curso"/><SC lbl="Pendientes de firma" val={pend} valC={pend>0?"#f59e0b":undefined}/></div>
       <div className="g2">{[{ico:"📋",t:"Reservas",s:"Listado completo",id:"reservas"},{ico:"📅",t:"Calendario",s:"Disponibilidad",id:"calendario"}].map(it=>(
         <button key={it.id} className="card" style={{cursor:"pointer",textAlign:"left",border:"1px solid rgba(201,168,76,.15)"}} onClick={()=>setPage(it.id)}>
-          <div style={{fontSize:28,marginBottom:8}}>{it.ico}</div><div style={{fontSize:14,fontWeight:600,color:"#c9c5b8"}}>{it.t}</div><div style={{fontSize:12,color:"#5a5e6e",marginTop:3}}>{it.s}</div>
+          <div style={{fontSize:28,marginBottom:8}}>{it.ico}</div><div style={{fontSize:14,fontWeight:600,color:"#1A1A1A"}}>{it.t}</div><div style={{fontSize:12,color:"#8A8580",marginTop:3}}>{it.s}</div>
         </button>))}</div>
     </div>
   </>;
@@ -1725,12 +1725,12 @@ function SemanaArchivada({semana,estado,nota}){
   return <div style={{background:ok?"rgba(16,185,129,.06)":"rgba(245,158,11,.06)",border:`1px solid ${ok?"rgba(16,185,129,.2)":"rgba(245,158,11,.2)"}`,borderRadius:10,marginBottom:8,overflow:"hidden"}}>
     <div onClick={()=>setOpen(!open)} style={{display:"flex",alignItems:"center",gap:10,padding:"12px 14px",cursor:"pointer"}}>
       <span style={{fontSize:18}}>{ok?"✅":"⚠️"}</span>
-      <div style={{flex:1}}><div style={{fontSize:13,fontWeight:600,color:ok?"#10b981":"#f59e0b"}}>Semana del {rango}</div><div style={{fontSize:11,color:"#7a7f94",marginTop:2}}>{ok?"Jardín verificado ✓":"Cerrado con incidencias"}</div></div>
-      <span style={{color:"#5a5e6e",fontSize:18,transition:"transform .2s",transform:open?"rotate(90deg)":"none"}}>›</span>
+      <div style={{flex:1}}><div style={{fontSize:13,fontWeight:600,color:ok?"#10b981":"#f59e0b"}}>Semana del {rango}</div><div style={{fontSize:11,color:"#8A8580",marginTop:2}}>{ok?"Jardín verificado ✓":"Cerrado con incidencias"}</div></div>
+      <span style={{color:"#8A8580",fontSize:18,transition:"transform .2s",transform:open?"rotate(90deg)":"none"}}>›</span>
     </div>
     {open&&<div style={{padding:"0 14px 14px",borderTop:"1px solid rgba(255,255,255,.05)"}}>
-      {nota&&<div style={{fontSize:12,color:"#c9c5b8",marginTop:10,lineHeight:1.5}}>📝 {nota}</div>}
-      <div style={{fontSize:11,color:"#5a5e6e",marginTop:6}}>Archivada · {semana}</div>
+      {nota&&<div style={{fontSize:12,color:"#1A1A1A",marginTop:10,lineHeight:1.5}}>📝 {nota}</div>}
+      <div style={{fontSize:11,color:"#8A8580",marginTop:6}}>Archivada · {semana}</div>
     </div>}
   </div>;
 }
@@ -1913,7 +1913,7 @@ function JardinCheck({perfil,tok,rol}){
     const ok=yaVerif.done;
     return <div style={{background:ok?"rgba(16,185,129,.1)":"rgba(245,158,11,.1)",border:`1px solid ${ok?"rgba(16,185,129,.3)":"rgba(245,158,11,.3)"}`,borderRadius:10,padding:"12px 16px",marginBottom:16,display:"flex",alignItems:"center",gap:10}}>
       <span style={{fontSize:20}}>{ok?"✅":"⚠️"}</span>
-      <div><div style={{fontSize:13,fontWeight:600,color:ok?"#10b981":"#f59e0b"}}>{ok?"Jardín verificado esta semana":"Semana cerrada con incidencias"}</div><div style={{fontSize:11,color:"#7a7f94",marginTop:2}}>{yaVerif.nota} · {fmtDT(yaVerif.completado_ts)}</div></div>
+      <div><div style={{fontSize:13,fontWeight:600,color:ok?"#10b981":"#f59e0b"}}>{ok?"Jardín verificado esta semana":"Semana cerrada con incidencias"}</div><div style={{fontSize:11,color:"#8A8580",marginTop:2}}>{yaVerif.nota} · {fmtDT(yaVerif.completado_ts)}</div></div>
       {!isA&&<button className="btn bg sm" style={{marginLeft:"auto",flexShrink:0}} onClick={()=>{setFinalCheck({});setFinalMode(null);setFinalNota("");setShowFinal(true);}}>Cambiar</button>}
     </div>;
   };
@@ -1930,7 +1930,7 @@ function JardinCheck({perfil,tok,rol}){
       )}
       {actv.length>0&&(
         <div className="card" style={{marginBottom:14}}>
-          <div className="chdr"><span className="ctit">📋 Esta semana</span><span className="badge" style={{background:"rgba(16,185,129,.1)",color:"#10b981"}}>{comp}/{actv.length}</span></div>
+          <div className="chdr"><span className="ctit">📋 Esta semana</span><span className="badge" style={{background:"rgba(16,185,129,.1)",color:"#A6BE59"}}>{comp}/{actv.length}</span></div>
           {actv.map(t=>{
             const e=sj[t.id]||{};
             return <div key={t.id} className={`cli${e.done?" done":""}`}>
@@ -1958,7 +1958,7 @@ function JardinCheck({perfil,tok,rol}){
               <div style={{flex:1,minWidth:0}}>
                 <span className="tz">{t.zona||"General"}</span>
                 <div className={`tl${t.done?" done":""}`}>{t.txt}</div>
-                <div className="tm" style={{color:"#f59e0b"}}>📌 Puntual · {t.creado_por}</div>
+                <div className="tm" style={{color:"#D4A017"}}>📌 Puntual · {t.creado_por}</div>
                 {t.done&&<div className="tm">✓ {t.completado_por} · {fmtDT(t.completado_ts)}</div>}
                 {t.nota&&<div className="nbox">📝 {t.nota}</div>}
                 {t.foto_url&&<img src={t.foto_url} alt="" className="pthumb"/>}
@@ -1976,12 +1976,12 @@ function JardinCheck({perfil,tok,rol}){
         return <div key={s.id} className="card" style={{marginBottom:14,border:"1px solid rgba(201,168,76,.2)"}}>
           <div className="chdr" onClick={()=>setSrvOpen(prev=>({...prev,[s.id]:!prev[s.id]}))} style={{cursor:"pointer"}}>
             <span className="ctit">{abierto?"▼":"▶"} 🌿 {s.nombre}</span>
-            <span className="badge" style={{background:"rgba(201,168,76,.1)",color:"#c9a84c"}}>{hechas}/{tareas.length}</span>
+            <span className="badge" style={{background:"rgba(201,168,76,.1)",color:"#EC683E"}}>{hechas}/{tareas.length}</span>
           </div>
-          <div style={{padding:"2px 0",fontSize:12,color:"#7a7f94"}}>📅 {fi} – {ff}</div>
+          <div style={{padding:"2px 0",fontSize:12,color:"#8A8580"}}>📅 {fi} – {ff}</div>
           {abierto&&<>
             {s.notas&&<div className="nbox" style={{margin:"6px 0"}}>📝 {s.notas}</div>}
-            <div className="prog" style={{margin:"8px 0",height:5}}><div className="pfill" style={{width:`${tareas.length?(hechas/tareas.length)*100:0}%`,background:"#c9a84c"}}/></div>
+            <div className="prog" style={{margin:"8px 0",height:5}}><div className="pfill" style={{width:`${tareas.length?(hechas/tareas.length)*100:0}%`,background:"#EC683E"}}/></div>
             {tareas.map(t=><div key={t.id} className={`cli${t.done?" done":""}`}>
               <div className={`chk${t.done?" on":""}`} onClick={()=>toggleSrvTarea(t.id,t.done)} style={{cursor:"pointer"}}/>
               <div style={{flex:1,minWidth:0}}>
@@ -1992,25 +1992,25 @@ function JardinCheck({perfil,tok,rol}){
               </div>
               <span className="ibtn" onClick={()=>openSrvNota(t)}>{t.nota||t.foto_url?"✏️":"➕"}</span>
             </div>)}
-            {hechas===tareas.length&&tareas.length>0&&<div style={{textAlign:"center",padding:"10px 0",fontSize:13,color:"#10b981",fontWeight:600}}>✅ ¡Servicio completado!</div>}
+            {hechas===tareas.length&&tareas.length>0&&<div style={{textAlign:"center",padding:"10px 0",fontSize:13,color:"#A6BE59",fontWeight:600}}>✅ ¡Servicio completado!</div>}
           </>}
         </div>;
       })}
       {tot===0&&misSrvs.length===0&&<div className="empty"><span className="ico">✅</span><p>Sin tareas esta semana</p></div>}
       {inac.length>0&&(
         <div className="card" style={{opacity:.4}}>
-          <div className="chdr"><span className="ctit" style={{color:"#5a5e6e"}}>⏭ No toca esta semana</span></div>
+          <div className="chdr"><span className="ctit" style={{color:"#8A8580"}}>⏭ No toca esta semana</span></div>
           {inac.map(t=>(
             <div key={t.id} style={{display:"flex",alignItems:"center",gap:10,padding:"7px 0",borderBottom:"1px solid rgba(255,255,255,.04)"}}>
               <span style={{fontSize:13}}>⏸</span>
-              <div><div style={{fontSize:12,color:"#5a5e6e"}}>{t.txt}</div><div style={{fontSize:10,color:"#3d4155"}}>🔁 {FREC_LBL[fr[t.id]||t.frec]}</div></div>
+              <div><div style={{fontSize:12,color:"#8A8580"}}>{t.txt}</div><div style={{fontSize:10,color:"#BFBAB4"}}>🔁 {FREC_LBL[fr[t.id]||t.frec]}</div></div>
             </div>
           ))}
         </div>
       )}
       {historial.length>0&&(
         <div style={{marginTop:24}}>
-          <div style={{fontSize:11,color:"#5a5e6e",textTransform:"uppercase",letterSpacing:1.5,marginBottom:10}}>📁 Semanas anteriores</div>
+          <div style={{fontSize:11,color:"#8A8580",textTransform:"uppercase",letterSpacing:1.5,marginBottom:10}}>📁 Semanas anteriores</div>
           {historial.map(h=><SemanaArchivada key={h.id} semana={h.semana} estado={h.done} nota={h.nota}/>)}
         </div>
       )}
@@ -2018,11 +2018,11 @@ function JardinCheck({perfil,tok,rol}){
 
     {showFinal&&!isA&&(
       <div className="ov" style={{alignItems:"flex-end",padding:0}}>
-        <div style={{background:"#13161f",border:"1px solid rgba(201,168,76,.25)",borderRadius:"20px 20px 0 0",padding:"24px 20px 36px",width:"100%",maxWidth:540,maxHeight:"92vh",overflowY:"auto"}}>
+        <div style={{background:"#FFFFFF",border:"1px solid rgba(201,168,76,.25)",borderRadius:"20px 20px 0 0",padding:"24px 20px 36px",width:"100%",maxWidth:540,maxHeight:"92vh",overflowY:"auto"}}>
           <div style={{textAlign:"center",marginBottom:20}}>
             <div style={{fontSize:36,marginBottom:8}}>🌿</div>
-            <div style={{fontFamily:"'Playfair Display',serif",fontSize:20,color:"#e8e6e1",marginBottom:4}}>¡Últimas comprobaciones!</div>
-            <div style={{fontSize:13,color:"#7a7f94"}}>Has completado todas las tareas. Antes de cerrar, verifica que todo está correcto.</div>
+            <div style={{fontFamily:"'Inter Tight',sans-serif",fontSize:20,color:"#1A1A1A",marginBottom:4}}>¡Últimas comprobaciones!</div>
+            <div style={{fontSize:13,color:"#8A8580"}}>Has completado todas las tareas. Antes de cerrar, verifica que todo está correcto.</div>
           </div>
           {!finalMode&&(
             <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:20}}>
@@ -2031,7 +2031,7 @@ function JardinCheck({perfil,tok,rol}){
             </div>
           )}
           {finalMode==="ok"&&<>
-            <div style={{fontSize:12,color:"#c9a84c",fontWeight:600,marginBottom:12,textTransform:"uppercase",letterSpacing:1}}>✅ Comprueba cada punto antes de confirmar</div>
+            <div style={{fontSize:12,color:"#EC683E",fontWeight:600,marginBottom:12,textTransform:"uppercase",letterSpacing:1}}>✅ Comprueba cada punto antes de confirmar</div>
             {JARDIN_CF.map(item=>(
               <div key={item.id} onClick={()=>setFinalCheck(prev=>({...prev,[item.id]:!prev[item.id]}))}
                 style={{display:"flex",alignItems:"center",gap:12,padding:"11px 12px",borderRadius:10,marginBottom:6,cursor:"pointer",background:finalCheck[item.id]?"rgba(16,185,129,.08)":"#0f1117",border:`1px solid ${finalCheck[item.id]?"rgba(16,185,129,.25)":"rgba(255,255,255,.06)"}`,transition:"all .15s"}}>
@@ -2045,14 +2045,14 @@ function JardinCheck({perfil,tok,rol}){
             </div>
           </>}
           {finalMode==="incidencia"&&<>
-            <div style={{fontSize:13,color:"#f59e0b",fontWeight:600,marginBottom:10}}>⚠️ ¿Por qué no se ha podido completar el trabajo?</div>
+            <div style={{fontSize:13,color:"#D4A017",fontWeight:600,marginBottom:10}}>⚠️ ¿Por qué no se ha podido completar el trabajo?</div>
             <textarea className="fi" rows={4} value={finalNota} onChange={e=>setFinalNota(e.target.value)} placeholder="Ej: Falta material para la piscina…" style={{marginBottom:14,fontSize:14,lineHeight:1.5}}/>
             <div style={{display:"flex",gap:8}}>
               <button className="btn bg" style={{flex:1,justifyContent:"center"}} onClick={()=>setFinalMode(null)}>← Volver</button>
               <button className="btn" style={{flex:2,justifyContent:"center",padding:"12px",fontSize:15,background:"#f59e0b",color:"#0f1117"}} onClick={()=>guardarFinal("incidencia")} disabled={finalSaving||!finalNota.trim()}>{finalSaving?"Guardando…":"⚠️ Cerrar con incidencias"}</button>
             </div>
           </>}
-          <button onClick={()=>setShowFinal(false)} style={{background:"none",border:"none",color:"#5a5e6e",cursor:"pointer",width:"100%",textAlign:"center",marginTop:16,fontSize:12,fontFamily:"'DM Sans',sans-serif",padding:"8px"}}>Cerrar y decidir más tarde</button>
+          <button onClick={()=>setShowFinal(false)} style={{background:"none",border:"none",color:"#8A8580",cursor:"pointer",width:"100%",textAlign:"center",marginTop:16,fontSize:12,fontFamily:"'DM Sans',sans-serif",padding:"8px"}}>Cerrar y decidir más tarde</button>
         </div>
       </div>
     )}
@@ -2151,7 +2151,7 @@ function JardinAdmin({perfil,tok}){
           {actv.map(t=>{const e=sj[t.id]||{};return <div key={t.id} className={`cli${e.done?" done":""}`}>
             <span style={{fontSize:17,flexShrink:0}}>{e.done?"✅":"⬜"}</span>
             <div style={{flex:1,minWidth:0}}><span className="tz">{t.zona}</span><div className="tl">{t.txt}</div><div className="tm" style={{color:"#6366f1"}}>🔁 {FREC_LBL[getFr(t)]}</div>
-              {e.done?<div className="tm">✓ {e.completado_por} · {fmtDT(e.completado_ts)}</div>:<div className="tm" style={{color:"#e85555"}}>⏳ Pendiente</div>}
+              {e.done?<div className="tm">✓ {e.completado_por} · {fmtDT(e.completado_ts)}</div>:<div className="tm" style={{color:"#F35757"}}>⏳ Pendiente</div>}
               {e.nota&&<div className="nbox">📝 {e.nota}</div>}{e.foto_url&&<img src={e.foto_url} alt="" className="pthumb"/>}
             </div>
           </div>;})}
@@ -2178,9 +2178,9 @@ function JardinAdmin({perfil,tok}){
           return <div key={s.id} className="card" style={{marginBottom:14}}>
             <div className="chdr" onClick={()=>setSelSrv(abierto?null:s.id)} style={{cursor:"pointer"}}>
               <span className="ctit">{abierto?"▼":"▶"} 🌿 {s.nombre}</span>
-              <span className="badge" style={{background:"rgba(16,185,129,.1)",color:"#10b981"}}>{hechas}/{tareas.length}</span>
+              <span className="badge" style={{background:"rgba(16,185,129,.1)",color:"#A6BE59"}}>{hechas}/{tareas.length}</span>
             </div>
-            <div style={{padding:"4px 0 0",fontSize:12,color:"#7a7f94",display:"flex",gap:12,flexWrap:"wrap"}}>
+            <div style={{padding:"4px 0 0",fontSize:12,color:"#8A8580",display:"flex",gap:12,flexWrap:"wrap"}}>
               <span>📅 {fi} – {ff}</span>
               <span>👤 {s.jardinero_nombre}</span>
             </div>
@@ -2189,11 +2189,11 @@ function JardinAdmin({perfil,tok}){
                 {tareas.map(t=><div key={t.id} className={`cli${t.done?" done":""}`} style={{padding:"8px 0"}}>
                   <span style={{fontSize:17,flexShrink:0}}>{t.done?"✅":"⬜"}</span>
                   <div style={{flex:1,minWidth:0}}>
-                    {t.añadida_por_jardinero&&<span className="badge" style={{background:"rgba(201,168,76,.12)",color:"#c9a84c",fontSize:10,marginBottom:3,display:"inline-block"}}>👷 Añadida por jardinero</span>}
-                    {t.es_extra&&!t.añadida_por_jardinero&&<span className="badge" style={{background:"rgba(201,168,76,.12)",color:"#c9a84c",fontSize:10,marginBottom:3,display:"inline-block"}}>➕ Extra</span>}
+                    {t.añadida_por_jardinero&&<span className="badge" style={{background:"rgba(201,168,76,.12)",color:"#EC683E",fontSize:10,marginBottom:3,display:"inline-block"}}>👷 Añadida por jardinero</span>}
+                    {t.es_extra&&!t.añadida_por_jardinero&&<span className="badge" style={{background:"rgba(201,168,76,.12)",color:"#EC683E",fontSize:10,marginBottom:3,display:"inline-block"}}>➕ Extra</span>}
                     <div className="tl">{t.txt}</div>
-                    {t.zona&&<div className="tm" style={{color:"#c9a84c"}}>{t.zona}</div>}
-                    {t.done?<div className="tm">✓ {t.completado_por} · {fmtDT(t.completado_ts)}</div>:<div className="tm" style={{color:"#e85555"}}>⏳ Pendiente</div>}
+                    {t.zona&&<div className="tm" style={{color:"#EC683E"}}>{t.zona}</div>}
+                    {t.done?<div className="tm">✓ {t.completado_por} · {fmtDT(t.completado_ts)}</div>:<div className="tm" style={{color:"#F35757"}}>⏳ Pendiente</div>}
                     {t.nota&&<div className="nbox">📝 {t.nota}</div>}
                     {t.foto_url&&<img src={t.foto_url} alt="" className="pthumb"/>}
                     {t.resp_admin&&<div className="rbox">✅ Admin: {t.resp_admin}</div>}
@@ -2209,7 +2209,7 @@ function JardinAdmin({perfil,tok}){
           </div>;
         })}
         {srvsHist.length>0&&<>
-          <div style={{fontSize:11,color:"#5a5e6e",textTransform:"uppercase",letterSpacing:1.5,marginTop:20,marginBottom:10}}>📁 Historial</div>
+          <div style={{fontSize:11,color:"#8A8580",textTransform:"uppercase",letterSpacing:1.5,marginTop:20,marginBottom:10}}>📁 Historial</div>
           {srvsHist.map(s=>{const tareas=s.jardin_servicio_tareas||[];const hechas=tareas.filter(t=>t.done).length;
             const fi=new Date(s.fecha_inicio+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"});
             const ff=new Date(s.fecha_fin+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"});
@@ -2218,7 +2218,7 @@ function JardinAdmin({perfil,tok}){
                 <span className="ctit">{s.estado==="completado"?"✅":"❌"} {s.nombre}</span>
                 <span className="badge" style={{background:s.estado==="completado"?"rgba(16,185,129,.1)":"rgba(232,85,85,.1)",color:s.estado==="completado"?"#10b981":"#e85555"}}>{s.estado==="completado"?"Completado":"Cancelado"}</span>
               </div>
-              <div style={{fontSize:12,color:"#5a5e6e"}}>📅 {fi} – {ff} · 👤 {s.jardinero_nombre} · {hechas}/{tareas.length} tareas</div>
+              <div style={{fontSize:12,color:"#8A8580"}}>📅 {fi} – {ff} · 👤 {s.jardinero_nombre} · {hechas}/{tareas.length} tareas</div>
             </div>;
           })}
         </>}
@@ -2229,7 +2229,7 @@ function JardinAdmin({perfil,tok}){
           const f=getFr(t),activa=tocaSemana({...t,frec:f},cwk),ed=editFr===t.id;
           return <div key={t.id} style={{padding:"11px 0",borderBottom:"1px solid rgba(255,255,255,.05)"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8}}>
-              <div style={{minWidth:0}}><div style={{fontSize:13,color:activa?"#c9c5b8":"#5a5e6e",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.txt}</div><div style={{fontSize:11,color:"#5a5e6e"}}>{t.zona}</div></div>
+              <div style={{minWidth:0}}><div style={{fontSize:13,color:activa?"#c9c5b8":"#5a5e6e",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.txt}</div><div style={{fontSize:11,color:"#8A8580"}}>{t.zona}</div></div>
               <div style={{display:"flex",gap:6,alignItems:"center",flexShrink:0}}>
                 <span className="badge" style={{background:activa?"rgba(16,185,129,.1)":"rgba(255,255,255,.04)",color:activa?"#10b981":"#5a5e6e"}}>{activa?"Esta sem.":"No esta sem."}</span>
                 <button className="btn bg sm" onClick={()=>setEditFr(ed?null:t.id)}>🔁 {FREC_LBL[f]}</button>
@@ -2255,7 +2255,7 @@ function JardinAdmin({perfil,tok}){
         <div className="fg" style={{flex:1}}><label>Fecha fin *</label><input className="fi" type="date" value={srvForm.fecha_fin} onChange={e=>setSrvForm(v=>({...v,fecha_fin:e.target.value}))}/></div>
       </div>
       <div className="fg"><label>Jardinero asignado *</label>
-        {jardineros.length===0?<div style={{fontSize:12,color:"#f59e0b",background:"rgba(245,158,11,.06)",borderRadius:8,padding:"10px 12px"}}>⚠️ Añade jardineros en el módulo Jardineros antes de crear servicios</div>
+        {jardineros.length===0?<div style={{fontSize:12,color:"#D4A017",background:"rgba(245,158,11,.06)",borderRadius:8,padding:"10px 12px"}}>⚠️ Añade jardineros en el módulo Jardineros antes de crear servicios</div>
         :<select className="fi" value={srvForm.jardinero_id} onChange={e=>setSrvForm(v=>({...v,jardinero_id:e.target.value}))}>
           <option value="">Seleccionar jardinero…</option>
           {jardineros.map(j=><option key={j.id} value={j.id}>{j.nombre}</option>)}
@@ -2270,9 +2270,9 @@ function JardinAdmin({perfil,tok}){
         </div>
         {srvTareas.length>0&&<div style={{marginTop:10}}>
           {srvTareas.map((t,i)=><div key={i} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",background:"rgba(255,255,255,.03)",borderRadius:8,marginBottom:4}}>
-            <span style={{color:"#c9a84c",fontSize:13,flexShrink:0}}>{i+1}.</span>
-            <span style={{flex:1,fontSize:13,color:"#c9c5b8"}}>{t}</span>
-            <button onClick={()=>removeTareaTemp(i)} style={{background:"none",border:"none",color:"#e85555",cursor:"pointer",fontSize:15,padding:"0 4px"}}>×</button>
+            <span style={{color:"#EC683E",fontSize:13,flexShrink:0}}>{i+1}.</span>
+            <span style={{flex:1,fontSize:13,color:"#1A1A1A"}}>{t}</span>
+            <button onClick={()=>removeTareaTemp(i)} style={{background:"none",border:"none",color:"#F35757",cursor:"pointer",fontSize:15,padding:"0 4px"}}>×</button>
           </div>)}
         </div>}
       </div>
@@ -2321,17 +2321,17 @@ function IncCard({inc,onResp}){
   return <div className="card" style={{marginBottom:10,borderLeft:`3px solid ${col}`}}>
     <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:12,marginBottom:10}}>
       <div style={{minWidth:0}}>
-        <div style={{fontSize:14,fontWeight:600,color:"#e8e6e1",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{inc.tarea}</div>
+        <div style={{fontSize:14,fontWeight:600,color:"#1A1A1A",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{inc.tarea}</div>
         <div style={{display:"flex",gap:6,marginTop:5,flexWrap:"wrap"}}>
-          <span className="badge" style={{background:"rgba(201,168,76,.1)",color:"#c9a84c"}}>📍 {inc.zona}</span>
+          <span className="badge" style={{background:"rgba(201,168,76,.1)",color:"#EC683E"}}>📍 {inc.zona}</span>
           <span className="badge" style={{background:`${col}18`,color:col}}>{inc.tag} {inc.tipo}</span>
         </div>
       </div>
-      <div style={{textAlign:"right",flexShrink:0,fontSize:11,color:"#5a5e6e"}}>{inc.completado_por&&<div>👤 {inc.completado_por}</div>}<div>🕐 {fmtDT(inc.completado_ts||inc.created_at)}</div></div>
+      <div style={{textAlign:"right",flexShrink:0,fontSize:11,color:"#8A8580"}}>{inc.completado_por&&<div>👤 {inc.completado_por}</div>}<div>🕐 {fmtDT(inc.completado_ts||inc.created_at)}</div></div>
     </div>
-    {inc.nota&&<div className="nbox"><div style={{fontSize:10,color:"#f59e0b",fontWeight:600,marginBottom:3}}>📝 NOTA</div>{inc.nota}</div>}
+    {inc.nota&&<div className="nbox"><div style={{fontSize:10,color:"#D4A017",fontWeight:600,marginBottom:3}}>📝 NOTA</div>{inc.nota}</div>}
     {inc.foto_url&&<img src={inc.foto_url} alt="" style={{maxWidth:"100%",maxHeight:220,borderRadius:8,marginTop:8,objectFit:"cover",display:"block"}}/>}
-    {inc.resp_admin&&<div className="rbox"><div style={{fontSize:10,color:"#10b981",fontWeight:600,marginBottom:3}}>✅ RESPUESTA ADMIN</div>{inc.resp_admin}</div>}
+    {inc.resp_admin&&<div className="rbox"><div style={{fontSize:10,color:"#A6BE59",fontWeight:600,marginBottom:3}}>✅ RESPUESTA ADMIN</div>{inc.resp_admin}</div>}
     <div style={{marginTop:10}}><button className="btn bg sm" onClick={()=>setShow(!show)}>{inc.resp_admin?"✏️ Editar respuesta":"💬 Responder"}</button></div>
     {show&&<div style={{marginTop:9}}>
       <textarea className="fi" rows={3} value={reply} onChange={e=>setReply(e.target.value)} placeholder="Escribe tu respuesta…"/>
@@ -2674,8 +2674,8 @@ function Limpieza({perfil,tok,rol}){
             const vOk=s.verificado&&s.verificado_ok;
             const vInc=s.verificado&&!s.verificado_ok;
             return <div key={s.id} className="card" style={{marginBottom:8,cursor:"pointer",borderColor:actId===s.id?"rgba(201,168,76,.35)":undefined}} onClick={()=>setActId(s.id)}>
-              <div style={{fontSize:13,fontWeight:600,color:"#c9a84c",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>🧹 {s.nombre}</div>
-              <div style={{fontSize:11,color:"#7a7f94",marginTop:3}}>📅 {new Date(s.fecha).toLocaleDateString("es-ES")}</div>
+              <div style={{fontSize:13,fontWeight:600,color:"#EC683E",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>🧹 {s.nombre}</div>
+              <div style={{fontSize:11,color:"#8A8580",marginTop:3}}>📅 {new Date(s.fecha).toLocaleDateString("es-ES")}</div>
               {s.verificado&&<div style={{marginTop:5,fontSize:11,color:vOk?"#10b981":"#f59e0b",fontWeight:600}}>{vOk?"✅ Verificado":"⚠️ Con incidencias"}</div>}
             </div>;
           })}
@@ -2688,15 +2688,15 @@ function Limpieza({perfil,tok,rol}){
             <span style={{fontSize:20}}>{srv.verificado_ok?"✅":"⚠️"}</span>
             <div>
               <div style={{fontSize:13,fontWeight:600,color:srv.verificado_ok?"#10b981":"#f59e0b"}}>{srv.verificado_ok?"Servicio verificado":"Cerrado con incidencias"}</div>
-              <div style={{fontSize:11,color:"#7a7f94",marginTop:2}}>{srv.verificado_nota}</div>
+              <div style={{fontSize:11,color:"#8A8580",marginTop:2}}>{srv.verificado_nota}</div>
             </div>
           </div>}
 
           {/* Cabecera servicio */}
           <div style={{background:"rgba(201,168,76,.08)",border:"1px solid rgba(201,168,76,.15)",borderRadius:10,padding:"12px 16px",marginBottom:12,display:"flex",justifyContent:"space-between",alignItems:"center",gap:8}}>
             <div style={{minWidth:0}}>
-              <div style={{fontSize:13,fontWeight:600,color:"#c9a84c",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>🧹 {srv.nombre}</div>
-              <div style={{fontSize:11,color:"#7a7f94"}}>{new Date(srv.fecha).toLocaleDateString("es-ES")} · {comp}/{tot} tareas</div>
+              <div style={{fontSize:13,fontWeight:600,color:"#EC683E",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>🧹 {srv.nombre}</div>
+              <div style={{fontSize:11,color:"#8A8580"}}>{new Date(srv.fecha).toLocaleDateString("es-ES")} · {comp}/{tot} tareas</div>
             </div>
             {isA&&<div style={{display:"flex",gap:6,flexShrink:0}}>
               <button className="btn bg sm" onClick={()=>setShowEx(true)}>+ Extra</button>
@@ -2711,7 +2711,7 @@ function Limpieza({perfil,tok,rol}){
             ):(
               <div style={{background:"rgba(16,185,129,.08)",border:"1px solid rgba(16,185,129,.2)",borderRadius:10,padding:"10px 14px",marginBottom:14,display:"flex",alignItems:"center",gap:8}}>
                 <span style={{fontSize:18}}>⏱️</span>
-                <div style={{fontSize:13,color:"#10b981",fontWeight:500}}>En curso desde las <strong>{srv.hora_inicio?.slice(0,5)}</strong></div>
+                <div style={{fontSize:13,color:"#A6BE59",fontWeight:500}}>En curso desde las <strong>{srv.hora_inicio?.slice(0,5)}</strong></div>
               </div>
             )}
           </>}
@@ -2750,7 +2750,7 @@ function Limpieza({perfil,tok,rol}){
           {/* EXTRAS */}
           {extras.length>0&&<>
             <hr className="div"/>
-            <div style={{fontSize:12,color:"#c9a84c",fontWeight:600,marginBottom:9}}>⭐ Extras</div>
+            <div style={{fontSize:12,color:"#EC683E",fontWeight:600,marginBottom:9}}>⭐ Extras</div>
             {extras.map(t=>(
               <div key={t.id} className={`cli${t.done?" done":""}`}>
                 {!isA
@@ -2815,11 +2815,11 @@ function Limpieza({perfil,tok,rol}){
     {/* MODAL VERIFICACIÓN FINAL */}
     {showFinal&&!isA&&(
       <div className="ov" style={{alignItems:"flex-end",padding:0}}>
-        <div style={{background:"#13161f",border:"1px solid rgba(201,168,76,.25)",borderRadius:"20px 20px 0 0",padding:"24px 20px 36px",width:"100%",maxWidth:540,maxHeight:"92vh",overflowY:"auto"}}>
+        <div style={{background:"#FFFFFF",border:"1px solid rgba(201,168,76,.25)",borderRadius:"20px 20px 0 0",padding:"24px 20px 36px",width:"100%",maxWidth:540,maxHeight:"92vh",overflowY:"auto"}}>
           <div style={{textAlign:"center",marginBottom:20}}>
             <div style={{fontSize:36,marginBottom:8}}>🧹</div>
-            <div style={{fontFamily:"'Playfair Display',serif",fontSize:20,color:"#e8e6e1",marginBottom:4}}>¡Comprobación final!</div>
-            <div style={{fontSize:13,color:"#7a7f94"}}>Has completado todas las tareas. Verifica que la casa está perfecta antes de cerrar.</div>
+            <div style={{fontFamily:"'Inter Tight',sans-serif",fontSize:20,color:"#1A1A1A",marginBottom:4}}>¡Comprobación final!</div>
+            <div style={{fontSize:13,color:"#8A8580"}}>Has completado todas las tareas. Verifica que la casa está perfecta antes de cerrar.</div>
           </div>
 
           {!finalMode&&(
@@ -2830,7 +2830,7 @@ function Limpieza({perfil,tok,rol}){
           )}
 
           {finalMode==="ok"&&finalStep==="check"&&<>
-            <div style={{fontSize:12,color:"#c9a84c",fontWeight:600,marginBottom:12,textTransform:"uppercase",letterSpacing:1}}>✅ Marca cada punto antes de confirmar</div>
+            <div style={{fontSize:12,color:"#EC683E",fontWeight:600,marginBottom:12,textTransform:"uppercase",letterSpacing:1}}>✅ Marca cada punto antes de confirmar</div>
             {LIMP_CF.map(item=>(
               <div key={item.id} onClick={()=>setFinalCheck(prev=>({...prev,[item.id]:!prev[item.id]}))}
                 style={{display:"flex",alignItems:"center",gap:12,padding:"11px 12px",borderRadius:10,marginBottom:6,cursor:"pointer",background:finalCheck[item.id]?"rgba(16,185,129,.08)":"#0f1117",border:`1px solid ${finalCheck[item.id]?"rgba(16,185,129,.25)":"rgba(255,255,255,.06)"}`,transition:"all .15s"}}>
@@ -2849,20 +2849,20 @@ function Limpieza({perfil,tok,rol}){
             return <>
             <div style={{textAlign:"center",marginBottom:16}}>
               <div style={{fontSize:28,marginBottom:6}}>🕐</div>
-              <div style={{fontFamily:"'Playfair Display',serif",fontSize:18,color:"#e8e6e1",marginBottom:4}}>¿A qué hora has terminado?</div>
+              <div style={{fontFamily:"'Inter Tight',sans-serif",fontSize:18,color:"#1A1A1A",marginBottom:4}}>¿A qué hora has terminado?</div>
             </div>
             <div className="fg">
               <label>Hora de finalización</label>
               <input type="time" className="fi" value={horaFin} onChange={e=>recalcHora(e.target.value)} style={{fontSize:18,textAlign:"center",padding:"12px"}}/>
             </div>
             {horasCalc>0&&<div style={{background:"rgba(201,168,76,.06)",border:"1px solid rgba(201,168,76,.15)",borderRadius:10,padding:"14px 16px",marginBottom:14}}>
-              <div style={{fontSize:13,color:"#c9c5b8",marginBottom:6}}>⏱ Has trabajado <strong style={{color:"#c9a84c"}}>{horasCalc} horas</strong></div>
+              <div style={{fontSize:13,color:"#1A1A1A",marginBottom:6}}>⏱ Has trabajado <strong style={{color:"#EC683E"}}>{horasCalc} horas</strong></div>
               {mod==="permuta"?<div style={{fontSize:14,color:"#a5b4fc"}}>🔄 Permuta: {srvM?.permuta_descripcion||"Acuerdo de permuta"} — Coste: 0€</div>
-              :mod==="precio_fijo_servicio"?<div style={{fontSize:14,color:"#e8e6e1"}}>Precio fijo acordado: <strong style={{color:"#c9a84c",fontSize:18}}>{costeCalc}€</strong></div>
-              :tarifaHora>0?<div style={{fontSize:14,color:"#e8e6e1"}}>Coste: <strong>{horasCalc}</strong> × <strong>{tarifaHora}€/h</strong> = <strong style={{color:"#c9a84c",fontSize:18}}>{costeCalc}€</strong></div>
-              :<div style={{fontSize:12,color:"#f59e0b",marginTop:4}}>⚠️ Configura la tarifa por hora en Ajustes para calcular el coste automáticamente</div>}
+              :mod==="precio_fijo_servicio"?<div style={{fontSize:14,color:"#1A1A1A"}}>Precio fijo acordado: <strong style={{color:"#EC683E",fontSize:18}}>{costeCalc}€</strong></div>
+              :tarifaHora>0?<div style={{fontSize:14,color:"#1A1A1A"}}>Coste: <strong>{horasCalc}</strong> × <strong>{tarifaHora}€/h</strong> = <strong style={{color:"#EC683E",fontSize:18}}>{costeCalc}€</strong></div>
+              :<div style={{fontSize:12,color:"#D4A017",marginTop:4}}>⚠️ Configura la tarifa por hora en Ajustes para calcular el coste automáticamente</div>}
             </div>}
-            {horasCalc===0&&<div style={{background:"rgba(245,158,11,.06)",border:"1px solid rgba(245,158,11,.15)",borderRadius:8,padding:"10px 12px",marginBottom:14,fontSize:12,color:"#f59e0b"}}>No se ha podido calcular la duración. Puedes continuar igualmente.</div>}
+            {horasCalc===0&&<div style={{background:"rgba(245,158,11,.06)",border:"1px solid rgba(245,158,11,.15)",borderRadius:8,padding:"10px 12px",marginBottom:14,fontSize:12,color:"#D4A017"}}>No se ha podido calcular la duración. Puedes continuar igualmente.</div>}
             <div style={{display:"flex",gap:8,marginTop:8}}>
               <button className="btn bg" style={{flex:1,justifyContent:"center"}} onClick={()=>setFinalStep("check")}>← Volver</button>
               <button className="btn bp" style={{flex:2,justifyContent:"center",padding:"12px",fontSize:15}} onClick={confirmarConHora} disabled={finalSaving}>{finalSaving?"Guardando…":"✅ Confirmar y cerrar servicio"}</button>
@@ -2870,7 +2870,7 @@ function Limpieza({perfil,tok,rol}){
           </>;})()}
 
           {finalMode==="incidencia"&&<>
-            <div style={{fontSize:13,color:"#f59e0b",fontWeight:600,marginBottom:10}}>⚠️ ¿Qué incidencia hay?</div>
+            <div style={{fontSize:13,color:"#D4A017",fontWeight:600,marginBottom:10}}>⚠️ ¿Qué incidencia hay?</div>
             <textarea className="fi" rows={4} value={finalNota} onChange={e=>setFinalNota(e.target.value)} placeholder="Ej: Falta reponer gel en baño principal, mancha en sofá…" style={{marginBottom:14,fontSize:14,lineHeight:1.5}}/>
             <div style={{display:"flex",gap:8}}>
               <button className="btn bg" style={{flex:1,justifyContent:"center"}} onClick={()=>setFinalMode(null)}>← Volver</button>
@@ -2878,7 +2878,7 @@ function Limpieza({perfil,tok,rol}){
             </div>
           </>}
 
-          <button onClick={()=>{setShowFinal(false);setFinalStep("check");}} style={{background:"none",border:"none",color:"#5a5e6e",cursor:"pointer",width:"100%",textAlign:"center",marginTop:16,fontSize:12,fontFamily:"'DM Sans',sans-serif",padding:"8px"}}>Cerrar y decidir más tarde</button>
+          <button onClick={()=>{setShowFinal(false);setFinalStep("check");}} style={{background:"none",border:"none",color:"#8A8580",cursor:"pointer",width:"100%",textAlign:"center",marginTop:16,fontSize:12,fontFamily:"'DM Sans',sans-serif",padding:"8px"}}>Cerrar y decidir más tarde</button>
         </div>
       </div>
     )}
@@ -2922,34 +2922,34 @@ function Chat({perfil,tok,rol}){
     <div className="ph chat-desktop-only"><h2>💬 {isA?"Chat con el equipo":"Chat con administración"}</h2></div>
     <div style={{display:"flex",height:"calc(100vh - 128px)",minHeight:300,overflow:"hidden"}} className="chat-desktop-only">
       {isA&&<div className="chat-list-col">
-        <div style={{padding:"12px 14px 8px",fontSize:10,color:"#5a5e6e",textTransform:"uppercase",letterSpacing:1}}>Conversaciones</div>
+        <div style={{padding:"12px 14px 8px",fontSize:10,color:"#8A8580",textTransform:"uppercase",letterSpacing:1}}>Conversaciones</div>
         {usuarios.map(u=><div key={u.id} className={`cu${String(conId)===String(u.id)?" on":""}`} onClick={()=>selectU(u.id)}>
           <div className="av" style={{width:32,height:32,fontSize:11}}>{u.avatar||u.nombre.slice(0,2).toUpperCase()}</div>
-          <div style={{flex:1,minWidth:0}}><div style={{fontSize:13,color:"#c9c5b8",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{u.nombre}</div><div style={{fontSize:10,color:"#5a5e6e",textTransform:"capitalize"}}>{u.rol}</div></div>
-          {(unread[String(u.id)]||0)>0&&<span style={{background:"#e85555",color:"#fff",borderRadius:20,padding:"2px 7px",fontSize:11,fontWeight:700,flexShrink:0}}>{unread[String(u.id)]}</span>}
+          <div style={{flex:1,minWidth:0}}><div style={{fontSize:13,color:"#1A1A1A",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{u.nombre}</div><div style={{fontSize:10,color:"#8A8580",textTransform:"capitalize"}}>{u.rol}</div></div>
+          {(unread[String(u.id)]||0)>0&&<span style={{background:"#F35757",color:"#fff",borderRadius:20,padding:"2px 7px",fontSize:11,fontWeight:700,flexShrink:0}}>{unread[String(u.id)]}</span>}
         </div>)}
       </div>}
       {conId?<div className="chat-area">
         <div className="chdr2">
           <div className="av" style={{width:32,height:32,fontSize:11}}>{isA?(conUser?.avatar||conUser?.nombre?.slice(0,2).toUpperCase()||"?"):"AD"}</div>
-          <div><div style={{fontSize:13,fontWeight:600,color:"#e8e6e1"}}>{isA?(conUser?.nombre||"…"):"Administración"}</div><div style={{fontSize:10,color:"#5a5e6e",textTransform:"capitalize"}}>{isA?(conUser?.rol||""):"admin"}</div></div>
+          <div><div style={{fontSize:13,fontWeight:600,color:"#1A1A1A"}}>{isA?(conUser?.nombre||"…"):"Administración"}</div><div style={{fontSize:10,color:"#8A8580",textTransform:"capitalize"}}>{isA?(conUser?.rol||""):"admin"}</div></div>
         </div>
         <div className="msgs">
-          {msgs.length===0&&<div style={{textAlign:"center",color:"#5a5e6e",fontSize:13,padding:"36px 0"}}>Comienza la conversación…</div>}
+          {msgs.length===0&&<div style={{textAlign:"center",color:"#8A8580",fontSize:13,padding:"36px 0"}}>Comienza la conversación…</div>}
           {msgs.map(m=>{const mine=String(m.de)===myId;return <div key={m.id} className={`bub${mine?" me":" them"}`}>{m.txt&&<div>{m.txt}</div>}{m.foto_url&&<img src={m.foto_url} alt="" style={{maxWidth:200,maxHeight:160,borderRadius:8,marginTop:6,objectFit:"cover",display:"block"}}/>}<div className="bmeta">{fmtDT(m.created_at)}</div></div>;})}
           <div ref={endRef}/>
         </div>
         {/* INPUT DESKTOP */}
-        <div style={{flexShrink:0,borderTop:"1px solid rgba(255,255,255,.08)",padding:"10px 14px",display:"flex",gap:8,alignItems:"flex-end",background:"#13161f"}}>
+        <div style={{flexShrink:0,borderTop:"1px solid rgba(255,255,255,.08)",padding:"10px 14px",display:"flex",gap:8,alignItems:"flex-end",background:"#FFFFFF"}}>
           <div style={{flex:1,minWidth:0}}>
-            {fotoMsg&&<div style={{marginBottom:8,position:"relative",display:"inline-block"}}><img src={fotoMsg} alt="" style={{height:50,borderRadius:6,objectFit:"cover"}}/><button onClick={()=>setFotoMsg(null)} style={{position:"absolute",top:-6,right:-6,background:"#e85555",border:"none",borderRadius:"50%",width:18,height:18,cursor:"pointer",color:"#fff",fontSize:10,display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button></div>}
+            {fotoMsg&&<div style={{marginBottom:8,position:"relative",display:"inline-block"}}><img src={fotoMsg} alt="" style={{height:50,borderRadius:6,objectFit:"cover"}}/><button onClick={()=>setFotoMsg(null)} style={{position:"absolute",top:-6,right:-6,background:"#F35757",border:"none",borderRadius:"50%",width:18,height:18,cursor:"pointer",color:"#fff",fontSize:10,display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button></div>}
             <textarea ref={inputRef} className="fi" rows={2} value={txt} onChange={e=>setTxt(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey&&window.innerWidth>768){e.preventDefault();send();}}} placeholder="Escribe un mensaje…" style={{resize:"none",fontSize:15,lineHeight:1.5}}/>
           </div>
           <div style={{display:"flex",flexDirection:"column",gap:6,flexShrink:0}}>
-            <label style={{cursor:"pointer",width:44,height:44,background:"rgba(255,255,255,.06)",border:"1px solid rgba(255,255,255,.1)",borderRadius:10,color:"#c9a84c",fontSize:20,display:"flex",alignItems:"center",justifyContent:"center"}}>
+            <label style={{cursor:"pointer",width:44,height:44,background:"rgba(255,255,255,.06)",border:"1px solid rgba(255,255,255,.1)",borderRadius:10,color:"#EC683E",fontSize:20,display:"flex",alignItems:"center",justifyContent:"center"}}>
               📷<input type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={async e=>{const f=e.target.files[0];if(f){try{const url=await uploadFoto(f,tok);setFotoMsg(url);}catch(_){const r=new FileReader();r.onload=ev=>setFotoMsg(ev.target.result);r.readAsDataURL(f);}}}}/>
             </label>
-            <button onClick={send} style={{width:44,height:44,background:"#c9a84c",border:"none",borderRadius:10,color:"#0f1117",fontSize:22,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700}}>→</button>
+            <button onClick={send} style={{width:44,height:44,background:"#EC683E",border:"none",borderRadius:10,color:"#0f1117",fontSize:22,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700}}>→</button>
           </div>
         </div>
       </div>:<div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center"}}><div className="empty"><span className="ico">💬</span><p>Selecciona una conversación</p></div></div>}
@@ -2958,37 +2958,37 @@ function Chat({perfil,tok,rol}){
     {/* MÓVIL */}
     <div className="chat-mobile-wrap">
       {isA&&!conId&&<>
-        <div style={{padding:"16px 16px 8px",borderBottom:"1px solid rgba(255,255,255,.06)"}}><div style={{fontFamily:"'Playfair Display',serif",fontSize:18,color:"#e8e6e1"}}>💬 Chat con el equipo</div></div>
+        <div style={{padding:"16px 16px 8px",borderBottom:"1px solid rgba(255,255,255,.06)"}}><div style={{fontFamily:"'Inter Tight',sans-serif",fontSize:18,color:"#1A1A1A"}}>💬 Chat con el equipo</div></div>
         <div style={{flex:1,overflowY:"auto"}}>
           {usuarios.map(u=><div key={u.id} className="cu" style={{padding:"14px 16px",borderBottom:"1px solid rgba(255,255,255,.06)"}} onClick={()=>selectU(u.id)}>
             <div className="av" style={{width:40,height:40,fontSize:13}}>{u.avatar||u.nombre.slice(0,2).toUpperCase()}</div>
-            <div style={{flex:1,minWidth:0,marginLeft:4}}><div style={{fontSize:15,color:"#c9c5b8",fontWeight:500}}>{u.nombre}</div><div style={{fontSize:12,color:"#5a5e6e",textTransform:"capitalize",marginTop:2}}>{u.rol}</div></div>
-            {(unread[String(u.id)]||0)>0?<span style={{background:"#e85555",color:"#fff",borderRadius:20,padding:"3px 9px",fontSize:12,fontWeight:700}}>{unread[String(u.id)]}</span>:<span style={{color:"#5a5e6e",fontSize:22}}>›</span>}
+            <div style={{flex:1,minWidth:0,marginLeft:4}}><div style={{fontSize:15,color:"#1A1A1A",fontWeight:500}}>{u.nombre}</div><div style={{fontSize:12,color:"#8A8580",textTransform:"capitalize",marginTop:2}}>{u.rol}</div></div>
+            {(unread[String(u.id)]||0)>0?<span style={{background:"#F35757",color:"#fff",borderRadius:20,padding:"3px 9px",fontSize:12,fontWeight:700}}>{unread[String(u.id)]}</span>:<span style={{color:"#8A8580",fontSize:22}}>›</span>}
           </div>)}
         </div>
       </>}
       {conId&&<div style={{display:"flex",flexDirection:"column",height:"100%",overflow:"hidden",position:"relative"}}>
-        <div style={{flexShrink:0,padding:"11px 16px",borderBottom:"1px solid rgba(255,255,255,.07)",display:"flex",alignItems:"center",gap:10,background:"#13161f"}}>
-          {isA&&<button onClick={()=>setConId(null)} style={{background:"none",border:"none",color:"#c9a84c",fontSize:26,cursor:"pointer",padding:"0 8px 0 0",lineHeight:1,flexShrink:0}}>‹</button>}
+        <div style={{flexShrink:0,padding:"11px 16px",borderBottom:"1px solid rgba(255,255,255,.07)",display:"flex",alignItems:"center",gap:10,background:"#FFFFFF"}}>
+          {isA&&<button onClick={()=>setConId(null)} style={{background:"none",border:"none",color:"#EC683E",fontSize:26,cursor:"pointer",padding:"0 8px 0 0",lineHeight:1,flexShrink:0}}>‹</button>}
           <div className="av" style={{width:36,height:36,fontSize:12,flexShrink:0}}>{isA?(conUser?.avatar||conUser?.nombre?.slice(0,2).toUpperCase()||"?"):"AD"}</div>
-          <div><div style={{fontSize:14,fontWeight:600,color:"#e8e6e1"}}>{isA?(conUser?.nombre||"…"):"Administración"}</div><div style={{fontSize:11,color:"#5a5e6e",textTransform:"capitalize"}}>{isA?(conUser?.rol||""):"admin"}</div></div>
+          <div><div style={{fontSize:14,fontWeight:600,color:"#1A1A1A"}}>{isA?(conUser?.nombre||"…"):"Administración"}</div><div style={{fontSize:11,color:"#8A8580",textTransform:"capitalize"}}>{isA?(conUser?.rol||""):"admin"}</div></div>
         </div>
         <div className="msgs" style={{flex:1,overflowY:"auto",paddingBottom:80}}>
-          {msgs.length===0&&<div style={{textAlign:"center",color:"#5a5e6e",fontSize:13,padding:"32px 0"}}>Comienza la conversación…</div>}
+          {msgs.length===0&&<div style={{textAlign:"center",color:"#8A8580",fontSize:13,padding:"32px 0"}}>Comienza la conversación…</div>}
           {msgs.map(m=>{const mine=String(m.de)===myId;return <div key={m.id} className={`bub${mine?" me":" them"}`}>{m.txt&&<div>{m.txt}</div>}{m.foto_url&&<img src={m.foto_url} alt="" style={{maxWidth:"70%",borderRadius:8,marginTop:6,objectFit:"cover",display:"block"}}/>}<div className="bmeta">{fmtDT(m.created_at)}</div></div>;})}
           <div ref={endRef}/>
         </div>
         {/* INPUT MÓVIL */}
-        <div style={{position:"absolute",bottom:0,left:0,right:0,zIndex:10,flexShrink:0,borderTop:"1px solid rgba(255,255,255,.08)",padding:"10px 14px",display:"flex",gap:8,alignItems:"flex-end",background:"#13161f"}}>
+        <div style={{position:"absolute",bottom:0,left:0,right:0,zIndex:10,flexShrink:0,borderTop:"1px solid rgba(255,255,255,.08)",padding:"10px 14px",display:"flex",gap:8,alignItems:"flex-end",background:"#FFFFFF"}}>
           <div style={{flex:1,minWidth:0}}>
-            {fotoMsg&&<div style={{marginBottom:8,position:"relative",display:"inline-block"}}><img src={fotoMsg} alt="" style={{height:50,borderRadius:6,objectFit:"cover"}}/><button onClick={()=>setFotoMsg(null)} style={{position:"absolute",top:-6,right:-6,background:"#e85555",border:"none",borderRadius:"50%",width:18,height:18,cursor:"pointer",color:"#fff",fontSize:10,display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button></div>}
+            {fotoMsg&&<div style={{marginBottom:8,position:"relative",display:"inline-block"}}><img src={fotoMsg} alt="" style={{height:50,borderRadius:6,objectFit:"cover"}}/><button onClick={()=>setFotoMsg(null)} style={{position:"absolute",top:-6,right:-6,background:"#F35757",border:"none",borderRadius:"50%",width:18,height:18,cursor:"pointer",color:"#fff",fontSize:10,display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button></div>}
             <textarea className="fi" rows={2} value={txt} onChange={e=>setTxt(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send();}}} placeholder="Escribe un mensaje…" style={{resize:"none",fontSize:15,lineHeight:1.5}}/>
           </div>
           <div style={{display:"flex",flexDirection:"column",gap:6,flexShrink:0}}>
-            <label style={{cursor:"pointer",width:44,height:44,background:"rgba(255,255,255,.06)",border:"1px solid rgba(255,255,255,.1)",borderRadius:10,color:"#c9a84c",fontSize:20,display:"flex",alignItems:"center",justifyContent:"center"}}>
+            <label style={{cursor:"pointer",width:44,height:44,background:"rgba(255,255,255,.06)",border:"1px solid rgba(255,255,255,.1)",borderRadius:10,color:"#EC683E",fontSize:20,display:"flex",alignItems:"center",justifyContent:"center"}}>
               📷<input type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={async e=>{const f=e.target.files[0];if(f){try{const url=await uploadFoto(f,tok);setFotoMsg(url);}catch(_){const r=new FileReader();r.onload=ev=>setFotoMsg(ev.target.result);r.readAsDataURL(f);}}}}/>
             </label>
-            <button onClick={send} style={{width:44,height:44,background:"#c9a84c",border:"none",borderRadius:10,color:"#0f1117",fontSize:22,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700}}>→</button>
+            <button onClick={send} style={{width:44,height:44,background:"#EC683E",border:"none",borderRadius:10,color:"#0f1117",fontSize:22,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700}}>→</button>
           </div>
         </div>
       </div>}
@@ -3007,7 +3007,7 @@ async function checkDisponibilidad(fecha, tok){
   ]);
   const conflictos=[
     ...reservas.filter(r=>["visita","pendiente_contrato","contrato_firmado","reserva_pagada","precio_total"].includes(r.estado)).map(r=>({tipo:"evento",nombre:r.nombre,detalle:`Evento: ${r.tipo||""}`,color:"#6366f1"})),
-    ...airbnbs.map(a=>({tipo:"airbnb",nombre:"Alojamiento turístico",detalle:`Airbnb: ${a.huesped}`,color:"#10b981"})),
+    ...airbnbs.map(a=>({tipo:"airbnb",nombre:"Alojamiento turístico",detalle:`Airbnb: ${a.huesped}`,color:"#A6BE59"})),
   ];
   return {libre:conflictos.length===0, conflictos};
 }
@@ -3042,24 +3042,24 @@ function ModalOcupado({fecha,conflictos,tipoAccion,perfil,tok,onCerrar,onForzar}
   };
 
   return <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.82)",backdropFilter:"blur(4px)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:16,overflowY:"auto"}}>
-    <div style={{background:"#13161f",border:"1px solid rgba(201,168,76,.2)",borderRadius:14,padding:"24px 20px",width:"100%",maxWidth:460,position:"relative"}} onClick={e=>e.stopPropagation()}>
+    <div style={{background:"#FFFFFF",border:"1px solid rgba(201,168,76,.2)",borderRadius:14,padding:"24px 20px",width:"100%",maxWidth:460,position:"relative"}} onClick={e=>e.stopPropagation()}>
       {!enviado?<>
         <div style={{textAlign:"center",marginBottom:20}}>
           <div style={{fontSize:40,marginBottom:10}}>🔒</div>
-          <div style={{fontFamily:"'Playfair Display',serif",fontSize:19,color:"#e8e6e1",marginBottom:8}}>Fecha no disponible</div>
-          <div style={{fontSize:13,color:"#7a7f94",lineHeight:1.5}}>El <strong style={{color:"#c9c5b8"}}>{fmtFecha}</strong> ya tiene reservas activas.</div>
+          <div style={{fontFamily:"'Inter Tight',sans-serif",fontSize:19,color:"#1A1A1A",marginBottom:8}}>Fecha no disponible</div>
+          <div style={{fontSize:13,color:"#8A8580",lineHeight:1.5}}>El <strong style={{color:"#1A1A1A"}}>{fmtFecha}</strong> ya tiene reservas activas.</div>
         </div>
         <div style={{marginBottom:16}}>
           {conflictos.map((c,i)=>(
-            <div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",background:"#0f1117",borderRadius:8,marginBottom:6,borderLeft:`3px solid ${c.color}`}}>
+            <div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",background:"#F5F3F0",borderRadius:8,marginBottom:6,borderLeft:`3px solid ${c.color}`}}>
               <span style={{fontSize:16}}>{c.tipo==="airbnb"?"🏠":"🎉"}</span>
-              <div><div style={{fontSize:13,color:"#c9c5b8",fontWeight:500}}>{c.nombre}</div><div style={{fontSize:11,color:"#5a5e6e"}}>{c.detalle}</div></div>
+              <div><div style={{fontSize:13,color:"#1A1A1A",fontWeight:500}}>{c.nombre}</div><div style={{fontSize:11,color:"#8A8580"}}>{c.detalle}</div></div>
             </div>
           ))}
         </div>
         <div style={{background:"rgba(201,168,76,.06)",border:"1px solid rgba(201,168,76,.15)",borderRadius:10,padding:"14px",marginBottom:12}}>
-          <div style={{fontSize:13,color:"#c9a84c",fontWeight:600,marginBottom:6}}>¿Necesitas usar esta fecha?</div>
-          <div style={{fontSize:12,color:"#7a7f94",marginBottom:10,lineHeight:1.5}}>Solicita al administrador que autorice una franja horaria concreta.</div>
+          <div style={{fontSize:13,color:"#EC683E",fontWeight:600,marginBottom:6}}>¿Necesitas usar esta fecha?</div>
+          <div style={{fontSize:12,color:"#8A8580",marginBottom:10,lineHeight:1.5}}>Solicita al administrador que autorice una franja horaria concreta.</div>
           <textarea className="fi" rows={3} value={motivo} onChange={e=>setMotivo(e.target.value)} placeholder="Ej: Visita rápida por la mañana, los huéspedes llegan a las 16:00…" style={{fontSize:13,marginBottom:10}}/>
           <button className="btn bp" style={{width:"100%",justifyContent:"center",padding:"12px",fontSize:14}} onClick={solicitar} disabled={saving}>
             {saving?"Enviando…":"📨 Solicitar desbloqueo"}
@@ -3069,8 +3069,8 @@ function ModalOcupado({fecha,conflictos,tipoAccion,perfil,tok,onCerrar,onForzar}
       </>:<>
         <div style={{textAlign:"center",padding:"16px 0"}}>
           <div style={{fontSize:44,marginBottom:12}}>📨</div>
-          <div style={{fontFamily:"'Playfair Display',serif",fontSize:18,color:"#e8e6e1",marginBottom:10}}>Solicitud enviada</div>
-          <div style={{fontSize:13,color:"#7a7f94",lineHeight:1.6,marginBottom:20}}>El administrador ha recibido tu solicitud y te notificará si aprueba una franja horaria.</div>
+          <div style={{fontFamily:"'Inter Tight',sans-serif",fontSize:18,color:"#1A1A1A",marginBottom:10}}>Solicitud enviada</div>
+          <div style={{fontSize:13,color:"#8A8580",lineHeight:1.6,marginBottom:20}}>El administrador ha recibido tu solicitud y te notificará si aprueba una franja horaria.</div>
           <button className="btn bp" style={{width:"100%",justifyContent:"center",padding:"12px",fontSize:14}} onClick={onCerrar}>Entendido</button>
         </div>
       </>}
@@ -3123,22 +3123,22 @@ function PanelSolicitudes({tok,perfil}){
     setSaving(false);
   };
 
-  if(load)return <div style={{color:"#5a5e6e",fontSize:13,padding:"8px 0"}}>Cargando…</div>;
-  if(solicitudes.length===0)return <div style={{background:"rgba(16,185,129,.06)",border:"1px solid rgba(16,185,129,.15)",borderRadius:10,padding:"12px 16px",fontSize:13,color:"#10b981",marginBottom:16}}>✅ Sin solicitudes de desbloqueo pendientes</div>;
+  if(load)return <div style={{color:"#8A8580",fontSize:13,padding:"8px 0"}}>Cargando…</div>;
+  if(solicitudes.length===0)return <div style={{background:"rgba(16,185,129,.06)",border:"1px solid rgba(16,185,129,.15)",borderRadius:10,padding:"12px 16px",fontSize:13,color:"#A6BE59",marginBottom:16}}>✅ Sin solicitudes de desbloqueo pendientes</div>;
 
   return <div style={{marginBottom:20}}>
-    <div style={{fontSize:11,color:"#e85555",textTransform:"uppercase",letterSpacing:1,fontWeight:600,marginBottom:10}}>🔒 Solicitudes de desbloqueo ({solicitudes.length})</div>
+    <div style={{fontSize:11,color:"#F35757",textTransform:"uppercase",letterSpacing:1,fontWeight:600,marginBottom:10}}>🔒 Solicitudes de desbloqueo ({solicitudes.length})</div>
     {solicitudes.map(s=>{
       const fmtF=new Date(s.fecha+"T12:00:00").toLocaleDateString("es-ES",{weekday:"long",day:"numeric",month:"long"});
       const tipoLbl={visita:"Visita",reserva:"Reserva evento",airbnb:"Reserva Airbnb"}[s.tipo_accion]||s.tipo_accion;
       return <div key={s.id} className="card" style={{marginBottom:10,borderLeft:"3px solid #e85555"}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8,marginBottom:10}}>
           <div>
-            <div style={{fontSize:14,fontWeight:600,color:"#e8e6e1"}}>🔒 {tipoLbl} · {fmtF}</div>
-            <div style={{fontSize:12,color:"#7a7f94",marginTop:3}}>Solicitado por <strong>{s.solicitado_por}</strong></div>
-            {s.motivo&&<div style={{fontSize:12,color:"#c9c5b8",marginTop:5,background:"#0f1117",borderRadius:7,padding:"6px 10px"}}>{s.motivo}</div>}
+            <div style={{fontSize:14,fontWeight:600,color:"#1A1A1A"}}>🔒 {tipoLbl} · {fmtF}</div>
+            <div style={{fontSize:12,color:"#8A8580",marginTop:3}}>Solicitado por <strong>{s.solicitado_por}</strong></div>
+            {s.motivo&&<div style={{fontSize:12,color:"#1A1A1A",marginTop:5,background:"#F5F3F0",borderRadius:7,padding:"6px 10px"}}>{s.motivo}</div>}
           </div>
-          <span style={{fontSize:10,color:"#5a5e6e",flexShrink:0}}>{fmtDT(s.created_at)}</span>
+          <span style={{fontSize:10,color:"#8A8580",flexShrink:0}}>{fmtDT(s.created_at)}</span>
         </div>
         {sel?.id===s.id?(
           <div style={{background:"rgba(201,168,76,.06)",border:"1px solid rgba(201,168,76,.15)",borderRadius:10,padding:"12px"}}>
@@ -3186,7 +3186,7 @@ function Notifs({perfil,tok,rol}){
       {notifs.length===0?<div className="empty"><span className="ico">🔔</span><p>Sin notificaciones</p></div>
         :<div className="card" style={{padding:0,overflow:"hidden"}}>
           {notifs.map(n=>{const destU=isA?(n.usuarios||null):null;return <div key={n.id} className={`nitem${!n.leida?" unread":""}`}>
-            <div className={`ndot${n.leida?" read":""}`}/><div style={{flex:1,minWidth:0}}>{isA&&destU&&<div style={{fontSize:10,color:"#c9a84c",marginBottom:3}}>→ {destU.nombre}</div>}<div style={{fontSize:13,color:n.leida?"#7a7f94":"#c9c5b8",lineHeight:1.4}}>{n.txt}</div><div style={{fontSize:10,color:"#5a5e6e",marginTop:4}}>{fmtDT(n.created_at)}</div></div>
+            <div className={`ndot${n.leida?" read":""}`}/><div style={{flex:1,minWidth:0}}>{isA&&destU&&<div style={{fontSize:10,color:"#EC683E",marginBottom:3}}>→ {destU.nombre}</div>}<div style={{fontSize:13,color:n.leida?"#7a7f94":"#c9c5b8",lineHeight:1.4}}>{n.txt}</div><div style={{fontSize:10,color:"#8A8580",marginTop:4}}>{fmtDT(n.created_at)}</div></div>
             {!n.leida&&!isA&&<button className="btn bg sm" style={{flexShrink:0}} onClick={()=>leer(n.id)}>✓</button>}
           </div>;})}
         </div>}
@@ -3220,9 +3220,9 @@ function Usuarios({tok}){
         {usuarios.map(u=><div key={u.id} className="card">
           <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:14}}>
             <div style={{width:44,height:44,borderRadius:"50%",background:`${RC[u.rol]||"#c9a84c"}20`,border:`2px solid ${RC[u.rol]||"#c9a84c"}40`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:700,color:RC[u.rol]||"#c9a84c",flexShrink:0}}>{u.avatar||u.nombre.slice(0,2).toUpperCase()}</div>
-            <div style={{minWidth:0}}><div style={{fontSize:14,fontWeight:600,color:"#e8e6e1",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{u.nombre}</div><span className="badge" style={{background:`${RC[u.rol]||"#c9a84c"}15`,color:RC[u.rol]||"#c9a84c",border:`1px solid ${RC[u.rol]||"#c9a84c"}30`,marginTop:3,display:"inline-block"}}>{RL[u.rol]||u.rol}</span></div>
+            <div style={{minWidth:0}}><div style={{fontSize:14,fontWeight:600,color:"#1A1A1A",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{u.nombre}</div><span className="badge" style={{background:`${RC[u.rol]||"#c9a84c"}15`,color:RC[u.rol]||"#c9a84c",border:`1px solid ${RC[u.rol]||"#c9a84c"}30`,marginTop:3,display:"inline-block"}}>{RL[u.rol]||u.rol}</span></div>
           </div>
-          <div style={{fontSize:11,color:"#3d4155"}}>🔑 {u.id.slice(0,8)}…</div>
+          <div style={{fontSize:11,color:"#BFBAB4"}}>🔑 {u.id.slice(0,8)}…</div>
         </div>)}
       </div>
     </div>
@@ -3295,13 +3295,13 @@ function Jardineros({tok,rol}){
         return <div key={j.id} className="card" style={{marginBottom:10,borderLeft:`3px solid ${j.activo?"#10b981":"#5a5e6e"}`,opacity:j.activo?1:.6}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10}}>
             <div style={{flex:1,minWidth:0}}>
-              <div style={{fontSize:15,fontWeight:600,color:"#e8e6e1",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{j.nombre}</div>
+              <div style={{fontSize:15,fontWeight:600,color:"#1A1A1A",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{j.nombre}</div>
               <div style={{display:"flex",gap:6,marginTop:5,flexWrap:"wrap"}}>
-                <span className="badge" style={{background:"rgba(201,168,76,.1)",color:"#c9a84c"}}>{modLbl}</span>
-                <span className="badge" style={{background:"rgba(255,255,255,.06)",color:"#7a7f94"}}>{tarifaLbl}</span>
+                <span className="badge" style={{background:"rgba(201,168,76,.1)",color:"#EC683E"}}>{modLbl}</span>
+                <span className="badge" style={{background:"rgba(255,255,255,.06)",color:"#8A8580"}}>{tarifaLbl}</span>
                 <span className="badge" style={{background:j.activo?"rgba(16,185,129,.1)":"rgba(107,114,128,.1)",color:j.activo?"#10b981":"#6b7280"}}>{j.activo?"Activo":"Inactivo"}</span>
               </div>
-              {j.notas&&<div style={{fontSize:11,color:"#5a5e6e",marginTop:4}}>{j.notas}</div>}
+              {j.notas&&<div style={{fontSize:11,color:"#8A8580",marginTop:4}}>{j.notas}</div>}
             </div>
             <div style={{display:"flex",gap:6,flexShrink:0}}>
               <button className="btn bg sm" onClick={()=>verAnalisis(j)}>{abierto?"▲ Cerrar":"📊 Análisis"}</button>
@@ -3309,20 +3309,20 @@ function Jardineros({tok,rol}){
             </div>
           </div>
           {abierto&&<div style={{marginTop:14,paddingTop:14,borderTop:"1px solid rgba(255,255,255,.06)"}}>
-            {analLoad?<div style={{color:"#5a5e6e",fontSize:13}}>Cargando…</div>
+            {analLoad?<div style={{color:"#8A8580",fontSize:13}}>Cargando…</div>
             :analData?<>
               <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(120px,1fr))",gap:8,marginBottom:14}}>
                 {[{l:"HORAS ESTE MES",v:`${analData.horasMes}h`,c:"#c9a84c"},{l:"COSTE ESTE MES",v:`${analData.costeMes}€`,c:"#e85555"},{l:"HORAS ESTE AÑO",v:`${analData.horasAño}h`,c:"#c9a84c"},{l:"COSTE ESTE AÑO",v:`${analData.costeAño}€`,c:"#e85555"},{l:"💡 €/HORA REAL",v:analData.euroHoraReal>0?`${analData.euroHoraReal}€`:"—",c:"#6366f1"}].map(x=>(
-                  <div key={x.l} style={{background:"#0f1117",borderRadius:8,padding:"10px 12px"}}><div style={{fontSize:10,color:"#5a5e6e"}}>{x.l}</div><div style={{fontSize:18,fontWeight:700,color:x.c,marginTop:3}}>{x.v}</div></div>
+                  <div key={x.l} style={{background:"#F5F3F0",borderRadius:8,padding:"10px 12px"}}><div style={{fontSize:10,color:"#8A8580"}}>{x.l}</div><div style={{fontSize:18,fontWeight:700,color:x.c,marginTop:3}}>{x.v}</div></div>
                 ))}
               </div>
-              <div style={{fontSize:11,color:"#c9a84c",fontWeight:600,textTransform:"uppercase",letterSpacing:1,marginBottom:8}}>Horas por mes</div>
+              <div style={{fontSize:11,color:"#EC683E",fontWeight:600,textTransform:"uppercase",letterSpacing:1,marginBottom:8}}>Horas por mes</div>
               <div style={{width:"100%",height:140}}>
                 <ResponsiveContainer><BarChart data={analData.barras} margin={{top:5,right:5,left:-20,bottom:5}}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,.06)"/><XAxis dataKey="name" tick={{fontSize:9,fill:"#5a5e6e"}} axisLine={false} tickLine={false}/><YAxis tick={{fontSize:9,fill:"#5a5e6e"}} axisLine={false} tickLine={false}/><Tooltip contentStyle={{background:"#13161f",border:"1px solid rgba(201,168,76,.25)",borderRadius:8,fontSize:12}} formatter={v=>[`${v}h`]}/><Bar dataKey="horas" fill="#c9a84c" radius={[3,3,0,0]}/>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,.06)"/><XAxis dataKey="name" tick={{fontSize:9,fill:"#5a5e6e"}} axisLine={false} tickLine={false}/><YAxis tick={{fontSize:9,fill:"#5a5e6e"}} axisLine={false} tickLine={false}/><Tooltip contentStyle={{background:"#FFFFFF",border:"1px solid rgba(201,168,76,.25)",borderRadius:8,fontSize:12}} formatter={v=>[`${v}h`]}/><Bar dataKey="horas" fill="#EC683E" radius={[3,3,0,0]}/>
                 </BarChart></ResponsiveContainer>
               </div>
-            </>:<div style={{color:"#5a5e6e",fontSize:13}}>Sin datos de jornadas</div>}
+            </>:<div style={{color:"#8A8580",fontSize:13}}>Sin datos de jornadas</div>}
           </div>}
         </div>;
       })}
@@ -3334,7 +3334,7 @@ function Jardineros({tok,rol}){
         <div className="fg"><label>Modalidad</label><select className="fi" value={jForm.modalidad} onChange={e=>setJForm(v=>({...v,modalidad:e.target.value}))}>{MODAL_JARDINERO.map(m=><option key={m}>{m}</option>)}</select></div>
         {jForm.modalidad==="Fijo mensual"&&<div className="fg"><label>Tarifa mensual (€)</label><input type="number" inputMode="decimal" className="fi" value={jForm.tarifa} onChange={e=>setJForm(v=>({...v,tarifa:e.target.value}))} placeholder="Ej: 800"/></div>}
         {jForm.modalidad==="Por horas"&&<div className="fg"><label>Tarifa por hora (€)</label><input type="number" inputMode="decimal" className="fi" value={jForm.tarifa} onChange={e=>setJForm(v=>({...v,tarifa:e.target.value}))} placeholder="Ej: 15"/></div>}
-        {jForm.modalidad==="Precio fijo por servicio"&&<div style={{fontSize:12,color:"#7a7f94",marginBottom:14,background:"rgba(201,168,76,.06)",borderRadius:8,padding:"10px 12px"}}>El precio se define por cada servicio concreto.</div>}
+        {jForm.modalidad==="Precio fijo por servicio"&&<div style={{fontSize:12,color:"#8A8580",marginBottom:14,background:"rgba(201,168,76,.06)",borderRadius:8,padding:"10px 12px"}}>El precio se define por cada servicio concreto.</div>}
         <div className="fg"><label>Notas (opcional)</label><textarea className="fi" rows={2} value={jForm.notas} onChange={e=>setJForm(v=>({...v,notas:e.target.value}))} placeholder="Notas…"/></div>
         <div className="mft"><button className="btn bg" onClick={()=>setShowJForm(false)}>Cancelar</button><button className="btn bp" onClick={crearJardinero} disabled={saving||!jForm.nombre}>{saving?"Guardando…":"🌿 Crear"}</button></div>
       </div>
@@ -3397,13 +3397,13 @@ function LimpiadorasPage({tok,rol}){
         return <div key={l.id} className="card" style={{marginBottom:10,borderLeft:`3px solid ${l.activa?"#6366f1":"#5a5e6e"}`,opacity:l.activa?1:.6}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10}}>
             <div style={{flex:1,minWidth:0}}>
-              <div style={{fontSize:15,fontWeight:600,color:"#e8e6e1"}}>{l.nombre}</div>
+              <div style={{fontSize:15,fontWeight:600,color:"#1A1A1A"}}>{l.nombre}</div>
               <div style={{display:"flex",gap:6,marginTop:5,flexWrap:"wrap"}}>
                 <span className="badge" style={{background:"rgba(99,102,241,.1)",color:"#a5b4fc"}}>{modLbl}</span>
-                <span className="badge" style={{background:"rgba(255,255,255,.06)",color:"#7a7f94"}}>{tarifaLbl}</span>
+                <span className="badge" style={{background:"rgba(255,255,255,.06)",color:"#8A8580"}}>{tarifaLbl}</span>
                 <span className="badge" style={{background:l.activa?"rgba(16,185,129,.1)":"rgba(107,114,128,.1)",color:l.activa?"#10b981":"#6b7280"}}>{l.activa?"Activa":"Inactiva"}</span>
               </div>
-              {l.notas&&<div style={{fontSize:11,color:"#5a5e6e",marginTop:4}}>{l.notas}</div>}
+              {l.notas&&<div style={{fontSize:11,color:"#8A8580",marginTop:4}}>{l.notas}</div>}
             </div>
             <div style={{display:"flex",gap:6,flexShrink:0}}>
               <button className="btn bg sm" onClick={()=>verAnal(l)}>{abierto?"▲":"📊"}</button>
@@ -3411,18 +3411,18 @@ function LimpiadorasPage({tok,rol}){
             </div>
           </div>
           {abierto&&<div style={{marginTop:14,paddingTop:14,borderTop:"1px solid rgba(255,255,255,.06)"}}>
-            {analLoad?<div style={{color:"#5a5e6e",fontSize:13}}>Cargando…</div>
+            {analLoad?<div style={{color:"#8A8580",fontSize:13}}>Cargando…</div>
             :analData?<>
               <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(120px,1fr))",gap:8,marginBottom:10}}>
                 {[{l:"SERVICIOS AÑO",v:analData.totalSrvs,c:"#c9a84c"},{l:"HORAS TOTAL",v:`${analData.horasTotal}h`,c:"#c9a84c"},{l:"COSTE TOTAL",v:`${analData.costeTotal}€`,c:"#e85555"},{l:"💡 €/HORA REAL",v:analData.euroHoraReal>0?`${analData.euroHoraReal}€`:"—",c:"#6366f1"}].map(x=>(
-                  <div key={x.l} style={{background:"#0f1117",borderRadius:8,padding:"10px 12px"}}><div style={{fontSize:10,color:"#5a5e6e"}}>{x.l}</div><div style={{fontSize:18,fontWeight:700,color:x.c,marginTop:3}}>{x.v}</div></div>
+                  <div key={x.l} style={{background:"#F5F3F0",borderRadius:8,padding:"10px 12px"}}><div style={{fontSize:10,color:"#8A8580"}}>{x.l}</div><div style={{fontSize:18,fontWeight:700,color:x.c,marginTop:3}}>{x.v}</div></div>
                 ))}
               </div>
               {analData.permutas.length>0&&<div style={{marginTop:8}}>
-                <div style={{fontSize:10,color:"#c9a84c",fontWeight:600,textTransform:"uppercase",letterSpacing:.5,marginBottom:6}}>Permutas</div>
-                {analData.permutas.map((p,i)=><div key={i} style={{fontSize:12,color:"#7a7f94",padding:"4px 0"}}>🔄 {p}</div>)}
+                <div style={{fontSize:10,color:"#EC683E",fontWeight:600,textTransform:"uppercase",letterSpacing:.5,marginBottom:6}}>Permutas</div>
+                {analData.permutas.map((p,i)=><div key={i} style={{fontSize:12,color:"#8A8580",padding:"4px 0"}}>🔄 {p}</div>)}
               </div>}
-            </>:<div style={{color:"#5a5e6e",fontSize:13}}>Sin datos</div>}
+            </>:<div style={{color:"#8A8580",fontSize:13}}>Sin datos</div>}
           </div>}
         </div>;
       })}
@@ -3524,7 +3524,7 @@ function Gastos({tok}){
       </div>
       <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap",alignItems:"center"}}>
         <input type="date" className="fi" value={desde} onChange={e=>setDesde(e.target.value)} style={{flex:1,minWidth:130}}/>
-        <span style={{color:"#5a5e6e",fontSize:12}}>→</span>
+        <span style={{color:"#8A8580",fontSize:12}}>→</span>
         <input type="date" className="fi" value={hasta} onChange={e=>setHasta(e.target.value)} style={{flex:1,minWidth:130}}/>
       </div>
 
@@ -3537,9 +3537,9 @@ function Gastos({tok}){
       {/* TOTAL + BOTÓN */}
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16,gap:12,flexWrap:"wrap"}}>
         <div style={{background:"rgba(232,85,85,.08)",border:"1px solid rgba(232,85,85,.2)",borderRadius:10,padding:"12px 18px"}}>
-          <div style={{fontSize:10,color:"#e85555",textTransform:"uppercase",letterSpacing:.5}}>Total período</div>
-          <div style={{fontSize:22,fontWeight:700,color:"#e85555",fontFamily:"'Playfair Display',serif"}}>{total.toLocaleString("es-ES",{minimumFractionDigits:0,maximumFractionDigits:2})}€</div>
-          <div style={{fontSize:11,color:"#5a5e6e"}}>{filtrados.length} gasto{filtrados.length!==1?"s":""}</div>
+          <div style={{fontSize:10,color:"#F35757",textTransform:"uppercase",letterSpacing:.5}}>Total período</div>
+          <div style={{fontSize:22,fontWeight:700,color:"#F35757",fontFamily:"'Inter Tight',sans-serif"}}>{total.toLocaleString("es-ES",{minimumFractionDigits:0,maximumFractionDigits:2})}€</div>
+          <div style={{fontSize:11,color:"#8A8580"}}>{filtrados.length} gasto{filtrados.length!==1?"s":""}</div>
         </div>
         <button className="btn bp" onClick={()=>{setForm(formVacio);setShowForm(true);}}>➕ Añadir gasto</button>
       </div>
@@ -3553,17 +3553,17 @@ function Gastos({tok}){
         return <div key={g.id} className="card" style={{marginBottom:8,borderLeft:`3px solid ${g.categoria==="Comisión gestor"?"#6366f1":"#e85555"}`}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10}}>
             <div style={{flex:1,minWidth:0}}>
-              <div style={{fontSize:14,fontWeight:600,color:"#e8e6e1",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{g.concepto}</div>
+              <div style={{fontSize:14,fontWeight:600,color:"#1A1A1A",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{g.concepto}</div>
               <div style={{display:"flex",gap:6,marginTop:5,flexWrap:"wrap"}}>
-                <span className="badge" style={{background:"rgba(232,85,85,.1)",color:"#e85555"}}>{g.categoria||"Sin categoría"}</span>
-                {g.recurrente&&<span className="badge" style={{background:"rgba(201,168,76,.1)",color:"#c9a84c"}}>🔁 {g.frecuencia||"mensual"}</span>}
+                <span className="badge" style={{background:"rgba(232,85,85,.1)",color:"#F35757"}}>{g.categoria||"Sin categoría"}</span>
+                {g.recurrente&&<span className="badge" style={{background:"rgba(201,168,76,.1)",color:"#EC683E"}}>🔁 {g.frecuencia||"mensual"}</span>}
                 {olbl&&<span className="badge" style={{background:"rgba(99,102,241,.1)",color:"#a5b4fc"}}>{olbl}</span>}
               </div>
-              <div style={{fontSize:11,color:"#5a5e6e",marginTop:4}}>📅 {new Date(g.fecha+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"long",year:"numeric"})}</div>
-              {g.notas&&<div style={{fontSize:11,color:"#7a7f94",marginTop:3}}>{g.notas}</div>}
+              <div style={{fontSize:11,color:"#8A8580",marginTop:4}}>📅 {new Date(g.fecha+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"long",year:"numeric"})}</div>
+              {g.notas&&<div style={{fontSize:11,color:"#8A8580",marginTop:3}}>{g.notas}</div>}
             </div>
             <div style={{textAlign:"right",flexShrink:0}}>
-              <div style={{fontSize:18,fontWeight:700,color:"#e85555",fontFamily:"'Playfair Display',serif"}}>{parseFloat(g.importe||0).toLocaleString("es-ES")}€</div>
+              <div style={{fontSize:18,fontWeight:700,color:"#F35757",fontFamily:"'Inter Tight',sans-serif"}}>{parseFloat(g.importe||0).toLocaleString("es-ES")}€</div>
               {!esAuto&&<button className="btn br sm" style={{marginTop:6}} onClick={()=>eliminar(g)}>🗑</button>}
             </div>
           </div>
@@ -3586,7 +3586,7 @@ function Gastos({tok}){
             style={{width:22,height:22,borderRadius:6,flexShrink:0,border:`2px solid ${form.recurrente?"#c9a84c":"rgba(255,255,255,.15)"}`,background:form.recurrente?"#c9a84c":"transparent",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:12,color:"#fff",fontWeight:700}}>
             {form.recurrente?"✓":""}
           </div>
-          <span style={{fontSize:13,color:"#c9c5b8"}}>¿Es recurrente?</span>
+          <span style={{fontSize:13,color:"#1A1A1A"}}>¿Es recurrente?</span>
           {form.recurrente&&<select className="fi" value={form.frecuencia} onChange={e=>setForm(v=>({...v,frecuencia:e.target.value}))} style={{width:"auto",flex:"none",padding:"6px 30px 6px 10px"}}>
             <option value="mensual">Mensual</option>
             <option value="anual">Anual</option>
@@ -3666,7 +3666,7 @@ function Ajustes({tok,rol}){
           <div key={f.clave} style={{marginBottom:16,paddingBottom:16,borderBottom:"1px solid rgba(255,255,255,.06)"}}>
             <div className="fg" style={{marginBottom:8}}>
               <label>{f.label}</label>
-              <div style={{fontSize:11,color:"#5a5e6e",marginBottom:6}}>{f.desc}</div>
+              <div style={{fontSize:11,color:"#8A8580",marginBottom:6}}>{f.desc}</div>
               <div style={{display:"flex",gap:8,alignItems:"center"}}>
                 <input type={f.type} inputMode={f.type==="number"?"decimal":"text"} className="fi" value={valores[f.clave]||""} onChange={e=>setValores(prev=>({...prev,[f.clave]:e.target.value}))} placeholder={f.placeholder} style={{flex:1}}/>
                 <button className="btn bp sm" style={{flexShrink:0}} onClick={()=>guardar(f.clave)} disabled={savingKey===f.clave}>
@@ -3674,8 +3674,8 @@ function Ajustes({tok,rol}){
                 </button>
               </div>
             </div>
-            {feedback[f.clave]==="ok"&&<div style={{fontSize:12,color:"#10b981",marginTop:4}}>✅ Guardado</div>}
-            {feedback[f.clave]==="error"&&<div style={{fontSize:12,color:"#e85555",marginTop:4}}>❌ Error al guardar</div>}
+            {feedback[f.clave]==="ok"&&<div style={{fontSize:12,color:"#A6BE59",marginTop:4}}>✅ Guardado</div>}
+            {feedback[f.clave]==="error"&&<div style={{fontSize:12,color:"#F35757",marginTop:4}}>❌ Error al guardar</div>}
           </div>
         ))}
       </div>
@@ -3687,7 +3687,7 @@ function Ajustes({tok,rol}){
           <span style={{fontSize:24}}>{notifPerm==="granted"?"✅":"⚠️"}</span>
           <div style={{flex:1}}>
             <div style={{fontSize:14,fontWeight:500,color:notifPerm==="granted"?"#10b981":"#f59e0b"}}>{notifPerm==="granted"?"Notificaciones activas":"Notificaciones desactivadas"}</div>
-            <div style={{fontSize:12,color:"#5a5e6e",marginTop:2}}>{notifPerm==="granted"?"Recibirás avisos en este dispositivo":"Activa las notificaciones para recibir avisos de la finca"}</div>
+            <div style={{fontSize:12,color:"#8A8580",marginTop:2}}>{notifPerm==="granted"?"Recibirás avisos en este dispositivo":"Activa las notificaciones para recibir avisos de la finca"}</div>
           </div>
           {notifPerm!=="granted"&&<button className="btn bp" onClick={activarNotifs}>Activar</button>}
         </div>
@@ -3775,8 +3775,8 @@ function CalBase({tok,rol="admin"}){
 
   return <>
     {/* BUSCADOR - visible para admin y comercial */}
-    {(isA||isC)&&<div style={{background:"#13161f",border:"1px solid rgba(201,168,76,.2)",borderRadius:12,padding:"14px 16px",marginBottom:14}}>
-      <div style={{fontSize:11,color:"#c9a84c",textTransform:"uppercase",letterSpacing:1,fontWeight:600,marginBottom:10}}>🔍 Consultar disponibilidad</div>
+    {(isA||isC)&&<div style={{background:"#FFFFFF",border:"1px solid rgba(201,168,76,.2)",borderRadius:12,padding:"14px 16px",marginBottom:14}}>
+      <div style={{fontSize:11,color:"#EC683E",textTransform:"uppercase",letterSpacing:1,fontWeight:600,marginBottom:10}}>🔍 Consultar disponibilidad</div>
       <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
         <input type="date" className="fi" value={busqueda} onChange={e=>{setBusqueda(e.target.value);setResultadoBusqueda(null);}} style={{flex:1,minWidth:140}}/>
         <button className="btn bp" onClick={buscar} disabled={!busqueda} style={{flexShrink:0}}>Buscar</button>
@@ -3789,27 +3789,27 @@ function CalBase({tok,rol="admin"}){
           </div>
           {/* Comercial: solo muestra "Ocupado" sin detalles de airbnb */}
           {isC&&!resultadoBusqueda.libre&&resultadoBusqueda.airbnbs.length>0&&resultadoBusqueda.reservas.length===0&&(
-            <div style={{fontSize:13,color:"#e85555"}}>🔴 Fecha bloqueada</div>
+            <div style={{fontSize:13,color:"#F35757"}}>🔴 Fecha bloqueada</div>
           )}
           {/* Admin: muestra todo */}
           {isA&&resultadoBusqueda.reservas.map(r=>{
             const est=ESTADOS.find(e=>e.id===r.estado);
             return <div key={r.id} style={{display:"flex",justifyContent:"space-between",gap:8,marginTop:6,paddingTop:6,borderTop:"1px solid rgba(255,255,255,.06)"}}>
-              <div><div style={{fontSize:13,fontWeight:600,color:"#e8e6e1"}}>{r.nombre}</div>{r.tipo&&<div style={{fontSize:11,color:"#7a7f94"}}>🎉 {r.tipo}</div>}</div>
+              <div><div style={{fontSize:13,fontWeight:600,color:"#1A1A1A"}}>{r.nombre}</div>{r.tipo&&<div style={{fontSize:11,color:"#8A8580"}}>🎉 {r.tipo}</div>}</div>
               {est&&<span className="badge" style={{background:`${est.col}18`,color:est.col,border:`1px solid ${est.col}30`,flexShrink:0}}>{est.lbl}</span>}
             </div>;
           })}
           {isA&&resultadoBusqueda.airbnbs.map(a=>(
             <div key={a.id} style={{display:"flex",justifyContent:"space-between",gap:8,marginTop:6,paddingTop:6,borderTop:"1px solid rgba(255,255,255,.06)"}}>
-              <div><div style={{fontSize:13,fontWeight:600,color:"#e8e6e1"}}>🏠 {a.huesped}</div><div style={{fontSize:11,color:"#7a7f94"}}>{fmtRango(a)}</div></div>
-              <span className="badge" style={{background:"rgba(16,185,129,.12)",color:"#10b981",border:"1px solid rgba(16,185,129,.25)",flexShrink:0}}>Airbnb</span>
+              <div><div style={{fontSize:13,fontWeight:600,color:"#1A1A1A"}}>🏠 {a.huesped}</div><div style={{fontSize:11,color:"#8A8580"}}>{fmtRango(a)}</div></div>
+              <span className="badge" style={{background:"rgba(16,185,129,.12)",color:"#A6BE59",border:"1px solid rgba(16,185,129,.25)",flexShrink:0}}>Airbnb</span>
             </div>
           ))}
           {/* Comercial: muestra evento pero no airbnb info */}
           {isC&&resultadoBusqueda.reservas.map(r=>{
             const est=ESTADOS.find(e=>e.id===r.estado);
             return <div key={r.id} style={{display:"flex",justifyContent:"space-between",gap:8,marginTop:6,paddingTop:6,borderTop:"1px solid rgba(255,255,255,.06)"}}>
-              <div><div style={{fontSize:13,fontWeight:600,color:"#e8e6e1"}}>{r.nombre}</div>{r.tipo&&<div style={{fontSize:11,color:"#7a7f94"}}>🎉 {r.tipo}</div>}</div>
+              <div><div style={{fontSize:13,fontWeight:600,color:"#1A1A1A"}}>{r.nombre}</div>{r.tipo&&<div style={{fontSize:11,color:"#8A8580"}}>🎉 {r.tipo}</div>}</div>
               {est&&<span className="badge" style={{background:`${est.col}18`,color:est.col,border:`1px solid ${est.col}30`,flexShrink:0}}>{est.lbl}</span>}
             </div>;
           })}
@@ -3842,8 +3842,8 @@ function CalBase({tok,rol="admin"}){
             onClick={()=>setSel(sel===d?null:d)}>
             <span>{d}</span>
             {hasRsv&&<div className="cdot" style={{background:ESTADOS.find(e=>e.id===rsv[0].estado)?.col||"#6366f1"}}/>}
-            {hasAir&&!hasRsv&&<div className="cdot" style={{background:"#e85555"}}/>}
-            {hasAir&&hasRsv&&<div style={{display:"flex",gap:2,marginTop:2}}><div className="cdot" style={{background:ESTADOS.find(e=>e.id===rsv[0].estado)?.col||"#6366f1"}}/><div className="cdot" style={{background:"#e85555"}}/></div>}
+            {hasAir&&!hasRsv&&<div className="cdot" style={{background:"#F35757"}}/>}
+            {hasAir&&hasRsv&&<div style={{display:"flex",gap:2,marginTop:2}}><div className="cdot" style={{background:ESTADOS.find(e=>e.id===rsv[0].estado)?.col||"#6366f1"}}/><div className="cdot" style={{background:"#F35757"}}/></div>}
           </div>;
         })}
       </div>
@@ -3851,9 +3851,9 @@ function CalBase({tok,rol="admin"}){
 
     {/* LEYENDA */}
     <div style={{display:"flex",gap:12,marginTop:8,marginBottom:4,flexWrap:"wrap"}}>
-      <div style={{display:"flex",alignItems:"center",gap:5,fontSize:11,color:"#7a7f94"}}><div style={{width:8,height:8,borderRadius:"50%",background:"#6366f1"}}/> Evento</div>
-      {(isA||isL||isJ)&&<div style={{display:"flex",alignItems:"center",gap:5,fontSize:11,color:"#7a7f94"}}><div style={{width:8,height:8,borderRadius:"50%",background:"#e85555"}}/> {isC?"Bloqueado":"Airbnb"}</div>}
-      {isC&&<div style={{display:"flex",alignItems:"center",gap:5,fontSize:11,color:"#7a7f94"}}><div style={{width:8,height:8,borderRadius:"50%",background:"#e85555"}}/> No disponible</div>}
+      <div style={{display:"flex",alignItems:"center",gap:5,fontSize:11,color:"#8A8580"}}><div style={{width:8,height:8,borderRadius:"50%",background:"#6366f1"}}/> Evento</div>
+      {(isA||isL||isJ)&&<div style={{display:"flex",alignItems:"center",gap:5,fontSize:11,color:"#8A8580"}}><div style={{width:8,height:8,borderRadius:"50%",background:"#F35757"}}/> {isC?"Bloqueado":"Airbnb"}</div>}
+      {isC&&<div style={{display:"flex",alignItems:"center",gap:5,fontSize:11,color:"#8A8580"}}><div style={{width:8,height:8,borderRadius:"50%",background:"#F35757"}}/> No disponible</div>}
     </div>
 
     {/* DETALLE DÍA SELECCIONADO */}
@@ -3867,9 +3867,9 @@ function CalBase({tok,rol="admin"}){
         return <div key={r.id} className="card" style={{marginBottom:8,borderLeft:`3px solid ${est?.col||"#6366f1"}`}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8}}>
             <div style={{minWidth:0}}>
-              <div style={{fontSize:14,fontWeight:600,color:"#e8e6e1"}}>{r.nombre}</div>
-              {r.tipo&&<div style={{fontSize:12,color:"#7a7f94",marginTop:3}}>🎉 {r.tipo}</div>}
-              {isA&&r.precio&&<div style={{fontSize:12,color:"#c9a84c",marginTop:2}}>💰 {parseFloat(r.precio).toLocaleString("es-ES")}€</div>}
+              <div style={{fontSize:14,fontWeight:600,color:"#1A1A1A"}}>{r.nombre}</div>
+              {r.tipo&&<div style={{fontSize:12,color:"#8A8580",marginTop:3}}>🎉 {r.tipo}</div>}
+              {isA&&r.precio&&<div style={{fontSize:12,color:"#EC683E",marginTop:2}}>💰 {parseFloat(r.precio).toLocaleString("es-ES")}€</div>}
             </div>
             {est&&<span className="badge" style={{background:`${est.col}18`,color:est.col,border:`1px solid ${est.col}30`,flexShrink:0}}>{est.lbl}</span>}
           </div>
@@ -3879,18 +3879,18 @@ function CalBase({tok,rol="admin"}){
       {grAirbnb(sel).map(a=>(
         isC
           ?<div key={a.id} className="card" style={{marginBottom:8,borderLeft:"3px solid #e85555"}}>
-            <div style={{fontSize:14,fontWeight:600,color:"#e85555"}}>🔴 Fecha no disponible</div>
+            <div style={{fontSize:14,fontWeight:600,color:"#F35757"}}>🔴 Fecha no disponible</div>
           </div>
           :<div key={a.id} className="card" style={{marginBottom:8,borderLeft:"3px solid #10b981"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8}}>
               <div>
-                <div style={{fontSize:12,color:"#10b981",fontWeight:600,marginBottom:3}}>🏠 Airbnb</div>
-                {(isA||isL)&&<div style={{fontSize:14,fontWeight:600,color:"#e8e6e1"}}>{a.huesped}</div>}
-                {isJ&&<div style={{fontSize:14,fontWeight:600,color:"#e8e6e1"}}>Alojamiento turístico</div>}
-                <div style={{fontSize:12,color:"#7a7f94",marginTop:3}}>📅 {fmtRango(a)}{a.personas?` · 👥 ${a.personas} personas`:""}</div>
-                {isA&&a.precio&&<div style={{fontSize:12,color:"#c9a84c",marginTop:2}}>💰 {parseFloat(a.precio).toLocaleString("es-ES")}€</div>}
+                <div style={{fontSize:12,color:"#A6BE59",fontWeight:600,marginBottom:3}}>🏠 Airbnb</div>
+                {(isA||isL)&&<div style={{fontSize:14,fontWeight:600,color:"#1A1A1A"}}>{a.huesped}</div>}
+                {isJ&&<div style={{fontSize:14,fontWeight:600,color:"#1A1A1A"}}>Alojamiento turístico</div>}
+                <div style={{fontSize:12,color:"#8A8580",marginTop:3}}>📅 {fmtRango(a)}{a.personas?` · 👥 ${a.personas} personas`:""}</div>
+                {isA&&a.precio&&<div style={{fontSize:12,color:"#EC683E",marginTop:2}}>💰 {parseFloat(a.precio).toLocaleString("es-ES")}€</div>}
               </div>
-              <span className="badge" style={{background:"rgba(16,185,129,.12)",color:"#10b981",border:"1px solid rgba(16,185,129,.25)",flexShrink:0}}>Airbnb</span>
+              <span className="badge" style={{background:"rgba(16,185,129,.12)",color:"#A6BE59",border:"1px solid rgba(16,185,129,.25)",flexShrink:0}}>Airbnb</span>
             </div>
           </div>
       ))}
@@ -3902,13 +3902,13 @@ function CalBase({tok,rol="admin"}){
         ?<div className="card"><div className="empty"><span className="ico">✅</span><p>Sin eventos este mes</p></div></div>
         :<>
           {rsvMes.map(r=><div key={r.id} className="card" style={{marginBottom:8,borderLeft:"3px solid #6366f1"}}>
-            <div style={{fontSize:13,fontWeight:600,color:"#e8e6e1"}}>{r.nombre}</div>
-            <div style={{fontSize:12,color:"#7a7f94",marginTop:3}}>📅 {new Date(r.fecha).toLocaleDateString("es-ES",{weekday:"long",day:"numeric",month:"long"})}</div>
-            {r.tipo&&<div style={{fontSize:11,color:"#5a5e6e",marginTop:2}}>🎉 {r.tipo}</div>}
+            <div style={{fontSize:13,fontWeight:600,color:"#1A1A1A"}}>{r.nombre}</div>
+            <div style={{fontSize:12,color:"#8A8580",marginTop:3}}>📅 {new Date(r.fecha).toLocaleDateString("es-ES",{weekday:"long",day:"numeric",month:"long"})}</div>
+            {r.tipo&&<div style={{fontSize:11,color:"#8A8580",marginTop:2}}>🎉 {r.tipo}</div>}
           </div>)}
           {airbnbMes.map(a=><div key={a.id} className="card" style={{marginBottom:8,borderLeft:"3px solid #10b981"}}>
-            <div style={{fontSize:13,fontWeight:600,color:"#e8e6e1"}}>{isL?`🏠 Airbnb: ${a.huesped}`:"🏠 Alojamiento turístico"}</div>
-            <div style={{fontSize:12,color:"#7a7f94",marginTop:3}}>📅 {fmtRango(a)}{a.personas?` · 👥 ${a.personas} personas`:""}</div>
+            <div style={{fontSize:13,fontWeight:600,color:"#1A1A1A"}}>{isL?`🏠 Airbnb: ${a.huesped}`:"🏠 Alojamiento turístico"}</div>
+            <div style={{fontSize:12,color:"#8A8580",marginTop:3}}>📅 {fmtRango(a)}{a.personas?` · 👥 ${a.personas} personas`:""}</div>
           </div>)}
         </>}
     </div>}
@@ -3977,20 +3977,20 @@ function Historial({entidad_tipo,entidad_id,tok,perfil}){
   };
 
   return <div style={{marginTop:16,borderTop:"1px solid rgba(255,255,255,.06)",paddingTop:14}}>
-    <button onClick={()=>setOpen(!open)} style={{background:"none",border:"none",cursor:"pointer",color:"#7a7f94",fontSize:13,display:"flex",alignItems:"center",gap:6,padding:0,fontFamily:"'DM Sans',sans-serif",width:"100%",justifyContent:"space-between"}}>
+    <button onClick={()=>setOpen(!open)} style={{background:"none",border:"none",cursor:"pointer",color:"#8A8580",fontSize:13,display:"flex",alignItems:"center",gap:6,padding:0,fontFamily:"'DM Sans',sans-serif",width:"100%",justifyContent:"space-between"}}>
       <span>📋 Historial de movimientos</span>
       <span style={{transition:"transform .2s",transform:open?"rotate(90deg)":"none",fontSize:16}}>›</span>
     </button>
     {open&&<div style={{marginTop:12}}>
-      {load?<div style={{color:"#5a5e6e",fontSize:13,padding:"8px 0"}}>Cargando…</div>
-        :items.length===0?<div style={{color:"#3d4155",fontSize:13,padding:"8px 0",fontStyle:"italic"}}>Sin movimientos registrados</div>
+      {load?<div style={{color:"#8A8580",fontSize:13,padding:"8px 0"}}>Cargando…</div>
+        :items.length===0?<div style={{color:"#BFBAB4",fontSize:13,padding:"8px 0",fontStyle:"italic"}}>Sin movimientos registrados</div>
         :<div style={{position:"relative",paddingLeft:20}}>
           <div style={{position:"absolute",left:7,top:0,bottom:0,width:1,background:"rgba(255,255,255,.08)"}}/>
           {items.map((h,i)=>(
             <div key={h.id} style={{position:"relative",marginBottom:12}}>
               <div style={{position:"absolute",left:-20,top:2,width:14,height:14,borderRadius:"50%",background:h.tipo==="manual"?"#c9a84c":"#3d4155",border:"2px solid #0f1117",display:"flex",alignItems:"center",justifyContent:"center",fontSize:8}}/>
               <div style={{fontSize:12,color:h.tipo==="manual"?"#c9c5b8":"#7a7f94",lineHeight:1.4}}>{iconTipo(h.texto)} {h.texto}</div>
-              <div style={{fontSize:10,color:"#3d4155",marginTop:2}}>{fmtDT(h.created_at)}{h.creado_por&&` · ${h.creado_por}`}</div>
+              <div style={{fontSize:10,color:"#BFBAB4",marginTop:2}}>{fmtDT(h.created_at)}{h.creado_por&&` · ${h.creado_por}`}</div>
             </div>
           ))}
         </div>}
@@ -4051,22 +4051,22 @@ function Documentos({entidad_tipo,entidad_id,tok,perfil}){
   };
 
   return <div style={{marginTop:16,borderTop:"1px solid rgba(255,255,255,.06)",paddingTop:14}}>
-    <button onClick={()=>setOpen(!open)} style={{background:"none",border:"none",cursor:"pointer",color:"#7a7f94",fontSize:13,display:"flex",alignItems:"center",gap:6,padding:0,fontFamily:"'DM Sans',sans-serif",width:"100%",justifyContent:"space-between"}}>
+    <button onClick={()=>setOpen(!open)} style={{background:"none",border:"none",cursor:"pointer",color:"#8A8580",fontSize:13,display:"flex",alignItems:"center",gap:6,padding:0,fontFamily:"'DM Sans',sans-serif",width:"100%",justifyContent:"space-between"}}>
       <span>📁 Documentos {docs.length>0&&!open?`(${docs.length})`:""}</span>
       <span style={{transition:"transform .2s",transform:open?"rotate(90deg)":"none",fontSize:16}}>›</span>
     </button>
     {open&&<div style={{marginTop:12}}>
-      {load?<div style={{color:"#5a5e6e",fontSize:13}}>Cargando…</div>
-        :docs.length===0?<div style={{color:"#3d4155",fontSize:13,fontStyle:"italic",marginBottom:10}}>Sin documentos adjuntos</div>
+      {load?<div style={{color:"#8A8580",fontSize:13}}>Cargando…</div>
+        :docs.length===0?<div style={{color:"#BFBAB4",fontSize:13,fontStyle:"italic",marginBottom:10}}>Sin documentos adjuntos</div>
         :<div style={{marginBottom:10}}>
           {docs.map(doc=>(
-            <div key={doc.id} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",background:"#0f1117",borderRadius:8,marginBottom:6}}>
+            <div key={doc.id} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",background:"#F5F3F0",borderRadius:8,marginBottom:6}}>
               <span style={{fontSize:18,flexShrink:0}}>{icono(doc.tipo_archivo)}</span>
               <div style={{flex:1,minWidth:0}}>
-                <a href={doc.url} target="_blank" rel="noreferrer" style={{fontSize:13,color:"#c9a84c",textDecoration:"none",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",display:"block"}}>{doc.nombre}</a>
-                <div style={{fontSize:10,color:"#3d4155"}}>{doc.subido_por} · {fmtDT(doc.created_at)}</div>
+                <a href={doc.url} target="_blank" rel="noreferrer" style={{fontSize:13,color:"#EC683E",textDecoration:"none",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",display:"block"}}>{doc.nombre}</a>
+                <div style={{fontSize:10,color:"#BFBAB4"}}>{doc.subido_por} · {fmtDT(doc.created_at)}</div>
               </div>
-              <button onClick={()=>eliminar(doc)} style={{background:"none",border:"none",color:"#5a5e6e",cursor:"pointer",fontSize:16,padding:4,flexShrink:0}}>🗑</button>
+              <button onClick={()=>eliminar(doc)} style={{background:"none",border:"none",color:"#8A8580",cursor:"pointer",fontSize:16,padding:4,flexShrink:0}}>🗑</button>
             </div>
           ))}
         </div>}
@@ -4121,24 +4121,24 @@ function VisitasCoordinacion({reservaId,reservaNombre,tok,perfil}){
   };
 
   return <div style={{marginTop:16,borderTop:"1px solid rgba(255,255,255,.06)",paddingTop:14}}>
-    <button onClick={()=>setOpen(!open)} style={{background:"none",border:"none",cursor:"pointer",color:"#7a7f94",fontSize:13,display:"flex",alignItems:"center",gap:6,padding:0,fontFamily:"'DM Sans',sans-serif",width:"100%",justifyContent:"space-between"}}>
+    <button onClick={()=>setOpen(!open)} style={{background:"none",border:"none",cursor:"pointer",color:"#8A8580",fontSize:13,display:"flex",alignItems:"center",gap:6,padding:0,fontFamily:"'DM Sans',sans-serif",width:"100%",justifyContent:"space-between"}}>
       <span>📅 Visitas de coordinación {visitas.length>0&&!open?`(${visitas.length})`:""}</span>
       <span style={{transition:"transform .2s",transform:open?"rotate(90deg)":"none",fontSize:16}}>›</span>
     </button>
     {open&&<div style={{marginTop:12}}>
-      {load?<div style={{color:"#5a5e6e",fontSize:13}}>Cargando…</div>
-      :visitas.length===0?<div style={{color:"#3d4155",fontSize:13,fontStyle:"italic",marginBottom:10}}>Sin visitas de coordinación</div>
+      {load?<div style={{color:"#8A8580",fontSize:13}}>Cargando…</div>
+      :visitas.length===0?<div style={{color:"#BFBAB4",fontSize:13,fontStyle:"italic",marginBottom:10}}>Sin visitas de coordinación</div>
       :<div style={{marginBottom:10}}>
         {visitas.map(v=>{
           const est=ESTADOS_VISITA[v.estado]||ESTADOS_VISITA.pendiente;
-          return <div key={v.id} style={{display:"flex",alignItems:"flex-start",gap:8,padding:"8px 10px",background:"#0f1117",borderRadius:8,marginBottom:6,borderLeft:`3px solid ${est.col}`}}>
+          return <div key={v.id} style={{display:"flex",alignItems:"flex-start",gap:8,padding:"8px 10px",background:"#F5F3F0",borderRadius:8,marginBottom:6,borderLeft:`3px solid ${est.col}`}}>
             <div style={{flex:1,minWidth:0}}>
               <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:3}}>
                 <span className="badge" style={{background:"rgba(99,102,241,.1)",color:"#a5b4fc",fontSize:10}}>{v.motivo_visita||v.tipo_evento||"Coordinación"}</span>
                 <span className="badge" style={{background:`${est.col}18`,color:est.col,fontSize:10}}>{est.lbl}</span>
               </div>
-              <div style={{fontSize:12,color:"#c9c5b8"}}>{new Date(v.fecha+"T12:00:00").toLocaleDateString("es-ES",{weekday:"short",day:"numeric",month:"short"})} · {v.hora?.slice(0,5)||"—"}</div>
-              {v.nota&&<div style={{fontSize:11,color:"#5a5e6e",marginTop:3}}>{v.nota}</div>}
+              <div style={{fontSize:12,color:"#1A1A1A"}}>{new Date(v.fecha+"T12:00:00").toLocaleDateString("es-ES",{weekday:"short",day:"numeric",month:"short"})} · {v.hora?.slice(0,5)||"—"}</div>
+              {v.nota&&<div style={{fontSize:11,color:"#8A8580",marginTop:3}}>{v.nota}</div>}
             </div>
           </div>;
         })}
@@ -4146,7 +4146,7 @@ function VisitasCoordinacion({reservaId,reservaNombre,tok,perfil}){
       <button className="btn bp sm" onClick={()=>{setForm(formVacio);setShowForm(true);}}>➕ Programar visita</button>
 
       {showForm&&<div style={{marginTop:12,background:"rgba(201,168,76,.04)",border:"1px solid rgba(201,168,76,.15)",borderRadius:10,padding:"14px"}}>
-        <div style={{fontSize:13,fontWeight:600,color:"#c9a84c",marginBottom:12}}>📅 Nueva visita de coordinación</div>
+        <div style={{fontSize:13,fontWeight:600,color:"#EC683E",marginBottom:12}}>📅 Nueva visita de coordinación</div>
         <div style={{display:"flex",gap:8}}>
           <div className="fg" style={{flex:1}}><label>Fecha *</label><input type="date" className="fi" value={form.fecha} onChange={e=>setForm(v=>({...v,fecha:e.target.value}))}/></div>
           <div className="fg" style={{flex:1}}><label>Hora *</label><input type="time" className="fi" value={form.hora} onChange={e=>setForm(v=>({...v,hora:e.target.value}))}/></div>
@@ -4258,12 +4258,12 @@ function Reservas({tok,rol,perfil}){
     return <div className="rc" style={{borderLeftColor:est?.col}} onClick={()=>setSel(r)}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10}}>
         <div style={{minWidth:0}}>
-          <div style={{fontSize:14,fontWeight:600,color:"#e8e6e1",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.nombre}</div>
-          <div style={{fontSize:11,color:"#7a7f94",marginTop:3}}>📅 {new Date(r.fecha).toLocaleDateString("es-ES",{weekday:"long",day:"numeric",month:"long",year:"numeric"})}</div>
-          {r.tipo&&<div style={{fontSize:11,color:"#5a5e6e"}}>🎉 {r.tipo}</div>}
+          <div style={{fontSize:14,fontWeight:600,color:"#1A1A1A",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.nombre}</div>
+          <div style={{fontSize:11,color:"#8A8580",marginTop:3}}>📅 {new Date(r.fecha).toLocaleDateString("es-ES",{weekday:"long",day:"numeric",month:"long",year:"numeric"})}</div>
+          {r.tipo&&<div style={{fontSize:11,color:"#8A8580"}}>🎉 {r.tipo}</div>}
         </div>
         <div style={{textAlign:"right",flexShrink:0}}>
-          <div style={{fontSize:16,fontWeight:700,color:"#c9a84c"}}>{parseFloat(r.precio||0).toLocaleString("es-ES")}€</div>
+          <div style={{fontSize:16,fontWeight:700,color:"#EC683E"}}>{parseFloat(r.precio||0).toLocaleString("es-ES")}€</div>
           {est&&<span className="badge" style={{background:`${est.col}18`,color:est.col,border:`1px solid ${est.col}30`,display:"inline-block",marginTop:3}}>{est.lbl}</span>}
         </div>
       </div>
@@ -4290,15 +4290,15 @@ function Reservas({tok,rol,perfil}){
         </div>
         {sel&&<div className="card" style={{position:"sticky",top:20}}>
           <div style={{display:"flex",justifyContent:"space-between",marginBottom:16,gap:8}}>
-            <div style={{minWidth:0}}><div style={{fontSize:18,fontWeight:700,color:"#e8e6e1",fontFamily:"'Playfair Display',serif"}}>{sel.nombre}</div><SBadge e={sel.estado}/></div>
+            <div style={{minWidth:0}}><div style={{fontSize:18,fontWeight:700,color:"#1A1A1A",fontFamily:"'Inter Tight',sans-serif"}}>{sel.nombre}</div><SBadge e={sel.estado}/></div>
             <button className="btn bg sm" style={{flexShrink:0}} onClick={()=>setSel(null)}>✕</button>
           </div>
           <div className="g2" style={{marginBottom:14}}>
-            {[{l:"FECHA",v:new Date(sel.fecha).toLocaleDateString("es-ES",{day:"numeric",month:"long",year:"numeric"})},{l:"PRECIO",v:`${parseFloat(sel.precio||0).toLocaleString("es-ES")}€`,gold:true},{l:"TIPO",v:sel.tipo},{l:"CONTACTO",v:sel.contacto}].filter(x=>x.v).map(x=><div key={x.l} style={{background:"#0f1117",borderRadius:8,padding:11}}><div style={{fontSize:10,color:"#5a5e6e"}}>{x.l}</div><div style={{fontSize:x.gold?16:12,fontWeight:x.gold?700:400,color:x.gold?"#c9a84c":"#e8e6e1",marginTop:3}}>{x.v}</div></div>)}
+            {[{l:"FECHA",v:new Date(sel.fecha).toLocaleDateString("es-ES",{day:"numeric",month:"long",year:"numeric"})},{l:"PRECIO",v:`${parseFloat(sel.precio||0).toLocaleString("es-ES")}€`,gold:true},{l:"TIPO",v:sel.tipo},{l:"CONTACTO",v:sel.contacto}].filter(x=>x.v).map(x=><div key={x.l} style={{background:"#F5F3F0",borderRadius:8,padding:11}}><div style={{fontSize:10,color:"#8A8580"}}>{x.l}</div><div style={{fontSize:x.gold?16:12,fontWeight:x.gold?700:400,color:x.gold?"#c9a84c":"#e8e6e1",marginTop:3}}>{x.v}</div></div>)}
           </div>
-          {sel.obs&&<div style={{background:"#0f1117",borderRadius:8,padding:11,marginBottom:14}}><div style={{fontSize:10,color:"#5a5e6e",marginBottom:5}}>OBSERVACIONES</div><div style={{fontSize:12,color:"#c9c5b8",lineHeight:1.5}}>{sel.obs}</div></div>}
+          {sel.obs&&<div style={{background:"#F5F3F0",borderRadius:8,padding:11,marginBottom:14}}><div style={{fontSize:10,color:"#8A8580",marginBottom:5}}>OBSERVACIONES</div><div style={{fontSize:12,color:"#1A1A1A",lineHeight:1.5}}>{sel.obs}</div></div>}
           {isA&&<><hr className="div"/>
-            <div style={{fontSize:10,color:"#5a5e6e",marginBottom:9,textTransform:"uppercase",letterSpacing:1}}>Cambiar estado</div>
+            <div style={{fontSize:10,color:"#8A8580",marginBottom:9,textTransform:"uppercase",letterSpacing:1}}>Cambiar estado</div>
             <div style={{display:"flex",flexDirection:"column",gap:5}}>
               {ESTADOS.map(e=><button key={e.id} className="btn bg" style={{justifyContent:"flex-start",borderColor:sel.estado===e.id?e.col:undefined,color:sel.estado===e.id?e.col:undefined}} onClick={()=>cambiarE(sel.id,e.id)}>
                 <span style={{width:7,height:7,borderRadius:"50%",background:e.col,display:"inline-block",flexShrink:0}}/>{e.lbl}{sel.estado===e.id?" ✓":""}
@@ -4308,7 +4308,7 @@ function Reservas({tok,rol,perfil}){
             <button className="btn br" style={{width:"100%",justifyContent:"center"}} onClick={()=>del(sel.id)}>🗑 Eliminar reserva</button>
             {/* ── CONTROLES DE COBRO ── */}
             <hr className="div"/>
-            <div style={{fontSize:10,color:"#5a5e6e",marginBottom:9,textTransform:"uppercase",letterSpacing:1}}>Estado de cobro</div>
+            <div style={{fontSize:10,color:"#8A8580",marginBottom:9,textTransform:"uppercase",letterSpacing:1}}>Estado de cobro</div>
             {(()=>{
               const ep=sel.estado_pago||"pendiente";
               const seña=parseFloat(sel.seña_importe)||0;
@@ -4322,16 +4322,16 @@ function Reservas({tok,rol,perfil}){
                     border:`1px solid ${ep==="pagado_completo"?"rgba(16,185,129,.3)":ep==="seña_cobrada"?"rgba(201,168,76,.3)":"rgba(245,158,11,.3)"}`
                   }}>{ep==="pagado_completo"?"✅ Pagado completo":ep==="seña_cobrada"?`💰 Seña cobrada: ${seña.toLocaleString("es-ES")}€`:"⏳ Pendiente de cobro"}</span>
                 </div>
-                {ep==="seña_cobrada"&&<div style={{fontSize:12,color:"#7a7f94",marginBottom:10}}>Saldo pendiente: <strong style={{color:"#f59e0b"}}>{(pt-seña).toLocaleString("es-ES")}€</strong></div>}
-                {sel.seña_fecha&&<div style={{fontSize:11,color:"#5a5e6e",marginBottom:4}}>Seña registrada: {new Date(sel.seña_fecha+"T12:00:00").toLocaleDateString("es-ES")}</div>}
-                {sel.saldo_fecha&&<div style={{fontSize:11,color:"#5a5e6e",marginBottom:4}}>Saldo registrado: {new Date(sel.saldo_fecha+"T12:00:00").toLocaleDateString("es-ES")}</div>}
+                {ep==="seña_cobrada"&&<div style={{fontSize:12,color:"#8A8580",marginBottom:10}}>Saldo pendiente: <strong style={{color:"#D4A017"}}>{(pt-seña).toLocaleString("es-ES")}€</strong></div>}
+                {sel.seña_fecha&&<div style={{fontSize:11,color:"#8A8580",marginBottom:4}}>Seña registrada: {new Date(sel.seña_fecha+"T12:00:00").toLocaleDateString("es-ES")}</div>}
+                {sel.saldo_fecha&&<div style={{fontSize:11,color:"#8A8580",marginBottom:4}}>Saldo registrado: {new Date(sel.saldo_fecha+"T12:00:00").toLocaleDateString("es-ES")}</div>}
                 {/* Botón registrar seña */}
                 {(ep==="pendiente"||!sel.estado_pago)&&sel.estado!=="cancelada"&&sel.estado!=="finalizada"&&(
                   <button className="btn bp" style={{width:"100%",justifyContent:"center",marginTop:6}} onClick={()=>{setSeñaImporte("");setShowSeña(true);}}>💰 Registrar seña cobrada</button>
                 )}
                 {/* Botón registrar pago total */}
                 {ep==="seña_cobrada"&&(
-                  <button className="btn bp" style={{width:"100%",justifyContent:"center",marginTop:6,background:"#10b981"}} onClick={()=>setShowPagoTotal(true)}>✅ Registrar pago total</button>
+                  <button className="btn bp" style={{width:"100%",justifyContent:"center",marginTop:6,background:"#A6BE59"}} onClick={()=>setShowPagoTotal(true)}>✅ Registrar pago total</button>
                 )}
               </>;
             })()}
@@ -4347,8 +4347,8 @@ function Reservas({tok,rol,perfil}){
       <div className="modal" style={{maxWidth:400}} onClick={e=>e.stopPropagation()}>
         <h3>💰 Registrar seña cobrada</h3>
         <div style={{background:"rgba(201,168,76,.06)",border:"1px solid rgba(201,168,76,.15)",borderRadius:10,padding:"12px 14px",marginBottom:16}}>
-          <div style={{fontSize:13,color:"#c9a84c",fontWeight:600}}>{sel.nombre}</div>
-          <div style={{fontSize:12,color:"#7a7f94",marginTop:3}}>Precio total: {(parseFloat(sel.precio_total)||parseFloat(sel.precio)||0).toLocaleString("es-ES")}€</div>
+          <div style={{fontSize:13,color:"#EC683E",fontWeight:600}}>{sel.nombre}</div>
+          <div style={{fontSize:12,color:"#8A8580",marginTop:3}}>Precio total: {(parseFloat(sel.precio_total)||parseFloat(sel.precio)||0).toLocaleString("es-ES")}€</div>
         </div>
         <div className="fg">
           <label>Importe de la seña (€) *</label>
@@ -4365,20 +4365,20 @@ function Reservas({tok,rol,perfil}){
       <div className="modal" style={{maxWidth:420}} onClick={e=>e.stopPropagation()}>
         <h3>✅ Confirmar pago total</h3>
         <div style={{background:"rgba(201,168,76,.06)",border:"1px solid rgba(201,168,76,.15)",borderRadius:10,padding:"12px 14px",marginBottom:16}}>
-          <div style={{fontSize:13,color:"#c9a84c",fontWeight:600}}>{sel.nombre}</div>
+          <div style={{fontSize:13,color:"#EC683E",fontWeight:600}}>{sel.nombre}</div>
           {(()=>{const pt=parseFloat(sel.precio_total)||parseFloat(sel.precio)||0;const seña=parseFloat(sel.seña_importe)||0;return <>
-            <div style={{fontSize:12,color:"#7a7f94",marginTop:6}}>Precio total: <strong style={{color:"#e8e6e1"}}>{pt.toLocaleString("es-ES")}€</strong></div>
-            <div style={{fontSize:12,color:"#7a7f94",marginTop:3}}>Seña cobrada: <strong style={{color:"#10b981"}}>−{seña.toLocaleString("es-ES")}€</strong></div>
+            <div style={{fontSize:12,color:"#8A8580",marginTop:6}}>Precio total: <strong style={{color:"#1A1A1A"}}>{pt.toLocaleString("es-ES")}€</strong></div>
+            <div style={{fontSize:12,color:"#8A8580",marginTop:3}}>Seña cobrada: <strong style={{color:"#A6BE59"}}>−{seña.toLocaleString("es-ES")}€</strong></div>
             <hr className="div"/>
-            <div style={{fontSize:16,fontWeight:700,color:"#c9a84c"}}>Saldo pendiente: {(pt-seña).toLocaleString("es-ES")}€</div>
+            <div style={{fontSize:16,fontWeight:700,color:"#EC683E"}}>Saldo pendiente: {(pt-seña).toLocaleString("es-ES")}€</div>
           </>;})()}
         </div>
-        <div style={{background:"rgba(16,185,129,.06)",border:"1px solid rgba(16,185,129,.15)",borderRadius:8,padding:"10px 12px",marginBottom:14,fontSize:12,color:"#10b981"}}>
+        <div style={{background:"rgba(16,185,129,.06)",border:"1px solid rgba(16,185,129,.15)",borderRadius:8,padding:"10px 12px",marginBottom:14,fontSize:12,color:"#A6BE59"}}>
           ✅ Se generará automáticamente el gasto de comisión del gestor
         </div>
         <div className="mft">
           <button className="btn bg" onClick={()=>setShowPagoTotal(false)}>Cancelar</button>
-          <button className="btn bp" style={{background:"#10b981"}} onClick={registrarPagoTotal} disabled={cobroSaving}>{cobroSaving?"Procesando…":"✅ Confirmar pago completo"}</button>
+          <button className="btn bp" style={{background:"#A6BE59"}} onClick={registrarPagoTotal} disabled={cobroSaving}>{cobroSaving?"Procesando…":"✅ Confirmar pago completo"}</button>
         </div>
       </div>
     </div>}
@@ -4409,7 +4409,7 @@ function NuevaReserva({perfil,tok,setPage}){
   return <>
     <div className="ph"><h2>Nueva reserva</h2></div>
     <div className="pb"><div style={{maxWidth:600}}>
-      {ok&&<div style={{background:"rgba(16,185,129,.1)",border:"1px solid rgba(16,185,129,.3)",borderRadius:10,padding:"12px 15px",marginBottom:16,color:"#10b981",fontSize:13}}>✅ Reserva creada. Redirigiendo…</div>}
+      {ok&&<div style={{background:"rgba(16,185,129,.1)",border:"1px solid rgba(16,185,129,.3)",borderRadius:10,padding:"12px 15px",marginBottom:16,color:"#A6BE59",fontSize:13}}>✅ Reserva creada. Redirigiendo…</div>}
       <div className="card">
         <div className="fg"><label>Nombre del cliente *</label><input className="fi" value={form.nombre} onChange={e=>setForm(v=>({...v,nombre:e.target.value}))} placeholder="Ej: María y Carlos García"/></div>
         <div className="g2"><div className="fg"><label>Fecha *</label><input type="date" className="fi" value={form.fecha} onChange={e=>setForm(v=>({...v,fecha:e.target.value}))}/></div><div className="fg"><label>Tipo</label><select className="fi" value={form.tipo} onChange={e=>setForm(v=>({...v,tipo:e.target.value}))}>{tipos.map(t=><option key={t}>{t}</option>)}</select></div></div>
@@ -4596,20 +4596,20 @@ function Visitas({perfil,tok,rol}){
         return <div key={v.id} className="card" style={{marginBottom:10,borderLeft:`3px solid ${est.col}`,cursor:"pointer"}} onClick={()=>setSel(v)}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:12}}>
             <div style={{minWidth:0}}>
-              <div style={{fontSize:15,fontWeight:600,color:"#e8e6e1",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{v.nombre}</div>
-              <div style={{fontSize:12,color:"#7a7f94",marginTop:4}}>📅 {fechaFmt} · 🕐 {v.hora?.slice(0,5)||"—"}</div>
+              <div style={{fontSize:15,fontWeight:600,color:"#1A1A1A",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{v.nombre}</div>
+              <div style={{fontSize:12,color:"#8A8580",marginTop:4}}>📅 {fechaFmt} · 🕐 {v.hora?.slice(0,5)||"—"}</div>
               <div style={{display:"flex",gap:6,marginTop:6,flexWrap:"wrap"}}>
                 <span className="badge" style={{background:`${est.col}18`,color:est.col,border:`1px solid ${est.col}30`}}>{est.lbl}</span>
                 {v.es_coordinacion?<span className="badge" style={{background:"rgba(99,102,241,.1)",color:"#a5b4fc",border:"1px solid rgba(99,102,241,.25)"}}>📋 {reservasMap[v.reserva_id]||"Coordinación"}</span>
-                :<span className="badge" style={{background:"rgba(245,158,11,.1)",color:"#f59e0b",border:"1px solid rgba(245,158,11,.25)"}}>🔍 Captación</span>}
-                {v.tipo_evento&&<span className="badge" style={{background:"rgba(201,168,76,.1)",color:"#c9a84c"}}>🎉 {v.tipo_evento}</span>}
-                {v.invitados&&<span className="badge" style={{background:"rgba(255,255,255,.06)",color:"#7a7f94"}}>👥 {v.invitados} inv.</span>}
+                :<span className="badge" style={{background:"rgba(245,158,11,.1)",color:"#D4A017",border:"1px solid rgba(245,158,11,.25)"}}>🔍 Captación</span>}
+                {v.tipo_evento&&<span className="badge" style={{background:"rgba(201,168,76,.1)",color:"#EC683E"}}>🎉 {v.tipo_evento}</span>}
+                {v.invitados&&<span className="badge" style={{background:"rgba(255,255,255,.06)",color:"#8A8580"}}>👥 {v.invitados} inv.</span>}
               </div>
             </div>
-            <span style={{color:"#5a5e6e",fontSize:22,flexShrink:0}}>›</span>
+            <span style={{color:"#8A8580",fontSize:22,flexShrink:0}}>›</span>
           </div>
           {v.nota&&<div className="nbox" style={{marginTop:10}}>💬 {v.nota}</div>}
-          {v.nota_cancelacion&&<div style={{marginTop:8,fontSize:12,color:"#e85555",background:"rgba(232,85,85,.06)",border:"1px solid rgba(232,85,85,.15)",borderRadius:7,padding:"6px 10px"}}>❌ {v.nota_cancelacion}</div>}
+          {v.nota_cancelacion&&<div style={{marginTop:8,fontSize:12,color:"#F35757",background:"rgba(232,85,85,.06)",border:"1px solid rgba(232,85,85,.15)",borderRadius:7,padding:"6px 10px"}}>❌ {v.nota_cancelacion}</div>}
         </div>;
       })}
     </div>
@@ -4655,13 +4655,13 @@ function Visitas({perfil,tok,rol}){
             {l:"INVITADOS",v:sel.invitados?`${sel.invitados} personas`:null},
             {l:"TELÉFONO",v:sel.telefono},
             {l:"EMAIL",v:sel.email},
-          ].filter(x=>x.v).map(x=><div key={x.l} style={{background:"#0f1117",borderRadius:8,padding:"10px 12px"}}>
-            <div style={{fontSize:10,color:"#5a5e6e",marginBottom:3}}>{x.l}</div>
-            <div style={{fontSize:13,color:"#e8e6e1"}}>{x.v}</div>
+          ].filter(x=>x.v).map(x=><div key={x.l} style={{background:"#F5F3F0",borderRadius:8,padding:"10px 12px"}}>
+            <div style={{fontSize:10,color:"#8A8580",marginBottom:3}}>{x.l}</div>
+            <div style={{fontSize:13,color:"#1A1A1A"}}>{x.v}</div>
           </div>)}
         </div>
 
-        {sel.nota_cancelacion&&<div style={{marginBottom:14,padding:"10px 12px",background:"rgba(232,85,85,.06)",border:"1px solid rgba(232,85,85,.2)",borderRadius:8,fontSize:13,color:"#e85555"}}>❌ Motivo cancelación: {sel.nota_cancelacion}</div>}
+        {sel.nota_cancelacion&&<div style={{marginBottom:14,padding:"10px 12px",background:"rgba(232,85,85,.06)",border:"1px solid rgba(232,85,85,.2)",borderRadius:8,fontSize:13,color:"#F35757"}}>❌ Motivo cancelación: {sel.nota_cancelacion}</div>}
 
         <NotaVisita sel={sel} onGuardar={guardarNota} puedeEditar={puedeEditar}/>
 
@@ -4688,10 +4688,10 @@ function Visitas({perfil,tok,rol}){
             <button className="btn br" style={{width:"100%",justifyContent:"center"}} onClick={()=>{setNotaCancelacion("");setShowRevertir(true);}}>↩️ Cancelar esta reserva</button>
           </div>
         )}
-        {sel.estado==="no_presentado"&&<div style={{marginTop:16,padding:"10px 12px",background:"rgba(232,85,85,.08)",border:"1px solid rgba(232,85,85,.2)",borderRadius:8,fontSize:13,color:"#e85555",textAlign:"center"}}>❌ El cliente no se presentó a esta visita</div>}
+        {sel.estado==="no_presentado"&&<div style={{marginTop:16,padding:"10px 12px",background:"rgba(232,85,85,.08)",border:"1px solid rgba(232,85,85,.2)",borderRadius:8,fontSize:13,color:"#F35757",textAlign:"center"}}>❌ El cliente no se presentó a esta visita</div>}
         {sel.estado==="reserva_cancelada"&&<div style={{marginTop:16,padding:"10px 12px",background:"rgba(107,114,128,.08)",border:"1px solid rgba(107,114,128,.2)",borderRadius:8,fontSize:13,color:"#9ca3af",textAlign:"center"}}>↩️ Reserva cancelada</div>}
 
-        {sel.creado_por&&<div style={{marginTop:12,fontSize:11,color:"#3d4155",textAlign:"right"}}>Creada por {sel.creado_por}</div>}
+        {sel.creado_por&&<div style={{marginTop:12,fontSize:11,color:"#BFBAB4",textAlign:"right"}}>Creada por {sel.creado_por}</div>}
 
         <Historial entidad_tipo="visita" entidad_id={sel.id} tok={tok} perfil={perfil}/>
         <Documentos entidad_tipo="visita" entidad_id={sel.id} tok={tok} perfil={perfil}/>
@@ -4702,8 +4702,8 @@ function Visitas({perfil,tok,rol}){
     {sel&&showNoPresentado&&<div className="ov" onClick={()=>setShowNoPresentado(false)}>
       <div className="modal" style={{maxWidth:420}} onClick={e=>e.stopPropagation()}>
         <h3>❌ No se presentó</h3>
-        <p style={{fontSize:13,color:"#7a7f94",marginBottom:20,lineHeight:1.6}}>
-          <strong style={{color:"#e8e6e1"}}>{sel.nombre}</strong> no se ha presentado a la visita del {new Date(sel.fecha+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"long"})} a las {sel.hora?.slice(0,5)||"—"}.<br/><br/>¿Qué deseas hacer?
+        <p style={{fontSize:13,color:"#8A8580",marginBottom:20,lineHeight:1.6}}>
+          <strong style={{color:"#1A1A1A"}}>{sel.nombre}</strong> no se ha presentado a la visita del {new Date(sel.fecha+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"long"})} a las {sel.hora?.slice(0,5)||"—"}.<br/><br/>¿Qué deseas hacer?
         </p>
         <div style={{display:"flex",flexDirection:"column",gap:10}}>
           <button className="btn bp" style={{width:"100%",justifyContent:"center",padding:"14px",fontSize:14}} onClick={()=>marcarNoPresentado("reprogramar")} disabled={saving}>📅 Marcar y programar nueva visita</button>
@@ -4717,14 +4717,14 @@ function Visitas({perfil,tok,rol}){
     {sel&&showRevertir&&<div className="ov" onClick={()=>setShowRevertir(false)}>
       <div className="modal" style={{maxWidth:440}} onClick={e=>e.stopPropagation()}>
         <h3>↩️ Cancelar reserva</h3>
-        <p style={{fontSize:13,color:"#7a7f94",marginBottom:16,lineHeight:1.5}}>
-          La reserva de <strong style={{color:"#e8e6e1"}}>{sel.nombre}</strong> quedará cancelada. Indica el motivo:
+        <p style={{fontSize:13,color:"#8A8580",marginBottom:16,lineHeight:1.5}}>
+          La reserva de <strong style={{color:"#1A1A1A"}}>{sel.nombre}</strong> quedará cancelada. Indica el motivo:
         </p>
         <div className="fg">
           <label>Motivo de cancelación *</label>
           <textarea className="fi" rows={4} value={notaCancelacion} onChange={e=>setNotaCancelacion(e.target.value)} placeholder="Ej: No firmaron el contrato, encontraron otra finca…"/>
         </div>
-        {!notaCancelacion.trim()&&<div style={{fontSize:12,color:"#e85555",marginBottom:10}}>⚠️ El motivo es obligatorio</div>}
+        {!notaCancelacion.trim()&&<div style={{fontSize:12,color:"#F35757",marginBottom:10}}>⚠️ El motivo es obligatorio</div>}
         <div className="mft">
           <button className="btn bg" onClick={()=>setShowRevertir(false)}>Cancelar</button>
           <button className="btn br" onClick={revertirReserva} disabled={saving||!notaCancelacion.trim()}>{saving?"Procesando…":"↩️ Confirmar cancelación"}</button>
@@ -4737,11 +4737,11 @@ function Visitas({perfil,tok,rol}){
       <div className="modal" style={{maxWidth:500}} onClick={e=>e.stopPropagation()}>
         <h3>🔄 Formalizar reserva</h3>
         <div style={{background:"rgba(201,168,76,.06)",border:"1px solid rgba(201,168,76,.15)",borderRadius:10,padding:"12px 14px",marginBottom:18}}>
-          <div style={{fontSize:13,color:"#c9a84c",fontWeight:600,marginBottom:2}}>{sel.nombre}</div>
-          <div style={{fontSize:12,color:"#7a7f94"}}>🎉 {sel.tipo_evento} · 👥 {sel.invitados||"—"} invitados</div>
+          <div style={{fontSize:13,color:"#EC683E",fontWeight:600,marginBottom:2}}>{sel.nombre}</div>
+          <div style={{fontSize:12,color:"#8A8580"}}>🎉 {sel.tipo_evento} · 👥 {sel.invitados||"—"} invitados</div>
         </div>
         <div className="fg">
-          <label>📅 Fecha del evento * <span style={{color:"#e85555",fontSize:11}}>(día de la boda/evento)</span></label>
+          <label>📅 Fecha del evento * <span style={{color:"#F35757",fontSize:11}}>(día de la boda/evento)</span></label>
           <input type="date" className="fi" value={formRes.fecha_evento} onChange={e=>setFormRes(v=>({...v,fecha_evento:e.target.value}))}/>
         </div>
         <div className="g2">
@@ -4754,7 +4754,7 @@ function Visitas({perfil,tok,rol}){
           </select>
         </div>
         <div className="fg"><label>Observaciones</label><textarea className="fi" rows={3} value={formRes.obs} onChange={e=>setFormRes(v=>({...v,obs:e.target.value}))} placeholder="Notas para la reserva…"/></div>
-        {!formRes.fecha_evento&&<div style={{fontSize:12,color:"#e85555",marginBottom:10}}>⚠️ La fecha del evento es obligatoria</div>}
+        {!formRes.fecha_evento&&<div style={{fontSize:12,color:"#F35757",marginBottom:10}}>⚠️ La fecha del evento es obligatoria</div>}
         <div className="mft">
           <button className="btn bg" onClick={()=>setShowConvertir(false)}>Cancelar</button>
           <button className="btn bp" onClick={convertirEnReserva} disabled={saving||!formRes.fecha_evento}>{saving?"Creando…":"✅ Crear reserva"}</button>
@@ -4775,7 +4775,7 @@ function NotaVisita({sel,onGuardar,puedeEditar}){
     setSaving(true);await onGuardar(sel,txt);setSaving(false);setEditando(false);
   };
   return <div style={{marginBottom:4}}>
-    <div style={{fontSize:10,color:"#5a5e6e",textTransform:"uppercase",letterSpacing:.8,marginBottom:8}}>Observaciones / Nota comercial</div>
+    <div style={{fontSize:10,color:"#8A8580",textTransform:"uppercase",letterSpacing:.8,marginBottom:8}}>Observaciones / Nota comercial</div>
     {editando?(
       <>
         <textarea className="fi" rows={4} value={txt} onChange={e=>setTxt(e.target.value)} placeholder="Ej: Les ha encantado la finca, piden presupuesto esta semana…" style={{marginBottom:8}}/>
@@ -4785,8 +4785,8 @@ function NotaVisita({sel,onGuardar,puedeEditar}){
         </div>
       </>
     ):(
-      <div style={{background:"#0f1117",borderRadius:8,padding:"10px 12px",minHeight:52,position:"relative"}}>
-        {sel.nota?<div style={{fontSize:13,color:"#c9c5b8",lineHeight:1.5,paddingRight:80}}>{sel.nota}</div>:<div style={{fontSize:13,color:"#3d4155",fontStyle:"italic"}}>Sin observaciones todavía…</div>}
+      <div style={{background:"#F5F3F0",borderRadius:8,padding:"10px 12px",minHeight:52,position:"relative"}}>
+        {sel.nota?<div style={{fontSize:13,color:"#1A1A1A",lineHeight:1.5,paddingRight:80}}>{sel.nota}</div>:<div style={{fontSize:13,color:"#BFBAB4",fontStyle:"italic"}}>Sin observaciones todavía…</div>}
         {puedeEditar&&<button className="btn bg sm" style={{position:"absolute",top:8,right:8}} onClick={()=>setEditando(true)}>{sel.nota?"✏️":"➕ Añadir"}</button>}
       </div>
     )}
@@ -4889,15 +4889,15 @@ function ReservasAirbnb({perfil,tok,rol}){
         return <div key={a.id} className="card" style={{marginBottom:10,borderLeft:"3px solid #10b981",cursor:"pointer"}} onClick={()=>setSel(a)}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:12}}>
             <div style={{minWidth:0}}>
-              <div style={{fontSize:15,fontWeight:600,color:"#e8e6e1",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>🏠 {a.huesped}</div>
-              <div style={{fontSize:12,color:"#7a7f94",marginTop:4}}>📅 {fmtRango(a)}</div>
+              <div style={{fontSize:15,fontWeight:600,color:"#1A1A1A",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>🏠 {a.huesped}</div>
+              <div style={{fontSize:12,color:"#8A8580",marginTop:4}}>📅 {fmtRango(a)}</div>
               <div style={{display:"flex",gap:6,marginTop:6,flexWrap:"wrap"}}>
-                <span className="badge" style={{background:"rgba(16,185,129,.1)",color:"#10b981",border:"1px solid rgba(16,185,129,.25)"}}>Airbnb · {n} noche{n!==1?"s":""}</span>
-                {a.personas&&<span className="badge" style={{background:"rgba(255,255,255,.06)",color:"#7a7f94"}}>👥 {a.personas} personas</span>}
-                {a.precio&&<span className="badge" style={{background:"rgba(201,168,76,.1)",color:"#c9a84c"}}>💰 {parseFloat(a.precio).toLocaleString("es-ES")}€</span>}
+                <span className="badge" style={{background:"rgba(16,185,129,.1)",color:"#A6BE59",border:"1px solid rgba(16,185,129,.25)"}}>Airbnb · {n} noche{n!==1?"s":""}</span>
+                {a.personas&&<span className="badge" style={{background:"rgba(255,255,255,.06)",color:"#8A8580"}}>👥 {a.personas} personas</span>}
+                {a.precio&&<span className="badge" style={{background:"rgba(201,168,76,.1)",color:"#EC683E"}}>💰 {parseFloat(a.precio).toLocaleString("es-ES")}€</span>}
               </div>
             </div>
-            <span style={{color:"#5a5e6e",fontSize:22,flexShrink:0}}>›</span>
+            <span style={{color:"#8A8580",fontSize:22,flexShrink:0}}>›</span>
           </div>
           {a.notas&&<div className="nbox" style={{marginTop:10}}>📝 {a.notas}</div>}
         </div>;
@@ -4914,7 +4914,7 @@ function ReservasAirbnb({perfil,tok,rol}){
           <div className="fg"><label>Fecha salida *</label><input type="date" className="fi" value={form.fecha_salida} onChange={e=>setForm(v=>({...v,fecha_salida:e.target.value}))}/></div>
         </div>
         {form.fecha_entrada&&form.fecha_salida&&form.fecha_salida>=form.fecha_entrada&&(
-          <div style={{fontSize:12,color:"#c9a84c",marginBottom:10}}>🌙 {Math.round((new Date(form.fecha_salida)-new Date(form.fecha_entrada))/(1000*60*60*24))} noches</div>
+          <div style={{fontSize:12,color:"#EC683E",marginBottom:10}}>🌙 {Math.round((new Date(form.fecha_salida)-new Date(form.fecha_entrada))/(1000*60*60*24))} noches</div>
         )}
         <div className="g2">
           <div className="fg"><label>Personas</label><input type="number" inputMode="numeric" className="fi" value={form.personas} onChange={e=>setForm(v=>({...v,personas:e.target.value}))} placeholder="Ej: 4"/></div>
@@ -4931,7 +4931,7 @@ function ReservasAirbnb({perfil,tok,rol}){
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:16,gap:8}}>
           <div>
             <h3 style={{marginBottom:6}}>🏠 {sel.huesped}</h3>
-            <span className="badge" style={{background:"rgba(16,185,129,.12)",color:"#10b981",border:"1px solid rgba(16,185,129,.25)"}}>Airbnb · {noches(sel)} noches</span>
+            <span className="badge" style={{background:"rgba(16,185,129,.12)",color:"#A6BE59",border:"1px solid rgba(16,185,129,.25)"}}>Airbnb · {noches(sel)} noches</span>
           </div>
           <button className="btn bg sm" style={{flexShrink:0}} onClick={()=>setSel(null)}>✕</button>
         </div>
@@ -4941,19 +4941,19 @@ function ReservasAirbnb({perfil,tok,rol}){
             {l:"SALIDA",v:new Date(sel.fecha_salida+"T12:00:00").toLocaleDateString("es-ES",{weekday:"long",day:"numeric",month:"long",year:"numeric"})},
             {l:"PERSONAS",v:sel.personas?`${sel.personas} personas`:null},
             {l:"PRECIO",v:sel.precio?`${parseFloat(sel.precio).toLocaleString("es-ES")}€`:null,gold:true},
-          ].filter(x=>x.v).map(x=><div key={x.l} style={{background:"#0f1117",borderRadius:8,padding:"10px 12px"}}>
-            <div style={{fontSize:10,color:"#5a5e6e",marginBottom:3}}>{x.l}</div>
+          ].filter(x=>x.v).map(x=><div key={x.l} style={{background:"#F5F3F0",borderRadius:8,padding:"10px 12px"}}>
+            <div style={{fontSize:10,color:"#8A8580",marginBottom:3}}>{x.l}</div>
             <div style={{fontSize:x.gold?16:13,fontWeight:x.gold?700:400,color:x.gold?"#c9a84c":"#e8e6e1"}}>{x.v}</div>
           </div>)}
         </div>
-        {sel.notas&&<div style={{background:"#0f1117",borderRadius:8,padding:"10px 12px",marginBottom:14}}>
-          <div style={{fontSize:10,color:"#5a5e6e",marginBottom:5}}>NOTAS</div>
-          <div style={{fontSize:13,color:"#c9c5b8",lineHeight:1.5}}>{sel.notas}</div>
+        {sel.notas&&<div style={{background:"#F5F3F0",borderRadius:8,padding:"10px 12px",marginBottom:14}}>
+          <div style={{fontSize:10,color:"#8A8580",marginBottom:5}}>NOTAS</div>
+          <div style={{fontSize:13,color:"#1A1A1A",lineHeight:1.5}}>{sel.notas}</div>
         </div>}
-        <div style={{background:"rgba(232,85,85,.06)",border:"1px solid rgba(232,85,85,.15)",borderRadius:8,padding:"10px 12px",marginBottom:14,fontSize:12,color:"#e85555"}}>
+        <div style={{background:"rgba(232,85,85,.06)",border:"1px solid rgba(232,85,85,.15)",borderRadius:8,padding:"10px 12px",marginBottom:14,fontSize:12,color:"#F35757"}}>
           🔴 Estas fechas quedan bloqueadas automáticamente en el calendario
         </div>
-        {sel.creado_por&&<div style={{fontSize:11,color:"#3d4155",marginBottom:14,textAlign:"right"}}>Creada por {sel.creado_por}</div>}
+        {sel.creado_por&&<div style={{fontSize:11,color:"#BFBAB4",marginBottom:14,textAlign:"right"}}>Creada por {sel.creado_por}</div>}
         {isA&&<button className="btn br" style={{width:"100%",justifyContent:"center"}} onClick={()=>eliminar(sel.id)}>🗑 Eliminar reserva</button>}
       </div>
     </div>}
