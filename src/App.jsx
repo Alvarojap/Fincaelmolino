@@ -746,8 +746,6 @@ function LoginScreen({onLogin,onLoginOperario,desactivado}){
   };
   const delDigit=()=>{setPin(p=>p.slice(0,-1));setPinErr(false);};
 
-  const PinDot=({filled})=><div style={{width:18,height:18,borderRadius:"50%",background:filled?"#1A1A1A":"transparent",border:"2.5px solid "+( pinErr?"#F35757":filled?"#1A1A1A":"#BFBAB4"),transition:"all .15s ease"}}/>;
-
   return <div className="lw"><div className="lbg"/>
     {modo==="admin"&&<div className="lc">
       <div className="llo">
@@ -801,7 +799,7 @@ function LoginScreen({onLogin,onLoginOperario,desactivado}){
       <div style={{width:60,height:60,borderRadius:"50%",background:"linear-gradient(135deg,#EC683E,#AFA3FF)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,fontWeight:700,color:"#fff",margin:"0 auto 16px"}}>{selOp.avatar||selOp.nombre.slice(0,2).toUpperCase()}</div>
       <div style={{fontSize:14,color:"#8A8580",marginBottom:20}}>Introduce tu PIN</div>
       <div style={{display:"flex",justifyContent:"center",gap:14,marginBottom:28,animation:pinErr?"shake .3s ease":"none"}}>
-        {[0,1,2,3].map(i=><PinDot key={i} filled={pin.length>i}/>)}
+        {[0,1,2,3].map(i=><div key={i} style={{width:18,height:18,borderRadius:"50%",background:pin.length>i?"#1A1A1A":"transparent",border:`2.5px solid ${pinErr?"#F35757":pin.length>i?"#1A1A1A":"#BFBAB4"}`,transition:"all .15s ease"}}/>)}
       </div>
       <style>{`@keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-8px)}40%,80%{transform:translateX(8px)}}`}</style>
       <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,maxWidth:240,margin:"0 auto"}}>
@@ -822,9 +820,9 @@ function Sidebar({perfil,page,setPage,onLogout,inDrawer,onClose}){
   const isA=rol==="admin",isJ=rol==="jardinero",isL=rol==="limpieza",isC=rol==="comercial";
   const RL={admin:"Administrador",jardinero:"Jardinero",limpieza:"Limpieza",comercial:"Comercial"};
   const av=perfil.avatar||perfil.nombre.slice(0,2).toUpperCase();
-  const N=({ico,lbl,id,badge})=>{
+  const nItem=(ico,lbl,id,badge)=>{
     const on=page===id;
-    return <div className="nw">
+    return <div key={id} className="nw">
       <button className={`nb${on?" on":""}`} onClick={()=>setPage(id)}>
         <span className="nb-ico">{typeof ico==="string"&&ico.length<=2?ico:<Icon name={ico} size={18} color={on?"#FFFFFF":"#8A8580"}/>}</span>{lbl}
       </button>
@@ -850,30 +848,30 @@ function Sidebar({perfil,page,setPage,onLogout,inDrawer,onClose}){
       </div>
     )}
     <nav className="sb-nav">
-      <N ico="dashboard" lbl="Panel principal" id="dashboard"/>
+      {nItem("dashboard","Panel principal","dashboard")}
       {(isA||isJ)&&<><p className="nav-sec">Jardín</p>
-        <N ico="check" lbl={isA?"Checklist jardín":"Mi checklist"} id="jcheck"/>
-        {isA&&<N ico="garden" lbl="Gestión jardín" id="jadmin"/>}
-        {isA&&<N ico="incidencias" lbl="Incidencias" id="incidencias"/>}
-        {isA&&<N ico="gardeners" lbl="Jardineros" id="jardineros"/>}
-        {isJ&&<N ico="calendar" lbl="Calendario" id="cal-jardin"/>}
+        {nItem("check",isA?"Checklist jardín":"Mi checklist","jcheck")}
+        {isA&&nItem("garden","Gestión jardín","jadmin")}
+        {isA&&nItem("incidencias","Incidencias","incidencias")}
+        {isA&&nItem("gardeners","Jardineros","jardineros")}
+        {isJ&&nItem("calendar","Calendario","cal-jardin")}
       </>}
       {(isA||isL)&&<><p className="nav-sec">Limpieza</p>
-        <N ico="cleaning" lbl={isA?"Gestión limpieza":"Mi servicio"} id="limpieza"/>
-        {isA&&<N ico="limpiadoras" lbl="Limpiadoras" id="limpiadoras"/>}
-        {isL&&<N ico="calendar" lbl="Calendario" id="cal-limp"/>}
+        {nItem("cleaning",isA?"Gestión limpieza":"Mi servicio","limpieza")}
+        {isA&&nItem("limpiadoras","Limpiadoras","limpiadoras")}
+        {isL&&nItem("calendar","Calendario","cal-limp")}
       </>}
       {(isA||isC)&&<><p className="nav-sec">Reservas</p>
-        <N ico="calendar" lbl="Calendario" id="calendario"/>
-        <N ico="reservations" lbl="Reservas" id="reservas"/>
-        {isA&&<N ico="new_res" lbl="Nueva reserva" id="nueva-res"/>}
-        <N ico="visits" lbl="Visitas" id="visitas"/>
-        {isA&&<N ico="airbnb" lbl="Airbnb" id="airbnb"/>}
+        {nItem("calendar","Calendario","calendario")}
+        {nItem("reservations","Reservas","reservas")}
+        {isA&&nItem("new_res","Nueva reserva","nueva-res")}
+        {nItem("visits","Visitas","visitas")}
+        {isA&&nItem("airbnb","Airbnb","airbnb")}
       </>}
       <p className="nav-sec">Comunicación</p>
-      <N ico="chat" lbl={isA?"Chat con equipo":"Chat con admin"} id="chat"/>
-      <N ico="notifications" lbl="Notificaciones" id="notifs"/>
-      {isA&&<><p className="nav-sec">Admin</p><N ico="expenses" lbl="Gastos" id="gastos"/><N ico="users" lbl="Usuarios" id="usuarios"/><N ico="settings" lbl="Ajustes" id="ajustes"/></>}
+      {nItem("chat",isA?"Chat con equipo":"Chat con admin","chat")}
+      {nItem("notifications","Notificaciones","notifs")}
+      {isA&&<><p className="nav-sec">Admin</p>{nItem("expenses","Gastos","gastos")}{nItem("users","Usuarios","usuarios")}{nItem("settings","Ajustes","ajustes")}</>}
     </nav>
     {!inDrawer&&(
       <div className="sb-user">
@@ -2061,21 +2059,20 @@ function JardinCheck({perfil,tok,rol}){
 
   if(load)return <div className="loading"><div className="spin"/><span>Cargando…</span></div>;
 
-  const BannerVerif=()=>{
-    if(!yaVerif)return null;
+  const bannerVerifJsx=yaVerif?(()=>{
     const ok=yaVerif.done;
     return <div style={{background:ok?"rgba(16,185,129,.1)":"rgba(245,158,11,.1)",border:`1px solid ${ok?"rgba(16,185,129,.3)":"rgba(245,158,11,.3)"}`,borderRadius:10,padding:"12px 16px",marginBottom:16,display:"flex",alignItems:"center",gap:10}}>
       <span style={{fontSize:20}}>{ok?"✅":"⚠️"}</span>
       <div><div style={{fontSize:13,fontWeight:600,color:ok?"#10b981":"#f59e0b"}}>{ok?"Jardín verificado esta semana":"Semana cerrada con incidencias"}</div><div style={{fontSize:11,color:"#8A8580",marginTop:2}}>{yaVerif.nota} · {fmtDT(yaVerif.completado_ts)}</div></div>
       {!isA&&<button className="btn bg sm" style={{marginLeft:"auto",flexShrink:0}} onClick={()=>{setFinalCheck({});setFinalMode(null);setFinalNota("");setShowFinal(true);}}>Cambiar</button>}
     </div>;
-  };
+  })():null;
 
   return <>
     <div className="ph"><h2>{isA?"Checklist jardín":"Mi checklist"}</h2><p>{TEMPORADA_LBL[temp]} · {comp}/{tot} tareas</p></div>
     <div className="pb">
       <div className="prog" style={{marginBottom:14,height:7}}><div className="pfill" style={{width:`${tot?(comp/tot)*100:0}%`}}/></div>
-      <BannerVerif/>
+      {bannerVerifJsx}
       {todoHecho&&!showFinal&&!isA&&(
         <div style={{marginBottom:16}}>
           <button className="btn bp" style={{width:"100%",justifyContent:"center",fontSize:15,padding:"12px"}} onClick={()=>{setFinalCheck({});setFinalMode(null);setFinalNota("");setShowFinal(true);}}>✅ Abrir control final del jardín</button>
@@ -4472,9 +4469,9 @@ function Reservas({tok,rol,perfil}){
   const canceladas=reservas.filter(r=>r.estado==="cancelada");
   const lista=filtro==="activas"?activas:filtro==="finalizadas"?finalizadas:filtro==="canceladas"?canceladas:reservas;
 
-  const RCard=({r})=>{
+  const renderRCard=(r)=>{
     const est=ESTADOS.find(e=>e.id===r.estado);
-    return <div className="rc" style={{borderLeftColor:est?.col}} onClick={()=>setSel(r)}>
+    return <div key={r.id} className="rc" style={{borderLeftColor:est?.col}} onClick={()=>setSel(r)}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10}}>
         <div style={{minWidth:0}}>
           <div style={{fontSize:14,fontWeight:600,color:"#1A1A1A",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.nombre}</div>
@@ -4505,7 +4502,7 @@ function Reservas({tok,rol,perfil}){
         <div>
           {lista.length===0
             ?<div className="empty"><span className="ico">📋</span><p>Sin reservas en esta categoría</p></div>
-            :lista.map(r=><RCard key={r.id} r={r}/>)}
+            :lista.map(r=>renderRCard(r))}
         </div>
         {sel&&<div className="card detail-panel" style={{position:"sticky",top:20}}>
           <div style={{display:"flex",justifyContent:"space-between",marginBottom:16,gap:8}}>
