@@ -255,22 +255,28 @@ function sendPush(title,body,tag="molino"){
   else if(Notification?.permission==="granted"){try{new Notification(title,{body,tag});}catch(_){}}
 }
 async function subscribePush(userId,tok,role){
-  if(!("PushManager"in window))return;
   try{
+    if(!("PushManager"in window)||!swReg)return;
     const reg=swReady?await swReady:swReg;
     if(!reg)return;
-    let sub=await reg.pushManager.getSubscription();
+    let sub=await reg.pushManager.getSubscription().catch(()=>null);
     if(!sub){
-      const key=Uint8Array.from(atob(VAPID_PUBLIC.replace(/-/g,"+").replace(/_/g,"/")),c=>c.charCodeAt(0));
-      sub=await swReg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:key});
+      try{
+        const key=Uint8Array.from(atob(VAPID_PUBLIC.replace(/-/g,"+").replace(/_/g,"/")),c=>c.charCodeAt(0));
+        sub=await swReg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:key});
+      }catch(_){return;}
     }
-    const {endpoint,keys}=sub.toJSON();
-    const body={user_id:userId,endpoint,p256dh:keys.p256dh,auth:keys.auth};
+    if(!sub)return;
+    const json=sub.toJSON();
+    if(!json?.endpoint)return;
+    const body={user_id:userId,endpoint:json.endpoint};
+    if(json.keys?.p256dh)body.p256dh=json.keys.p256dh;
+    if(json.keys?.auth)body.auth=json.keys.auth;
     if(role)body.role=role;
     await fetch(`${SB_URL}/rest/v1/push_subscriptions`,{
       method:"POST",headers:{...HDRA(tok),"Prefer":"resolution=merge-duplicates,return=minimal"},
       body:JSON.stringify(body)
-    });
+    }).catch(()=>{});
   }catch(_){}
 }
 async function notificarRoles(roles,titulo,cuerpo,tag,tok){
@@ -1273,8 +1279,8 @@ function FinancialCharts({tok}){
           <button className={`btn sm${vista==="semana"?" bp":" bg"}`} onClick={()=>setVista("semana")}>Semana</button>
         </div>
       </div>
-      <div style={{width:"100%",height:280}}>
-        <ResponsiveContainer>
+      <div style={{width:"100%",minHeight:280}}>
+        <ResponsiveContainer width="100%" height={280}>
           <ComposedChart data={chartData} margin={{top:5,right:5,left:-15,bottom:5}}>
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,.06)"/>
             <XAxis dataKey="name" tick={{fontSize:10,fill:"#5a5e6e"}} axisLine={{stroke:"rgba(255,255,255,.08)"}} tickLine={false} interval={vista==="semana"?3:"preserveStartEnd"}/>
@@ -1294,8 +1300,8 @@ function FinancialCharts({tok}){
     {prev2025>0&&(
       <div className="card" style={{marginBottom:16}}>
         <div className="chdr"><span className="ctit">📈 Comparativa {añoActual-1} vs {añoActual}</span></div>
-        <div style={{width:"100%",height:240}}>
-          <ResponsiveContainer>
+        <div style={{width:"100%",minHeight:240}}>
+          <ResponsiveContainer width="100%" height={240}>
             <LineChart data={monthly} margin={{top:5,right:5,left:-15,bottom:5}}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,.06)"/>
               <XAxis dataKey="name" tick={{fontSize:10,fill:"#5a5e6e"}} axisLine={{stroke:"rgba(255,255,255,.08)"}} tickLine={false}/>
@@ -1315,8 +1321,8 @@ function FinancialCharts({tok}){
       <div className="card" style={{marginBottom:16}}>
         <div className="chdr"><span className="ctit">🍩 Ingresos por fuente</span></div>
         <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:24,flexWrap:"wrap"}}>
-          <div style={{width:180,height:180}}>
-            <ResponsiveContainer>
+          <div style={{width:180,minHeight:180}}>
+            <ResponsiveContainer width={180} height={180}>
               <PieChart>
                 <Pie data={pie} cx="50%" cy="50%" innerRadius={45} outerRadius={75} dataKey="value" strokeWidth={0} label={({name,percent})=>`${name} ${(percent*100).toFixed(0)}%`} labelLine={false}>
                   <Cell fill={CHART_COLORS.eventos}/>
@@ -3485,7 +3491,7 @@ function Jardineros({tok,rol}){
   return <>
     <div className="ph"><h2>👷 Jardineros</h2><p>Gestión de jardineros y condiciones</p></div>
     <div className="pb">
-      <div style={{marginBottom:14}}><button className="btn bp" onClick={()=>{setJForm({nombre:"",modalidad:"Fijo mensual",tarifa:"",notas:""});setShowJForm(true);}}>➕ Nuevo jardinero</button></div>
+      <div style={{marginBottom:14}}><button className="btn bp" onClick={()=>{setJForm({nombre:"",modalidad:"Fijo mensual",tarifa:"",notas:"",pin:"",pinConfirm:""});setShowJForm(true);}}>➕ Nuevo jardinero</button></div>
       {jardineros.length===0?<div className="empty"><span className="ico">🌿</span><p>Sin jardineros registrados</p></div>
       :jardineros.map(j=>{
         const modLbl=j.modalidad||"—";
@@ -3516,8 +3522,8 @@ function Jardineros({tok,rol}){
                 ))}
               </div>
               <div style={{fontSize:11,color:"#EC683E",fontWeight:600,textTransform:"uppercase",letterSpacing:1,marginBottom:8}}>Horas por mes</div>
-              <div style={{width:"100%",height:140}}>
-                <ResponsiveContainer><BarChart data={analData.barras} margin={{top:5,right:5,left:-20,bottom:5}}>
+              <div style={{width:"100%",minHeight:140}}>
+                <ResponsiveContainer width="100%" height={140}><BarChart data={analData.barras} margin={{top:5,right:5,left:-20,bottom:5}}>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,.06)"/><XAxis dataKey="name" tick={{fontSize:9,fill:"#5a5e6e"}} axisLine={false} tickLine={false}/><YAxis tick={{fontSize:9,fill:"#5a5e6e"}} axisLine={false} tickLine={false}/><Tooltip contentStyle={{background:"#FFFFFF",border:"1px solid rgba(201,168,76,.25)",borderRadius:8,fontSize:12}} formatter={v=>[`${v}h`]}/><Bar dataKey="horas" fill="#EC683E" radius={[3,3,0,0]}/>
                 </BarChart></ResponsiveContainer>
               </div>
@@ -3597,7 +3603,7 @@ function LimpiadorasPage({tok,rol}){
   return <>
     <div className="ph"><h2>👩 Limpiadoras</h2><p>Gestión de limpiadoras y condiciones</p></div>
     <div className="pb">
-      <div style={{marginBottom:14}}><button className="btn bp" onClick={()=>{setForm({nombre:"",modalidad:"por_horas",tarifa_hora:"",notas:""});setShowForm(true);}}>➕ Nueva limpiadora</button></div>
+      <div style={{marginBottom:14}}><button className="btn bp" onClick={()=>{setForm({nombre:"",modalidad:"por_horas",tarifa_hora:"",notas:"",pin:"",pinConfirm:""});setShowForm(true);}}>➕ Nueva limpiadora</button></div>
       {limpiadoras.length===0?<div className="empty"><span className="ico">🧹</span><p>Sin limpiadoras registradas</p></div>
       :limpiadoras.map(l=>{
         const modLbl={por_horas:"Por horas",precio_fijo_servicio:"Precio fijo",permuta:"Permuta"}[l.modalidad]||l.modalidad;
