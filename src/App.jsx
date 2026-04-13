@@ -2566,16 +2566,19 @@ function Limpieza({perfil,tok,rol}){
     if(!newS.nombre||saving)return;setSaving(true);
     try{
       const limpSel=limpiadoras.find(l=>String(l.id)===String(newS.limpiadora_id));
-      const srvData={nombre:newS.nombre,fecha:newS.fecha,creado_por:perfil.nombre};
-      if(newS.limpiadora_id){
-        srvData.limpiadora_id=newS.limpiadora_id;
-        srvData.limpiadora_nombre=limpSel?.nombre||"";
-        srvData.modalidad_pago=newS.modalidad_pago||null;
-        if(newS.modalidad_pago==="por_horas")srvData.tarifa_hora_aplicada=parseFloat(newS.tarifa_hora)||null;
-        if(newS.modalidad_pago==="precio_fijo_servicio")srvData.precio_fijo_acordado=parseFloat(newS.precio_fijo_acordado)||null;
-        if(newS.modalidad_pago==="permuta")srvData.permuta_descripcion=newS.permuta_descripcion||null;
+      // Step 1: INSERT with only base fields that always exist
+      const [srv]=await sbPost("servicios",{nombre:newS.nombre,fecha:newS.fecha,creado_por:perfil.nombre},tok);
+      // Step 2: PATCH with optional limpiadora fields (may not exist in table)
+      if(newS.limpiadora_id&&srv?.id){
+        const extra={};
+        extra.limpiadora_id=newS.limpiadora_id;
+        extra.limpiadora_nombre=limpSel?.nombre||"";
+        if(newS.modalidad_pago)extra.modalidad_pago=newS.modalidad_pago;
+        if(newS.modalidad_pago==="por_horas")extra.tarifa_hora_aplicada=parseFloat(newS.tarifa_hora)||null;
+        if(newS.modalidad_pago==="precio_fijo_servicio")extra.precio_fijo_acordado=parseFloat(newS.precio_fijo_acordado)||null;
+        if(newS.modalidad_pago==="permuta")extra.permuta_descripcion=newS.permuta_descripcion||null;
+        await sbPatch("servicios",`id=eq.${srv.id}`,extra,tok).catch(()=>{});
       }
-      const [srv]=await sbPost("servicios",srvData,tok);
       for(const t of LIMP_T)await sbPost("servicio_tareas",{servicio_id:srv.id,tarea_id:t.id,zona:t.zona,es_extra:false},tok);
       const us=await sbGet("usuarios","?rol=eq.limpieza&select=id",tok);
       for(const u of us){await sbPost("notificaciones",{para:u.id,txt:`Nuevo servicio: "${newS.nombre}" — ${new Date(newS.fecha).toLocaleDateString("es-ES")}`},tok);sendPush("🌾 Finca El Molino",`Nuevo servicio: ${newS.nombre}`);}
@@ -3482,7 +3485,9 @@ function Jardineros({tok,rol}){
     setAnalisis(j);setAnalLoad(true);setAnalData(null);
     try{
       const hoy=new Date();const añoActual=hoy.getFullYear();const mesActual=String(hoy.getMonth()+1).padStart(2,"0");
-      const jornadas=await sbGet("jornadas_jardineria",`?jardinero_id=eq.${j.id}&fecha=gte.${añoActual}-01-01&select=*`,tok).catch(()=>[]);
+      const srvsDel=await sbGet("servicios_jardineria",`?jardinero_id=eq.${j.id}&select=id`,tok).catch(()=>[]);
+      const srvIds=srvsDel.map(s=>s.id);
+      const jornadas=srvIds.length>0?await sbGet("jornadas_jardineria",`?servicio_id=in.(${srvIds.join(",")})&fecha=gte.${añoActual}-01-01&select=*`,tok).catch(()=>[]):[];
       const jorMes=jornadas.filter(x=>x.fecha?.slice(5,7)===mesActual);
       const horasMes=jorMes.reduce((s,x)=>s+(parseFloat(x.horas)||0),0);
       const costeMes=jorMes.reduce((s,x)=>s+(parseFloat(x.coste)||0),0);
