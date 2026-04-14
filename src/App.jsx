@@ -1596,13 +1596,20 @@ function DashJ({perfil,jsem,jpunt,cwk,setPage,tok}){
   const hoyStr=new Date().toISOString().split("T")[0];
   const jId=perfil.es_operario?perfil.referencia_id:perfil.id;
 
+  console.log("perfil jardinero:",perfil);
+  console.log("perfil.referencia_id:",perfil.referencia_id);
+  console.log("perfil.id:",perfil.id);
+
   const loadSrvActivo=async()=>{
     try{
+      console.log("query jardinero_id usado:",jId);
       const srvs=await sbGet("jardin_servicios",`?jardinero_id=eq.${jId}&estado=eq.activo&select=*`,tok).catch(()=>[]);
+      console.log("servicios encontrados:",srvs);
       if(srvs.length===0){setSrvActivo(null);setSrvTareas([]);setSrvExtras([]);return;}
       const s=srvs[0];setSrvActivo(s);
       // Tareas
       const allTareas=await sbGet("jardin_servicio_tareas",`?servicio_id=eq.${s.id}&select=*&order=created_at.asc`,tok).catch(()=>[]);
+      console.log("tareas encontradas:",allTareas);
       setSrvTareas(allTareas.filter(t=>!t.añadida_por_jardinero));
       setSrvExtras(allTareas.filter(t=>t.añadida_por_jardinero));
       // Jornada hoy
