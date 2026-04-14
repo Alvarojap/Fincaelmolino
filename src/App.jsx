@@ -2943,7 +2943,33 @@ function Limpieza({perfil,tok,rol}){
           )}
 
           {/* TAREAS POR ZONAS */}
-          {LIMP_ZONAS.map(zona=>{
+          {(()=>{
+            // Check if tareas match new zone ids
+            const allZonaIds=LIMP_ZONAS.flatMap(z=>getZonaTareas(z).map(t=>t.id));
+            const matchCount=fijas.filter(t=>allZonaIds.includes(t.tarea_id)).length;
+            const useZonas=matchCount>0;
+            if(!useZonas){
+              // Fallback: flat list for old-format tareas
+              return fijas.map(t=>(
+                <div key={t.id} className={`cli${t.done?" done":""}`} style={{marginBottom:4}}>
+                  {!isA?<div className={`chk${t.done?" on":""}`} onClick={()=>toggleT(t.id)} style={{cursor:"pointer"}}/>:<span style={{fontSize:17,flexShrink:0}}>{t.done?"✅":"⬜"}</span>}
+                  <div style={{flex:1,minWidth:0}}>
+                    <span className="tz">{t.zona||"General"}</span>
+                    <div className={`tl${t.done?" done":""}`}>{t.txt||t.tarea_id}</div>
+                    {t.done&&<div className="tm">✓ {t.completado_por}</div>}
+                    {t.nota&&<div className="nbox">📝 {t.nota}</div>}
+                    {t.foto_url&&<img src={t.foto_url} alt="" className="pthumb"/>}
+                  </div>
+                  <span className="ibtn" onClick={()=>openN2(t)}>{t.nota||t.foto_url?"✏️":"➕"}</span>
+                </div>
+              ));
+            }
+            return null;
+          })()}
+          {(()=>{
+            const allZonaIds=LIMP_ZONAS.flatMap(z=>getZonaTareas(z).map(t=>t.id));
+            if(fijas.filter(t=>allZonaIds.includes(t.tarea_id)).length===0)return null;
+            return LIMP_ZONAS.map(zona=>{
             const zonaTIds=getZonaTareas(zona).map(t=>t.id);
             const zonaTareas=fijas.filter(t=>zonaTIds.includes(t.tarea_id));
             const zonaDone=zonaTareas.filter(t=>t.done).length;
@@ -3017,7 +3043,8 @@ function Limpieza({perfil,tok,rol}){
                 {fotoTarea?.foto_url&&<img src={fotoTarea.foto_url} alt="" className="pthumb" style={{marginTop:8}}/>}
               </div>}
             </div>;
-          })}
+          });
+          })()}
 
           {/* EXTRAS */}
           {extras.length>0&&<>
