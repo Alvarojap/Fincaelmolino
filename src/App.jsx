@@ -676,6 +676,8 @@ export default function App() {
     ajustes:     <Ajustes     {...P}/>,
     analisis:    <Analisis    {...P}/>,
     limpiadoras:  <LimpiadorasPage {...P}/>,
+    lavanderia:  <Lavanderia  {...P}/>,
+    almacen:     <AlmacenPage {...P}/>,
   };
 
   return <>
@@ -867,6 +869,8 @@ function Sidebar({perfil,page,setPage,onLogout,inDrawer,onClose}){
       {(isA||isL)&&<><p className="nav-sec">Limpieza</p>
         {nItem("cleaning",isA?"Gestión limpieza":"Mi servicio","limpieza")}
         {isA&&nItem("limpiadoras","Limpiadoras","limpiadoras")}
+        {(isA||isL||isJ)&&nItem("dashboard","Lavandería","lavanderia")}
+        {(isA||isL||isJ)&&nItem("reservations","Almacén","almacen")}
         {isL&&nItem("calendar","Calendario","cal-limp")}
       </>}
       {(isA||isC)&&<><p className="nav-sec">Reservas</p>
@@ -1394,6 +1398,7 @@ function AtencionAhora({tok,setPage}){
   const [solicitudes,setSolicitudes]=useState([]);
   const [srvLimp,setSrvLimp]=useState([]);
   const [srvJard,setSrvJard]=useState([]);
+  const [stockBajos,setStockBajos]=useState([]);
   const [load,setLoad]=useState(true);
 
   useEffect(()=>{
@@ -1446,6 +1451,8 @@ function AtencionAhora({tok,setPage}){
         setSolicitudes(sols);
         setSrvLimp(sLimp.filter(s=>s.estado==="en_curso"));
         setSrvJard(sJard);
+        // Stock bajo
+        try{const arts=await sbGet("almacen_articulos","?activo=eq.true&select=nombre,stock_casa,stock_almacen,stock_minimo",tok);setStockBajos(arts.filter(a=>(parseFloat(a.stock_casa)||0)+(parseFloat(a.stock_almacen)||0)<=(parseFloat(a.stock_minimo)||0)));}catch(_){}
       }catch(e){console.error("AtencionAhora:",e);}
       setLoad(false);
     })();
@@ -1453,7 +1460,7 @@ function AtencionAhora({tok,setPage}){
 
   if(load)return <div style={{display:"flex",alignItems:"center",gap:8,justifyContent:"center",padding:"20px 0",color:"#8A8580",fontSize:13}}><div className="spin" style={{width:16,height:16,borderWidth:2}}/>Cargando…</div>;
 
-  const totalItems=llegadas.length+acciones.length+solicitudes.length+srvLimp.length+srvJard.length;
+  const totalItems=llegadas.length+acciones.length+solicitudes.length+srvLimp.length+srvJard.length+stockBajos.length;
   if(totalItems===0)return null;
 
   const fmtF=f=>new Date(f+"T12:00:00").toLocaleDateString("es-ES",{weekday:"short",day:"numeric",month:"short"});
@@ -1534,6 +1541,14 @@ function AtencionAhora({tok,setPage}){
           </div>
         </div>;
       })}
+    </>}
+
+    {/* STOCK BAJO */}
+    {stockBajos.length>0&&<>
+      <div style={{fontSize:11,color:"#F35757",fontWeight:600,textTransform:"uppercase",letterSpacing:1,marginBottom:8,marginTop:16}}>📦 Stock bajo ({stockBajos.length})</div>
+      <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+        {stockBajos.map(a=><span key={a.nombre} className="badge" style={{background:"#FEE8E8",color:"#F35757",cursor:"pointer"}} onClick={()=>setPage("almacen")}>{a.nombre}</span>)}
+      </div>
     </>}
   </div>;
 }
@@ -3048,7 +3063,7 @@ function Limpieza({perfil,tok,rol}){
                       📷 Cerrar zona con foto
                       <input type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={async e=>{
                         const f=e.target.files[0];if(!f)return;
-                        try{const url=await uploadFoto(f,tok);await sbPost("servicio_tareas",{servicio_id:actId,tarea_id:zona.id+"_cerrada",zona:zona.nombre,done:true,completado_por:perfil.nombre,completado_ts:new Date().toISOString(),foto_url:url,es_extra:false},tok);await loadTareas(actId);}catch(_){}
+                        try{const url=await uploadFoto(f,tok||SB_KEY);await sbPost("servicio_tareas",{servicio_id:actId,tarea_id:zona.id+"_cerrada",zona:zona.nombre,done:true,completado_por:perfil.nombre,completado_ts:new Date().toISOString(),foto_url:url,es_extra:false},tok);await loadTareas(actId);}catch(_){}
                       }}/>
                     </label>
                     <button className="btn bg" style={{width:"100%",justifyContent:"center",marginTop:6}} onClick={async()=>{
@@ -3832,6 +3847,268 @@ function LimpiadorasPage({tok,rol}){
         <div className="mft"><button className="btn bg" onClick={()=>setShowForm(false)}>Cancelar</button><button className="btn bp" onClick={crear} disabled={saving||!form.nombre||form.pin.length!==4||form.pin!==form.pinConfirm}>{saving?"Guardando…":"🧹 Crear"}</button></div>
       </div>
     </div>}
+  </>;
+}
+
+// ─── LAVANDERÍA ─────────────────────────────────────────────────────────────
+function Lavanderia({perfil,tok,rol}){
+  const isA=rol==="admin";
+  const hoyStr=new Date().toISOString().split("T")[0];
+  const [envios,setEnvios]=useState([]);const [articulos,setArticulos]=useState([]);
+  const [load,setLoad]=useState(true);const [saving,setSaving]=useState(false);
+  const [showEnvio,setShowEnvio]=useState(false);const [showRecogida,setShowRecogida]=useState(null);
+  const [items,setItems]=useState([]);const [notas,setNotas]=useState("");
+  const [recFecha,setRecFecha]=useState(hoyStr);const [recCoste,setRecCoste]=useState("");const [recFoto,setRecFoto]=useState(null);
+
+  const load_=async()=>{
+    try{
+      const[e,a]=await Promise.all([
+        sbGet("lavanderia","?select=*&order=fecha_envio.desc",tok),
+        sbGet("almacen_articulos","?tiene_lavanderia=eq.true&activo=eq.true&select=*&order=nombre.asc",tok).catch(()=>[]),
+      ]);
+      setEnvios(e);setArticulos(a);
+    }catch(_){}setLoad(false);
+  };
+  useEffect(()=>{load_();},[]);
+
+  const enviar=async()=>{
+    const filled=items.filter(i=>i.cantidad>0);
+    if(filled.length===0||saving)return;setSaving(true);
+    try{
+      await sbPost("lavanderia",{fecha_envio:hoyStr,items:filled.map(i=>({articulo_id:i.id,nombre:i.nombre,cantidad:i.cantidad})),estado:"en_lavanderia",creado_por:perfil.nombre,notas:notas||null},tok);
+      for(const i of filled){await sbPatch("almacen_articulos",`id=eq.${i.id}`,{stock_casa:(parseFloat(articulos.find(a=>a.id===i.id)?.stock_casa)||0)-i.cantidad,stock_lavanderia:(parseFloat(articulos.find(a=>a.id===i.id)?.stock_lavanderia)||0)+i.cantidad},tok).catch(()=>{});}
+      setShowEnvio(false);setItems([]);setNotas("");await load_();
+    }catch(_){}setSaving(false);
+  };
+
+  const recoger=async()=>{
+    if(!showRecogida||saving)return;setSaving(true);
+    const coste=parseFloat(recCoste)||0;
+    try{
+      await sbPatch("lavanderia",`id=eq.${showRecogida.id}`,{estado:"recogido",fecha_recogida:recFecha,coste,factura_url:recFoto||null},tok);
+      if(coste>0)await sbPost("gastos",{fecha:hoyStr,categoria:"Otros",concepto:`Lavandería - ${showRecogida.fecha_envio}`,importe:coste,origen:"manual"},tok).catch(()=>{});
+      const itemsR=showRecogida.items||[];
+      for(const i of itemsR){await sbPatch("almacen_articulos",`id=eq.${i.articulo_id}`,{stock_lavanderia:Math.max(0,(parseFloat(articulos.find(a=>a.id===i.articulo_id)?.stock_lavanderia)||0)-i.cantidad),stock_almacen:(parseFloat(articulos.find(a=>a.id===i.articulo_id)?.stock_almacen)||0)+i.cantidad},tok).catch(()=>{});}
+      setShowRecogida(null);await load_();
+    }catch(_){}setSaving(false);
+  };
+
+  const enLav=envios.filter(e=>e.estado==="en_lavanderia");
+  const historial=envios.filter(e=>e.estado==="recogido");
+
+  if(load)return <div className="loading"><div className="spin"/><span>Cargando…</span></div>;
+  return <>
+    <div className="ph"><h2>🧺 Lavandería</h2><p>{enLav.length} envíos pendientes</p></div>
+    <div className="pb">
+      <button className="btn bp" style={{marginBottom:16}} onClick={()=>{setItems(articulos.map(a=>({...a,cantidad:0})));setNotas("");setShowEnvio(true);}}>➕ Enviar a lavandería</button>
+
+      {enLav.length===0?<div className="empty"><span className="ico">🧺</span><p>Sin envíos pendientes</p></div>
+      :enLav.map(e=><div key={e.id} className="card" style={{marginBottom:10,borderLeft:"3px solid #D4A017"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8}}>
+          <div><div style={{fontSize:14,fontWeight:600,color:"#1A1A1A"}}>Envío {new Date(e.fecha_envio+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"})}</div>
+            <div style={{fontSize:12,color:"#8A8580",marginTop:3}}>{(e.items||[]).map(i=>`${i.nombre} ×${i.cantidad}`).join(", ")}</div>
+            {e.notas&&<div style={{fontSize:11,color:"#8A8580",marginTop:2}}>{e.notas}</div>}
+            <div style={{fontSize:11,color:"#BFBAB4",marginTop:3}}>Por {e.creado_por}</div>
+          </div>
+          <button className="btn bp sm" onClick={()=>{setRecFecha(hoyStr);setRecCoste("");setRecFoto(null);setShowRecogida(e);}}>✅ Recogido</button>
+        </div>
+      </div>)}
+
+      {historial.length>0&&<>
+        <div style={{fontSize:11,color:"#8A8580",textTransform:"uppercase",letterSpacing:1,fontWeight:700,marginTop:24,marginBottom:10}}>Historial</div>
+        {historial.slice(0,10).map(e=><div key={e.id} className="card" style={{marginBottom:8,opacity:.7}}>
+          <div style={{fontSize:13,fontWeight:600,color:"#1A1A1A"}}>{new Date(e.fecha_envio+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"})} → {e.fecha_recogida?new Date(e.fecha_recogida+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"}):"—"}</div>
+          <div style={{fontSize:12,color:"#8A8580"}}>{(e.items||[]).map(i=>`${i.nombre} ×${i.cantidad}`).join(", ")}{e.coste?` · ${parseFloat(e.coste).toLocaleString("es-ES")}€`:""}</div>
+        </div>)}
+      </>}
+    </div>
+
+    {showEnvio&&<div className="ov" onClick={()=>setShowEnvio(false)}><div className="modal" style={{maxHeight:"90vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
+      <h3>🧺 Enviar a lavandería</h3>
+      {items.map((it,idx)=><div key={it.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderBottom:"1px solid rgba(0,0,0,.04)"}}>
+        <div style={{flex:1,fontSize:13,color:"#1A1A1A"}}>{it.nombre}</div>
+        <div style={{display:"flex",alignItems:"center",gap:6}}>
+          <button className="btn bg sm" onClick={()=>setItems(prev=>prev.map((p,i)=>i===idx?{...p,cantidad:Math.max(0,p.cantidad-1)}:p))}>−</button>
+          <span style={{fontSize:16,fontWeight:700,minWidth:24,textAlign:"center"}}>{it.cantidad}</span>
+          <button className="btn bg sm" onClick={()=>setItems(prev=>prev.map((p,i)=>i===idx?{...p,cantidad:p.cantidad+1}:p))}>+</button>
+        </div>
+      </div>)}
+      <div className="fg" style={{marginTop:12}}><label>Notas</label><textarea className="fi" rows={2} value={notas} onChange={e=>setNotas(e.target.value)} placeholder="Notas opcionales…"/></div>
+      <div className="mft"><button className="btn bg" onClick={()=>setShowEnvio(false)}>Cancelar</button><button className="btn bp" onClick={enviar} disabled={saving||items.every(i=>i.cantidad===0)}>{saving?"Enviando…":"🧺 Confirmar envío"}</button></div>
+    </div></div>}
+
+    {showRecogida&&<div className="ov" onClick={()=>setShowRecogida(null)}><div className="modal" onClick={e=>e.stopPropagation()}>
+      <h3>✅ Marcar como recogido</h3>
+      <div className="fg"><label>Fecha recogida</label><input type="date" className="fi" value={recFecha} onChange={e=>setRecFecha(e.target.value)}/></div>
+      <div className="fg"><label>Coste factura (€)</label><input type="number" inputMode="decimal" className="fi" value={recCoste} onChange={e=>setRecCoste(e.target.value)} placeholder="0"/></div>
+      <div className="fg"><label>Foto factura (opcional)</label>
+        <label className="pbtn">{recFoto?"📷 Cambiar":"📷 Foto factura"}<input type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={async e=>{const f=e.target.files[0];if(!f)return;try{const url=await uploadFoto(f,tok||SB_KEY);setRecFoto(url);}catch(_){const r=new FileReader();r.onload=ev=>setRecFoto(ev.target.result);r.readAsDataURL(f);}}}/></label>
+        {recFoto&&<img src={recFoto} alt="" className="pprev"/>}
+      </div>
+      <div className="mft"><button className="btn bg" onClick={()=>setShowRecogida(null)}>Cancelar</button><button className="btn bp" onClick={recoger} disabled={saving}>{saving?"Guardando…":"✅ Confirmar"}</button></div>
+    </div></div>}
+  </>;
+}
+
+// ─── ALMACÉN ────────────────────────────────────────────────────────────────
+const ALMACEN_CATS=["Todos","🧴 Limpieza","🛁 Reposición","🛏️ Ropa cama","🚿 Toallas","🛋️ Textiles"];
+
+function AlmacenPage({perfil,tok,rol}){
+  const isA=rol==="admin";
+  const [articulos,setArticulos]=useState([]);const [movimientos,setMovimientos]=useState([]);
+  const [load,setLoad]=useState(true);const [saving,setSaving]=useState(false);
+  const [catFiltro,setCatFiltro]=useState("Todos");
+  const [showNew,setShowNew]=useState(false);const [showMov,setShowMov]=useState(null);const [showHist,setShowHist]=useState(false);
+  const newVacio={nombre:"",categoria:"Limpieza",unidad:"unidad",es_liquido:false,tiene_lavanderia:false,stock_minimo:"2",codigo_barras:"",stock_casa:"0",stock_almacen:"0"};
+  const [newForm,setNewForm]=useState(newVacio);
+  const [movForm,setMovForm]=useState({tipo:"entrada",cantidad:"1",ubicacion:"casa",concepto:""});
+
+  const load_=async()=>{
+    try{
+      const[a,m]=await Promise.all([
+        sbGet("almacen_articulos","?activo=eq.true&select=*&order=nombre.asc",tok),
+        sbGet("almacen_movimientos","?select=*&order=created_at.desc&limit=20",tok).catch(()=>[]),
+      ]);
+      setArticulos(a);setMovimientos(m);
+    }catch(_){}setLoad(false);
+  };
+  useEffect(()=>{load_();},[]);
+
+  const crearArticulo=async()=>{
+    if(!newForm.nombre||saving)return;setSaving(true);
+    try{
+      const[art]=await sbPost("almacen_articulos",{nombre:newForm.nombre,categoria:newForm.categoria,unidad:newForm.unidad,es_liquido:newForm.es_liquido,tiene_lavanderia:newForm.tiene_lavanderia,stock_minimo:parseInt(newForm.stock_minimo)||2,codigo_barras:newForm.codigo_barras||null,stock_casa:parseFloat(newForm.stock_casa)||0,stock_almacen:parseFloat(newForm.stock_almacen)||0,stock_lavanderia:0,activo:true},tok);
+      if((parseFloat(newForm.stock_casa)||0)>0)await sbPost("almacen_movimientos",{articulo_id:art.id,tipo:"entrada",cantidad:parseFloat(newForm.stock_casa),ubicacion_destino:"casa",concepto:"Stock inicial",creado_por:perfil.nombre},tok).catch(()=>{});
+      if((parseFloat(newForm.stock_almacen)||0)>0)await sbPost("almacen_movimientos",{articulo_id:art.id,tipo:"entrada",cantidad:parseFloat(newForm.stock_almacen),ubicacion_destino:"almacen",concepto:"Stock inicial",creado_por:perfil.nombre},tok).catch(()=>{});
+      setShowNew(false);setNewForm(newVacio);await load_();
+    }catch(_){}setSaving(false);
+  };
+
+  const ejecutarMov=async()=>{
+    if(!showMov||saving)return;setSaving(true);
+    const art=showMov;const cant=parseFloat(movForm.cantidad)||0;
+    if(cant<=0){setSaving(false);return;}
+    try{
+      if(movForm.tipo==="entrada"){
+        const field=movForm.ubicacion==="casa"?"stock_casa":"stock_almacen";
+        await sbPatch("almacen_articulos",`id=eq.${art.id}`,{[field]:(parseFloat(art[field])||0)+cant},tok);
+        await sbPost("almacen_movimientos",{articulo_id:art.id,tipo:"entrada",cantidad:cant,ubicacion_destino:movForm.ubicacion,concepto:movForm.concepto||"Entrada de stock",creado_por:perfil.nombre},tok).catch(()=>{});
+      }else if(movForm.tipo==="salida"){
+        await sbPatch("almacen_articulos",`id=eq.${art.id}`,{stock_casa:Math.max(0,(parseFloat(art.stock_casa)||0)-cant)},tok);
+        await sbPost("almacen_movimientos",{articulo_id:art.id,tipo:"salida",cantidad:cant,ubicacion_origen:"casa",concepto:movForm.concepto||"Uso/salida",creado_por:perfil.nombre},tok).catch(()=>{});
+      }else if(movForm.tipo==="traslado_a_casa"){
+        await sbPatch("almacen_articulos",`id=eq.${art.id}`,{stock_almacen:Math.max(0,(parseFloat(art.stock_almacen)||0)-cant),stock_casa:(parseFloat(art.stock_casa)||0)+cant},tok);
+        await sbPost("almacen_movimientos",{articulo_id:art.id,tipo:"traslado",cantidad:cant,ubicacion_origen:"almacen",ubicacion_destino:"casa",concepto:movForm.concepto||"Almacén → Casa",creado_por:perfil.nombre},tok).catch(()=>{});
+      }else if(movForm.tipo==="traslado_a_almacen"){
+        await sbPatch("almacen_articulos",`id=eq.${art.id}`,{stock_casa:Math.max(0,(parseFloat(art.stock_casa)||0)-cant),stock_almacen:(parseFloat(art.stock_almacen)||0)+cant},tok);
+        await sbPost("almacen_movimientos",{articulo_id:art.id,tipo:"traslado",cantidad:cant,ubicacion_origen:"casa",ubicacion_destino:"almacen",concepto:movForm.concepto||"Casa → Almacén",creado_por:perfil.nombre},tok).catch(()=>{});
+      }
+      setShowMov(null);await load_();
+    }catch(_){}setSaving(false);
+  };
+
+  const bajos=articulos.filter(a=>(parseFloat(a.stock_casa)||0)+(parseFloat(a.stock_almacen)||0)<=(parseFloat(a.stock_minimo)||0));
+  const filtered=catFiltro==="Todos"?articulos:articulos.filter(a=>a.categoria===catFiltro.replace(/^[^\s]+\s/,""));
+
+  if(load)return <div className="loading"><div className="spin"/><span>Cargando…</span></div>;
+  return <>
+    <div className="ph"><h2>📦 Almacén</h2><p>{articulos.length} artículos · {bajos.length} con stock bajo</p></div>
+    <div className="pb">
+      {bajos.length>0&&<div style={{background:"#FEE8E8",borderRadius:14,padding:"12px 16px",marginBottom:16,fontSize:13,color:"#F35757",fontWeight:600}}>⚠️ {bajos.length} artículo{bajos.length>1?"s":""} con stock bajo: {bajos.slice(0,5).map(a=>a.nombre).join(", ")}</div>}
+
+      <div style={{display:"flex",gap:8,marginBottom:16,flexWrap:"wrap"}}>
+        {isA&&<button className="btn bp" onClick={()=>{setNewForm(newVacio);setShowNew(true);}}>➕ Nuevo artículo</button>}
+      </div>
+
+      <div style={{display:"flex",gap:4,overflowX:"auto",marginBottom:16,scrollbarWidth:"none"}}>
+        {ALMACEN_CATS.map(c=><button key={c} className={`btn sm${catFiltro===c?" bp":" bg"}`} onClick={()=>setCatFiltro(c)} style={{flexShrink:0}}>{c}</button>)}
+      </div>
+
+      {filtered.length===0?<div className="empty"><span className="ico">📦</span><p>Sin artículos en esta categoría</p></div>
+      :filtered.map(a=>{
+        const sC=parseFloat(a.stock_casa)||0;const sA=parseFloat(a.stock_almacen)||0;const sL=parseFloat(a.stock_lavanderia)||0;const sMin=parseFloat(a.stock_minimo)||0;
+        const total=sC+sA;const estado=total<=sMin?"🔴":total<=sMin*2?"🟡":"🟢";
+        return <div key={a.id} className="card" style={{marginBottom:8}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8,marginBottom:8}}>
+            <div style={{fontSize:14,fontWeight:600,color:"#1A1A1A"}}>{a.nombre}</div>
+            <span style={{fontSize:12,fontWeight:700,color:estado==="🔴"?"#F35757":estado==="🟡"?"#D4A017":"#A6BE59"}}>{estado} {estado==="🔴"?"BAJO":estado==="🟡"?"JUSTO":"OK"}</span>
+          </div>
+          <div style={{display:"flex",gap:12,fontSize:12,color:"#8A8580",marginBottom:10}}>
+            <span>🏠 Casa: <strong style={{color:"#1A1A1A"}}>{sC} {a.unidad||""}</strong></span>
+            <span>📦 Almacén: <strong style={{color:"#1A1A1A"}}>{sA}</strong></span>
+            {a.tiene_lavanderia&&<span>🧺 Lavand: <strong style={{color:"#1A1A1A"}}>{sL}</strong></span>}
+          </div>
+          <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+            <button className="btn bg sm" onClick={()=>{setMovForm({tipo:"entrada",cantidad:"1",ubicacion:"casa",concepto:""});setShowMov(a);}}>+ Entrada</button>
+            <button className="btn bg sm" onClick={()=>{setMovForm({tipo:"salida",cantidad:"1",ubicacion:"casa",concepto:""});setShowMov(a);}}>− Uso</button>
+            {sA>0&&<button className="btn bg sm" onClick={()=>{setMovForm({tipo:"traslado_a_casa",cantidad:"1",ubicacion:"",concepto:""});setShowMov(a);}}>📦→🏠</button>}
+            {sC>0&&<button className="btn bg sm" onClick={()=>{setMovForm({tipo:"traslado_a_almacen",cantidad:"1",ubicacion:"",concepto:""});setShowMov(a);}}>🏠→📦</button>}
+          </div>
+        </div>;
+      })}
+
+      {/* Historial */}
+      <div style={{marginTop:20}}>
+        <button onClick={()=>setShowHist(!showHist)} style={{background:"none",border:"none",cursor:"pointer",color:"#8A8580",fontSize:13,fontFamily:"'Inter Tight',sans-serif",fontWeight:600,display:"flex",alignItems:"center",gap:6,padding:0}}>
+          <span>📋 Historial de movimientos</span><span style={{transition:"transform .2s",transform:showHist?"rotate(90deg)":"none",fontSize:16}}>›</span>
+        </button>
+        {showHist&&<div style={{marginTop:10}}>
+          {movimientos.length===0?<div style={{color:"#BFBAB4",fontSize:13}}>Sin movimientos</div>
+          :movimientos.map(m=>{const artN=articulos.find(a=>a.id===m.articulo_id)?.nombre||"—";return <div key={m.id} style={{display:"flex",gap:8,padding:"6px 0",borderBottom:"1px solid rgba(0,0,0,.04)",fontSize:12}}>
+            <span style={{color:"#8A8580"}}>{fmtDT(m.created_at)}</span>
+            <span style={{fontWeight:600}}>{artN}</span>
+            <span className="badge" style={{background:m.tipo==="entrada"?"rgba(166,190,89,.1)":m.tipo==="salida"?"rgba(243,87,87,.1)":"rgba(127,178,255,.1)",color:m.tipo==="entrada"?"#A6BE59":m.tipo==="salida"?"#F35757":"#7FB2FF",fontSize:10}}>{m.tipo}</span>
+            <span>{m.cantidad} {m.ubicacion_origen?`${m.ubicacion_origen}→${m.ubicacion_destino}`:m.ubicacion_destino||""}</span>
+          </div>;})}
+        </div>}
+      </div>
+    </div>
+
+    {/* Modal nuevo artículo */}
+    {showNew&&<div className="ov" onClick={()=>setShowNew(false)}><div className="modal" style={{maxHeight:"90vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
+      <h3>➕ Nuevo artículo</h3>
+      <div className="fg"><label>Nombre *</label><input className="fi" value={newForm.nombre} onChange={e=>setNewForm(v=>({...v,nombre:e.target.value}))} placeholder="Ej: Lejía"/></div>
+      <div className="g2">
+        <div className="fg"><label>Categoría</label><select className="fi" value={newForm.categoria} onChange={e=>setNewForm(v=>({...v,categoria:e.target.value}))}>{["Limpieza","Reposición","Ropa cama","Toallas","Textiles"].map(c=><option key={c}>{c}</option>)}</select></div>
+        <div className="fg"><label>Unidad</label><input className="fi" value={newForm.unidad} onChange={e=>setNewForm(v=>({...v,unidad:e.target.value}))} placeholder="bote, paquete, unidad"/></div>
+      </div>
+      <div style={{display:"flex",gap:16,marginBottom:14}}>
+        <div onClick={()=>setNewForm(v=>({...v,es_liquido:!v.es_liquido}))} style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer",fontSize:13}}>
+          <div style={{width:22,height:22,borderRadius:6,border:`2px solid ${newForm.es_liquido?"#EC683E":"#BFBAB4"}`,background:newForm.es_liquido?"#EC683E":"transparent",display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:12,fontWeight:700}}>{newForm.es_liquido?"✓":""}</div>
+          Es líquido
+        </div>
+        <div onClick={()=>setNewForm(v=>({...v,tiene_lavanderia:!v.tiene_lavanderia}))} style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer",fontSize:13}}>
+          <div style={{width:22,height:22,borderRadius:6,border:`2px solid ${newForm.tiene_lavanderia?"#EC683E":"#BFBAB4"}`,background:newForm.tiene_lavanderia?"#EC683E":"transparent",display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:12,fontWeight:700}}>{newForm.tiene_lavanderia?"✓":""}</div>
+          Va a lavandería
+        </div>
+      </div>
+      <div className="g2">
+        <div className="fg"><label>Stock mínimo</label><input type="number" className="fi" value={newForm.stock_minimo} onChange={e=>setNewForm(v=>({...v,stock_minimo:e.target.value}))}/></div>
+        <div className="fg"><label>Código barras</label><input className="fi" value={newForm.codigo_barras} onChange={e=>setNewForm(v=>({...v,codigo_barras:e.target.value}))} placeholder="Opcional"/></div>
+      </div>
+      <div className="g2">
+        <div className="fg"><label>Stock inicial casa</label><input type="number" className="fi" value={newForm.stock_casa} onChange={e=>setNewForm(v=>({...v,stock_casa:e.target.value}))}/></div>
+        <div className="fg"><label>Stock inicial almacén</label><input type="number" className="fi" value={newForm.stock_almacen} onChange={e=>setNewForm(v=>({...v,stock_almacen:e.target.value}))}/></div>
+      </div>
+      <div className="mft"><button className="btn bg" onClick={()=>setShowNew(false)}>Cancelar</button><button className="btn bp" onClick={crearArticulo} disabled={saving||!newForm.nombre}>{saving?"Creando…":"➕ Crear"}</button></div>
+    </div></div>}
+
+    {/* Modal movimiento */}
+    {showMov&&<div className="ov" onClick={()=>setShowMov(null)}><div className="modal" style={{maxWidth:400}} onClick={e=>e.stopPropagation()}>
+      <h3>{movForm.tipo==="entrada"?"+ Entrada de stock":movForm.tipo==="salida"?"− Registrar uso":movForm.tipo==="traslado_a_casa"?"📦 → 🏠 Traslado":"🏠 → 📦 Traslado"}</h3>
+      <div style={{background:"#F5F3F0",borderRadius:12,padding:"12px 14px",marginBottom:14}}>
+        <div style={{fontSize:14,fontWeight:600}}>{showMov.nombre}</div>
+        <div style={{fontSize:12,color:"#8A8580",marginTop:3}}>Casa: {parseFloat(showMov.stock_casa)||0} · Almacén: {parseFloat(showMov.stock_almacen)||0}</div>
+      </div>
+      {movForm.tipo==="entrada"&&<div className="fg"><label>Ubicación destino</label><select className="fi" value={movForm.ubicacion} onChange={e=>setMovForm(v=>({...v,ubicacion:e.target.value}))}><option value="casa">🏠 Casa</option><option value="almacen">📦 Almacén</option></select></div>}
+      <div className="fg"><label>Cantidad</label>
+        {showMov.es_liquido?<div style={{display:"flex",gap:6}}>
+          {[0.25,0.5,0.75,1,2,3].map(v=><button key={v} className={`btn sm${parseFloat(movForm.cantidad)===v?" bp":" bg"}`} onClick={()=>setMovForm(p=>({...p,cantidad:String(v)}))}>{v<1?`${v*100}%`:v}</button>)}
+        </div>:<input type="number" inputMode="decimal" className="fi" value={movForm.cantidad} onChange={e=>setMovForm(v=>({...v,cantidad:e.target.value}))}/>}
+      </div>
+      <div className="fg"><label>Concepto (opcional)</label><input className="fi" value={movForm.concepto} onChange={e=>setMovForm(v=>({...v,concepto:e.target.value}))} placeholder="Ej: Compra semanal"/></div>
+      <div className="mft"><button className="btn bg" onClick={()=>setShowMov(null)}>Cancelar</button><button className="btn bp" onClick={ejecutarMov} disabled={saving}>{saving?"Guardando…":"✅ Confirmar"}</button></div>
+    </div></div>}
   </>;
 }
 
