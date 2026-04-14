@@ -1656,9 +1656,9 @@ function DashJ({perfil,jsem,jpunt,cwk,setPage,tok}){
       const allTareas=await sbGet("jardin_servicio_tareas",`?servicio_id=eq.${s.id}&select=*&order=created_at.asc`,tok).catch(()=>[]);
       setSrvTareas(allTareas.filter(t=>!t.añadida_por_jardinero));
       setSrvExtras(allTareas.filter(t=>t.añadida_por_jardinero));
-      // Jornada hoy — usar servicio_id_int (integer compatible)
+      // Jornada hoy
       let jHoy=[];
-      try{jHoy=await sbGet("jornadas_jardineria",`?servicio_id_int=eq.${s.id}&hora_inicio=gte.${hoyStr}T00:00:00&hora_inicio=lte.${hoyStr}T23:59:59&select=*`,tok);}catch(_){jHoy=[];}
+      try{jHoy=await sbGet("jornadas_jardineria",`?servicio_id=eq.${s.id}&hora_inicio=gte.${hoyStr}T00:00:00&hora_inicio=lte.${hoyStr}T23:59:59&select=*`,tok);}catch(_){jHoy=[];}
       if(jHoy.length>0){
         const j=jHoy[0];
         setJornadaId(j.id);setPausasArr(j.pausas||[]);
@@ -1713,7 +1713,7 @@ function DashJ({perfil,jsem,jpunt,cwk,setPage,tok}){
     const ahora=new Date();
     const tsInicio=ahora.getTime();
     try{
-      const [j]=await sbPost("jornadas_jardineria",{servicio_id_int:srvActivo.id,fecha:hoyStr,hora_inicio:ahora.toISOString(),pausas:[]},tok);
+      const [j]=await sbPost("jornadas_jardineria",{servicio_id:srvActivo.id,fecha:hoyStr,hora_inicio:ahora.toISOString(),pausas:[]},tok);
       setJornadaId(j.id);setJornadaFin(false);setPausasArr([]);setPausado(false);
       localStorage.setItem(`fm_jornada_inicio_${srvActivo.id}`,tsInicio.toString());
       localStorage.setItem(`fm_jornada_id_${srvActivo.id}`,String(j.id));
@@ -3659,8 +3659,7 @@ function Jardineros({tok,rol}){
       const srvIds=srvsDel.map(s=>s.id);
       let jornadas=[];
       if(srvIds.length>0){
-        try{jornadas=await sbGet("jornadas_jardineria",`?servicio_id_int=in.(${srvIds.join(",")})&select=*`,tok);}
-        catch(_){try{jornadas=await sbGet("jornadas_jardineria",`?servicio_id=in.(${srvIds.join(",")})&select=*`,tok);}catch(_2){}}
+        try{jornadas=await sbGet("jornadas_jardineria",`?servicio_id=in.(${srvIds.join(",")})&select=*`,tok);}catch(_){}
       }
       const jorMes=jornadas.filter(x=>x.fecha?.slice(5,7)===mesActual);
       const horasMes=jorMes.reduce((s,x)=>s+(parseFloat(x.horas)||0),0);
