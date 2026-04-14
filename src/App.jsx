@@ -639,10 +639,12 @@ export default function App() {
   };
 
   const logout=async()=>{
-    const esOp=perfil?.es_operario;
-    if(!esOp&&session)await authLogout(session.access_token).catch(()=>{});
-    localStorage.removeItem("fm_session");
-    localStorage.removeItem("fm_operario_session");
+    if(perfil?.es_operario){
+      localStorage.removeItem("fm_operario_session");
+    }else{
+      if(session?.access_token&&session.access_token!==SB_KEY)await authLogout(session.access_token).catch(()=>{});
+      localStorage.removeItem("fm_session");
+    }
     setSession(null);setPerfil(null);setPage("dashboard");setDrawerOpen(false);
   };
 
@@ -905,7 +907,7 @@ function MobileNav({perfil,page,setPage,tok}){
   const [chatBadge,setChatBadge]=useState(0);
 
   useEffect(()=>{
-    if(!tok)return;
+    if(!tok||perfil?.es_operario)return;
     const check=async()=>{
       try{
         const r=await sbGet("mensajes",`?para=eq.${myId}&leido=eq.false&select=id`,tok);
@@ -1596,20 +1598,23 @@ function DashJ({perfil,jsem,jpunt,cwk,setPage,tok}){
   const hoyStr=new Date().toISOString().split("T")[0];
   const jId=perfil.es_operario?perfil.referencia_id:perfil.id;
 
-  console.log("perfil jardinero:",perfil);
-  console.log("perfil.referencia_id:",perfil.referencia_id);
-  console.log("perfil.id:",perfil.id);
+  console.log("perfil:",JSON.stringify(perfil));
+  console.log("es_operario:",perfil?.es_operario);
+  console.log("referencia_id:",perfil?.referencia_id);
+  console.log("perfil.id:",perfil?.id);
+  console.log("jId calculado:",jId);
 
   const loadSrvActivo=async()=>{
     try{
-      console.log("query jardinero_id usado:",jId);
+      console.log("query jardin_servicios: jardinero_id=eq."+jId+"&estado=eq.activo");
       const srvs=await sbGet("jardin_servicios",`?jardinero_id=eq.${jId}&estado=eq.activo&select=*`,tok).catch(()=>[]);
-      console.log("servicios encontrados:",srvs);
+      console.log("servicios query result:",JSON.stringify(srvs));
       if(srvs.length===0){setSrvActivo(null);setSrvTareas([]);setSrvExtras([]);return;}
       const s=srvs[0];setSrvActivo(s);
+      console.log("servicio activo id:",s.id,"tipo id:",typeof s.id);
       // Tareas
       const allTareas=await sbGet("jardin_servicio_tareas",`?servicio_id=eq.${s.id}&select=*&order=created_at.asc`,tok).catch(()=>[]);
-      console.log("tareas encontradas:",allTareas);
+      console.log("tareas query result:",JSON.stringify(allTareas));
       setSrvTareas(allTareas.filter(t=>!t.añadida_por_jardinero));
       setSrvExtras(allTareas.filter(t=>t.añadida_por_jardinero));
       // Jornada hoy
