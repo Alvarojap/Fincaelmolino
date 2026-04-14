@@ -1107,6 +1107,35 @@ function FinancialKPIs({tok}){
     {id:"comision",lbl:`Comisión gestor (${data?.comisionPct||10}%)`,val:data?.comision,bg:"#7FB2FF",light:false},
   ];
 
+  const renderKpiDetail=(id,d,r,hs,fm,ff,fk,rs,cts,cw)=>{
+    const prc=v=>parseFloat(v)||0;
+    if(id==="fact"){
+      const mData=MESES_CORTO.map((lbl,i)=>{const m=String(i+1).padStart(2,"0");return{name:lbl,Eventos:Math.round(r.reservas.filter(x=>x.fecha?.slice(5,7)===m).reduce((s,x)=>s+(prc(x.precio_total)||prc(x.precio)),0)),Airbnb:Math.round(r.airbnbs.filter(x=>x.fecha_entrada?.slice(5,7)===m).reduce((s,x)=>s+prc(x.precio),0))};});
+      const has=mData.some(m=>m.Eventos>0||m.Airbnb>0);
+      return <><div style={rs}><span>Eventos ({r.reservas.length})</span><strong>{fm(d.factEventos)}</strong></div>
+        <div style={rs}><span>Airbnb ({r.airbnbs.length})</span><strong>{fm(d.factAirbnb)}</strong></div>
+        {has&&<div style={{marginTop:12,overflow:"hidden"}}><BarChart width={cw} height={200} data={mData} margin={{top:5,right:5,left:-20,bottom:5}}><XAxis dataKey="name" tick={{fontSize:10,fill:"#8A8580"}} axisLine={false} tickLine={false}/><YAxis tick={{fontSize:10,fill:"#8A8580"}} axisLine={false} tickLine={false} tickFormatter={fk}/><Tooltip {...cts} formatter={(v,n)=>[`${v.toLocaleString("es-ES")}€`,n]}/><Bar dataKey="Eventos" fill="#EC683E" radius={[3,3,0,0]}/><Bar dataKey="Airbnb" fill="#A6BE59" radius={[3,3,0,0]}/></BarChart></div>}
+        {r.reservas.slice(0,5).map(x=><div key={x.id} style={{...rs,fontSize:12,color:"#8A8580"}}><span style={{flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{x.nombre}</span><span>{ff(x.fecha)}</span><strong style={{color:"#1A1A1A"}}>{fm(prc(x.precio_total)||prc(x.precio))}</strong></div>)}</>;
+    }
+    if(id==="cobrado") return <><div style={rs}><span>Señas cobradas</span><strong>{fm(d.cobradoEventos)}</strong></div><div style={rs}><span>Airbnb cobrado</span><strong>{fm(d.cobradoAirbnb)}</strong></div><div style={{fontWeight:600,marginTop:10,marginBottom:6,fontSize:12,color:"#8A8580"}}>Pendientes de saldo:</div>{r.reservas.filter(x=>x.seña_cobrada&&!x.saldo_cobrado).slice(0,5).map(x=><div key={x.id} style={{...rs,fontSize:12}}><span style={{flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{x.nombre}</span><span style={{color:"#D4A017"}}>{fm((prc(x.precio_total)||prc(x.precio))-prc(x.seña_importe))}</span></div>)}</>;
+    if(id==="pendiente") return <>{r.reservas.filter(x=>x.estado_pago!=="pagado_completo"&&!["cancelada","finalizada"].includes(x.estado)).sort((a,b)=>(a.fecha||"").localeCompare(b.fecha||"")).slice(0,8).map(x=>{const dias=Math.round((new Date(x.fecha)-new Date())/(86400000));const sem=dias<30?"🔴":dias<90?"🟡":"🟢";const pend=(prc(x.precio_total)||prc(x.precio))-(x.seña_cobrada?prc(x.seña_importe):0);return <div key={x.id} style={{...rs,fontSize:12}}><span>{sem}</span><span style={{flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{x.nombre}</span><span style={{color:"#8A8580"}}>{ff(x.fecha)}</span><strong style={{color:"#D4A017"}}>{fm(pend)}</strong></div>;})}</>;
+    if(id==="gastos"){
+      const cats={};r.gastos.forEach(g=>{const c=g.categoria||"Otros";cats[c]=(cats[c]||0)+prc(g.importe);});const total=d.gastosReales||1;const catE=Object.entries(cats).sort((a,b)=>b[1]-a[1]);
+      const pieColors=["#F35757","#EC683E","#ECD227","#A6BE59","#7FB2FF","#AFA3FF","#BFBAB4"];const pieD=catE.map(([c,v])=>({name:c,value:Math.round(v)}));
+      return <>{pieD.length>1&&<div style={{overflow:"hidden",marginBottom:12}}><PieChart width={cw} height={180}><Pie data={pieD} cx={cw/2} cy={90} innerRadius={40} outerRadius={70} dataKey="value" strokeWidth={0}>{pieD.map((_,i)=><Cell key={i} fill={pieColors[i%pieColors.length]}/>)}</Pie><Tooltip {...cts} formatter={v=>[`${v.toLocaleString("es-ES")}€`]}/></PieChart></div>}
+        {catE.map(([c,v])=><div key={c} style={{marginBottom:6}}><div style={{display:"flex",justifyContent:"space-between",fontSize:12}}><span>{c}</span><strong>{fm(v)} ({Math.round(v/total*100)}%)</strong></div><div style={{height:6,background:"#E5E1DB",borderRadius:3,marginTop:3}}><div style={{height:"100%",borderRadius:3,background:"#F35757",width:`${v/total*100}%`}}/></div></div>)}</>;
+    }
+    if(id==="gastosProy") return <><div style={rs}><span>Gastos reales YTD</span><strong>{fm(d.gastosReales)}</strong></div><div style={rs}><span>Proyección diciembre</span><strong>{fm(d.gastosProyectados)}</strong></div><div style={{fontWeight:600,marginTop:10,marginBottom:6,fontSize:12,color:"#8A8580"}}>Recurrentes:</div>{r.gastos.filter(g=>g.recurrente).map(g=><div key={g.id} style={{...rs,fontSize:12}}><span style={{flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>🔁 {g.concepto}</span><strong>{fm(prc(g.importe))}/mes</strong></div>)}</>;
+    if(id==="beneficio"){
+      const bData=MESES_CORTO.map((lbl,i)=>{const m=String(i+1).padStart(2,"0");let cob=0;r.reservas.filter(x=>x.fecha?.slice(5,7)===m).forEach(x=>{if(x.seña_cobrada)cob+=prc(x.seña_importe);if(x.saldo_cobrado)cob+=(prc(x.precio_total)||prc(x.precio))-prc(x.seña_importe);});cob+=r.airbnbs.filter(a=>(a.cobrado||a.fecha_entrada<hs)&&a.fecha_entrada?.slice(5,7)===m).reduce((s,a)=>s+prc(a.precio),0);const gst=r.gastos.filter(g=>g.fecha?.slice(5,7)===m).reduce((s,g)=>s+prc(g.importe),0);return{name:lbl,Beneficio:Math.round(cob-gst)};});
+      const has=bData.some(m=>m.Beneficio!==0);
+      return <><div style={rs}><span>Cobrado</span><strong style={{color:"#A6BE59"}}>{fm(d.yaCobrado)}</strong></div><div style={rs}><span>Gastos</span><strong style={{color:"#F35757"}}>−{fm(d.gastosReales)}</strong></div><div style={{...rs,fontWeight:700,fontSize:16}}><span>Beneficio</span><strong style={{color:d.beneficio>=0?"#A6BE59":"#F35757"}}>{fm(d.beneficio)}</strong></div>{d.yaCobrado>0&&<div style={{marginTop:8,fontSize:12,color:"#8A8580"}}>Margen: <strong style={{color:"#1A1A1A"}}>{Math.round(d.beneficio/d.yaCobrado*100)}%</strong></div>}
+        {has&&<div style={{marginTop:12,overflow:"hidden"}}><LineChart width={cw} height={200} data={bData} margin={{top:5,right:5,left:-20,bottom:5}}><XAxis dataKey="name" tick={{fontSize:10,fill:"#8A8580"}} axisLine={false} tickLine={false}/><YAxis tick={{fontSize:10,fill:"#8A8580"}} axisLine={false} tickLine={false} tickFormatter={fk}/><Tooltip {...cts} formatter={v=>[`${v.toLocaleString("es-ES")}€`]}/><Line type="monotone" dataKey="Beneficio" stroke="#AFA3FF" strokeWidth={2} dot={{r:3,fill:"#AFA3FF"}}/></LineChart></div>}</>;
+    }
+    if(id==="comision") return <><div style={rs}><span>Base de cálculo</span><strong>{fm(d.facturacion)}</strong></div><div style={rs}><span>Porcentaje</span><strong>{d.comisionPct}%</strong></div><div style={{...rs,fontWeight:700}}><span>Total comisión</span><strong style={{color:"#7FB2FF"}}>{fm(d.comision)}</strong></div></>;
+    return null;
+  };
+
   return <><div className="card" style={{marginBottom:16}}>
     <div className="chdr"><span className="ctit">💰 KPIs financieros</span></div>
     <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:14}}>
@@ -1122,108 +1151,40 @@ function FinancialKPIs({tok}){
     {load?<div style={{display:"flex",alignItems:"center",gap:8,justifyContent:"center",padding:"20px 0",color:"#8A8580",fontSize:13}}><div className="spin" style={{width:16,height:16,borderWidth:2}}/>Calculando…</div>
     :data?<>
       {data.desde&&<div style={{fontSize:11,color:"#8A8580",marginBottom:12}}>📅 {fmtF(data.desde)} – {new Date(data.hasta+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short",year:"numeric"})}</div>}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(140px,1fr))",gap:10}}>
-        {kpis.map(k=>k.val!==undefined&&<div key={k.id}>
-          <div onClick={()=>toggleKpi(k.id)} style={{background:k.bg,borderRadius:18,padding:20,cursor:"pointer",opacity:k.opacity||1,transition:"all .15s",border:kpiAbierto===k.id?"3px solid #1A1A1A":"3px solid transparent"}}>
-            <div style={{fontSize:10,color:k.light?"rgba(255,255,255,.7)":"rgba(0,0,0,.5)",textTransform:"uppercase",letterSpacing:.5,fontWeight:600}}>{k.lbl}</div>
-            <div style={{fontSize:22,fontWeight:800,color:k.light?"#fff":"#1A1A1A",marginTop:5}}>{fmt(k.val)}</div>
-          </div>
-          {/* Expanded panel */}
-          {kpiAbierto===k.id&&<div style={panelStyle}>
-            {k.id==="fact"&&(()=>{
-              const cw=typeof window!=="undefined"?Math.min(window.innerWidth-80,380):300;
-              const mData=MESES_CORTO.map((lbl,i)=>{const m=String(i+1).padStart(2,"0");const ev=raw.reservas.filter(r=>r.fecha?.slice(5,7)===m).reduce((s,r)=>s+(parseFloat(r.precio_total)||parseFloat(r.precio)||0),0);const ab=raw.airbnbs.filter(a=>a.fecha_entrada?.slice(5,7)===m).reduce((s,a)=>s+(parseFloat(a.precio)||0),0);return{name:lbl,Eventos:Math.round(ev),Airbnb:Math.round(ab)};});
-              const hasData=mData.some(m=>m.Eventos>0||m.Airbnb>0);
-              return <>
-              <div style={{fontWeight:700,marginBottom:8}}>Desglose facturación</div>
-              <div style={rowStyle}><span>Eventos ({raw.reservas.length})</span><strong>{fmt(data.factEventos)}</strong></div>
-              <div style={rowStyle}><span>Airbnb ({raw.airbnbs.length})</span><strong>{fmt(data.factAirbnb)}</strong></div>
-              {hasData&&<div style={{marginTop:12,overflow:"hidden"}}>
-                <BarChart width={cw} height={120} data={mData} margin={{top:5,right:5,left:-20,bottom:5}}>
-                  <XAxis dataKey="name" tick={{fontSize:9,fill:"#8A8580"}} axisLine={false} tickLine={false}/>
-                  <YAxis tick={{fontSize:9,fill:"#8A8580"}} axisLine={false} tickLine={false} tickFormatter={fmtK}/>
-                  <Tooltip {...ChartTooltipStyle} formatter={(v,n)=>[`${v.toLocaleString("es-ES")}€`,n]}/>
-                  <Bar dataKey="Eventos" fill="#EC683E" radius={[3,3,0,0]}/>
-                  <Bar dataKey="Airbnb" fill="#A6BE59" radius={[3,3,0,0]}/>
-                </BarChart>
-              </div>}
-              {raw.reservas.slice(0,5).map(r=><div key={r.id} style={{...rowStyle,fontSize:12,color:"#8A8580"}}><span style={{flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.nombre}</span><span>{fmtF(r.fecha)}</span><strong style={{color:"#1A1A1A"}}>{fmt(parseFloat(r.precio_total)||parseFloat(r.precio)||0)}</strong></div>)}
-              {raw.airbnbs.slice(0,3).map(a=><div key={a.id} style={{...rowStyle,fontSize:12,color:"#8A8580"}}><span style={{flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>🏠 {a.huesped}</span><span>{fmtF(a.fecha_entrada)}</span><strong style={{color:"#1A1A1A"}}>{fmt(parseFloat(a.precio)||0)}</strong></div>)}
-            </>;})()}
-            {k.id==="cobrado"&&<>
-              <div style={{fontWeight:700,marginBottom:8}}>Desglose cobros</div>
-              <div style={rowStyle}><span>Señas cobradas</span><strong>{fmt(data.cobradoEventos)}</strong></div>
-              <div style={rowStyle}><span>Airbnb cobrado</span><strong>{fmt(data.cobradoAirbnb)}</strong></div>
-              <div style={{fontWeight:600,marginTop:10,marginBottom:6,fontSize:12,color:"#8A8580"}}>Pendientes de saldo:</div>
-              {raw.reservas.filter(r=>r.seña_cobrada&&!r.saldo_cobrado).slice(0,5).map(r=><div key={r.id} style={{...rowStyle,fontSize:12}}><span style={{flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.nombre}</span><span style={{color:"#D4A017"}}>{fmt((parseFloat(r.precio_total)||parseFloat(r.precio)||0)-(parseFloat(r.seña_importe)||0))}</span></div>)}
-            </>}
-            {k.id==="pendiente"&&<>
-              <div style={{fontWeight:700,marginBottom:8}}>Cobros pendientes por urgencia</div>
-              {raw.reservas.filter(r=>r.estado_pago!=="pagado_completo"&&!["cancelada","finalizada"].includes(r.estado)).sort((a,b)=>a.fecha?.localeCompare(b.fecha)).slice(0,8).map(r=>{const dias=Math.round((new Date(r.fecha)-new Date())/(86400000));const sem=dias<30?"🔴":dias<90?"🟡":"🟢";const pend=(parseFloat(r.precio_total)||parseFloat(r.precio)||0)-(r.seña_cobrada?parseFloat(r.seña_importe)||0:0);return <div key={r.id} style={{...rowStyle,fontSize:12}}><span>{sem}</span><span style={{flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.nombre}</span><span style={{color:"#8A8580"}}>{fmtF(r.fecha)}</span><strong style={{color:"#D4A017"}}>{fmt(pend)}</strong></div>;})}
-            </>}
-            {k.id==="gastos"&&(()=>{
-              const cats={};raw.gastos.forEach(g=>{const c=g.categoria||"Otros";cats[c]=(cats[c]||0)+(parseFloat(g.importe)||0);});
-              const total=data.gastosReales||1;
-              const catEntries=Object.entries(cats).sort((a,b)=>b[1]-a[1]);
-              const pieColors=["#F35757","#EC683E","#ECD227","#A6BE59","#7FB2FF","#AFA3FF","#BFBAB4"];
-              const pieData=catEntries.map(([c,v])=>({name:c,value:Math.round(v)}));
-              const cw=typeof window!=="undefined"?Math.min(window.innerWidth-80,380):300;
-              return <>
-              <div style={{fontWeight:700,marginBottom:8}}>Por categoría</div>
-              {pieData.length>1&&<div style={{marginBottom:12,overflow:"hidden"}}>
-                <PieChart width={cw} height={160}>
-                  <Pie data={pieData} cx={cw/2} cy={80} innerRadius={35} outerRadius={60} dataKey="value" strokeWidth={0}>
-                    {pieData.map((_,i)=><Cell key={i} fill={pieColors[i%pieColors.length]}/>)}
-                  </Pie>
-                  <Tooltip {...ChartTooltipStyle} formatter={v=>[`${v.toLocaleString("es-ES")}€`]}/>
-                </PieChart>
-              </div>}
-              {catEntries.map(([c,v])=><div key={c} style={{marginBottom:6}}>
-                <div style={{display:"flex",justifyContent:"space-between",fontSize:12}}><span>{c}</span><strong>{fmt(v)} ({Math.round(v/total*100)}%)</strong></div>
-                <div style={{height:6,background:"#E5E1DB",borderRadius:3,marginTop:3}}><div style={{height:"100%",borderRadius:3,background:"#F35757",width:`${v/total*100}%`}}/></div>
-              </div>)}
-              <div style={{fontWeight:600,marginTop:10,marginBottom:6,fontSize:12,color:"#8A8580"}}>Últimos gastos:</div>
-              {[...raw.gastos].sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||"")).slice(0,6).map(g=><div key={g.id} style={{...rowStyle,fontSize:12}}><span style={{flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{g.concepto}</span><span style={{color:"#8A8580"}}>{fmtF(g.fecha)}</span><strong style={{color:"#F35757"}}>{fmt(parseFloat(g.importe)||0)}</strong></div>)}
-            </>;})()}
-            {k.id==="gastosProy"&&<>
-              <div style={{fontWeight:700,marginBottom:8}}>Proyección anual</div>
-              <div style={rowStyle}><span>Gastos reales YTD</span><strong>{fmt(data.gastosReales)}</strong></div>
-              <div style={rowStyle}><span>Proyección hasta diciembre</span><strong>{fmt(data.gastosProyectados)}</strong></div>
-              <div style={{fontWeight:600,marginTop:10,marginBottom:6,fontSize:12,color:"#8A8580"}}>Gastos recurrentes:</div>
-              {raw.gastos.filter(g=>g.recurrente).map(g=><div key={g.id} style={{...rowStyle,fontSize:12}}><span style={{flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>🔁 {g.concepto}</span><strong>{fmt(parseFloat(g.importe)||0)}/mes</strong></div>)}
-            </>}
-            {k.id==="beneficio"&&(()=>{
-              const cw=typeof window!=="undefined"?Math.min(window.innerWidth-80,380):300;
-              const bData=MESES_CORTO.map((lbl,i)=>{const m=String(i+1).padStart(2,"0");
-                let cob=0;raw.reservas.filter(r=>r.fecha?.slice(5,7)===m).forEach(r=>{const seña=parseFloat(r.seña_importe)||0;const pt=parseFloat(r.precio_total)||parseFloat(r.precio)||0;if(r.seña_cobrada)cob+=seña;if(r.saldo_cobrado)cob+=(pt-seña);});
-                cob+=raw.airbnbs.filter(a=>(a.cobrado||a.fecha_entrada<hoyStr)&&a.fecha_entrada?.slice(5,7)===m).reduce((s,a)=>s+(parseFloat(a.precio)||0),0);
-                const gst=raw.gastos.filter(g=>g.fecha?.slice(5,7)===m).reduce((s,g)=>s+(parseFloat(g.importe)||0),0);
-                return{name:lbl,Beneficio:Math.round(cob-gst)};});
-              const hasData=bData.some(m=>m.Beneficio!==0);
-              return <>
-              <div style={{fontWeight:700,marginBottom:8}}>Análisis de beneficio</div>
-              <div style={rowStyle}><span>Cobrado</span><strong style={{color:"#A6BE59"}}>{fmt(data.yaCobrado)}</strong></div>
-              <div style={rowStyle}><span>Gastos</span><strong style={{color:"#F35757"}}>−{fmt(data.gastosReales)}</strong></div>
-              <div style={{...rowStyle,fontWeight:700,fontSize:16}}><span>Beneficio</span><strong style={{color:data.beneficio>=0?"#A6BE59":"#F35757"}}>{fmt(data.beneficio)}</strong></div>
-              {data.yaCobrado>0&&<div style={{marginTop:8,fontSize:12,color:"#8A8580"}}>Margen: <strong style={{color:"#1A1A1A"}}>{Math.round(data.beneficio/data.yaCobrado*100)}%</strong></div>}
-              {hasData&&<div style={{marginTop:12,overflow:"hidden"}}>
-                <LineChart width={cw} height={120} data={bData} margin={{top:5,right:5,left:-20,bottom:5}}>
-                  <XAxis dataKey="name" tick={{fontSize:9,fill:"#8A8580"}} axisLine={false} tickLine={false}/>
-                  <YAxis tick={{fontSize:9,fill:"#8A8580"}} axisLine={false} tickLine={false} tickFormatter={fmtK}/>
-                  <Tooltip {...ChartTooltipStyle} formatter={v=>[`${v.toLocaleString("es-ES")}€`]}/>
-                  <Line type="monotone" dataKey="Beneficio" stroke="#AFA3FF" strokeWidth={2} dot={{r:3,fill:"#AFA3FF"}}/>
-                </LineChart>
-              </div>}
-            </>;})()}
-            {k.id==="comision"&&<>
-              <div style={{fontWeight:700,marginBottom:8}}>Comisión gestor</div>
-              <div style={rowStyle}><span>Base de cálculo</span><strong>{fmt(data.facturacion)}</strong></div>
-              <div style={rowStyle}><span>Porcentaje</span><strong>{data.comisionPct}%</strong></div>
-              <div style={{...rowStyle,fontWeight:700}}><span>Total comisión</span><strong style={{color:"#7FB2FF"}}>{fmt(data.comision)}</strong></div>
-            </>}
-          </div>}
+      {/* KPI cards — horizontal scroll on mobile, grid on desktop */}
+      <div style={{display:"flex",gap:10,overflowX:"auto",scrollSnapType:"x mandatory",paddingBottom:8,WebkitOverflowScrolling:"touch",scrollbarWidth:"none"}}>
+        <style>{`.kpi-scroll::-webkit-scrollbar{display:none}`}</style>
+        {kpis.map(k=>k.val!==undefined&&<div key={k.id} onClick={()=>toggleKpi(k.id)} style={{background:k.bg,borderRadius:18,padding:"18px 20px",cursor:"pointer",opacity:k.opacity||1,transition:"all .15s",border:kpiAbierto===k.id?"3px solid #1A1A1A":"3px solid transparent",minWidth:160,scrollSnapAlign:"start",flex:"0 0 auto"}}>
+          <div style={{fontSize:10,color:k.light?"rgba(255,255,255,.7)":"rgba(0,0,0,.5)",textTransform:"uppercase",letterSpacing:.5,fontWeight:600}}>{k.lbl}</div>
+          <div style={{fontSize:22,fontWeight:800,color:k.light?"#fff":"#1A1A1A",marginTop:5}}>{fmt(k.val)}</div>
         </div>)}
       </div>
+      {/* Full-width detail panel below KPI row (desktop) */}
+      {kpiAbierto&&typeof window!=="undefined"&&window.innerWidth>=768&&(()=>{
+        const ak=kpis.find(k=>k.id===kpiAbierto);
+        const chartW=Math.min(500,window.innerWidth-400);
+        const detailContent=renderKpiDetail(kpiAbierto,data,raw,hoyStr,fmt,fmtF,fmtK,rowStyle,ChartTooltipStyle,chartW);
+        return <div style={{background:"#F5F3F0",borderRadius:16,padding:"20px 24px",marginTop:12,animation:"modalIn .2s ease",position:"relative"}}>
+          <button onClick={()=>setKpiAbierto(null)} style={{position:"absolute",top:12,right:14,background:"none",border:"none",cursor:"pointer",color:"#8A8580",fontSize:18,lineHeight:1}}>✕</button>
+          <div style={{fontSize:14,fontWeight:700,color:ak?.bg||"#1A1A1A",marginBottom:14}}>{ak?.lbl}</div>
+          {detailContent}
+        </div>;
+      })()}
+      {/* Mobile bottom sheet */}
+      {kpiAbierto&&typeof window!=="undefined"&&window.innerWidth<768&&(()=>{
+        const ak=kpis.find(k=>k.id===kpiAbierto);
+        const chartW=window.innerWidth-48;
+        const detailContent=renderKpiDetail(kpiAbierto,data,raw,hoyStr,fmt,fmtF,fmtK,rowStyle,ChartTooltipStyle,chartW);
+        return <div style={{position:"fixed",inset:0,zIndex:1000,background:"rgba(0,0,0,.4)",backdropFilter:"blur(8px)"}} onClick={()=>setKpiAbierto(null)}>
+          <div style={{position:"absolute",bottom:0,left:0,right:0,maxHeight:"90vh",overflowY:"auto",background:"#FFFFFF",borderRadius:"24px 24px 0 0",padding:"20px 20px 36px",animation:"modalSlideUp .28s cubic-bezier(.34,1.56,.64,1)"}} onClick={e=>e.stopPropagation()}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+              <div style={{fontSize:16,fontWeight:800,color:ak?.bg||"#1A1A1A"}}>{ak?.lbl}</div>
+              <button onClick={()=>setKpiAbierto(null)} style={{background:"#F0EDE8",border:"none",cursor:"pointer",borderRadius:100,width:32,height:32,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,color:"#8A8580"}}>✕</button>
+            </div>
+            {detailContent}
+          </div>
+        </div>;
+      })()}
     </>:<div style={{color:"#8A8580",fontSize:13,padding:"16px 0",textAlign:"center"}}>No se pudieron cargar los datos</div>}
   </div>
   {/* ALERTAS */}
