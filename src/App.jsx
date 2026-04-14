@@ -667,6 +667,7 @@ export default function App() {
     gastos:      <Gastos      {...P}/>,
     jardineros:  <Jardineros  {...P}/>,
     ajustes:     <Ajustes     {...P}/>,
+    analisis:    <Analisis    {...P}/>,
     limpiadoras:  <LimpiadorasPage {...P}/>,
   };
 
@@ -871,7 +872,7 @@ function Sidebar({perfil,page,setPage,onLogout,inDrawer,onClose}){
       <p className="nav-sec">Comunicación</p>
       {nItem("chat",isA?"Chat con equipo":"Chat con admin","chat")}
       {nItem("notifications","Notificaciones","notifs")}
-      {isA&&<><p className="nav-sec">Admin</p>{nItem("expenses","Gastos","gastos")}{nItem("users","Usuarios","usuarios")}{nItem("settings","Ajustes","ajustes")}</>}
+      {isA&&<><p className="nav-sec">Admin</p>{nItem("expenses","Gastos","gastos")}{nItem("dashboard","Análisis","analisis")}{nItem("users","Usuarios","usuarios")}{nItem("settings","Ajustes","ajustes")}</>}
     </nav>
     {!inDrawer&&(
       <div className="sb-user">
@@ -4018,6 +4019,240 @@ function Gastos({tok}){
         </div>
       </div>
     </div>}
+  </>;
+}
+
+// ─── ANÁLISIS ───────────────────────────────────────────────────────────────
+function Analisis({tok,rol}){
+  if(rol!=="admin")return null;
+  const hoy=new Date();const hoyStr=hoy.toISOString().split("T")[0];const año=hoy.getFullYear();const mesIdx=hoy.getMonth();
+  const [tab,setTab]=useState("proyeccion");
+  const [load,setLoad]=useState(true);
+  const [reservas,setReservas]=useState([]);const [airbnbs,setAirbnbs]=useState([]);const [gastos,setGastos]=useState([]);const [visitas,setVisitas]=useState([]);const [f2025,setF2025]=useState(0);
+
+  useEffect(()=>{(async()=>{
+    try{
+      const[r,a,g,v,cfg]=await Promise.all([
+        sbGet("reservas",`?fecha=gte.${año}-01-01&fecha=lte.${año}-12-31&select=*`,tok),
+        sbGet("reservas_airbnb",`?fecha_entrada=gte.${año}-01-01&fecha_entrada=lte.${año}-12-31&select=*`,tok),
+        sbGet("gastos",`?fecha=gte.${año}-01-01&fecha=lte.${año}-12-31&select=*`,tok).catch(()=>[]),
+        sbGet("visitas",`?select=*`,tok).catch(()=>[]),
+        sbGet("configuracion","?select=*",tok).catch(()=>[]),
+      ]);
+      setReservas(r);setAirbnbs(a);setGastos(g);setVisitas(v);
+      const c={};cfg.forEach(x=>c[x.clave]=x.valor);setF2025(parseFloat(c.facturacion_2025)||0);
+    }catch(_){}setLoad(false);
+  })();},[]);
+
+  const fmt=v=>`${Math.round(v).toLocaleString("es-ES")}€`;
+  const cw=typeof window!=="undefined"?Math.min(window.innerWidth-64,560):400;
+  const prc=v=>parseFloat(v)||0;
+  const precioR=r=>prc(r.precio_total)||prc(r.precio);
+  const ACTIVOS=["visita","pendiente_contrato","contrato_firmado","reserva_pagada","precio_total"];
+
+  // Monthly helpers
+  const mFact=i=>{const m=String(i+1).padStart(2,"0");return reservas.filter(r=>r.fecha?.slice(5,7)===m).reduce((s,r)=>s+precioR(r),0)+airbnbs.filter(a=>a.fecha_entrada?.slice(5,7)===m).reduce((s,a)=>s+prc(a.precio),0);};
+  const mGast=i=>{const m=String(i+1).padStart(2,"0");return gastos.filter(g=>g.fecha?.slice(5,7)===m).reduce((s,g)=>s+prc(g.importe),0);};
+  const mCob=i=>{const m=String(i+1).padStart(2,"0");let c=0;reservas.filter(r=>r.fecha?.slice(5,7)===m).forEach(r=>{const s=prc(r.seña_importe);if(r.seña_cobrada)c+=s;if(r.saldo_cobrado)c+=(precioR(r)-s);});c+=airbnbs.filter(a=>(a.cobrado||a.fecha_entrada<hoyStr)&&a.fecha_entrada?.slice(5,7)===m).reduce((s,a)=>s+prc(a.precio),0);return c;};
+
+  if(load)return <div className="loading"><div className="spin"/><span>Cargando análisis…</span></div>;
+
+  const factTotal=reservas.reduce((s,r)=>s+precioR(r),0)+airbnbs.reduce((s,a)=>s+prc(a.precio),0);
+  const gastTotal=gastos.reduce((s,g)=>s+prc(g.importe),0);
+  const mesesT=mesIdx+1;const mediaG=mesesT>0?gastTotal/mesesT:0;
+  const gastProy=gastTotal+mediaG*(11-mesIdx);
+  const benProy=factTotal-gastProy;
+  const cobTotal=reservas.reduce((s,r)=>{let c=0;if(r.seña_cobrada)c+=prc(r.seña_importe);if(r.saldo_cobrado)c+=(precioR(r)-prc(r.seña_importe));return s+c;},0)+airbnbs.filter(a=>a.cobrado||a.fecha_entrada<hoyStr).reduce((s,a)=>s+prc(a.precio),0);
+  const pendTotal=factTotal-cobTotal;
+
+  const tabStyle=(id)=>({padding:"9px 16px",borderRadius:10,cursor:"pointer",fontSize:12,fontWeight:600,border:"none",background:tab===id?"#FFFFFF":"none",color:tab===id?"#1A1A1A":"#8A8580",boxShadow:tab===id?"0 2px 8px rgba(0,0,0,.06)":"none",fontFamily:"'Inter Tight',sans-serif",whiteSpace:"nowrap"});
+  const kpiBox=(lbl,val,col)=><div style={{background:"#fff",borderRadius:14,padding:"14px 16px",boxShadow:"0 1px 6px rgba(0,0,0,.04)"}}><div style={{fontSize:10,color:"#8A8580",textTransform:"uppercase",fontWeight:700,letterSpacing:.5}}>{lbl}</div><div style={{fontSize:22,fontWeight:800,color:col||"#1A1A1A",marginTop:4}}>{val}</div></div>;
+  const rowS={display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderBottom:"1px solid rgba(0,0,0,.04)",gap:8,fontSize:13};
+
+  return <>
+    <div className="ph"><h2>📈 Análisis financiero</h2><p>Datos de {año}</p></div>
+    <div className="pb">
+      <div style={{display:"flex",gap:4,background:"#F0EDE8",padding:4,borderRadius:14,marginBottom:20,overflowX:"auto",scrollbarWidth:"none"}}>
+        {[{id:"proyeccion",lbl:"Proyección"},{id:"cobros",lbl:"Cobros"},{id:"crecimiento",lbl:"Crecimiento"},{id:"gastos_tab",lbl:"Gastos"},{id:"eventos",lbl:"Eventos"},{id:"airbnb_tab",lbl:"Airbnb"}].map(t=><button key={t.id} style={tabStyle(t.id)} onClick={()=>setTab(t.id)}>{t.lbl}</button>)}
+      </div>
+
+      {/* TAB PROYECCIÓN */}
+      {tab==="proyeccion"&&<>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(140px,1fr))",gap:10,marginBottom:20}}>
+          {kpiBox("Facturación proy.",fmt(factTotal),"#EC683E")}
+          {kpiBox("Gastos proy.",fmt(gastProy),"#F35757")}
+          {kpiBox("Beneficio proy.",fmt(benProy),benProy>=0?"#A6BE59":"#F35757")}
+          {kpiBox("Margen proy.",factTotal>0?Math.round(benProy/factTotal*100)+"%":"—",benProy>=0?"#A6BE59":"#F35757")}
+        </div>
+        <div className="card" style={{marginBottom:16,overflow:"hidden"}}>
+          <div className="ctit" style={{marginBottom:12}}>Evolución mensual</div>
+          <ComposedChart width={cw} height={220} data={MESES_CORTO.map((n,i)=>({name:n,Real:i<=mesIdx?Math.round(mFact(i)):0,Futuro:i>mesIdx?Math.round(mFact(i)):0,Beneficio:Math.round(mCob(i)-mGast(i))}))}>
+            <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,.06)"/>
+            <XAxis dataKey="name" tick={{fontSize:10,fill:"#8A8580"}} axisLine={false} tickLine={false}/>
+            <YAxis tick={{fontSize:10,fill:"#8A8580"}} axisLine={false} tickLine={false} tickFormatter={fmtK}/>
+            <Tooltip {...ChartTooltipStyle} formatter={(v,n)=>[`${v.toLocaleString("es-ES")}€`,n]}/>
+            <Bar dataKey="Real" fill="#EC683E" radius={[3,3,0,0]} stackId="f"/>
+            <Bar dataKey="Futuro" fill="rgba(236,104,62,.3)" radius={[3,3,0,0]} stackId="f"/>
+            <Line type="monotone" dataKey="Beneficio" stroke="#AFA3FF" strokeWidth={2} dot={{r:2,fill:"#AFA3FF"}}/>
+          </ComposedChart>
+        </div>
+        <div className="card">
+          <div className="ctit" style={{marginBottom:10}}>Próximos cobros esperados</div>
+          {reservas.filter(r=>ACTIVOS.includes(r.estado)&&r.fecha>=hoyStr).sort((a,b)=>a.fecha.localeCompare(b.fecha)).slice(0,8).map(r=><div key={r.id} style={rowS}><span style={{flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.nombre}</span><span style={{color:"#8A8580"}}>{new Date(r.fecha+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"})}</span><strong style={{color:"#EC683E"}}>{fmt(precioR(r))}</strong></div>)}
+          {airbnbs.filter(a=>a.fecha_entrada>=hoyStr).sort((a,b)=>a.fecha_entrada.localeCompare(b.fecha_entrada)).slice(0,5).map(a=><div key={a.id} style={rowS}><span style={{flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>🏠 {a.huesped}</span><span style={{color:"#8A8580"}}>{new Date(a.fecha_entrada+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"})}</span><strong style={{color:"#A6BE59"}}>{fmt(prc(a.precio))}</strong></div>)}
+        </div>
+      </>}
+
+      {/* TAB COBROS */}
+      {tab==="cobros"&&<>
+        <div className="card" style={{marginBottom:16}}>
+          <div style={{display:"flex",justifyContent:"space-between",marginBottom:8,fontSize:13}}><span>Cobrado</span><strong style={{color:"#A6BE59"}}>{fmt(cobTotal)}</strong></div>
+          <div style={{height:10,background:"#F0EDE8",borderRadius:10,overflow:"hidden",marginBottom:12}}><div style={{height:"100%",borderRadius:10,background:"#A6BE59",width:`${factTotal>0?cobTotal/factTotal*100:0}%`}}/></div>
+          <div style={{display:"flex",justifyContent:"space-between",fontSize:13}}><span>Pendiente</span><strong style={{color:"#D4A017"}}>{fmt(pendTotal)}</strong></div>
+        </div>
+        <div className="card" style={{marginBottom:16,overflow:"hidden"}}>
+          <BarChart width={cw} height={180} data={MESES_CORTO.map((n,i)=>({name:n,Cobrado:Math.round(mCob(i)),Pendiente:Math.round(mFact(i)-mCob(i))}))}>
+            <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,.06)"/>
+            <XAxis dataKey="name" tick={{fontSize:10,fill:"#8A8580"}} axisLine={false} tickLine={false}/>
+            <YAxis tick={{fontSize:10,fill:"#8A8580"}} axisLine={false} tickLine={false} tickFormatter={fmtK}/>
+            <Tooltip {...ChartTooltipStyle} formatter={(v,n)=>[`${v.toLocaleString("es-ES")}€`,n]}/>
+            <Bar dataKey="Cobrado" fill="#A6BE59" radius={[3,3,0,0]} stackId="c"/>
+            <Bar dataKey="Pendiente" fill="#ECD227" radius={[3,3,0,0]} stackId="c"/>
+          </BarChart>
+        </div>
+        {["rojo","amarillo","verde"].map(nivel=>{const dias=nivel==="rojo"?30:nivel==="amarillo"?90:9999;const diasMin=nivel==="rojo"?0:nivel==="amarillo"?30:90;
+          const items=reservas.filter(r=>{if(r.estado_pago==="pagado_completo"||["cancelada","finalizada"].includes(r.estado))return false;const d=Math.round((new Date(r.fecha)-hoy)/(86400000));return d>=diasMin&&d<dias;}).sort((a,b)=>a.fecha.localeCompare(b.fecha));
+          if(items.length===0)return null;const emoji=nivel==="rojo"?"🔴":nivel==="amarillo"?"🟡":"🟢";const col=nivel==="rojo"?"#F35757":nivel==="amarillo"?"#D4A017":"#A6BE59";
+          return <div key={nivel} className="card" style={{marginBottom:10}}>
+            <div style={{fontSize:12,fontWeight:700,color:col,marginBottom:8}}>{emoji} {nivel==="rojo"?"Menos de 30 días":nivel==="amarillo"?"30-90 días":"Más de 90 días"}</div>
+            {items.map(r=>{const pend=precioR(r)-(r.seña_cobrada?prc(r.seña_importe):0);return <div key={r.id} style={rowS}><span style={{flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.nombre}</span><span style={{fontSize:11,color:"#8A8580"}}>{!r.seña_cobrada?"Seña":"Saldo"}</span><strong style={{color:col}}>{fmt(pend)}</strong></div>;})}
+          </div>;
+        })}
+      </>}
+
+      {/* TAB CRECIMIENTO */}
+      {tab==="crecimiento"&&<>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(140px,1fr))",gap:10,marginBottom:20}}>
+          {kpiBox("Facturación YoY",f2025>0?`${factTotal>f2025?"+":""}${Math.round((factTotal/f2025-1)*100)}%`:"—",factTotal>=f2025?"#A6BE59":"#F35757")}
+          {kpiBox("Reservas "+año,String(reservas.length),"#EC683E")}
+          {kpiBox("Precio medio",reservas.length>0?fmt(reservas.reduce((s,r)=>s+precioR(r),0)/reservas.length):"—","#7FB2FF")}
+        </div>
+        {f2025>0&&<div className="card" style={{marginBottom:16,overflow:"hidden"}}>
+          <div className="ctit" style={{marginBottom:12}}>Comparativa {año-1} vs {año}</div>
+          <LineChart width={cw} height={200} data={MESES_CORTO.map((n,i)=>({name:n,[año-1]:Math.round(f2025/12),[año]:Math.round(mFact(i))}))}>
+            <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,.06)"/>
+            <XAxis dataKey="name" tick={{fontSize:10,fill:"#8A8580"}} axisLine={false} tickLine={false}/>
+            <YAxis tick={{fontSize:10,fill:"#8A8580"}} axisLine={false} tickLine={false} tickFormatter={fmtK}/>
+            <Tooltip {...ChartTooltipStyle} formatter={(v,n)=>[`${v.toLocaleString("es-ES")}€`,n]}/>
+            <Line type="monotone" dataKey={año-1} stroke="#BFBAB4" strokeWidth={2} strokeDasharray="6 3" dot={{r:2}}/>
+            <Line type="monotone" dataKey={año} stroke="#EC683E" strokeWidth={2} dot={{r:3,fill:"#EC683E"}}/>
+          </LineChart>
+        </div>}
+        <div className="card">
+          <div className="ctit" style={{marginBottom:10}}>Por mes</div>
+          <div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+            <thead><tr style={{borderBottom:"2px solid rgba(0,0,0,.06)"}}>{["Mes",año-1,año,"Dif."].map(h=><th key={h} style={{padding:"6px 8px",textAlign:"right",color:"#8A8580",fontWeight:700}}>{h}</th>)}</tr></thead>
+            <tbody>{MESES_CORTO.map((n,i)=>{const p=Math.round(f2025/12);const c=Math.round(mFact(i));const d=c-p;return <tr key={n} style={{borderBottom:"1px solid rgba(0,0,0,.03)"}}><td style={{padding:"6px 8px",fontWeight:600}}>{n}</td><td style={{padding:"6px 8px",textAlign:"right",color:"#8A8580"}}>{fmt(p)}</td><td style={{padding:"6px 8px",textAlign:"right"}}>{fmt(c)}</td><td style={{padding:"6px 8px",textAlign:"right",color:d>=0?"#A6BE59":"#F35757"}}>{d>=0?"+":""}{fmt(d)}</td></tr>;})}</tbody>
+          </table></div>
+        </div>
+      </>}
+
+      {/* TAB GASTOS */}
+      {tab==="gastos_tab"&&<>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(130px,1fr))",gap:10,marginBottom:20}}>
+          {kpiBox("Total YTD",fmt(gastTotal),"#F35757")}
+          {kpiBox("Media/mes",fmt(mediaG),"#F35757")}
+          {kpiBox("Proy. anual",fmt(gastProy),"#F35757")}
+          {kpiBox("% s/facturación",factTotal>0?Math.round(gastTotal/factTotal*100)+"%":"—",gastTotal/factTotal>.5?"#F35757":"#A6BE59")}
+        </div>
+        <div className="card" style={{marginBottom:16}}>
+          <div className="ctit" style={{marginBottom:10}}>Por categoría</div>
+          {(()=>{const cats={};gastos.forEach(g=>{const c=g.categoria||"Otros";cats[c]=(cats[c]||0)+prc(g.importe);});return Object.entries(cats).sort((a,b)=>b[1]-a[1]).map(([c,v])=><div key={c} style={{marginBottom:8}}>
+            <div style={{display:"flex",justifyContent:"space-between",fontSize:13}}><span>{c}</span><strong>{fmt(v)} <span style={{color:"#8A8580",fontWeight:400}}>({Math.round(v/(gastTotal||1)*100)}%)</span></strong></div>
+            <div style={{height:8,background:"#F0EDE8",borderRadius:4,marginTop:4}}><div style={{height:"100%",borderRadius:4,background:"#F35757",width:`${v/(gastTotal||1)*100}%`,transition:"width .3s"}}/></div>
+          </div>);})()}
+        </div>
+        <div className="card" style={{marginBottom:16,overflow:"hidden"}}>
+          <BarChart width={cw} height={160} data={MESES_CORTO.map((n,i)=>({name:n,Gastos:Math.round(mGast(i))}))}>
+            <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,.06)"/>
+            <XAxis dataKey="name" tick={{fontSize:10,fill:"#8A8580"}} axisLine={false} tickLine={false}/>
+            <YAxis tick={{fontSize:10,fill:"#8A8580"}} axisLine={false} tickLine={false} tickFormatter={fmtK}/>
+            <Tooltip {...ChartTooltipStyle} formatter={(v)=>[`${v.toLocaleString("es-ES")}€`]}/>
+            <Bar dataKey="Gastos" fill="#F35757" radius={[3,3,0,0]}/>
+          </BarChart>
+        </div>
+        <div className="card">
+          <div className="ctit" style={{marginBottom:10}}>Últimos gastos</div>
+          {[...gastos].sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||"")).slice(0,10).map(g=><div key={g.id} style={rowS}><span style={{fontSize:11,color:"#8A8580"}}>{new Date(g.fecha+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"})}</span><span className="badge" style={{background:"#F0EDE8",color:"#8A8580",fontSize:10}}>{g.categoria||"—"}</span><span style={{flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{g.concepto}</span><strong style={{color:"#F35757"}}>{fmt(prc(g.importe))}</strong></div>)}
+        </div>
+      </>}
+
+      {/* TAB EVENTOS */}
+      {tab==="eventos"&&<>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(140px,1fr))",gap:10,marginBottom:20}}>
+          {kpiBox("Total reservas",String(reservas.length),"#EC683E")}
+          {kpiBox("Precio medio",reservas.length>0?fmt(reservas.reduce((s,r)=>s+precioR(r),0)/reservas.length):"—","#7FB2FF")}
+          {(()=>{const vr=visitas.filter(v=>v.estado==="realizada"||v.estado==="convertida").length;const vc=visitas.filter(v=>v.estado==="convertida").length;return kpiBox("Conversión",vr>0?Math.round(vc/vr*100)+"%":"—","#AFA3FF");})()}
+        </div>
+        <div className="card" style={{marginBottom:16}}>
+          <div className="ctit" style={{marginBottom:10}}>Por tipo de evento</div>
+          <div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+            <thead><tr style={{borderBottom:"2px solid rgba(0,0,0,.06)"}}>{["Tipo","N","Precio medio","Total","%"].map(h=><th key={h} style={{padding:"6px 8px",textAlign:"right",color:"#8A8580",fontWeight:700}}>{h}</th>)}</tr></thead>
+            <tbody>{(()=>{const tipos={};reservas.forEach(r=>{const t=r.tipo||"Otro";if(!tipos[t])tipos[t]={n:0,total:0};tipos[t].n++;tipos[t].total+=precioR(r);});return Object.entries(tipos).sort((a,b)=>b[1].total-a[1].total).map(([t,d])=><tr key={t} style={{borderBottom:"1px solid rgba(0,0,0,.03)"}}><td style={{padding:"6px 8px",fontWeight:600}}>{t}</td><td style={{padding:"6px 8px",textAlign:"right"}}>{d.n}</td><td style={{padding:"6px 8px",textAlign:"right"}}>{fmt(d.total/d.n)}</td><td style={{padding:"6px 8px",textAlign:"right",fontWeight:700}}>{fmt(d.total)}</td><td style={{padding:"6px 8px",textAlign:"right",color:"#8A8580"}}>{Math.round(d.total/(factTotal||1)*100)}%</td></tr>);})()}</tbody>
+          </table></div>
+        </div>
+        <div className="card" style={{marginBottom:16,overflow:"hidden"}}>
+          {(()=>{const tipos={};reservas.forEach(r=>{const t=r.tipo||"Otro";if(!tipos[t])tipos[t]={n:0,total:0};tipos[t].n++;tipos[t].total+=precioR(r);});const bd=Object.entries(tipos).map(([t,d])=>({name:t,Cantidad:d.n,Media:Math.round(d.total/d.n)}));
+          return <BarChart width={cw} height={160} data={bd}>
+            <XAxis dataKey="name" tick={{fontSize:10,fill:"#8A8580"}} axisLine={false} tickLine={false}/>
+            <YAxis tick={{fontSize:10,fill:"#8A8580"}} axisLine={false} tickLine={false}/>
+            <Tooltip {...ChartTooltipStyle}/>
+            <Bar dataKey="Cantidad" fill="#EC683E" radius={[3,3,0,0]}/>
+            <Bar dataKey="Media" fill="#AFA3FF" radius={[3,3,0,0]}/>
+          </BarChart>;})()}
+        </div>
+        <div className="card">
+          <div className="ctit" style={{marginBottom:10}}>Embudo de conversión</div>
+          {(()=>{const vTot=visitas.length;const vReal=visitas.filter(v=>["realizada","convertida"].includes(v.estado)).length;const vConv=visitas.filter(v=>v.estado==="convertida").length;const rFirm=reservas.filter(r=>["contrato_firmado","reserva_pagada","precio_total","finalizada"].includes(r.estado)).length;const rPag=reservas.filter(r=>r.estado_pago==="pagado_completo").length;
+          const steps=[{lbl:"Visitas programadas",n:vTot},{lbl:"Visitas realizadas",n:vReal},{lbl:"Reservas generadas",n:vConv},{lbl:"Contratos firmados",n:rFirm},{lbl:"Pagos completados",n:rPag}];const mx=Math.max(...steps.map(s=>s.n),1);
+          return steps.map(s=><div key={s.lbl} style={{marginBottom:8}}>
+            <div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:3}}><span>{s.lbl}</span><strong>{s.n}</strong></div>
+            <div style={{height:8,background:"#F0EDE8",borderRadius:4}}><div style={{height:"100%",borderRadius:4,background:"#EC683E",width:`${s.n/mx*100}%`}}/></div>
+          </div>);})()}
+        </div>
+      </>}
+
+      {/* TAB AIRBNB */}
+      {tab==="airbnb_tab"&&<>
+        {(()=>{const totalN=airbnbs.reduce((s,a)=>{const n=Math.round((new Date(a.fecha_salida)-new Date(a.fecha_entrada))/(86400000));return s+Math.max(n,0);},0);const totalIng=airbnbs.reduce((s,a)=>s+prc(a.precio),0);const diasAño=365;const ocu=Math.round(totalN/diasAño*100);
+        return <>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(130px,1fr))",gap:10,marginBottom:20}}>
+            {kpiBox("Reservas",String(airbnbs.length),"#A6BE59")}
+            {kpiBox("Total noches",String(totalN),"#7FB2FF")}
+            {kpiBox("Ingresos",fmt(totalIng),"#EC683E")}
+            {kpiBox("€/noche",totalN>0?fmt(totalIng/totalN):"—","#AFA3FF")}
+            {kpiBox("Ocupación",ocu+"%","#ECD227")}
+          </div>
+          <div className="card" style={{marginBottom:16}}>
+            <div className="ctit" style={{marginBottom:10}}>Por mes</div>
+            <div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+              <thead><tr style={{borderBottom:"2px solid rgba(0,0,0,.06)"}}>{["Mes","Res.","Noches","Ingresos","Ocu."].map(h=><th key={h} style={{padding:"6px 8px",textAlign:"right",color:"#8A8580",fontWeight:700}}>{h}</th>)}</tr></thead>
+              <tbody>{MESES_CORTO.map((n,i)=>{const m=String(i+1).padStart(2,"0");const ma=airbnbs.filter(a=>a.fecha_entrada?.slice(5,7)===m);const mn=ma.reduce((s,a)=>s+Math.max(Math.round((new Date(a.fecha_salida)-new Date(a.fecha_entrada))/86400000),0),0);const mi=ma.reduce((s,a)=>s+prc(a.precio),0);const diasM=new Date(año,i+1,0).getDate();
+                return <tr key={n} style={{borderBottom:"1px solid rgba(0,0,0,.03)"}}><td style={{padding:"6px 8px",fontWeight:600}}>{n}</td><td style={{textAlign:"right",padding:"6px 8px"}}>{ma.length}</td><td style={{textAlign:"right",padding:"6px 8px"}}>{mn}</td><td style={{textAlign:"right",padding:"6px 8px"}}>{fmt(mi)}</td><td style={{textAlign:"right",padding:"6px 8px",color:mn/diasM>.5?"#A6BE59":"#8A8580"}}>{Math.round(mn/diasM*100)}%</td></tr>;})}</tbody>
+            </table></div>
+          </div>
+          <div className="card" style={{overflow:"hidden"}}>
+            <BarChart width={cw} height={180} data={MESES_CORTO.map((n,i)=>{const m=String(i+1).padStart(2,"0");const mn=airbnbs.filter(a=>a.fecha_entrada?.slice(5,7)===m).reduce((s,a)=>s+Math.max(Math.round((new Date(a.fecha_salida)-new Date(a.fecha_entrada))/86400000),0),0);const diasM=new Date(año,i+1,0).getDate();return{name:n,Ocupación:Math.round(mn/diasM*100),Ingresos:Math.round(airbnbs.filter(a=>a.fecha_entrada?.slice(5,7)===m).reduce((s,a)=>s+prc(a.precio),0))/100};})}>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,.06)"/>
+              <XAxis dataKey="name" tick={{fontSize:10,fill:"#8A8580"}} axisLine={false} tickLine={false}/>
+              <YAxis tick={{fontSize:10,fill:"#8A8580"}} axisLine={false} tickLine={false}/>
+              <Tooltip {...ChartTooltipStyle}/>
+              <Bar dataKey="Ocupación" fill="#A6BE59" radius={[3,3,0,0]} name="Ocupación %"/>
+            </BarChart>
+          </div>
+        </>;})()}
+      </>}
+    </div>
   </>;
 }
 
