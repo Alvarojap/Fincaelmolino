@@ -3,7 +3,10 @@ import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, ComposedChart, XAx
 
 // ─── SUPABASE ────────────────────────────────────────────────────────────────
 const SB_URL = "https://bqubxkuuyohuatdothwx.supabase.co";
+// Supabase anon key — segura para exponer en cliente (Row Level Security activo)
 const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJxdWJ4a3V1eW9odWF0ZG90aHd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ0NTE0MzgsImV4cCI6MjA5MDAyNzQzOH0.kwYPiTj0KOmw9RAm88DNceAYdFC3yHF4ogSzXXwSIDA";
+// Helper: obtener precio de reserva (unifica precio_total y precio)
+const getPrecioReserva=(r)=>parseFloat(r?.precio_total)||parseFloat(r?.precio)||0;
 const HDR  = { "Content-Type":"application/json","apikey":SB_KEY,"Authorization":`Bearer ${SB_KEY}` };
 const HDRA = tok => ({ ...HDR, "Authorization":`Bearer ${tok}` });
 
@@ -734,7 +737,7 @@ function LoginScreen({onLogin,onLoginOperario,desactivado}){
 
   const cargarOperarios=async()=>{
     setOpLoad(true);
-    try{const ops=await sbGet("operarios","?activo=eq.true&select=*&order=nombre.asc");setOperarios(ops);}catch(_){setOperarios([]);}
+    try{const ops=await sbGet("operarios","?activo=eq.true&select=id,nombre,rol,referencia_id,avatar&order=nombre.asc");setOperarios(ops);}catch(_){setOperarios([]);}
     setOpLoad(false);setModo("seleccion");
   };
 
@@ -745,13 +748,11 @@ function LoginScreen({onLogin,onLoginOperario,desactivado}){
     const newPin=pin+d;
     setPin(newPin);setPinErr(false);
     if(newPin.length===4){
-      // Verify
-      if(newPin===selOp.pin){
-        onLoginOperario(selOp);
-      }else{
-        setPinErr(true);
-        setTimeout(()=>{setPin("");setPinErr(false);},600);
-      }
+      // Server-side PIN verification
+      sbGet("operarios",`?id=eq.${selOp.id}&pin=eq.${newPin}&activo=eq.true&select=id,nombre,rol,referencia_id,avatar`).then(r=>{
+        if(r.length>0)onLoginOperario(r[0]);
+        else{setPinErr(true);setTimeout(()=>{setPin("");setPinErr(false);},600);}
+      }).catch(()=>{setPinErr(true);setTimeout(()=>{setPin("");setPinErr(false);},600);});
     }
   };
   const delDigit=()=>{setPin(p=>p.slice(0,-1));setPinErr(false);};
@@ -1075,7 +1076,7 @@ function FinancialKPIs({tok}){
       ]);
       const cfg={};configRows.forEach(c=>cfg[c.clave]=c.valor);
       const comisionPct=parseFloat(cfg.comision_pct)||10;
-      const factEventos=reservas.reduce((s,r)=>s+(parseFloat(r.precio_total)||parseFloat(r.precio)||0),0);
+      const factEventos=reservas.reduce((s,r)=>s+getPrecioReserva(r),0);
       const factAirbnb=airbnbs.reduce((s,a)=>s+(parseFloat(a.precio)||0),0);
       const facturacion=factEventos+factAirbnb;
       let cobradoEventos=0;
@@ -1107,7 +1108,7 @@ function FinancialKPIs({tok}){
   if(data&&raw.reservas){
     const en30=new Date(Date.now()+30*86400000).toISOString().split("T")[0];
     const urgentes=raw.reservas.filter(r=>r.estado_pago!=="pagado_completo"&&!["cancelada","finalizada"].includes(r.estado)&&r.fecha<=en30);
-    if(urgentes.length>0){const imp=urgentes.reduce((s,r)=>s+(parseFloat(r.precio_total)||parseFloat(r.precio)||0)-(parseFloat(r.seña_importe)||0),0);alertas.push({tipo:"rojo",txt:`${urgentes.length} reserva(s) con cobro pendiente en menos de 30 días — ${Math.round(imp).toLocaleString("es-ES")}€ por cobrar`});}
+    if(urgentes.length>0){const imp=urgentes.reduce((s,r)=>s+getPrecioReserva(r)-(parseFloat(r.seña_importe)||0),0);alertas.push({tipo:"rojo",txt:`${urgentes.length} reserva(s) con cobro pendiente en menos de 30 días — ${Math.round(imp).toLocaleString("es-ES")}€ por cobrar`});}
     if(raw.gastos.length>0){const ult=raw.gastos.sort((a,b)=>b.fecha?.localeCompare(a.fecha))[0];const dias=ult?Math.floor((Date.now()-new Date(ult.fecha).getTime())/86400000):999;if(dias>30)alertas.push({tipo:"amarillo",txt:`Llevas ${dias} días sin registrar gastos — ¿están al día?`});}
     if(data.yaCobrado>0&&data.gastosReales/data.yaCobrado>.7)alertas.push({tipo:"rojo",txt:`Los gastos representan el ${Math.round(data.gastosReales/data.yaCobrado*100)}% de lo cobrado — margen ajustado`});
     if(data.beneficio>0&&data.yaCobrado>0)alertas.push({tipo:"verde",txt:`Margen actual: ${Math.round(data.beneficio/data.yaCobrado*100)}% — beneficio de ${fmt(data.beneficio)}`});
@@ -1249,7 +1250,7 @@ function FinancialCharts({tok}){
           const rM=reservas.filter(r=>r.fecha?.slice(5,7)===m);
           const aM=airbnbs.filter(a=>a.fecha_entrada?.slice(5,7)===m);
           const gM=gastos.filter(g=>g.fecha?.slice(5,7)===m);
-          const fact=rM.reduce((s,r)=>s+(parseFloat(r.precio_total)||parseFloat(r.precio)||0),0)
+          const fact=rM.reduce((s,r)=>s+getPrecioReserva(r),0)
                     +aM.reduce((s,a)=>s+(parseFloat(a.precio)||0),0);
           let cob=0;
           for(const r of rM){
@@ -1297,10 +1298,10 @@ function FinancialCharts({tok}){
         setWeekly(wData);
 
         // ── Pie data ──
-        const totalEventos=reservas.reduce((s,r)=>s+(parseFloat(r.precio_total)||parseFloat(r.precio)||0),0);
+        const totalEventos=reservas.reduce((s,r)=>s+getPrecioReserva(r),0);
         const totalAirbnb=airbnbs.reduce((s,a)=>s+(parseFloat(a.precio)||0),0);
         setPie([{name:"Eventos",value:Math.round(totalEventos)},{name:"Airbnb",value:Math.round(totalAirbnb)}]);
-      }catch(e){console.error("Charts error:",e);}
+      }catch(_){}
       setLoad(false);
     })();
   },[]);
@@ -1453,7 +1454,7 @@ function AtencionAhora({tok,setPage}){
         setSrvJard(sJard);
         // Stock bajo
         try{const arts=await sbGet("almacen_articulos","?activo=eq.true&select=nombre,stock_casa,stock_almacen,stock_minimo",tok);setStockBajos(arts.filter(a=>(parseFloat(a.stock_casa)||0)+(parseFloat(a.stock_almacen)||0)<=(parseFloat(a.stock_minimo)||0)));}catch(_){}
-      }catch(e){console.error("AtencionAhora:",e);}
+      }catch(_){}
       setLoad(false);
     })();
   },[]);
@@ -1624,8 +1625,6 @@ function DashJ({perfil,jsem,jpunt,cwk,setPage,tok}){
   const actv=JARDIN_T[temp].filter(t=>tocaSemana({...t,frec:t.frec},cwk));
   const tot=actv.length+jpunt.length;
   const comp=actv.filter(t=>sj[t.id]?.done).length+jpunt.filter(t=>t.done).length;
-  const isA=false; // jardinero view, never admin
-
   // Servicio activo
   const [srvActivo,setSrvActivo]=useState(null);
   const [srvTareas,setSrvTareas]=useState([]);
@@ -1719,7 +1718,7 @@ function DashJ({perfil,jsem,jpunt,cwk,setPage,tok}){
       localStorage.setItem(`fm_jornada_inicio_${srvActivo.id}`,tsInicio.toString());
       localStorage.setItem(`fm_jornada_id_${srvActivo.id}`,String(j.id));
       setShowNuevaJornada(false);
-    }catch(e){console.error("iniciarJornada:",e);}
+    }catch(_){}
     setSaving2(false);
   };
 
@@ -1803,7 +1802,7 @@ function DashJ({perfil,jsem,jpunt,cwk,setPage,tok}){
         return sbPatch("jardin_servicios",`id=eq.${srvActivo.id}`,{estado:"completado"},tok);
       });
       const admins=await sbGet("usuarios","?rol=eq.admin&select=id",tok);
-      const msg=`🌿 ${perfil.nombre} ha completado "${srvActivo.nombre||srvActivo.titulo}". Total: ${horasT}h. Coste: ${costeTotal}€.`;
+      const msg=`🌿 ${perfil.nombre} ha completado "${srvActivo.nombre}". Total: ${horasT}h. Coste: ${costeTotal}€.`;
       for(const a of admins){await sbPost("notificaciones",{para:a.id,txt:msg},tok);sendPush("🌿 Finca El Molino",msg,"jardin-srv-fin");}
       localStorage.removeItem(`fm_jornada_inicio_${srvActivo.id}`);
       localStorage.removeItem(`fm_jornada_id_${srvActivo.id}`);
@@ -1821,7 +1820,7 @@ function DashJ({perfil,jsem,jpunt,cwk,setPage,tok}){
       {/* SERVICIO ACTIVO */}
       {srvActivo&&<div className="card" style={{marginBottom:16,border:"1px solid rgba(16,185,129,.3)",background:"rgba(16,185,129,.04)"}}>
         <div className="chdr"><span className="ctit">🌿 Servicio activo</span></div>
-        <div style={{fontSize:16,fontWeight:600,color:"#1A1A1A",marginBottom:4}}>{srvActivo.nombre||srvActivo.titulo}</div>
+        <div style={{fontSize:16,fontWeight:600,color:"#1A1A1A",marginBottom:4}}>{srvActivo.nombre}</div>
         {(srvActivo.fecha_inicio||srvActivo.fecha_fin)&&<div style={{fontSize:11,color:"#8A8580",marginBottom:4}}>📅 {srvActivo.fecha_inicio?new Date(srvActivo.fecha_inicio+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"}):""}{srvActivo.fecha_fin?` → ${new Date(srvActivo.fecha_fin+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"})}`:""}</div>}
         <div style={{fontSize:12,color:"#8A8580",marginBottom:6}}>Tareas: {srvTareas.filter(t=>t.done).length} de {srvTareas.length} completadas{srvExtras.length>0?` + ${srvExtras.length} extra`:""}</div>
         <div className="prog" style={{marginBottom:14,height:8}}><div className="pfill" style={{width:`${srvTareas.length?(srvTareas.filter(t=>t.done).length/srvTareas.length)*100:0}%`}}/></div>
@@ -1897,7 +1896,7 @@ function DashJ({perfil,jsem,jpunt,cwk,setPage,tok}){
     {showNuevaJornada&&<div className="ov"><div className="modal" style={{maxWidth:400,textAlign:"center"}}>
       <div style={{fontSize:36,marginBottom:8}}>🌿</div>
       <h3>Tienes un servicio en curso</h3>
-      <p style={{fontSize:13,color:"#8A8580",marginBottom:20,lineHeight:1.5}}>"{srvActivo?.nombre||srvActivo?.titulo}" está activo. ¿Empezar la jornada de hoy?</p>
+      <p style={{fontSize:13,color:"#8A8580",marginBottom:20,lineHeight:1.5}}>"{srvActivo?.nombre}" está activo. ¿Empezar la jornada de hoy?</p>
       <button className="btn bp" style={{width:"100%",justifyContent:"center",padding:"14px",fontSize:15}} onClick={iniciarJornada} disabled={saving2}>{saving2?"Iniciando…":"▶️ Empezar jornada"}</button>
       <button onClick={()=>setShowNuevaJornada(false)} style={{background:"none",border:"none",color:"#8A8580",cursor:"pointer",width:"100%",textAlign:"center",marginTop:12,fontSize:12,fontFamily:"'DM Sans',sans-serif",padding:"8px"}}>Ahora no</button>
     </div></div>}
@@ -1916,7 +1915,7 @@ function DashJ({perfil,jsem,jpunt,cwk,setPage,tok}){
     {showFinSrv&&<div className="ov"><div className="modal" style={{maxWidth:440,textAlign:"center"}}>
       <div style={{fontSize:36,marginBottom:8}}>✅</div>
       <h3>Completar servicio</h3>
-      <p style={{fontSize:13,color:"#8A8580",marginBottom:16,lineHeight:1.5}}>"{srvActivo?.nombre||srvActivo?.titulo}" — todas las tareas asignadas completadas.</p>
+      <p style={{fontSize:13,color:"#8A8580",marginBottom:16,lineHeight:1.5}}>"{srvActivo?.nombre}" — todas las tareas asignadas completadas.</p>
       <div style={{background:"#F5F3F0",borderRadius:10,padding:"14px",marginBottom:20}}>
         <div style={{fontSize:12,color:"#8A8580"}}>Total acumulado: <strong style={{color:"#EC683E"}}>{fmtHM(totalAcum*60)}</strong></div>
         {srvExtras.length>0&&<div style={{fontSize:12,color:"#EC683E",marginTop:4}}>+ {srvExtras.length} tarea{srvExtras.length>1?"s":""} extra registrada{srvExtras.length>1?"s":""}</div>}
@@ -2083,7 +2082,7 @@ function JardinCheck({perfil,tok,rol}){
         },tok);
         await load_();
       }
-    }catch(e){console.error("toggle error:",e);}
+    }catch(_){}
     setSaving(false);
   };
 
@@ -2118,7 +2117,7 @@ function JardinCheck({perfil,tok,rol}){
         await sbPatch("jardin_puntual",`id=eq.${modal.id}`,{nota:nota.trim()||null,foto_url:foto||null},tok);
       }
       await load_();
-    }catch(e){console.error("saveNota:",e);}
+    }catch(_){}
     setSaving(false);setModal(null);
   };
 
@@ -2351,8 +2350,8 @@ function JardinAdmin({perfil,tok}){
       setForm({txt:"",zona:"",sem:cwk});setShowM(false);await load_();
     }catch(_){}setSaving(false);
   };
-  const delPunt=async id=>{await sbDelete("jardin_puntual",`id=eq.${id}`,tok);await load_();};
-  const setFrOv=async(tareaId,v)=>{await sbUpsert("jardin_frecuencias",{tarea_id:tareaId,frecuencia:parseInt(v),updated_at:new Date().toISOString()},tok);setEditFr(null);await load_();};
+  const delPunt=async id=>{try{await sbDelete("jardin_puntual",`id=eq.${id}`,tok);await load_();}catch(_){}};
+  const setFrOv=async(tareaId,v)=>{try{await sbUpsert("jardin_frecuencias",{tarea_id:tareaId,frecuencia:parseInt(v),updated_at:new Date().toISOString()},tok);setEditFr(null);await load_();}catch(_){}};
 
   // ─ Servicios a medida ─
   const addTareaTemp=()=>{if(!nuevaTarea.trim())return;setSrvTareas(prev=>[...prev,nuevaTarea.trim()]);setNuevaTarea("");};
@@ -2382,10 +2381,10 @@ function JardinAdmin({perfil,tok}){
     }catch(_){}setSaving(false);
   };
   const finalizarServicio=async id=>{
-    await sbPatch("jardin_servicios",`id=eq.${id}`,{estado:"completado"},tok);await load_();
+    try{await sbPatch("jardin_servicios",`id=eq.${id}`,{estado:"completado"},tok);await load_();}catch(_){}
   };
   const cancelarServicio=async id=>{
-    await sbPatch("jardin_servicios",`id=eq.${id}`,{estado:"cancelado"},tok);await load_();
+    try{await sbPatch("jardin_servicios",`id=eq.${id}`,{estado:"cancelado"},tok);await load_();}catch(_){}
   };
 
   if(load)return <div className="loading"><div className="spin"/><span>Cargando…</span></div>;
@@ -2555,7 +2554,7 @@ function Incidencias({tok}){
           ...stk.map(r=>({...r,tipo:`Limpieza: ${r.servicios?.nombre||""}`,tag:"🧹",tarea:r.txt||(LIMP_T.find(t=>t.id===r.tarea_id)?.txt)||r.tarea_id,zona:r.zona||"—"})),
         ].sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
         setItems(all);
-      }catch(e){console.error(e);}
+      }catch(_){}
       setLoad(false);
     })();
   },[]);
@@ -2626,12 +2625,6 @@ function Limpieza({perfil,tok,rol}){
   const [newE,setNewE]=useState({txt:"",zona:""});
   // Limpiadoras
   const [limpiadoras,setLimpiadoras]=useState([]);
-  const [limpTab,setLimpTab]=useState("servicios"); // "servicios" | "limpiadoras"
-  const [showLForm,setShowLForm]=useState(false);
-  const [lForm,setLForm]=useState({nombre:"",modalidad:"por_horas",tarifa_hora:"",notas:""});
-  const [analLimp,setAnalLimp]=useState(null);
-  const [analLData,setAnalLData]=useState(null);
-  const [analLLoad,setAnalLLoad]=useState(false);
   const [notaM,setNotaM]=useState(null);
   const [nota,setNota]=useState("");
   const [foto,setFoto]=useState(null);
@@ -2898,38 +2891,6 @@ function Limpieza({perfil,tok,rol}){
 
   const openN2=t=>{setNota(t.nota||"");setFoto(t.foto_url||null);setNotaM(t);};
 
-  // Limpiadoras CRUD
-  const crearLimpiadora=async()=>{
-    if(!lForm.nombre||saving)return;setSaving(true);
-    try{
-      await sbPost("limpiadoras",{nombre:lForm.nombre,modalidad:lForm.modalidad,tarifa_hora:lForm.modalidad==="por_horas"?parseFloat(lForm.tarifa_hora)||null:null,notas:lForm.notas||null,activa:true},tok);
-      setShowLForm(false);setLForm({nombre:"",modalidad:"por_horas",tarifa_hora:"",notas:""});await loadSrvs();
-    }catch(_){}setSaving(false);
-  };
-  const toggleLimpActiva=async l=>{await sbPatch("limpiadoras",`id=eq.${l.id}`,{activa:!l.activa},tok);await loadSrvs();};
-  const verAnalLimp=async l=>{
-    if(analLimp?.id===l.id){setAnalLimp(null);return;}
-    setAnalLimp(l);setAnalLLoad(true);setAnalLData(null);
-    try{
-      const añoActual=new Date().getFullYear();
-      const srvs=await sbGet("servicios",`?limpiadora_id=eq.${l.id}&fecha=gte.${añoActual}-01-01&select=*`,tok).catch(()=>[]);
-      const totalSrvs=srvs.length;
-      let horasTotal=0,costeTotal=0;
-      const permutas=[];
-      for(const s of srvs){
-        if(s.hora_inicio&&s.hora_fin){
-          const [h1,m1]=s.hora_inicio.split(":").map(Number);
-          const [h2,m2]=s.hora_fin.split(":").map(Number);
-          horasTotal+=Math.max(0,(h2+m2/60)-(h1+m1/60));
-        }
-        costeTotal+=parseFloat(s.coste_calculado)||0;
-        if(s.modalidad_pago==="permuta")permutas.push(s.permuta_descripcion||`Permuta - ${s.nombre}`);
-      }
-      const euroHoraReal=horasTotal>0?Math.round(costeTotal/horasTotal*100)/100:0;
-      setAnalLData({totalSrvs,horasTotal:Math.round(horasTotal*10)/10,costeTotal:Math.round(costeTotal),euroHoraReal,permutas});
-    }catch(_){}
-    setAnalLLoad(false);
-  };
   const selLimpiadora=(id)=>{
     const l=limpiadoras.find(x=>String(x.id)===String(id));
     setNewS(prev=>({...prev,limpiadora_id:id,modalidad_pago:l?.modalidad||"por_horas",tarifa_hora:l?.modalidad==="por_horas"?String(l?.tarifa_hora||""):""}));
@@ -3538,7 +3499,7 @@ function Notifs({perfil,tok,rol}){
   const [dest,setDest]=useState("");const [txt,setTxt]=useState("");const [load,setLoad]=useState(true);const [saving,setSaving]=useState(false);
   useEffect(()=>{(async()=>{const n=isA?await sbGet("notificaciones","?select=*,usuarios(nombre,rol)&order=created_at.desc",tok):await sbGet("notificaciones",`?para=eq.${perfil.id}&order=created_at.desc`,tok);setNotifs(n);if(isA){const u=await sbGet("usuarios","?rol=neq.admin&select=*",tok);setUsuarios(u);}setLoad(false);})();},[]);
   const enviar=async()=>{if(!txt.trim()||!dest||saving)return;setSaving(true);const targets=dest==="todos"?usuarios:usuarios.filter(u=>String(u.id)===dest);for(const u of targets){await sbPost("notificaciones",{para:u.id,txt},tok);sendPush("🌾 Finca El Molino",txt,`notif-${u.id}`);}setTxt("");setDest("");setSaving(false);};
-  const leer=async id=>{await sbPatch("notificaciones",`id=eq.${id}`,{leida:true},tok);setNotifs(prev=>prev.map(n=>n.id===id?{...n,leida:true}:n));};
+  const leer=async id=>{try{await sbPatch("notificaciones",`id=eq.${id}`,{leida:true},tok);setNotifs(prev=>prev.map(n=>n.id===id?{...n,leida:true}:n));}catch(_){}};
   if(load)return <div className="loading"><div className="spin"/><span>Cargando…</span></div>;
   const RL={jardinero:"Jardinero",limpieza:"Limpieza",comercial:"Comercial"};
   return <>
@@ -3694,7 +3655,7 @@ function Jardineros({tok,rol}){
     setAnalisis(j);setAnalLoad(true);setAnalData(null);
     try{
       const hoy=new Date();const añoActual=hoy.getFullYear();const mesActual=String(hoy.getMonth()+1).padStart(2,"0");
-      const srvsDel=await sbGet("servicios_jardineria",`?jardinero_id=eq.${j.id}&select=id`,tok).catch(()=>[]);
+      const srvsDel=await sbGet("jardin_servicios",`?jardinero_id=eq.${j.id}&select=id`,tok).catch(()=>[]);
       const srvIds=srvsDel.map(s=>s.id);
       let jornadas=[];
       if(srvIds.length>0){
@@ -5159,19 +5120,19 @@ function Reservas({tok,rol,perfil}){
   useEffect(()=>{load_();},[]);
 
   const cambiarE=async(id,e)=>{
-    await sbPatch("reservas",`id=eq.${id}`,{estado:e,updated_at:new Date().toISOString()},tok);
-    const est=ESTADOS.find(s=>s.id===e);
-    await addHistorial("reserva",id,`Estado cambiado a: ${est?.lbl||e}`,perfil?.nombre||"Admin",tok);
-    const r=reservas.find(x=>x.id===id);
-    if(r)notificarRoles(["admin","comercial"],`📋 Reserva actualizada`,`${r.nombre}: ${est?.lbl||e}`,"reserva-estado",tok);
-    setReservas(prev=>prev.map(r=>r.id===id?{...r,estado:e}:r));
-    setSel(p=>p?.id===id?{...p,estado:e}:p);
+    try{
+      await sbPatch("reservas",`id=eq.${id}`,{estado:e,updated_at:new Date().toISOString()},tok);
+      const est=ESTADOS.find(s=>s.id===e);
+      await addHistorial("reserva",id,`Estado cambiado a: ${est?.lbl||e}`,perfil?.nombre||"Admin",tok);
+      const r=reservas.find(x=>x.id===id);
+      if(r)notificarRoles(["admin","comercial"],`📋 Reserva actualizada`,`${r.nombre}: ${est?.lbl||e}`,"reserva-estado",tok);
+      setReservas(prev=>prev.map(r=>r.id===id?{...r,estado:e}:r));
+      setSel(p=>p?.id===id?{...p,estado:e}:p);
+    }catch(_){}
   };
 
   const del=async id=>{
-    await sbDelete("reservas",`id=eq.${id}`,tok);
-    setReservas(prev=>prev.filter(r=>r.id!==id));
-    setSel(null);
+    try{await sbDelete("reservas",`id=eq.${id}`,tok);setReservas(prev=>prev.filter(r=>r.id!==id));setSel(null);}catch(_){}
   };
 
   const registrarSeña=async()=>{
@@ -5471,13 +5432,12 @@ function Visitas({perfil,tok,rol}){
 
   const marcarRealizada=async()=>{
     if(!sel)return;
-    await sbPatch("visitas",`id=eq.${sel.id}`,{estado:"realizada"},tok);
-    await addHistorial("visita",sel.id,"Visita realizada en la finca",perfil.nombre,tok);
-    if(sel.es_coordinacion&&sel.reserva_id){
-      await addHistorial("reserva",sel.reserva_id,`Visita de coordinación realizada: ${sel.motivo_visita||sel.tipo_evento||"Coordinación"}`,perfil.nombre,tok);
-    }
-    setSel(prev=>({...prev,estado:"realizada"}));
-    await load_();
+    try{
+      await sbPatch("visitas",`id=eq.${sel.id}`,{estado:"realizada"},tok);
+      await addHistorial("visita",sel.id,"Visita realizada en la finca",perfil.nombre,tok);
+      if(sel.es_coordinacion&&sel.reserva_id)await addHistorial("reserva",sel.reserva_id,`Visita de coordinación realizada: ${sel.motivo_visita||sel.tipo_evento||"Coordinación"}`,perfil.nombre,tok);
+      setSel(prev=>({...prev,estado:"realizada"}));await load_();
+    }catch(_){}
   };
 
   const marcarNoPresentado=async(accion)=>{
@@ -5831,8 +5791,7 @@ function ReservasAirbnb({perfil,tok,rol}){
 
   const eliminar=async id=>{
     if(!window.confirm("¿Eliminar esta reserva Airbnb?"))return;
-    await sbDelete("reservas_airbnb",`id=eq.${id}`,tok);
-    await load_();setSel(null);
+    try{await sbDelete("reservas_airbnb",`id=eq.${id}`,tok);await load_();setSel(null);}catch(_){}
   };
 
   const fmtRango=a=>{
