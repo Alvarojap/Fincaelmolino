@@ -4477,6 +4477,25 @@ function Analisis({tok,rol}){
             <div style={{height:8,background:"#F0EDE8",borderRadius:4}}><div style={{height:"100%",borderRadius:4,background:"#EC683E",width:`${s.n/mx*100}%`}}/></div>
           </div>);})()}
         </div>
+        {/* Meses más demandados */}
+        <div className="card" style={{marginTop:16}}>
+          <div className="ctit" style={{marginBottom:10}}>📅 Meses más demandados</div>
+          {(()=>{
+            const meses={};visitas.forEach(v=>{const m=v.mes_evento_previsto||( v.fecha_evento_prevista?new Date(v.fecha_evento_prevista+"T12:00:00").getMonth()+1:null);if(m)meses[m]=(meses[m]||0)+1;});
+            const entries=Object.entries(meses).map(([m,n])=>({mes:parseInt(m),n})).sort((a,b)=>b.n-a.n);
+            const mx=entries.length>0?entries[0].n:1;const totalV=entries.reduce((s,e)=>s+e.n,0)||1;
+            const chartD=MESES_CORTO.map((lbl,i)=>({name:lbl,Visitas:meses[i+1]||0}));
+            const cw2=typeof window!=="undefined"?Math.min(window.innerWidth-64,560):400;
+            return entries.length===0?<div style={{color:"#8A8580",fontSize:13}}>Sin datos de fechas previstas de evento</div>:<>
+              <div style={{overflow:"hidden",marginBottom:12}}><BarChart width={cw2} height={160} data={chartD}><XAxis dataKey="name" tick={{fontSize:10,fill:"#8A8580"}} axisLine={false} tickLine={false}/><YAxis tick={{fontSize:10,fill:"#8A8580"}} axisLine={false} tickLine={false} allowDecimals={false}/><Tooltip {...ChartTooltipStyle}/><Bar dataKey="Visitas" fill="#EC683E" radius={[3,3,0,0]}/></BarChart></div>
+              {entries.map((e,i)=><div key={e.mes} style={{marginBottom:6}}>
+                <div style={{display:"flex",justifyContent:"space-between",fontSize:13}}><span>{i+1}. {MESES[e.mes-1]}</span><strong>{e.n} visita{e.n>1?"s":""} ({Math.round(e.n/totalV*100)}%)</strong></div>
+                <div style={{height:6,background:"#F0EDE8",borderRadius:3,marginTop:3}}><div style={{height:"100%",borderRadius:3,background:"#EC683E",width:`${e.n/mx*100}%`}}/></div>
+              </div>)}
+              <div style={{fontSize:11,color:"#8A8580",marginTop:10,lineHeight:1.5}}>💡 Incluye visitas realizadas y no convertidas — refleja la demanda real del mercado.</div>
+            </>;
+          })()}
+        </div>
       </>}
 
       {/* TAB AIRBNB */}
@@ -5363,7 +5382,7 @@ function Visitas({perfil,tok,rol}){
   const [notaCancelacion,setNotaCancelacion]=useState("");
   const [saving,setSaving]=useState(false);
 
-  const formVacio={nombre:"",fecha:hoy,hora:"10:00",tipo_evento:"Boda",invitados:"",telefono:"",email:"",nota:""};
+  const formVacio={nombre:"",fecha:hoy,hora:"10:00",tipo_evento:"Boda",invitados:"",telefono:"",email:"",nota:"",fecha_evento_prevista:""};
   const [form,setForm]=useState(formVacio);
   const [formRes,setFormRes]=useState({fecha_evento:"",precio:"",contacto:"",obs:"",estado:"visita"});
 
@@ -5398,7 +5417,10 @@ function Visitas({perfil,tok,rol}){
     try{
       const disp=await checkDisponibilidad(form.fecha,tok);
       if(!disp.libre){setSaving(false);setShowForm(false);setBloqueado(disp.conflictos);return;}
-      const [v]=await sbPost("visitas",{...form,invitados:parseInt(form.invitados)||null,estado:"pendiente",creado_por:perfil.nombre},tok);
+      const fep=form.fecha_evento_prevista||null;
+      const mep=fep?new Date(fep+"T12:00:00").getMonth()+1:null;
+      const aep=fep?new Date(fep+"T12:00:00").getFullYear():null;
+      const [v]=await sbPost("visitas",{...form,invitados:parseInt(form.invitados)||null,estado:"pendiente",creado_por:perfil.nombre,fecha_evento_prevista:fep,mes_evento_previsto:mep,anio_evento_previsto:aep},tok);
       await addHistorial("visita",v.id,`Visita registrada para el ${new Date(form.fecha+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"long",year:"numeric"})} a las ${form.hora}`,perfil.nombre,tok);
       const en7=new Date();en7.setDate(en7.getDate()+7);
       if(form.fecha&&form.fecha<=en7.toISOString().split("T")[0]){
@@ -5443,7 +5465,7 @@ function Visitas({perfil,tok,rol}){
   };
 
   const abrirConvertir=()=>{
-    setFormRes({fecha_evento:"",precio:"",contacto:sel.telefono||"",obs:sel.nota||"",estado:"visita"});
+    setFormRes({fecha_evento:sel.fecha_evento_prevista||"",precio:"",contacto:sel.telefono||"",obs:sel.nota||"",estado:"visita"});
     setShowConvertir(true);
   };
 
@@ -5538,6 +5560,11 @@ function Visitas({perfil,tok,rol}){
           <div className="fg"><label>Tipo de evento</label><select className="fi" value={form.tipo_evento} onChange={e=>setForm(v=>({...v,tipo_evento:e.target.value}))}>{TIPOS_EVENTO.map(t=><option key={t}>{t}</option>)}</select></div>
           <div className="fg"><label>Invitados estimados</label><input type="number" inputMode="numeric" className="fi" value={form.invitados} onChange={e=>setForm(v=>({...v,invitados:e.target.value}))} placeholder="Ej: 120"/></div>
         </div>
+        <div className="fg">
+          <label>Fecha prevista del evento (opcional)</label>
+          <input type="date" className="fi" value={form.fecha_evento_prevista} onChange={e=>setForm(v=>({...v,fecha_evento_prevista:e.target.value}))}/>
+          <div style={{fontSize:11,color:"#8A8580",marginTop:4}}>💡 Si no hay fecha fija, déjalo en blanco</div>
+        </div>
         <div className="g2">
           <div className="fg"><label>Teléfono</label><input className="fi" type="tel" value={form.telefono} onChange={e=>setForm(v=>({...v,telefono:e.target.value}))} placeholder="600 000 000"/></div>
           <div className="fg"><label>Email</label><input className="fi" type="email" value={form.email} onChange={e=>setForm(v=>({...v,email:e.target.value}))} placeholder="correo@email.com"/></div>
@@ -5564,6 +5591,7 @@ function Visitas({perfil,tok,rol}){
             {l:"HORA",v:sel.hora?.slice(0,5)},
             {l:"TIPO",v:sel.tipo_evento},
             {l:"INVITADOS",v:sel.invitados?`${sel.invitados} personas`:null},
+            {l:"FECHA EVENTO",v:sel.fecha_evento_prevista?new Date(sel.fecha_evento_prevista+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"long",year:"numeric"}):null},
             {l:"TELÉFONO",v:sel.telefono},
             {l:"EMAIL",v:sel.email},
           ].filter(x=>x.v).map(x=><div key={x.l} style={{background:"#F5F3F0",borderRadius:8,padding:"10px 12px"}}>
@@ -5654,6 +5682,7 @@ function Visitas({perfil,tok,rol}){
         <div className="fg">
           <label>📅 Fecha del evento * <span style={{color:"#F35757",fontSize:11}}>(día de la boda/evento)</span></label>
           <input type="date" className="fi" value={formRes.fecha_evento} onChange={e=>setFormRes(v=>({...v,fecha_evento:e.target.value}))}/>
+          {sel.fecha_evento_prevista&&formRes.fecha_evento===sel.fecha_evento_prevista&&<div style={{fontSize:12,color:"#A6BE59",marginTop:5}}>✅ Fecha pre-rellenada desde la visita — puedes cambiarla si es necesario</div>}
         </div>
         <div className="g2">
           <div className="fg"><label>Precio (€)</label><input type="number" inputMode="numeric" className="fi" value={formRes.precio} onChange={e=>setFormRes(v=>({...v,precio:e.target.value}))} placeholder="0"/></div>
