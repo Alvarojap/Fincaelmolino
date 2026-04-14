@@ -2634,9 +2634,11 @@ function Limpieza({perfil,tok,rol}){
     }catch(_){}setSaving(false);
   };
 
+  // Toggle tarea by tarea_id (string like "bpb1") — POST if new, PATCH if exists
   const toggleT=async tareaId=>{
     if(isA||saving)return;
     setSaving(true);
+    // tareaId here is the DB row id (integer) for existing tareas
     const cur=tareas.find(t=>t.id===tareaId);
     const nuevoDone=!cur?.done;
     await sbPatch("servicio_tareas",`id=eq.${tareaId}`,{
@@ -2645,12 +2647,11 @@ function Limpieza({perfil,tok,rol}){
       completado_ts:nuevoDone?new Date().toISOString():null,
     },tok);
     await loadTareas(actId);
-    // Comprobar si están todas hechas para abrir verificación
     const updated=await sbGet("servicio_tareas",`?servicio_id=eq.${actId}&select=*`,tok);
-    const srv=servicios.find(s=>s.id===actId);
-    const yaVerif=srv?.verificado;
-    const todas=updated.every(t=>t.done);
-    if(todas&&!yaVerif&&!isA){
+    const srvC=servicios.find(s=>s.id===actId);
+    const yaVerifC=srvC?.verificado;
+    const todas=updated.filter(t=>!t.es_extra).every(t=>t.done);
+    if(todas&&!yaVerifC&&!isA){
       setFinalCheck({});setFinalMode(null);setFinalNota("");setFinalStep("check");setShowFinal(true);
     }
     setSaving(false);
@@ -2862,7 +2863,12 @@ function Limpieza({perfil,tok,rol}){
   const srv=servicios.find(s=>s.id===actId);
   const fijas=tareas.filter(t=>!t.es_extra);
   const extras=tareas.filter(t=>t.es_extra);
-  const comp=tareas.filter(t=>t.done).length;
+  const comp=fijas.filter(t=>t.done).length;
+  // Map tarea_id → DB row for zone rendering
+  const tMap={};fijas.forEach(t=>{if(t.tarea_id)tMap[t.tarea_id]=t;});
+  // Check if tareas use new zone ids
+  const allZonaIds=LIMP_ZONAS.flatMap(z=>getZonaTareas(z).map(t=>t.id));
+  const useZonas=fijas.some(t=>allZonaIds.includes(t.tarea_id));
   const tot=tareas.length;
   const todoHecho=tot>0&&comp===tot;
   const yaVerif=srv?.verificado;
@@ -2924,11 +2930,14 @@ function Limpieza({perfil,tok,rol}){
           </>}
 
           {/* Barra progreso */}
-          {(()=>{const zComp=LIMP_ZONAS.filter(z=>{const tIds=getZonaTareas(z).map(t=>t.id);const zT=fijas.filter(t=>tIds.includes(t.tarea_id));const fT=fijas.find(t=>t.tarea_id===z.id+"_foto");return zT.length>0&&zT.every(t=>t.done)&&(!z.foto_requerida||fT?.done);}).length;
-          return <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6,fontSize:12,color:"#8A8580"}}>
-            <span>{zComp}/{LIMP_ZONAS.length} zonas · {comp}/{tot} tareas</span>
-            <span style={{fontWeight:700,color:tot&&comp===tot?"#A6BE59":"#1A1A1A"}}>{tot?Math.round(comp/tot*100):0}%</span>
-          </div>;})()}
+          {(()=>{
+            const zComp=useZonas?LIMP_ZONAS.filter(z=>{const cr=tMap[z.id+"_cerrada"];return !!cr?.done;}).length:0;
+            const pct=tot?Math.round(comp/tot*100):0;
+            return <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6,fontSize:12,color:"#8A8580"}}>
+              <span>{useZonas?`${zComp}/${LIMP_ZONAS.length} zonas · `:""}{comp}/{tot} tareas</span>
+              <span style={{fontWeight:700,color:pct===100?"#A6BE59":"#1A1A1A"}}>{pct}%</span>
+            </div>;
+          })()}
           <div className="prog" style={{marginBottom:14,height:10}}>
             <div className="pfill" style={{width:`${tot?(comp/tot)*100:0}%`,background:tot&&comp/tot>.8?"#A6BE59":comp/tot>.4?"#EC683E":"#F35757"}}/>
           </div>
@@ -2942,109 +2951,74 @@ function Limpieza({perfil,tok,rol}){
             </div>
           )}
 
-          {/* TAREAS POR ZONAS */}
-          {(()=>{
-            // Check if tareas match new zone ids
-            const allZonaIds=LIMP_ZONAS.flatMap(z=>getZonaTareas(z).map(t=>t.id));
-            const matchCount=fijas.filter(t=>allZonaIds.includes(t.tarea_id)).length;
-            const useZonas=matchCount>0;
-            if(!useZonas){
-              // Fallback: flat list for old-format tareas
-              return fijas.map(t=>(
-                <div key={t.id} className={`cli${t.done?" done":""}`} style={{marginBottom:4}}>
-                  {!isA?<div className={`chk${t.done?" on":""}`} onClick={()=>toggleT(t.id)} style={{cursor:"pointer"}}/>:<span style={{fontSize:17,flexShrink:0}}>{t.done?"✅":"⬜"}</span>}
-                  <div style={{flex:1,minWidth:0}}>
-                    <span className="tz">{t.zona||"General"}</span>
-                    <div className={`tl${t.done?" done":""}`}>{t.txt||t.tarea_id}</div>
-                    {t.done&&<div className="tm">✓ {t.completado_por}</div>}
-                    {t.nota&&<div className="nbox">📝 {t.nota}</div>}
-                    {t.foto_url&&<img src={t.foto_url} alt="" className="pthumb"/>}
-                  </div>
-                  <span className="ibtn" onClick={()=>openN2(t)}>{t.nota||t.foto_url?"✏️":"➕"}</span>
-                </div>
-              ));
-            }
-            return null;
-          })()}
-          {(()=>{
-            const allZonaIds=LIMP_ZONAS.flatMap(z=>getZonaTareas(z).map(t=>t.id));
-            if(fijas.filter(t=>allZonaIds.includes(t.tarea_id)).length===0)return null;
-            return LIMP_ZONAS.map(zona=>{
-            const zonaTIds=getZonaTareas(zona).map(t=>t.id);
-            const zonaTareas=fijas.filter(t=>zonaTIds.includes(t.tarea_id));
-            const zonaDone=zonaTareas.filter(t=>t.done).length;
-            const zonaTotal=zonaTareas.length;
+          {/* TAREAS — zonas o lista plana */}
+          {!useZonas?fijas.map(t=>(
+            <div key={t.id} className={`cli${t.done?" done":""}`} style={{marginBottom:4}}>
+              {!isA?<div className={`chk${t.done?" on":""}`} onClick={()=>toggleT(t.id)} style={{cursor:"pointer"}}/>:<span style={{fontSize:17,flexShrink:0}}>{t.done?"✅":"⬜"}</span>}
+              <div style={{flex:1,minWidth:0}}>
+                <span className="tz">{t.zona||"General"}</span>
+                <div className={`tl${t.done?" done":""}`}>{LIMP_T.find(x=>x.id===t.tarea_id)?.txt||t.txt||t.tarea_id}</div>
+                {t.done&&<div className="tm">✓ {t.completado_por}</div>}
+                {t.nota&&<div className="nbox">📝 {t.nota}</div>}
+                {t.foto_url&&<img src={t.foto_url} alt="" className="pthumb"/>}
+              </div>
+              <span className="ibtn" onClick={()=>openN2(t)}>{t.nota||t.foto_url?"✏️":"➕"}</span>
+            </div>
+          )):LIMP_ZONAS.map(zona=>{
+            const zt=getZonaTareas(zona);
+            const zonaDone=zt.filter(t=>tMap[t.id]?.done).length;
+            const zonaTotal=zt.length;
             const zonaCompleta=zonaTotal>0&&zonaDone===zonaTotal;
-            const fotoTarea=fijas.find(t=>t.tarea_id===zona.id+"_foto");
-            const zonaCerrada=zonaCompleta&&(!zona.foto_requerida||fotoTarea?.done);
+            const cerradaRow=tMap[zona.id+"_cerrada"];
+            const zonaCerrada=!!cerradaRow?.done;
             const abierta=!!zonasAbiertas[zona.id];
-            const estadoColor=zonaDone===0?"#BFBAB4":zonaCompleta?"#A6BE59":"#D4A017";
+            const estadoColor=zonaCerrada?"#A6BE59":zonaDone===0?"#BFBAB4":zonaCompleta?"#A6BE59":"#D4A017";
+            const renderTarea=(td)=>{const row=tMap[td.id];return <div key={td.id} className={`cli${row?.done?" done":""}`} style={{marginBottom:4}}>
+              {!isA?<div className={`chk${row?.done?" on":""}`} onClick={()=>{if(row)toggleT(row.id);}} style={{cursor:"pointer"}}/>:<span style={{fontSize:17,flexShrink:0}}>{row?.done?"✅":"⬜"}</span>}
+              <div style={{flex:1,minWidth:0}}>
+                <div className={`tl${row?.done?" done":""}`}>{td.txt}</div>
+                {row?.done&&<div className="tm">✓ {row.completado_por}</div>}
+                {row?.nota&&<div className="nbox">📝 {row.nota}</div>}
+                {row?.foto_url&&<img src={row.foto_url} alt="" className="pthumb"/>}
+              </div>
+              {row&&<span className="ibtn" onClick={()=>openN2(row)}>{row.nota||row.foto_url?"✏️":"➕"}</span>}
+            </div>;};
             return <div key={zona.id} style={{marginBottom:8,borderRadius:14,overflow:"hidden",border:`1.5px solid ${zonaCerrada?"rgba(166,190,89,.3)":abierta?"rgba(236,104,62,.2)":"rgba(0,0,0,.06)"}`,background:zonaCerrada?"rgba(166,190,89,.04)":"#fff"}}>
               <div onClick={()=>setZonasAbiertas(prev=>({...prev,[zona.id]:!prev[zona.id]}))} style={{display:"flex",alignItems:"center",gap:10,padding:"12px 14px",cursor:"pointer",background:zonaCerrada?"rgba(166,190,89,.06)":"transparent"}}>
                 <span style={{fontSize:20}}>{zona.emoji}</span>
-                <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontSize:14,fontWeight:600,color:"#1A1A1A"}}>{zona.nombre}</div>
-                </div>
+                <div style={{flex:1,minWidth:0}}><div style={{fontSize:14,fontWeight:600,color:"#1A1A1A"}}>{zona.nombre}</div></div>
                 <span className="badge" style={{background:`${estadoColor}18`,color:estadoColor,border:`1px solid ${estadoColor}30`}}>{zonaDone}/{zonaTotal}</span>
                 {zonaCerrada&&<span style={{fontSize:16}}>✅</span>}
                 <span style={{color:"#BFBAB4",fontSize:18,transition:"transform .2s",transform:abierta?"rotate(90deg)":"none"}}>›</span>
               </div>
               {abierta&&<div style={{padding:"0 14px 14px"}}>
                 {zona.subzonas?zona.subzonas.map(sz=>{
-                  const szTIds=sz.tareas.map(t=>t.id);
-                  const szTareas=fijas.filter(t=>szTIds.includes(t.tarea_id));
-                  const szDone=szTareas.filter(t=>t.done).length;
+                  const szDone=sz.tareas.filter(t=>tMap[t.id]?.done).length;
                   return <div key={sz.id} style={{marginBottom:10}}>
-                    <div style={{fontSize:12,fontWeight:700,color:"#8A8580",textTransform:"uppercase",letterSpacing:.5,marginBottom:6,paddingTop:8,borderTop:"1px solid rgba(0,0,0,.04)"}}>{sz.nombre} ({szDone}/{szTareas.length})</div>
-                    {szTareas.map(t=>(
-                      <div key={t.id} className={`cli${t.done?" done":""}`} style={{marginBottom:4}}>
-                        {!isA?<div className={`chk${t.done?" on":""}`} onClick={()=>toggleT(t.id)} style={{cursor:"pointer"}}/>:<span style={{fontSize:17,flexShrink:0}}>{t.done?"✅":"⬜"}</span>}
-                        <div style={{flex:1,minWidth:0}}>
-                          <div className={`tl${t.done?" done":""}`}>{LIMP_T.find(x=>x.id===t.tarea_id)?.txt||t.txt}</div>
-                          {t.done&&<div className="tm">✓ {t.completado_por}</div>}
-                          {t.nota&&<div className="nbox">📝 {t.nota}</div>}
-                          {t.foto_url&&<img src={t.foto_url} alt="" className="pthumb"/>}
-                        </div>
-                        <span className="ibtn" onClick={()=>openN2(t)}>{t.nota||t.foto_url?"✏️":"➕"}</span>
-                      </div>
-                    ))}
+                    <div style={{fontSize:12,fontWeight:700,color:"#8A8580",textTransform:"uppercase",letterSpacing:.5,marginBottom:6,paddingTop:8,borderTop:"1px solid rgba(0,0,0,.04)"}}>{sz.nombre} ({szDone}/{sz.tareas.length})</div>
+                    {sz.tareas.map(td=>renderTarea(td))}
                   </div>;
-                }):zonaTareas.map(t=>(
-                  <div key={t.id} className={`cli${t.done?" done":""}`} style={{marginBottom:4}}>
-                    {!isA?<div className={`chk${t.done?" on":""}`} onClick={()=>toggleT(t.id)} style={{cursor:"pointer"}}/>:<span style={{fontSize:17,flexShrink:0}}>{t.done?"✅":"⬜"}</span>}
-                    <div style={{flex:1,minWidth:0}}>
-                      <div className={`tl${t.done?" done":""}`}>{LIMP_T.find(x=>x.id===t.tarea_id)?.txt||t.txt}</div>
-                      {t.done&&<div className="tm">✓ {t.completado_por}</div>}
-                      {t.nota&&<div className="nbox">📝 {t.nota}</div>}
-                      {t.foto_url&&<img src={t.foto_url} alt="" className="pthumb"/>}
-                    </div>
-                    <span className="ibtn" onClick={()=>openN2(t)}>{t.nota||t.foto_url?"✏️":"➕"}</span>
-                  </div>
-                ))}
-                {/* Cerrar zona */}
-                {!isA&&zonaCompleta&&!zonaCerrada&&<div style={{marginTop:8}}>
+                }):zt.map(td=>renderTarea(td))}
+                {!isA&&zonaCompleta&&!zonaCerrada&&<div style={{marginTop:10}}>
                   {zona.foto_requerida?<>
                     <label className="btn bp" style={{width:"100%",justifyContent:"center",cursor:"pointer"}}>
                       📷 Cerrar zona con foto
                       <input type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={async e=>{
                         const f=e.target.files[0];if(!f)return;
-                        try{const url=await uploadFoto(f,tok);await sbPost("servicio_tareas",{servicio_id:actId,tarea_id:zona.id+"_foto",zona:zona.nombre,done:true,completado_por:perfil.nombre,completado_ts:new Date().toISOString(),foto_url:url,es_extra:false},tok);await loadTareas(actId);}catch(_){}
+                        try{const url=await uploadFoto(f,tok);await sbPost("servicio_tareas",{servicio_id:actId,tarea_id:zona.id+"_cerrada",zona:zona.nombre,done:true,completado_por:perfil.nombre,completado_ts:new Date().toISOString(),foto_url:url,es_extra:false},tok);await loadTareas(actId);}catch(_){}
                       }}/>
                     </label>
                     <button className="btn bg" style={{width:"100%",justifyContent:"center",marginTop:6}} onClick={async()=>{
-                      await sbPost("servicio_tareas",{servicio_id:actId,tarea_id:zona.id+"_foto",zona:zona.nombre,done:true,completado_por:perfil.nombre,completado_ts:new Date().toISOString(),es_extra:false},tok).catch(()=>{});
-                      await loadTareas(actId);
+                      await sbPost("servicio_tareas",{servicio_id:actId,tarea_id:zona.id+"_cerrada",zona:zona.nombre,done:true,completado_por:perfil.nombre,completado_ts:new Date().toISOString(),es_extra:false},tok).catch(()=>{});await loadTareas(actId);
                     }}>Cerrar zona sin foto</button>
                   </>:<button className="btn bp" style={{width:"100%",justifyContent:"center"}} onClick={async()=>{
-                    await sbPost("servicio_tareas",{servicio_id:actId,tarea_id:zona.id+"_foto",zona:zona.nombre,done:true,completado_por:perfil.nombre,completado_ts:new Date().toISOString(),es_extra:false},tok).catch(()=>{});
-                    await loadTareas(actId);
+                    await sbPost("servicio_tareas",{servicio_id:actId,tarea_id:zona.id+"_cerrada",zona:zona.nombre,done:true,completado_por:perfil.nombre,completado_ts:new Date().toISOString(),es_extra:false},tok).catch(()=>{});await loadTareas(actId);
                   }}>✅ Cerrar zona</button>}
                 </div>}
-                {fotoTarea?.foto_url&&<img src={fotoTarea.foto_url} alt="" className="pthumb" style={{marginTop:8}}/>}
+                {cerradaRow?.foto_url&&<img src={cerradaRow.foto_url} alt="" className="pthumb" style={{marginTop:8}}/>}
               </div>}
             </div>;
-          });
-          })()}
+          })}
 
           {/* EXTRAS */}
           {extras.length>0&&<>
