@@ -1612,13 +1612,22 @@ function DashJ({perfil,jsem,jpunt,cwk,setPage,tok}){
       if(srvs.length===0){setSrvActivo(null);setSrvTareas([]);setSrvExtras([]);return;}
       const s=srvs[0];setSrvActivo(s);
       console.log("servicio activo id:",s.id,"tipo id:",typeof s.id);
-      // Tareas
-      const allTareas=await sbGet("jardin_servicio_tareas",`?servicio_id=eq.${s.id}&select=*&order=created_at.asc`,tok).catch(()=>[]);
+      // Tareas — try both table names
+      let allTareas=[];
+      try{allTareas=await sbGet("jardin_servicio_tareas",`?servicio_id=eq.${s.id}&select=*&order=created_at.asc`,tok);}
+      catch(e1){console.log("jardin_servicio_tareas falló, probando jardin_servicios_tareas");
+        try{allTareas=await sbGet("jardin_servicios_tareas",`?servicio_id=eq.${s.id}&select=*&order=created_at.asc`,tok);}
+        catch(e2){console.log("Ninguna tabla de tareas encontrada");}
+      }
       console.log("tareas query result:",JSON.stringify(allTareas));
       setSrvTareas(allTareas.filter(t=>!t.añadida_por_jardinero));
       setSrvExtras(allTareas.filter(t=>t.añadida_por_jardinero));
       // Jornada hoy
-      const jHoy=await sbGet("jornadas_jardineria",`?servicio_id=eq.${s.id}&fecha=eq.${hoyStr}&select=*`,tok).catch(()=>[]);
+      // Query by date range (fecha may be DATE or TIMESTAMP)
+      let jHoy=[];
+      try{jHoy=await sbGet("jornadas_jardineria",`?servicio_id=eq.${s.id}&fecha=eq.${hoyStr}&select=*`,tok);}
+      catch(_){try{jHoy=await sbGet("jornadas_jardineria",`?servicio_id=eq.${s.id}&hora_inicio=gte.${hoyStr}T00:00:00&hora_inicio=lte.${hoyStr}T23:59:59&select=*`,tok);}catch(_2){}}
+      console.log("jornadas hoy:",JSON.stringify(jHoy));
       if(jHoy.length>0){
         const j=jHoy[0];
         setJornadaId(j.id);setPausasArr(j.pausas||[]);
@@ -1627,12 +1636,10 @@ function DashJ({perfil,jsem,jpunt,cwk,setPage,tok}){
           setJornadaFin(true);setJornadaDurMin(j.duracion_minutos||0);
         }else{
           setJornadaFin(false);
-          // Recover start timestamp
-          if(!localStorage.getItem(`fm_jornada_inicio_${s.id}`)){
-            // Convert HH:MM to timestamp
-            const [hh,mm]=(j.hora_inicio||"08:00").split(":").map(Number);
-            const d=new Date();d.setHours(hh,mm,0,0);
-            localStorage.setItem(`fm_jornada_inicio_${s.id}`,d.getTime().toString());
+          // Recover start timestamp from DB (ISO timestamp)
+          if(!localStorage.getItem(`fm_jornada_inicio_${s.id}`)&&j.hora_inicio){
+            const ts=new Date(j.hora_inicio).getTime();
+            if(ts>0)localStorage.setItem(`fm_jornada_inicio_${s.id}`,ts.toString());
           }
           const pArr=j.pausas||[];
           const lastP=pArr[pArr.length-1];
@@ -1675,10 +1682,9 @@ function DashJ({perfil,jsem,jpunt,cwk,setPage,tok}){
   const iniciarJornada=async()=>{
     if(saving2||!srvActivo)return;setSaving2(true);
     const ahora=new Date();
-    const hi=`${String(ahora.getHours()).padStart(2,"0")}:${String(ahora.getMinutes()).padStart(2,"0")}`;
     const tsInicio=ahora.getTime();
     try{
-      const [j]=await sbPost("jornadas_jardineria",{servicio_id:srvActivo.id,fecha:hoyStr,hora_inicio:hi,pausas:[]},tok);
+      const [j]=await sbPost("jornadas_jardineria",{servicio_id:srvActivo.id,fecha:hoyStr,hora_inicio:ahora.toISOString(),pausas:[]},tok);
       setJornadaId(j.id);setJornadaFin(false);setPausasArr([]);setPausado(false);
       localStorage.setItem(`fm_jornada_inicio_${srvActivo.id}`,tsInicio.toString());
       localStorage.setItem(`fm_jornada_id_${srvActivo.id}`,String(j.id));
@@ -1708,13 +1714,12 @@ function DashJ({perfil,jsem,jpunt,cwk,setPage,tok}){
   const terminarJornada=async()=>{
     if(!jornadaId||!srvActivo||saving2)return;setSaving2(true);
     const ahora=new Date();
-    const hf=`${String(ahora.getHours()).padStart(2,"0")}:${String(ahora.getMinutes()).padStart(2,"0")}`;
     const newPausas=[...pausasArr];
     const last=newPausas[newPausas.length-1];
     if(last&&!last.fin)last.fin=Date.now();
     const durMin=Math.max(0,Math.round(tiempoJornada/60));
     try{
-      await sbPatch("jornadas_jardineria",`id=eq.${jornadaId}`,{hora_fin:hf,duracion_minutos:durMin,pausas:newPausas},tok);
+      await sbPatch("jornadas_jardineria",`id=eq.${jornadaId}`,{hora_fin:ahora.toISOString(),duracion_minutos:durMin,pausas:newPausas},tok);
       const horasJornada=Math.round(durMin/60*100)/100;
       const prevHoras=parseFloat(srvActivo.horas_totales)||0;
       await sbPatch("jardin_servicios",`id=eq.${srvActivo.id}`,{horas_totales:prevHoras+horasJornada},tok).catch(()=>{});
