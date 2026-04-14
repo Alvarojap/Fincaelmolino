@@ -2642,7 +2642,8 @@ function Limpieza({perfil,tok,rol}){
   const [finalNota,setFinalNota]=useState("");
   const [finalSaving,setFinalSaving]=useState(false);
   // Paso hora fin
-  const [finalStep,setFinalStep]=useState("check"); // "check" | "hora"
+  const [finalStep,setFinalStep]=useState("check"); // "check" | "consumo" | "hora"
+  const [consumoItems,setConsumoItems]=useState([]);
   const [horaFin,setHoraFin]=useState("");
   const [tarifaHora,setTarifaHora]=useState(0);
   const [horasCalc,setHorasCalc]=useState(0);
@@ -2801,10 +2802,29 @@ function Limpieza({perfil,tok,rol}){
     setCosteCalc(tarifaHora>0?Math.round(horas*tarifaHora*100)/100:0);
   };
 
+  const prepararConsumo=async()=>{
+    try{
+      const arts=await sbGet("almacen_articulos",`?activo=eq.true&stock_casa=gt.0&categoria=in.(limpieza,reposicion)&select=*&order=nombre.asc`,tok).catch(()=>[]);
+      setConsumoItems(arts.map(a=>({...a,usado:0})));
+    }catch(_){setConsumoItems([]);}
+    setFinalStep("consumo");
+  };
+  const registrarConsumo=async()=>{
+    const usados=consumoItems.filter(i=>i.usado>0);
+    if(usados.length>0){
+      const hoy=new Date().toISOString().split("T")[0];
+      for(const i of usados){
+        await sbPatch("almacen_articulos",`id=eq.${i.id}`,{stock_casa:Math.max(0,(parseFloat(i.stock_casa)||0)-i.usado)},tok).catch(()=>{});
+        await sbPost("almacen_movimientos",{articulo_id:i.id,tipo:"salida",cantidad:i.usado,ubicacion_origen:"casa",concepto:`Consumo servicio limpieza - ${hoy}`,creado_por:perfil.nombre},tok).catch(()=>{});
+      }
+    }
+    await prepararPasoHora();
+  };
+
   const guardarFinal=async(modo)=>{
     if(finalSaving)return;
     if(modo==="ok"){
-      await prepararPasoHora();
+      await prepararConsumo();
       return;
     }
     if(modo==="incidencia"&&!finalNota.trim())return;
@@ -3170,6 +3190,25 @@ function Limpieza({perfil,tok,rol}){
             <div style={{display:"flex",gap:8,marginTop:16}}>
               <button className="btn bg" style={{flex:1,justifyContent:"center"}} onClick={()=>setFinalMode(null)}>← Volver</button>
               <button className="btn bp" style={{flex:2,justifyContent:"center",padding:"12px",fontSize:15}} onClick={()=>guardarFinal("ok")} disabled={finalSaving}>✅ Servicio terminado y verificado</button>
+            </div>
+          </>}
+          {finalMode==="ok"&&finalStep==="consumo"&&<>
+            <div style={{textAlign:"center",marginBottom:16}}>
+              <div style={{fontSize:28,marginBottom:6}}>📦</div>
+              <div style={{fontFamily:"'Inter Tight',sans-serif",fontSize:18,fontWeight:800,color:"#1A1A1A",marginBottom:4}}>¿Has consumido productos?</div>
+              <div style={{fontSize:13,color:"#8A8580"}}>Registra lo que has gastado en este servicio</div>
+            </div>
+            {consumoItems.length===0?<div style={{color:"#8A8580",fontSize:13,textAlign:"center",padding:"16px 0"}}>No hay artículos con stock en casa</div>
+            :consumoItems.map((it,idx)=><div key={it.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderBottom:"1px solid rgba(0,0,0,.04)"}}>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:13,fontWeight:600,color:"#1A1A1A"}}>{it.nombre}</div>
+                <div style={{fontSize:11,color:"#8A8580"}}>Stock: {parseFloat(it.stock_casa)||0} {it.unidad||""}</div>
+              </div>
+              <input type="number" min="0" step={it.es_liquido?"0.25":"1"} value={it.usado||""} onChange={e=>setConsumoItems(prev=>prev.map((p,i)=>i===idx?{...p,usado:parseFloat(e.target.value)||0}:p))} placeholder="0" style={{width:70,textAlign:"center",fontSize:18,fontWeight:700,padding:"8px",borderRadius:10,border:"1.5px solid transparent",background:"#F5F3F0",fontFamily:"'Inter Tight',sans-serif",outline:"none"}}/>
+            </div>)}
+            <div style={{display:"flex",gap:8,marginTop:16}}>
+              <button className="btn bg" style={{flex:1,justifyContent:"center"}} onClick={()=>prepararPasoHora()}>Saltar</button>
+              <button className="btn bp" style={{flex:2,justifyContent:"center",padding:"12px",fontSize:15}} onClick={registrarConsumo} disabled={finalSaving}>{finalSaving?"Registrando…":"📦 Registrar y continuar"}</button>
             </div>
           </>}
           {finalMode==="ok"&&finalStep==="hora"&&(()=>{
@@ -3966,7 +4005,7 @@ function AlmacenPage({perfil,tok,rol}){
   const [load,setLoad]=useState(true);const [saving,setSaving]=useState(false);
   const [catFiltro,setCatFiltro]=useState("todos");
   const [showNew,setShowNew]=useState(false);const [showMov,setShowMov]=useState(null);const [showHist,setShowHist]=useState(false);
-  const newVacio={nombre:"",categoria:"limpieza",unidad:"unidad",es_liquido:false,tiene_lavanderia:false,stock_minimo:"2",codigo_barras:"",stock_casa:"0",stock_almacen:"0"};
+  const newVacio={nombre:"",categoria:"limpieza",unidad:"unidad",es_liquido:false,tiene_lavanderia:false,stock_minimo:"1",codigo_barras:"",stock_casa:"0",stock_almacen:"0"};
   const [newForm,setNewForm]=useState(newVacio);
   const [movForm,setMovForm]=useState({tipo:"entrada",cantidad:"1",ubicacion:"casa",concepto:""});
 
@@ -4109,9 +4148,8 @@ function AlmacenPage({perfil,tok,rol}){
       </div>
       {movForm.tipo==="entrada"&&<div className="fg"><label>Ubicación destino</label><select className="fi" value={movForm.ubicacion} onChange={e=>setMovForm(v=>({...v,ubicacion:e.target.value}))}><option value="casa">🏠 Casa</option><option value="almacen">📦 Almacén</option></select></div>}
       <div className="fg"><label>Cantidad</label>
-        {showMov.es_liquido?<div style={{display:"flex",gap:6}}>
-          {[0.25,0.5,0.75,1,2,3].map(v=><button key={v} className={`btn sm${parseFloat(movForm.cantidad)===v?" bp":" bg"}`} onClick={()=>setMovForm(p=>({...p,cantidad:String(v)}))}>{v<1?`${v*100}%`:v}</button>)}
-        </div>:<input type="number" inputMode="decimal" className="fi" value={movForm.cantidad} onChange={e=>setMovForm(v=>({...v,cantidad:e.target.value}))}/>}
+        <input type="number" inputMode="decimal" min="0" step={showMov.es_liquido?"0.25":"1"} className="fi" value={movForm.cantidad} onChange={e=>setMovForm(v=>({...v,cantidad:e.target.value}))} style={{width:120,textAlign:"center",fontSize:20,fontWeight:700}}/>
+        {showMov.es_liquido&&<div style={{fontSize:11,color:"#8A8580",marginTop:4}}>💡 Usa 0.25, 0.5, 0.75 para cantidades parciales de bote</div>}
       </div>
       <div className="fg"><label>Concepto (opcional)</label><input className="fi" value={movForm.concepto} onChange={e=>setMovForm(v=>({...v,concepto:e.target.value}))} placeholder="Ej: Compra semanal"/></div>
       <div className="mft"><button className="btn bg" onClick={()=>setShowMov(null)}>Cancelar</button><button className="btn bp" onClick={ejecutarMov} disabled={saving}>{saving?"Guardando…":"✅ Confirmar"}</button></div>
