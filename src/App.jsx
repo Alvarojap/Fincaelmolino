@@ -153,71 +153,63 @@ const JARDIN_CF = [
   {id:"cf8",txt:"No hay herramientas visibles"},
   {id:"cf9",txt:"Manguera recogida"},
 ];
-const LIMP_T = [
-  {id:"l1", txt:"Ventilar toda la casa (abrir ventanas)",         zona:"General"},
-  {id:"l2", txt:"Revisar objetos olvidados",                      zona:"General"},
-  {id:"l3", txt:"Retirar basura de toda la casa",                 zona:"General"},
-  {id:"l4", txt:"Recoger ropa de cama y toallas usadas",          zona:"General"},
-  {id:"l5", txt:"Revisar desperfectos (anotar si hay algo roto)", zona:"General"},
-  {id:"l6", txt:"Hacer camas (sábanas limpias, bien estiradas)",  zona:"Habitaciones"},
-  {id:"l7", txt:"Colocar cojines decorativos",                    zona:"Habitaciones"},
-  {id:"l8", txt:"Dejar toallas por huésped",                      zona:"Habitaciones"},
-  {id:"l9", txt:"Limpiar polvo (mesillas, cabecero, lámparas)",   zona:"Habitaciones"},
-  {id:"l10",txt:"Revisar armario (limpio y ordenado)",            zona:"Habitaciones"},
-  {id:"l11",txt:"Aspirar suelo y alfombras",                      zona:"Habitaciones"},
-  {id:"l12",txt:"Fregar suelo habitaciones",                      zona:"Habitaciones"},
-  {id:"l13",txt:"Revisar olor (sin olores)",                      zona:"Habitaciones"},
-  {id:"l14",txt:"Limpiar y desinfectar WC completo",              zona:"Baños"},
-  {id:"l15",txt:"Limpiar lavabo y grifo (sin marcas)",            zona:"Baños"},
-  {id:"l16",txt:"Limpiar espejo (sin marcas)",                    zona:"Baños"},
-  {id:"l17",txt:"Limpiar ducha/bañera (sin cal)",                 zona:"Baños"},
-  {id:"l18",txt:"Vaciar papelera baños",                          zona:"Baños"},
-  {id:"l19",txt:"Aspirar y fregar suelo baños",                   zona:"Baños"},
-  {id:"l20",txt:"Colocar toallas limpias",                        zona:"Baños"},
-  {id:"l21",txt:"Reponer papel higiénico (mín. 2 rollos)",        zona:"Baños"},
-  {id:"l22",txt:"Reponer gel y champú",                           zona:"Baños"},
-  {id:"l23",txt:"Limpiar encimera",                               zona:"Cocina"},
-  {id:"l24",txt:"Limpiar vitro / fogones",                        zona:"Cocina"},
-  {id:"l25",txt:"Limpiar fregadero y grifo",                      zona:"Cocina"},
-  {id:"l26",txt:"Limpiar microondas",                             zona:"Cocina"},
-  {id:"l27",txt:"Limpiar horno (si está sucio)",                  zona:"Cocina"},
-  {id:"l28",txt:"Limpiar exterior electrodomésticos",             zona:"Cocina"},
-  {id:"l29",txt:"Revisar y limpiar nevera (sin restos)",          zona:"Cocina"},
-  {id:"l30",txt:"Revisar vajilla limpia y ordenada",              zona:"Cocina"},
-  {id:"l31",txt:"Vaciar basura cocina",                           zona:"Cocina"},
-  {id:"l32",txt:"Reponer café",                                   zona:"Cocina"},
-  {id:"l33",txt:"Reponer bolsas de basura",                       zona:"Cocina"},
-  {id:"l34",txt:"Barrer/aspirar suelo cocina",                    zona:"Cocina"},
-  {id:"l35",txt:"Fregar suelo cocina",                            zona:"Cocina"},
-  {id:"l36",txt:"Limpiar polvo (mesas, muebles, TV)",             zona:"Salón"},
-  {id:"l37",txt:"Aspirar sofá",                                   zona:"Salón"},
-  {id:"l38",txt:"Aspirar alfombras salón",                        zona:"Salón"},
-  {id:"l39",txt:"Limpiar mesa comedor",                           zona:"Salón"},
-  {id:"l40",txt:"Aspirar suelo salón",                            zona:"Salón"},
-  {id:"l41",txt:"Fregar suelo salón",                             zona:"Salón"},
-  {id:"l42",txt:"Barrer accesos y entrada",                       zona:"Exterior"},
-  {id:"l43",txt:"Limpiar mobiliario exterior",                    zona:"Exterior"},
-  {id:"l44",txt:"Retirar hojas visibles",                         zona:"Exterior"},
-  {id:"l45",txt:"Limpiar porches",                                zona:"Exterior"},
-  {id:"l46",txt:"Limpiar barbacoa",                               zona:"Exterior"},
-  {id:"l47",txt:"Llevar sábanas y toallas a la lavandería",       zona:"Lavandería"},
-  {id:"l48",txt:"Recoger sábanas de la lavandería",               zona:"Lavandería"},
-  {id:"l49",txt:"Revisar sábanas antes de almacenar",             zona:"Lavandería"},
-  {id:"l50",txt:"Almacenar sábanas en el almacén",                zona:"Lavandería"},
-  {id:"l51",txt:"Papel higiénico en todos los baños",             zona:"Reposición"},
-  {id:"l52",txt:"Toallas en habitaciones y baños",                zona:"Reposición"},
-  {id:"l53",txt:"Gel y champú en baños",                          zona:"Reposición"},
-  {id:"l54",txt:"Café en cocina",                                 zona:"Reposición"},
-  {id:"l55",txt:"Bolsas de basura",                               zona:"Reposición"},
-  {id:"l56",txt:"Sin pelos en suelos ni baños",                   zona:"Control final"},
-  {id:"l57",txt:"Sin manchas en espejos ni grifos",               zona:"Control final"},
-  {id:"l58",txt:"Camas perfectas (sin arrugas)",                  zona:"Control final"},
-  {id:"l59",txt:"Cocina limpia y ordenada",                       zona:"Control final"},
-  {id:"l60",txt:"Casa huele bien",                                zona:"Control final"},
-  {id:"l61",txt:"Basura retirada",                                zona:"Control final"},
-  {id:"l62",txt:"Luces funcionan",                                zona:"Control final"},
-  {id:"l63",txt:"Puertas y ventanas cerradas",                    zona:"Control final"},
+const LIMP_ZONAS=[
+  {id:"general",emoji:"🏠",nombre:"Tareas generales",orden:0,tareas:[
+    {id:"g1",txt:"Abrir ventanas de toda la casa para ventilar"},{id:"g2",txt:"Revisar objetos olvidados por los huéspedes"},{id:"g3",txt:"Retirar ropa de cama y toallas sucias de toda la casa"},{id:"g4",txt:"Revisión general del estado de la casa (anotar desperfectos)"},
+  ]},
+  {id:"banio_pb",emoji:"🚿",nombre:"Baño compartido planta baja",orden:1,foto_requerida:true,tareas:[
+    {id:"bpb1",txt:"Limpiar plato de ducha"},{id:"bpb2",txt:"Limpiar inodoro completo"},{id:"bpb3",txt:"Limpiar espejo (sin marcas)"},{id:"bpb4",txt:"Limpiar ventana"},{id:"bpb5",txt:"Limpiar armario/mueble"},{id:"bpb6",txt:"Reponer papel higiénico (mín. 2 rollos)"},{id:"bpb7",txt:"Reponer gel, champú y acondicionador"},{id:"bpb8",txt:"Cambiar bolsa del cubo de basura"},{id:"bpb9",txt:"Fregar suelo"},
+  ]},
+  {id:"hab_mat_pb",emoji:"🛏️",nombre:"Habitación matrimonio planta baja",orden:2,foto_requerida:true,tareas:[
+    {id:"hmpb1",txt:"Limpiar ventana"},{id:"hmpb2",txt:"Quitar polvo de armario y mobiliario"},{id:"hmpb3",txt:"Aspirar suelo y alfombra"},{id:"hmpb4",txt:"Hacer la cama (sábanas limpias)"},{id:"hmpb5",txt:"Colocar toallas"},{id:"hmpb6",txt:"Fregar suelo"},
+  ]},
+  {id:"hab_2c_pb",emoji:"🛏️",nombre:"Habitación dos camas planta baja",orden:3,foto_requerida:true,tareas:[
+    {id:"h2pb1",txt:"Limpiar ventana"},{id:"h2pb2",txt:"Quitar polvo de armario y mobiliario"},{id:"h2pb3",txt:"Aspirar suelo"},{id:"h2pb4",txt:"Hacer las dos camas (sábanas limpias)"},{id:"h2pb5",txt:"Colocar toallas"},{id:"h2pb6",txt:"Fregar suelo"},
+  ]},
+  {id:"pasillo_pb",emoji:"🚪",nombre:"Pasillo planta baja",orden:4,tareas:[
+    {id:"ppb1",txt:"Limpiar puertas"},{id:"ppb2",txt:"Aspirar pasillo"},{id:"ppb3",txt:"Fregar pasillo"},
+  ]},
+  {id:"hab_principal",emoji:"⭐",nombre:"Habitación principal con baño en suite",orden:5,foto_requerida:true,subzonas:[
+    {id:"banio_suite",nombre:"Baño en suite",tareas:[
+      {id:"bs1",txt:"Limpiar ducha/bañera completa"},{id:"bs2",txt:"Limpiar inodoro"},{id:"bs3",txt:"Limpiar espejo (sin marcas)"},{id:"bs4",txt:"Reponer toallas"},{id:"bs5",txt:"Reponer papel higiénico"},{id:"bs6",txt:"Reponer gel, champú y acondicionador"},{id:"bs7",txt:"Cambiar bolsa del cubo de basura"},{id:"bs8",txt:"Aspirar y fregar suelo del baño"},
+    ]},
+    {id:"hab_suite",nombre:"Habitación",tareas:[
+      {id:"hs1",txt:"Limpiar dos ventanas y cristales"},{id:"hs2",txt:"Quitar polvo de armario y mobiliario"},{id:"hs3",txt:"Aspirar suelo"},{id:"hs4",txt:"Hacer la cama (sábanas limpias)"},{id:"hs5",txt:"Colocar toallas decorativas a los pies de la cama"},{id:"hs6",txt:"Fregar suelo"},{id:"hs7",txt:"Cerrar puerta del baño"},
+    ]},
+  ]},
+  {id:"hab_mat_pa",emoji:"🛏️",nombre:"Habitación matrimonio planta alta",orden:6,foto_requerida:true,tareas:[
+    {id:"hmpa1",txt:"Limpiar ventana"},{id:"hmpa2",txt:"Quitar polvo de armario y mobiliario"},{id:"hmpa3",txt:"Aspirar suelo"},{id:"hmpa4",txt:"Hacer la cama (sábanas limpias)"},{id:"hmpa5",txt:"Colocar toallas"},{id:"hmpa6",txt:"Fregar suelo"},
+  ]},
+  {id:"hab_2c_pa",emoji:"🛏️",nombre:"Habitación dos camas planta alta",orden:7,foto_requerida:true,tareas:[
+    {id:"h2pa1",txt:"Limpiar ventana"},{id:"h2pa2",txt:"Quitar polvo de armario y mobiliario"},{id:"h2pa3",txt:"Aspirar suelo"},{id:"h2pa4",txt:"Hacer las dos camas (sábanas limpias)"},{id:"h2pa5",txt:"Colocar toallas respectivas"},{id:"h2pa6",txt:"Fregar suelo"},
+  ]},
+  {id:"pasillo_pa",emoji:"🚪",nombre:"Pasillo y escalera planta alta",orden:8,tareas:[
+    {id:"ppa1",txt:"Limpiar barandilla"},{id:"ppa2",txt:"Aspirar pasillo"},{id:"ppa3",txt:"Fregar pasillo"},{id:"ppa4",txt:"Aspirar escalera"},{id:"ppa5",txt:"Fregar escalera"},
+  ]},
+  {id:"cocina",emoji:"🍳",nombre:"Cocina",orden:9,foto_requerida:true,tareas:[
+    {id:"co1",txt:"Limpiar azulejos y salpicadero"},{id:"co2",txt:"Limpiar armarios exteriores"},{id:"co3",txt:"Comprobar lavavajillas (vacío y limpio)"},{id:"co4",txt:"Limpiar microondas interior y exterior"},{id:"co5",txt:"Limpiar frigorífico (sin restos, sin olores)"},{id:"co6",txt:"Limpiar encimera"},{id:"co7",txt:"Limpiar fregadero y grifo"},{id:"co8",txt:"Comprobar vajilla ordenada"},{id:"co9",txt:"Reponer café"},{id:"co10",txt:"Comprobar y reponer aceite"},{id:"co11",txt:"Comprobar y reponer sal"},{id:"co12",txt:"Barrer y fregar suelo cocina"},
+  ]},
+  {id:"banio_salon",emoji:"🚿",nombre:"Baño de servicio salón",orden:10,foto_requerida:true,tareas:[
+    {id:"bs1x",txt:"Limpiar azulejos"},{id:"bs2x",txt:"Limpiar espejo (sin marcas)"},{id:"bs3x",txt:"Limpiar ventana"},{id:"bs4x",txt:"Limpiar armario/mueble"},{id:"bs5x",txt:"Limpiar inodoro completo"},{id:"bs6x",txt:"Reponer papel higiénico"},{id:"bs7x",txt:"Reponer gel, champú y acondicionador"},{id:"bs8x",txt:"Cambiar bolsa del cubo de basura"},{id:"bs9x",txt:"Fregar suelo"},
+  ]},
+  {id:"salon",emoji:"🛋️",nombre:"Salón",orden:11,foto_requerida:true,tareas:[
+    {id:"sl1",txt:"Barrer y fregar suelo del salón"},{id:"sl2",txt:"Aspirar sofás"},{id:"sl3",txt:"Comprobar fundas de sofás (¿necesitan lavado?)"},{id:"sl4",txt:"Limpiar mesa central"},{id:"sl5",txt:"Limpiar televisión y mueble TV"},{id:"sl6",txt:"Quitar polvo de todos los muebles y superficies"},{id:"sl7",txt:"Limpiar cuadros"},{id:"sl8",txt:"Limpiar encimeras y mesas auxiliares"},{id:"sl9",txt:"Limpiar cristales y ventanas"},{id:"sl10",txt:"Golpear y colocar cojines perfectamente"},{id:"sl11",txt:"Ordenar decoración (revistas, libros, objetos)"},{id:"sl12",txt:"Limpiar enchufes e interruptores"},
+  ]},
+  {id:"comedor",emoji:"🍽️",nombre:"Comedor",orden:12,foto_requerida:true,tareas:[
+    {id:"cm1",txt:"Barrer y fregar suelo"},{id:"cm2",txt:"Aspirar alfombra"},{id:"cm3",txt:"Limpiar mesa del comedor"},{id:"cm4",txt:"Limpiar sillas (revisar estado)"},{id:"cm5",txt:"Limpiar decoración centro de mesa"},{id:"cm6",txt:"Colocar mesa perfectamente"},{id:"cm7",txt:"Limpiar enchufes e interruptores"},{id:"cm8",txt:"Quitar polvo de muebles"},{id:"cm9",txt:"Comprobar cuadros y decoración en su sitio"},
+  ]},
+  {id:"exteriores",emoji:"🏡",nombre:"Exteriores",orden:13,tareas:[
+    {id:"ex1",txt:"Limpiar barbacoa"},{id:"ex2",txt:"Ordenar zona barbacoa"},{id:"ex3",txt:"Barrer porche frontal"},{id:"ex4",txt:"Limpiar sofás exteriores porche frontal"},{id:"ex5",txt:"Colocar cojines porche frontal"},{id:"ex6",txt:"Barrer porches laterales"},{id:"ex7",txt:"Limpiar sofás exteriores porches laterales"},{id:"ex8",txt:"Colocar cojines porches laterales"},
+  ]},
 ];
+// Flat list for service creation and lookups
+const LIMP_T=LIMP_ZONAS.flatMap(z=>{
+  const tareasDirectas=(z.tareas||[]).map(t=>({...t,zona:z.nombre}));
+  const tareasSubzonas=(z.subzonas||[]).flatMap(sz=>sz.tareas.map(t=>({...t,zona:z.nombre+" — "+sz.nombre})));
+  return [...tareasDirectas,...tareasSubzonas];
+});
+// Helper: get all tareas of a zona (including subzonas)
+function getZonaTareas(z){return z.subzonas?z.subzonas.flatMap(sz=>sz.tareas):z.tareas||[];};
 const ESTADOS = [
   {id:"visita",             lbl:"Visita realizada",   col:"#6366f1"},
   {id:"pendiente_contrato", lbl:"Pendiente de firma", col:"#f59e0b"},
@@ -2548,15 +2540,18 @@ function IncCard({inc,onResp}){
 
 // ─── LIMPIEZA ────────────────────────────────────────────────────────────────
 const LIMP_CF = [
-  {id:"cf1", txt:"Sin pelos en suelos ni baños"},
-  {id:"cf2", txt:"Sin manchas en espejos ni grifos"},
-  {id:"cf3", txt:"Camas perfectas, sin arrugas"},
-  {id:"cf4", txt:"Cocina limpia y ordenada"},
-  {id:"cf5", txt:"Casa huele bien"},
-  {id:"cf6", txt:"Basura retirada"},
-  {id:"cf7", txt:"Luces funcionan"},
-  {id:"cf8", txt:"Puertas y ventanas cerradas"},
-  {id:"cf9", txt:"Reposición completa (toallas, papel, café…)"},
+  {id:"cf1",txt:"Sin pelos en suelos ni baños"},
+  {id:"cf2",txt:"Sin manchas en espejos ni grifos"},
+  {id:"cf3",txt:"Camas perfectas, sin arrugas, cojines colocados"},
+  {id:"cf4",txt:"Cocina limpia y ordenada"},
+  {id:"cf5",txt:"Casa huele bien en todas las habitaciones"},
+  {id:"cf6",txt:"Basura retirada de todas las zonas"},
+  {id:"cf7",txt:"Luces funcionan correctamente"},
+  {id:"cf8",txt:"Puertas y ventanas cerradas"},
+  {id:"cf9",txt:"Reposición completa (toallas, papel, gel, champú, café)"},
+  {id:"cf10",txt:"Decoración y cojines perfectamente colocados"},
+  {id:"cf11",txt:"Sin objetos olvidados por huéspedes"},
+  {id:"cf12",txt:"Alarma lista para activar"},
 ];
 
 function Limpieza({perfil,tok,rol}){
@@ -2594,6 +2589,9 @@ function Limpieza({perfil,tok,rol}){
   const [tarifaHora,setTarifaHora]=useState(0);
   const [horasCalc,setHorasCalc]=useState(0);
   const [costeCalc,setCosteCalc]=useState(0);
+  // Zonas state
+  const [zonasAbiertas,setZonasAbiertas]=useState({general:true});
+  const [zonaFotoId,setZonaFotoId]=useState(null);
 
   const loadSrvs=async()=>{
     const [s,limps]=await Promise.all([
@@ -2926,8 +2924,13 @@ function Limpieza({perfil,tok,rol}){
           </>}
 
           {/* Barra progreso */}
-          <div className="prog" style={{marginBottom:14,height:7}}>
-            <div className="pfill" style={{width:`${tot?(comp/tot)*100:0}%`}}/>
+          {(()=>{const zComp=LIMP_ZONAS.filter(z=>{const tIds=getZonaTareas(z).map(t=>t.id);const zT=fijas.filter(t=>tIds.includes(t.tarea_id));const fT=fijas.find(t=>t.tarea_id===z.id+"_foto");return zT.length>0&&zT.every(t=>t.done)&&(!z.foto_requerida||fT?.done);}).length;
+          return <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6,fontSize:12,color:"#8A8580"}}>
+            <span>{zComp}/{LIMP_ZONAS.length} zonas · {comp}/{tot} tareas</span>
+            <span style={{fontWeight:700,color:tot&&comp===tot?"#A6BE59":"#1A1A1A"}}>{tot?Math.round(comp/tot*100):0}%</span>
+          </div>;})()}
+          <div className="prog" style={{marginBottom:14,height:10}}>
+            <div className="pfill" style={{width:`${tot?(comp/tot)*100:0}%`,background:tot&&comp/tot>.8?"#A6BE59":comp/tot>.4?"#EC683E":"#F35757"}}/>
           </div>
 
           {/* Botón verificación si todo hecho y no verificado */}
@@ -2939,22 +2942,82 @@ function Limpieza({perfil,tok,rol}){
             </div>
           )}
 
-          {/* TAREAS FIJAS */}
-          {fijas.map(t=>(
-            <div key={t.id} className={`cli${t.done?" done":""}`}>
-              {!isA
-                ?<div className={`chk${t.done?" on":""}`} onClick={()=>toggleT(t.id)} style={{cursor:"pointer"}}/>
-                :<span style={{fontSize:17,flexShrink:0}}>{t.done?"✅":"⬜"}</span>}
-              <div style={{flex:1,minWidth:0}}>
-                <span className="tz">{t.zona}</span>
-                <div className={`tl${t.done?" done":""}`}>{LIMP_T.find(x=>x.id===t.tarea_id)?.txt||t.txt}</div>
-                {t.done&&<div className="tm">✓ {t.completado_por} · {fmtDT(t.completado_ts)}</div>}
-                {t.nota&&<div className="nbox">📝 {t.nota}</div>}
-                {t.foto_url&&<img src={t.foto_url} alt="" className="pthumb"/>}
+          {/* TAREAS POR ZONAS */}
+          {LIMP_ZONAS.map(zona=>{
+            const zonaTIds=getZonaTareas(zona).map(t=>t.id);
+            const zonaTareas=fijas.filter(t=>zonaTIds.includes(t.tarea_id));
+            const zonaDone=zonaTareas.filter(t=>t.done).length;
+            const zonaTotal=zonaTareas.length;
+            const zonaCompleta=zonaTotal>0&&zonaDone===zonaTotal;
+            const fotoTarea=fijas.find(t=>t.tarea_id===zona.id+"_foto");
+            const zonaCerrada=zonaCompleta&&(!zona.foto_requerida||fotoTarea?.done);
+            const abierta=!!zonasAbiertas[zona.id];
+            const estadoColor=zonaDone===0?"#BFBAB4":zonaCompleta?"#A6BE59":"#D4A017";
+            return <div key={zona.id} style={{marginBottom:8,borderRadius:14,overflow:"hidden",border:`1.5px solid ${zonaCerrada?"rgba(166,190,89,.3)":abierta?"rgba(236,104,62,.2)":"rgba(0,0,0,.06)"}`,background:zonaCerrada?"rgba(166,190,89,.04)":"#fff"}}>
+              <div onClick={()=>setZonasAbiertas(prev=>({...prev,[zona.id]:!prev[zona.id]}))} style={{display:"flex",alignItems:"center",gap:10,padding:"12px 14px",cursor:"pointer",background:zonaCerrada?"rgba(166,190,89,.06)":"transparent"}}>
+                <span style={{fontSize:20}}>{zona.emoji}</span>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:14,fontWeight:600,color:"#1A1A1A"}}>{zona.nombre}</div>
+                </div>
+                <span className="badge" style={{background:`${estadoColor}18`,color:estadoColor,border:`1px solid ${estadoColor}30`}}>{zonaDone}/{zonaTotal}</span>
+                {zonaCerrada&&<span style={{fontSize:16}}>✅</span>}
+                <span style={{color:"#BFBAB4",fontSize:18,transition:"transform .2s",transform:abierta?"rotate(90deg)":"none"}}>›</span>
               </div>
-              <span className="ibtn" onClick={()=>openN2(t)}>{t.nota||t.foto_url?"✏️":"➕"}</span>
-            </div>
-          ))}
+              {abierta&&<div style={{padding:"0 14px 14px"}}>
+                {zona.subzonas?zona.subzonas.map(sz=>{
+                  const szTIds=sz.tareas.map(t=>t.id);
+                  const szTareas=fijas.filter(t=>szTIds.includes(t.tarea_id));
+                  const szDone=szTareas.filter(t=>t.done).length;
+                  return <div key={sz.id} style={{marginBottom:10}}>
+                    <div style={{fontSize:12,fontWeight:700,color:"#8A8580",textTransform:"uppercase",letterSpacing:.5,marginBottom:6,paddingTop:8,borderTop:"1px solid rgba(0,0,0,.04)"}}>{sz.nombre} ({szDone}/{szTareas.length})</div>
+                    {szTareas.map(t=>(
+                      <div key={t.id} className={`cli${t.done?" done":""}`} style={{marginBottom:4}}>
+                        {!isA?<div className={`chk${t.done?" on":""}`} onClick={()=>toggleT(t.id)} style={{cursor:"pointer"}}/>:<span style={{fontSize:17,flexShrink:0}}>{t.done?"✅":"⬜"}</span>}
+                        <div style={{flex:1,minWidth:0}}>
+                          <div className={`tl${t.done?" done":""}`}>{LIMP_T.find(x=>x.id===t.tarea_id)?.txt||t.txt}</div>
+                          {t.done&&<div className="tm">✓ {t.completado_por}</div>}
+                          {t.nota&&<div className="nbox">📝 {t.nota}</div>}
+                          {t.foto_url&&<img src={t.foto_url} alt="" className="pthumb"/>}
+                        </div>
+                        <span className="ibtn" onClick={()=>openN2(t)}>{t.nota||t.foto_url?"✏️":"➕"}</span>
+                      </div>
+                    ))}
+                  </div>;
+                }):zonaTareas.map(t=>(
+                  <div key={t.id} className={`cli${t.done?" done":""}`} style={{marginBottom:4}}>
+                    {!isA?<div className={`chk${t.done?" on":""}`} onClick={()=>toggleT(t.id)} style={{cursor:"pointer"}}/>:<span style={{fontSize:17,flexShrink:0}}>{t.done?"✅":"⬜"}</span>}
+                    <div style={{flex:1,minWidth:0}}>
+                      <div className={`tl${t.done?" done":""}`}>{LIMP_T.find(x=>x.id===t.tarea_id)?.txt||t.txt}</div>
+                      {t.done&&<div className="tm">✓ {t.completado_por}</div>}
+                      {t.nota&&<div className="nbox">📝 {t.nota}</div>}
+                      {t.foto_url&&<img src={t.foto_url} alt="" className="pthumb"/>}
+                    </div>
+                    <span className="ibtn" onClick={()=>openN2(t)}>{t.nota||t.foto_url?"✏️":"➕"}</span>
+                  </div>
+                ))}
+                {/* Cerrar zona */}
+                {!isA&&zonaCompleta&&!zonaCerrada&&<div style={{marginTop:8}}>
+                  {zona.foto_requerida?<>
+                    <label className="btn bp" style={{width:"100%",justifyContent:"center",cursor:"pointer"}}>
+                      📷 Cerrar zona con foto
+                      <input type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={async e=>{
+                        const f=e.target.files[0];if(!f)return;
+                        try{const url=await uploadFoto(f,tok);await sbPost("servicio_tareas",{servicio_id:actId,tarea_id:zona.id+"_foto",zona:zona.nombre,done:true,completado_por:perfil.nombre,completado_ts:new Date().toISOString(),foto_url:url,es_extra:false},tok);await loadTareas(actId);}catch(_){}
+                      }}/>
+                    </label>
+                    <button className="btn bg" style={{width:"100%",justifyContent:"center",marginTop:6}} onClick={async()=>{
+                      await sbPost("servicio_tareas",{servicio_id:actId,tarea_id:zona.id+"_foto",zona:zona.nombre,done:true,completado_por:perfil.nombre,completado_ts:new Date().toISOString(),es_extra:false},tok).catch(()=>{});
+                      await loadTareas(actId);
+                    }}>Cerrar zona sin foto</button>
+                  </>:<button className="btn bp" style={{width:"100%",justifyContent:"center"}} onClick={async()=>{
+                    await sbPost("servicio_tareas",{servicio_id:actId,tarea_id:zona.id+"_foto",zona:zona.nombre,done:true,completado_por:perfil.nombre,completado_ts:new Date().toISOString(),es_extra:false},tok).catch(()=>{});
+                    await loadTareas(actId);
+                  }}>✅ Cerrar zona</button>}
+                </div>}
+                {fotoTarea?.foto_url&&<img src={fotoTarea.foto_url} alt="" className="pthumb" style={{marginTop:8}}/>}
+              </div>}
+            </div>;
+          })}
 
           {/* EXTRAS */}
           {extras.length>0&&<>
@@ -2962,9 +3025,7 @@ function Limpieza({perfil,tok,rol}){
             <div style={{fontSize:12,color:"#EC683E",fontWeight:600,marginBottom:9}}>⭐ Extras</div>
             {extras.map(t=>(
               <div key={t.id} className={`cli${t.done?" done":""}`}>
-                {!isA
-                  ?<div className={`chk${t.done?" on":""}`} onClick={()=>toggleT(t.id)} style={{cursor:"pointer"}}/>
-                  :<span style={{fontSize:17,flexShrink:0}}>{t.done?"✅":"⬜"}</span>}
+                {!isA?<div className={`chk${t.done?" on":""}`} onClick={()=>toggleT(t.id)} style={{cursor:"pointer"}}/>:<span style={{fontSize:17,flexShrink:0}}>{t.done?"✅":"⬜"}</span>}
                 <div style={{flex:1,minWidth:0}}>
                   <span className="tz">{t.zona||"General"}</span>
                   <div className={`tl${t.done?" done":""}`}>{t.txt}</div>
