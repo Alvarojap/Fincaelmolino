@@ -3951,15 +3951,22 @@ function Lavanderia({perfil,tok,rol}){
 }
 
 // ─── ALMACÉN ────────────────────────────────────────────────────────────────
-const ALMACEN_CATS=["Todos","🧴 Limpieza","🛁 Reposición","🛏️ Ropa cama","🚿 Toallas","🛋️ Textiles"];
+const ALMACEN_CATS=[
+  {id:"todos",lbl:"Todos"},
+  {id:"limpieza",lbl:"🧴 Limpieza"},
+  {id:"reposicion",lbl:"🛁 Reposición"},
+  {id:"ropa_cama",lbl:"🛏️ Ropa cama"},
+  {id:"toallas",lbl:"🚿 Toallas"},
+  {id:"textiles",lbl:"🛋️ Textiles"},
+];
 
 function AlmacenPage({perfil,tok,rol}){
   const isA=rol==="admin";
   const [articulos,setArticulos]=useState([]);const [movimientos,setMovimientos]=useState([]);
   const [load,setLoad]=useState(true);const [saving,setSaving]=useState(false);
-  const [catFiltro,setCatFiltro]=useState("Todos");
+  const [catFiltro,setCatFiltro]=useState("todos");
   const [showNew,setShowNew]=useState(false);const [showMov,setShowMov]=useState(null);const [showHist,setShowHist]=useState(false);
-  const newVacio={nombre:"",categoria:"Limpieza",unidad:"unidad",es_liquido:false,tiene_lavanderia:false,stock_minimo:"2",codigo_barras:"",stock_casa:"0",stock_almacen:"0"};
+  const newVacio={nombre:"",categoria:"limpieza",unidad:"unidad",es_liquido:false,tiene_lavanderia:false,stock_minimo:"2",codigo_barras:"",stock_casa:"0",stock_almacen:"0"};
   const [newForm,setNewForm]=useState(newVacio);
   const [movForm,setMovForm]=useState({tipo:"entrada",cantidad:"1",ubicacion:"casa",concepto:""});
 
@@ -4008,7 +4015,7 @@ function AlmacenPage({perfil,tok,rol}){
   };
 
   const bajos=articulos.filter(a=>(parseFloat(a.stock_casa)||0)+(parseFloat(a.stock_almacen)||0)<=(parseFloat(a.stock_minimo)||0));
-  const filtered=catFiltro==="Todos"?articulos:articulos.filter(a=>a.categoria===catFiltro.replace(/^[^\s]+\s/,""));
+  const filtered=catFiltro==="todos"?articulos:articulos.filter(a=>a.categoria===catFiltro);
 
   if(load)return <div className="loading"><div className="spin"/><span>Cargando…</span></div>;
   return <>
@@ -4021,7 +4028,7 @@ function AlmacenPage({perfil,tok,rol}){
       </div>
 
       <div style={{display:"flex",gap:4,overflowX:"auto",marginBottom:16,scrollbarWidth:"none"}}>
-        {ALMACEN_CATS.map(c=><button key={c} className={`btn sm${catFiltro===c?" bp":" bg"}`} onClick={()=>setCatFiltro(c)} style={{flexShrink:0}}>{c}</button>)}
+        {ALMACEN_CATS.map(c=><button key={c.id} className={`btn sm${catFiltro===c.id?" bp":" bg"}`} onClick={()=>setCatFiltro(c.id)} style={{flexShrink:0}}>{c.lbl}</button>)}
       </div>
 
       {filtered.length===0?<div className="empty"><span className="ico">📦</span><p>Sin artículos en esta categoría</p></div>
@@ -4069,7 +4076,7 @@ function AlmacenPage({perfil,tok,rol}){
       <h3>➕ Nuevo artículo</h3>
       <div className="fg"><label>Nombre *</label><input className="fi" value={newForm.nombre} onChange={e=>setNewForm(v=>({...v,nombre:e.target.value}))} placeholder="Ej: Lejía"/></div>
       <div className="g2">
-        <div className="fg"><label>Categoría</label><select className="fi" value={newForm.categoria} onChange={e=>setNewForm(v=>({...v,categoria:e.target.value}))}>{["Limpieza","Reposición","Ropa cama","Toallas","Textiles"].map(c=><option key={c}>{c}</option>)}</select></div>
+        <div className="fg"><label>Categoría</label><select className="fi" value={newForm.categoria} onChange={e=>setNewForm(v=>({...v,categoria:e.target.value}))}>{ALMACEN_CATS.filter(c=>c.id!=="todos").map(c=><option key={c.id} value={c.id}>{c.lbl}</option>)}</select></div>
         <div className="fg"><label>Unidad</label><input className="fi" value={newForm.unidad} onChange={e=>setNewForm(v=>({...v,unidad:e.target.value}))} placeholder="bote, paquete, unidad"/></div>
       </div>
       <div style={{display:"flex",gap:16,marginBottom:14}}>
