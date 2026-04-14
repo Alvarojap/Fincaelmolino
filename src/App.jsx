@@ -1151,10 +1151,10 @@ function FinancialKPIs({tok}){
     {load?<div style={{display:"flex",alignItems:"center",gap:8,justifyContent:"center",padding:"20px 0",color:"#8A8580",fontSize:13}}><div className="spin" style={{width:16,height:16,borderWidth:2}}/>Calculando…</div>
     :data?<>
       {data.desde&&<div style={{fontSize:11,color:"#8A8580",marginBottom:12}}>📅 {fmtF(data.desde)} – {new Date(data.hasta+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short",year:"numeric"})}</div>}
-      {/* KPI cards — horizontal scroll on mobile, grid on desktop */}
-      <div style={{display:"flex",gap:10,overflowX:"auto",scrollSnapType:"x mandatory",paddingBottom:8,WebkitOverflowScrolling:"touch",scrollbarWidth:"none"}}>
-        <style>{`.kpi-scroll::-webkit-scrollbar{display:none}`}</style>
-        {kpis.map(k=>k.val!==undefined&&<div key={k.id} onClick={()=>toggleKpi(k.id)} style={{background:k.bg,borderRadius:18,padding:"18px 20px",cursor:"pointer",opacity:k.opacity||1,transition:"all .15s",border:kpiAbierto===k.id?"3px solid #1A1A1A":"3px solid transparent",minWidth:160,scrollSnapAlign:"start",flex:"0 0 auto"}}>
+      {/* KPI cards — grid 2col mobile, auto-fill desktop */}
+      <style>{`@media(max-width:768px){.kpi-grid{grid-template-columns:1fr 1fr!important}.kpi-grid>div:last-child{grid-column:span 2}}`}</style>
+      <div className="kpi-grid" style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(140px,1fr))",gap:10}}>
+        {kpis.map(k=>k.val!==undefined&&<div key={k.id} onClick={()=>toggleKpi(k.id)} style={{background:k.bg,borderRadius:14,padding:"14px 16px",cursor:"pointer",opacity:k.opacity||1,transition:"all .15s",border:kpiAbierto===k.id?"3px solid #1A1A1A":"3px solid transparent"}}>
           <div style={{fontSize:10,color:k.light?"rgba(255,255,255,.7)":"rgba(0,0,0,.5)",textTransform:"uppercase",letterSpacing:.5,fontWeight:600}}>{k.lbl}</div>
           <div style={{fontSize:22,fontWeight:800,color:k.light?"#fff":"#1A1A1A",marginTop:5}}>{fmt(k.val)}</div>
         </div>)}
