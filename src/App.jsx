@@ -1035,28 +1035,22 @@ function FinancialKPIs({tok}){
   const [rangoDesde,setRangoDesde]=useState(hoyStr);
   const [rangoHasta,setRangoHasta]=useState(hoyStr);
   const [data,setData]=useState(null);
+  const [raw,setRaw]=useState({reservas:[],airbnbs:[],gastos:[],cfg:{}});
   const [load,setLoad]=useState(true);
+  const [kpiAbierto,setKpiAbierto]=useState(null);
 
   const getRango=()=>{
-    if(periodo==="año") return {desde:`${añoActual}-01-01`,hasta:`${añoActual}-12-31`};
-    if(periodo==="mes"){
-      const m=String(hoy.getMonth()+1).padStart(2,"0");
-      const lastDay=new Date(añoActual,hoy.getMonth()+1,0).getDate();
-      return {desde:`${añoActual}-${m}-01`,hasta:`${añoActual}-${m}-${String(lastDay).padStart(2,"0")}`};
-    }
-    if(periodo==="semana"){
-      const d=new Date(hoy);const day=d.getDay();const diff=d.getDate()-day+(day===0?-6:1);
-      const lunes=new Date(d.setDate(diff));const domingo=new Date(lunes);domingo.setDate(lunes.getDate()+6);
-      return {desde:lunes.toISOString().split("T")[0],hasta:domingo.toISOString().split("T")[0]};
-    }
-    return {desde:rangoDesde,hasta:rangoHasta};
+    if(periodo==="año")return{desde:`${añoActual}-01-01`,hasta:`${añoActual}-12-31`};
+    if(periodo==="mes"){const m=String(hoy.getMonth()+1).padStart(2,"0");const ld=new Date(añoActual,hoy.getMonth()+1,0).getDate();return{desde:`${añoActual}-${m}-01`,hasta:`${añoActual}-${m}-${String(ld).padStart(2,"0")}`};}
+    if(periodo==="semana"){const d=new Date(hoy);const day=d.getDay();const diff=d.getDate()-day+(day===0?-6:1);const lun=new Date(d.setDate(diff));const dom=new Date(lun);dom.setDate(lun.getDate()+6);return{desde:lun.toISOString().split("T")[0],hasta:dom.toISOString().split("T")[0]};}
+    return{desde:rangoDesde,hasta:rangoHasta};
   };
 
   const cargar=async()=>{
     setLoad(true);
     try{
-      const {desde,hasta}=getRango();
-      const [reservas,airbnbs,gastos,configRows]=await Promise.all([
+      const{desde,hasta}=getRango();
+      const[reservas,airbnbs,gastos,configRows]=await Promise.all([
         sbGet("reservas",`?fecha=gte.${desde}&fecha=lte.${hasta}&select=*`,tok),
         sbGet("reservas_airbnb",`?fecha_entrada=gte.${desde}&fecha_entrada=lte.${hasta}&select=*`,tok),
         sbGet("gastos",`?fecha=gte.${desde}&fecha=lte.${hasta}&select=*`,tok).catch(()=>[]),
@@ -1064,105 +1058,136 @@ function FinancialKPIs({tok}){
       ]);
       const cfg={};configRows.forEach(c=>cfg[c.clave]=c.valor);
       const comisionPct=parseFloat(cfg.comision_pct)||10;
-
-      // Facturación proyectada
       const factEventos=reservas.reduce((s,r)=>s+(parseFloat(r.precio_total)||parseFloat(r.precio)||0),0);
       const factAirbnb=airbnbs.reduce((s,a)=>s+(parseFloat(a.precio)||0),0);
       const facturacion=factEventos+factAirbnb;
-
-      // Ya cobrado
       let cobradoEventos=0;
-      for(const r of reservas){
-        const seña=parseFloat(r.seña_importe)||0;
-        const precioTotal=parseFloat(r.precio_total)||parseFloat(r.precio)||0;
-        if(r.seña_cobrada)cobradoEventos+=seña;
-        if(r.saldo_cobrado)cobradoEventos+=(precioTotal-seña);
-      }
+      for(const r of reservas){const seña=parseFloat(r.seña_importe)||0;const pt=parseFloat(r.precio_total)||parseFloat(r.precio)||0;if(r.seña_cobrada)cobradoEventos+=seña;if(r.saldo_cobrado)cobradoEventos+=(pt-seña);}
       const cobradoAirbnb=airbnbs.filter(a=>a.cobrado||a.fecha_entrada<hoyStr).reduce((s,a)=>s+(parseFloat(a.precio)||0),0);
       const yaCobrado=cobradoEventos+cobradoAirbnb;
-
-      // Pendiente de cobro
       const pendiente=facturacion-yaCobrado;
-
-      // Gastos reales
       const gastosReales=gastos.reduce((s,g)=>s+(parseFloat(g.importe)||0),0);
-
-      // Gastos proyectados año
       let gastosProyectados=gastosReales;
-      if(periodo==="año"){
-        const mesActual=hoy.getMonth()+1;
-        const mesesRestantes=12-mesActual;
-        const gastosRecurrentes=gastos.filter(g=>g.recurrente);
-        if(gastosRecurrentes.length>0&&mesActual>0){
-          const mediaRecurrente=gastosRecurrentes.reduce((s,g)=>s+(parseFloat(g.importe)||0),0)/mesActual;
-          gastosProyectados=gastosReales+(mediaRecurrente*mesesRestantes);
-        }
-      }
-
-      // Beneficio estimado
+      if(periodo==="año"){const mA=hoy.getMonth()+1;const mR=12-mA;const gRec=gastos.filter(g=>g.recurrente);if(gRec.length>0&&mA>0){gastosProyectados=gastosReales+(gRec.reduce((s,g)=>s+(parseFloat(g.importe)||0),0)/mA*mR);}}
       const beneficio=yaCobrado-gastosReales;
-
-      // Comisión gestor
       const comision=facturacion*(comisionPct/100);
-
-      setData({facturacion,yaCobrado,pendiente,gastosReales,gastosProyectados,beneficio,comision,comisionPct,desde,hasta});
-    }catch(e){console.error("KPI error:",e);setData(null);}
+      setData({facturacion,factEventos,factAirbnb,yaCobrado,cobradoEventos,cobradoAirbnb,pendiente,gastosReales,gastosProyectados,beneficio,comision,comisionPct,desde,hasta});
+      setRaw({reservas,airbnbs,gastos,cfg});
+    }catch(_){setData(null);}
     setLoad(false);
   };
 
   useEffect(()=>{cargar();},[periodo,rangoDesde,rangoHasta]);
 
   const fmt=v=>`${v.toLocaleString("es-ES",{minimumFractionDigits:0,maximumFractionDigits:0})}€`;
+  const fmtF=f=>f?new Date(f+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"}):"—";
+  const toggleKpi=id=>setKpiAbierto(kpiAbierto===id?null:id);
+  const panelStyle={background:"#F5F3F0",borderRadius:14,padding:"14px 16px",marginTop:10,fontSize:13,color:"#1A1A1A",lineHeight:1.6};
+  const rowStyle={display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 0",borderBottom:"1px solid rgba(0,0,0,.04)",gap:8};
 
-  return <div className="card" style={{marginBottom:16}}>
+  // Alertas
+  const alertas=[];
+  if(data&&raw.reservas){
+    const en30=new Date(Date.now()+30*86400000).toISOString().split("T")[0];
+    const urgentes=raw.reservas.filter(r=>r.estado_pago!=="pagado_completo"&&!["cancelada","finalizada"].includes(r.estado)&&r.fecha<=en30);
+    if(urgentes.length>0){const imp=urgentes.reduce((s,r)=>s+(parseFloat(r.precio_total)||parseFloat(r.precio)||0)-(parseFloat(r.seña_importe)||0),0);alertas.push({tipo:"rojo",txt:`${urgentes.length} reserva(s) con cobro pendiente en menos de 30 días — ${Math.round(imp).toLocaleString("es-ES")}€ por cobrar`});}
+    if(raw.gastos.length>0){const ult=raw.gastos.sort((a,b)=>b.fecha?.localeCompare(a.fecha))[0];const dias=ult?Math.floor((Date.now()-new Date(ult.fecha).getTime())/86400000):999;if(dias>30)alertas.push({tipo:"amarillo",txt:`Llevas ${dias} días sin registrar gastos — ¿están al día?`});}
+    if(data.yaCobrado>0&&data.gastosReales/data.yaCobrado>.7)alertas.push({tipo:"rojo",txt:`Los gastos representan el ${Math.round(data.gastosReales/data.yaCobrado*100)}% de lo cobrado — margen ajustado`});
+    if(data.beneficio>0&&data.yaCobrado>0)alertas.push({tipo:"verde",txt:`Margen actual: ${Math.round(data.beneficio/data.yaCobrado*100)}% — beneficio de ${fmt(data.beneficio)}`});
+  }
+
+  const kpis=[
+    {id:"fact",lbl:"Facturación proyectada",val:data?.facturacion,bg:"#EC683E",light:true},
+    {id:"cobrado",lbl:"Ya cobrado",val:data?.yaCobrado,bg:"#A6BE59",light:true},
+    {id:"pendiente",lbl:"Pendiente de cobro",val:data?.pendiente,bg:"#ECD227",light:false},
+    {id:"gastos",lbl:"Gastos reales",val:data?.gastosReales,bg:"#F35757",light:true},
+    {id:"gastosProy",lbl:"Gastos proyectados año",val:data?.gastosProyectados,bg:"#F35757",light:true,opacity:.8},
+    {id:"beneficio",lbl:"Beneficio estimado",val:data?.beneficio,bg:"#AFA3FF",light:false},
+    {id:"comision",lbl:`Comisión gestor (${data?.comisionPct||10}%)`,val:data?.comision,bg:"#7FB2FF",light:false},
+  ];
+
+  return <><div className="card" style={{marginBottom:16}}>
     <div className="chdr"><span className="ctit">💰 KPIs financieros</span></div>
     <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:14}}>
       {[{id:"año",lbl:"Este año"},{id:"mes",lbl:"Este mes"},{id:"semana",lbl:"Esta semana"},{id:"rango",lbl:"Rango"}].map(p=>(
         <button key={p.id} className={`btn sm${periodo===p.id?" bp":" bg"}`} onClick={()=>setPeriodo(p.id)}>{p.lbl}</button>
       ))}
     </div>
-    {periodo==="rango"&&(
-      <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap",alignItems:"center"}}>
-        <input type="date" className="fi" value={rangoDesde} onChange={e=>setRangoDesde(e.target.value)} style={{flex:1,minWidth:130}}/>
-        <span style={{color:"#8A8580",fontSize:12}}>→</span>
-        <input type="date" className="fi" value={rangoHasta} onChange={e=>setRangoHasta(e.target.value)} style={{flex:1,minWidth:130}}/>
-      </div>
-    )}
+    {periodo==="rango"&&<div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap",alignItems:"center"}}>
+      <input type="date" className="fi" value={rangoDesde} onChange={e=>setRangoDesde(e.target.value)} style={{flex:1,minWidth:130}}/>
+      <span style={{color:"#8A8580",fontSize:12}}>→</span>
+      <input type="date" className="fi" value={rangoHasta} onChange={e=>setRangoHasta(e.target.value)} style={{flex:1,minWidth:130}}/>
+    </div>}
     {load?<div style={{display:"flex",alignItems:"center",gap:8,justifyContent:"center",padding:"20px 0",color:"#8A8580",fontSize:13}}><div className="spin" style={{width:16,height:16,borderWidth:2}}/>Calculando…</div>
     :data?<>
-      {data.desde&&<div style={{fontSize:11,color:"#8A8580",marginBottom:12}}>📅 {new Date(data.desde+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"})} – {new Date(data.hasta+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short",year:"numeric"})}</div>}
+      {data.desde&&<div style={{fontSize:11,color:"#8A8580",marginBottom:12}}>📅 {fmtF(data.desde)} – {new Date(data.hasta+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short",year:"numeric"})}</div>}
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(140px,1fr))",gap:10}}>
-        <div style={{background:"#EC683E",borderRadius:18,padding:20}}>
-          <div style={{fontSize:10,color:"rgba(255,255,255,.7)",textTransform:"uppercase",letterSpacing:.5,fontWeight:600}}>Facturación proyectada</div>
-          <div style={{fontSize:22,fontWeight:800,color:"#fff",marginTop:5}}>{fmt(data.facturacion)}</div>
-        </div>
-        <div style={{background:"#A6BE59",borderRadius:18,padding:20}}>
-          <div style={{fontSize:10,color:"rgba(255,255,255,.7)",textTransform:"uppercase",letterSpacing:.5,fontWeight:600}}>Ya cobrado</div>
-          <div style={{fontSize:22,fontWeight:800,color:"#fff",marginTop:5}}>{fmt(data.yaCobrado)}</div>
-        </div>
-        <div style={{background:"#ECD227",borderRadius:18,padding:20}}>
-          <div style={{fontSize:10,color:"rgba(0,0,0,.5)",textTransform:"uppercase",letterSpacing:.5,fontWeight:600}}>Pendiente de cobro</div>
-          <div style={{fontSize:22,fontWeight:800,color:"#1A1A1A",marginTop:5}}>{fmt(data.pendiente)}</div>
-        </div>
-        <div style={{background:"#F35757",borderRadius:18,padding:20}}>
-          <div style={{fontSize:10,color:"rgba(255,255,255,.7)",textTransform:"uppercase",letterSpacing:.5,fontWeight:600}}>Gastos reales</div>
-          <div style={{fontSize:22,fontWeight:800,color:"#fff",marginTop:5}}>{fmt(data.gastosReales)}</div>
-        </div>
-        <div style={{background:"#F35757",borderRadius:18,padding:20,opacity:.8}}>
-          <div style={{fontSize:10,color:"rgba(255,255,255,.7)",textTransform:"uppercase",letterSpacing:.5,fontWeight:600}}>Gastos proyectados año</div>
-          <div style={{fontSize:22,fontWeight:800,color:"#fff",marginTop:5}}>{fmt(data.gastosProyectados)}</div>
-        </div>
-        <div style={{background:"#AFA3FF",borderRadius:18,padding:20}}>
-          <div style={{fontSize:10,color:"rgba(0,0,0,.5)",textTransform:"uppercase",letterSpacing:.5,fontWeight:600}}>Beneficio estimado</div>
-          <div style={{fontSize:22,fontWeight:800,color:"#1A1A1A",marginTop:5}}>{fmt(data.beneficio)}</div>
-        </div>
-        <div style={{background:"#7FB2FF",borderRadius:18,padding:20}}>
-          <div style={{fontSize:10,color:"rgba(0,0,0,.5)",textTransform:"uppercase",letterSpacing:.5,fontWeight:600}}>Comisión gestor ({data.comisionPct}%)</div>
-          <div style={{fontSize:22,fontWeight:800,color:"#1A1A1A",marginTop:5}}>{fmt(data.comision)}</div>
-        </div>
+        {kpis.map(k=>k.val!==undefined&&<div key={k.id}>
+          <div onClick={()=>toggleKpi(k.id)} style={{background:k.bg,borderRadius:18,padding:20,cursor:"pointer",opacity:k.opacity||1,transition:"all .15s",border:kpiAbierto===k.id?"3px solid #1A1A1A":"3px solid transparent"}}>
+            <div style={{fontSize:10,color:k.light?"rgba(255,255,255,.7)":"rgba(0,0,0,.5)",textTransform:"uppercase",letterSpacing:.5,fontWeight:600}}>{k.lbl}</div>
+            <div style={{fontSize:22,fontWeight:800,color:k.light?"#fff":"#1A1A1A",marginTop:5}}>{fmt(k.val)}</div>
+          </div>
+          {/* Expanded panel */}
+          {kpiAbierto===k.id&&<div style={panelStyle}>
+            {k.id==="fact"&&<>
+              <div style={{fontWeight:700,marginBottom:8}}>Desglose facturación</div>
+              <div style={rowStyle}><span>Eventos ({raw.reservas.length})</span><strong>{fmt(data.factEventos)}</strong></div>
+              <div style={rowStyle}><span>Airbnb ({raw.airbnbs.length})</span><strong>{fmt(data.factAirbnb)}</strong></div>
+              {raw.reservas.slice(0,5).map(r=><div key={r.id} style={{...rowStyle,fontSize:12,color:"#8A8580"}}><span style={{flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.nombre}</span><span>{fmtF(r.fecha)}</span><strong style={{color:"#1A1A1A"}}>{fmt(parseFloat(r.precio_total)||parseFloat(r.precio)||0)}</strong></div>)}
+              {raw.airbnbs.slice(0,3).map(a=><div key={a.id} style={{...rowStyle,fontSize:12,color:"#8A8580"}}><span style={{flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>🏠 {a.huesped}</span><span>{fmtF(a.fecha_entrada)}</span><strong style={{color:"#1A1A1A"}}>{fmt(parseFloat(a.precio)||0)}</strong></div>)}
+            </>}
+            {k.id==="cobrado"&&<>
+              <div style={{fontWeight:700,marginBottom:8}}>Desglose cobros</div>
+              <div style={rowStyle}><span>Señas cobradas</span><strong>{fmt(data.cobradoEventos)}</strong></div>
+              <div style={rowStyle}><span>Airbnb cobrado</span><strong>{fmt(data.cobradoAirbnb)}</strong></div>
+              <div style={{fontWeight:600,marginTop:10,marginBottom:6,fontSize:12,color:"#8A8580"}}>Pendientes de saldo:</div>
+              {raw.reservas.filter(r=>r.seña_cobrada&&!r.saldo_cobrado).slice(0,5).map(r=><div key={r.id} style={{...rowStyle,fontSize:12}}><span style={{flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.nombre}</span><span style={{color:"#D4A017"}}>{fmt((parseFloat(r.precio_total)||parseFloat(r.precio)||0)-(parseFloat(r.seña_importe)||0))}</span></div>)}
+            </>}
+            {k.id==="pendiente"&&<>
+              <div style={{fontWeight:700,marginBottom:8}}>Cobros pendientes por urgencia</div>
+              {raw.reservas.filter(r=>r.estado_pago!=="pagado_completo"&&!["cancelada","finalizada"].includes(r.estado)).sort((a,b)=>a.fecha?.localeCompare(b.fecha)).slice(0,8).map(r=>{const dias=Math.round((new Date(r.fecha)-new Date())/(86400000));const sem=dias<30?"🔴":dias<90?"🟡":"🟢";const pend=(parseFloat(r.precio_total)||parseFloat(r.precio)||0)-(r.seña_cobrada?parseFloat(r.seña_importe)||0:0);return <div key={r.id} style={{...rowStyle,fontSize:12}}><span>{sem}</span><span style={{flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.nombre}</span><span style={{color:"#8A8580"}}>{fmtF(r.fecha)}</span><strong style={{color:"#D4A017"}}>{fmt(pend)}</strong></div>;})}
+            </>}
+            {k.id==="gastos"&&<>
+              <div style={{fontWeight:700,marginBottom:8}}>Por categoría</div>
+              {(()=>{const cats={};raw.gastos.forEach(g=>{const c=g.categoria||"Otros";cats[c]=(cats[c]||0)+(parseFloat(g.importe)||0);});const total=data.gastosReales||1;return Object.entries(cats).sort((a,b)=>b[1]-a[1]).map(([c,v])=><div key={c} style={{marginBottom:6}}>
+                <div style={{display:"flex",justifyContent:"space-between",fontSize:12}}><span>{c}</span><strong>{fmt(v)} ({Math.round(v/total*100)}%)</strong></div>
+                <div style={{height:6,background:"#E5E1DB",borderRadius:3,marginTop:3}}><div style={{height:"100%",borderRadius:3,background:"#F35757",width:`${v/total*100}%`}}/></div>
+              </div>);})()}
+              <div style={{fontWeight:600,marginTop:10,marginBottom:6,fontSize:12,color:"#8A8580"}}>Últimos gastos:</div>
+              {raw.gastos.sort((a,b)=>b.fecha?.localeCompare(a.fecha)).slice(0,6).map(g=><div key={g.id} style={{...rowStyle,fontSize:12}}><span style={{flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{g.concepto}</span><span style={{color:"#8A8580"}}>{fmtF(g.fecha)}</span><strong style={{color:"#F35757"}}>{fmt(parseFloat(g.importe)||0)}</strong></div>)}
+            </>}
+            {k.id==="gastosProy"&&<>
+              <div style={{fontWeight:700,marginBottom:8}}>Proyección anual</div>
+              <div style={rowStyle}><span>Gastos reales YTD</span><strong>{fmt(data.gastosReales)}</strong></div>
+              <div style={rowStyle}><span>Proyección hasta diciembre</span><strong>{fmt(data.gastosProyectados)}</strong></div>
+              <div style={{fontWeight:600,marginTop:10,marginBottom:6,fontSize:12,color:"#8A8580"}}>Gastos recurrentes:</div>
+              {raw.gastos.filter(g=>g.recurrente).map(g=><div key={g.id} style={{...rowStyle,fontSize:12}}><span style={{flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>🔁 {g.concepto}</span><strong>{fmt(parseFloat(g.importe)||0)}/mes</strong></div>)}
+            </>}
+            {k.id==="beneficio"&&<>
+              <div style={{fontWeight:700,marginBottom:8}}>Análisis de beneficio</div>
+              <div style={rowStyle}><span>Cobrado</span><strong style={{color:"#A6BE59"}}>{fmt(data.yaCobrado)}</strong></div>
+              <div style={rowStyle}><span>Gastos</span><strong style={{color:"#F35757"}}>−{fmt(data.gastosReales)}</strong></div>
+              <div style={{...rowStyle,fontWeight:700,fontSize:16}}><span>Beneficio</span><strong style={{color:data.beneficio>=0?"#A6BE59":"#F35757"}}>{fmt(data.beneficio)}</strong></div>
+              {data.yaCobrado>0&&<div style={{marginTop:8,fontSize:12,color:"#8A8580"}}>Margen: <strong style={{color:"#1A1A1A"}}>{Math.round(data.beneficio/data.yaCobrado*100)}%</strong></div>}
+            </>}
+            {k.id==="comision"&&<>
+              <div style={{fontWeight:700,marginBottom:8}}>Comisión gestor</div>
+              <div style={rowStyle}><span>Base de cálculo</span><strong>{fmt(data.facturacion)}</strong></div>
+              <div style={rowStyle}><span>Porcentaje</span><strong>{data.comisionPct}%</strong></div>
+              <div style={{...rowStyle,fontWeight:700}}><span>Total comisión</span><strong style={{color:"#7FB2FF"}}>{fmt(data.comision)}</strong></div>
+            </>}
+          </div>}
+        </div>)}
       </div>
     </>:<div style={{color:"#8A8580",fontSize:13,padding:"16px 0",textAlign:"center"}}>No se pudieron cargar los datos</div>}
-  </div>;
+  </div>
+  {/* ALERTAS */}
+  {alertas.length>0&&<div style={{display:"flex",gap:8,overflowX:"auto",marginBottom:16,paddingBottom:4,scrollbarWidth:"none"}}>
+    {alertas.map((a,i)=>{const bg=a.tipo==="rojo"?"#FEE8E8":a.tipo==="amarillo"?"#FFF8E1":"#F0F8E8";const col=a.tipo==="rojo"?"#F35757":a.tipo==="amarillo"?"#D4A017":"#6B8A20";
+      return <div key={i} style={{background:bg,borderRadius:100,padding:"8px 16px",fontSize:12,color:col,fontWeight:600,whiteSpace:"nowrap",flexShrink:0}}>{a.tipo==="rojo"?"🔴":a.tipo==="amarillo"?"🟡":"🟢"} {a.txt}</div>;
+    })}
+  </div>}
+  </>;
 }
 
 // ─── FINANCIAL CHARTS ───────────────────────────────────────────────────────
