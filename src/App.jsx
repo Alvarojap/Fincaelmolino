@@ -1604,7 +1604,11 @@ function DashJ({perfil,jsem,jpunt,cwk,setPage,tok}){
       if(srvs.length===0){setSrvActivo(null);setSrvTareas([]);setSrvExtras([]);return;}
       const s=srvs[0];setSrvActivo(s);
       // Tareas
-      const allTareas=await sbGet("jardin_servicio_tareas",`?servicio_id=eq.${s.id}&select=*&order=created_at.asc`,tok).catch(()=>[]);
+      console.log("srv.id:",s.id,"tipo:",typeof s.id);
+      const tareasUrl=`?servicio_id=eq.${s.id}&select=*&order=created_at.asc`;
+      console.log("URL tareas:",tareasUrl);
+      const allTareas=await sbGet("jardin_servicio_tareas",tareasUrl,tok).catch(e=>{console.log("error tareas:",e.message);return[];});
+      console.log("tareas raw:",JSON.stringify(allTareas));
       setSrvTareas(allTareas.filter(t=>!t.añadida_por_jardinero));
       setSrvExtras(allTareas.filter(t=>t.añadida_por_jardinero));
       // Jornada hoy — usar servicio_id_int (integer compatible)
