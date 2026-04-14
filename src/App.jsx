@@ -54,10 +54,17 @@ async function authLogout(tok) {
 async function uploadFoto(file, tok) {
   const ext = file.name.split(".").pop();
   const path = `${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
-  const r = await fetch(`${SB_URL}/storage/v1/object/fotos/${path}`,{
-    method:"POST", headers:{"apikey":SB_KEY,"Authorization":`Bearer ${tok}`,"Content-Type":file.type},
+  // Try with provided token first, then fallback to SB_KEY
+  let r = await fetch(`${SB_URL}/storage/v1/object/fotos/${path}`,{
+    method:"POST", headers:{"apikey":SB_KEY,"Authorization":`Bearer ${tok||SB_KEY}`,"Content-Type":file.type},
     body:file
   });
+  if (!r.ok && tok && tok !== SB_KEY) {
+    r = await fetch(`${SB_URL}/storage/v1/object/fotos/${path}`,{
+      method:"POST", headers:{"apikey":SB_KEY,"Authorization":`Bearer ${SB_KEY}`,"Content-Type":file.type},
+      body:file
+    });
+  }
   if (!r.ok) throw new Error(await r.text());
   return `${SB_URL}/storage/v1/object/public/fotos/${path}`;
 }
@@ -972,9 +979,14 @@ function NotaModal({nota,setNota,foto,setFoto,onSave,onClose,tok}){
   const handleFoto=async e=>{
     const f=e.target.files[0];if(!f)return;
     setUploading(true);
-    try{const url=await uploadFoto(f,tok);setFoto(url);}
-    catch(_){const r=new FileReader();r.onload=ev=>setFoto(ev.target.result);r.readAsDataURL(f);}
-    finally{setUploading(false);}
+    try{
+      const url=await uploadFoto(f,tok||SB_KEY);
+      setFoto(url);
+    }catch(_){
+      // Fallback: read as base64
+      try{const reader=new FileReader();reader.onload=ev=>{setFoto(ev.target.result);setUploading(false);};reader.readAsDataURL(f);return;}catch(_2){}
+    }
+    setUploading(false);
   };
   return <div className="ov" onClick={onClose}>
     <div className="modal" onClick={e=>e.stopPropagation()}>
