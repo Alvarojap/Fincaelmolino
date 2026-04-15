@@ -659,14 +659,16 @@ export default function App() {
     setSession(null);setPerfil(null);setPage("dashboard");setDrawerOpen(false);
   };
 
+  // Badge polling — must be before any conditional return to keep hooks order stable
+  const tok=session?.access_token||SB_KEY;
+  const myUserId=perfil?String(perfil.id):null;
+  const refreshNoVistos=async()=>{if(!perfil||!myUserId)return;try{const nv=await contarNoVistos(myUserId,tok);setNoVistos(nv);}catch(_){}};
+  useEffect(()=>{if(!perfil)return;refreshNoVistos();const iv=setInterval(refreshNoVistos,30000);return()=>clearInterval(iv);},[perfil?.id]);
+
   if(authLoad)return <><style>{CSS}</style><div className="loading"><div className="spin"/><span>Cargando…</span></div></>;
   if(!session||!perfil)return <><style>{CSS}</style><LoginScreen onLogin={login} onLoginOperario={loginOperario} desactivado={opDesactivado}/></>;
 
-  const tok=session.access_token;
   const rol=perfil.rol;
-  const myUserId=String(perfil.id);
-  const refreshNoVistos=async()=>{if(perfil?.es_operario&&tok===SB_KEY)return;try{const nv=await contarNoVistos(myUserId,tok);setNoVistos(nv);}catch(_){}};
-  useEffect(()=>{refreshNoVistos();const iv=setInterval(refreshNoVistos,30000);return()=>clearInterval(iv);},[perfil?.id]);
   const P={perfil,tok,setPage,rol};
   const goTo=id=>{setPage(id);setDrawerOpen(false);};
 
@@ -760,14 +762,11 @@ function LoginScreen({onLogin,onLoginOperario,desactivado}){
     const newPin=pin+d;
     setPin(newPin);setPinErr(false);
     if(newPin.length===4){
-      // Server-side PIN verification
       const pinLimpio=newPin.toString().trim();
-      console.log("Verificando PIN para operario:",selOp.id,"PIN:",pinLimpio);
       sbGet("operarios",`?id=eq.${selOp.id}&pin=eq.${pinLimpio}&select=id,nombre,rol,referencia_id,avatar,activo`).then(r=>{
-        console.log("Resultado query:",JSON.stringify(r));
         if(r.length>0&&r[0].activo!==false)onLoginOperario(r[0]);
         else{setPinErr(true);setTimeout(()=>{setPin("");setPinErr(false);},600);}
-      }).catch(e=>{console.log("Error query PIN:",e.message);setPinErr(true);setTimeout(()=>{setPin("");setPinErr(false);},600);});
+      }).catch(()=>{setPinErr(true);setTimeout(()=>{setPin("");setPinErr(false);},600);});
     }
   };
   const delDigit=()=>{setPin(p=>p.slice(0,-1));setPinErr(false);};
