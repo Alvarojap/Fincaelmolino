@@ -761,10 +761,13 @@ function LoginScreen({onLogin,onLoginOperario,desactivado}){
     setPin(newPin);setPinErr(false);
     if(newPin.length===4){
       // Server-side PIN verification
-      sbGet("operarios",`?id=eq.${selOp.id}&pin=eq.${newPin}&activo=eq.true&select=id,nombre,rol,referencia_id,avatar`).then(r=>{
-        if(r.length>0)onLoginOperario(r[0]);
+      const pinLimpio=newPin.toString().trim();
+      console.log("Verificando PIN para operario:",selOp.id,"PIN:",pinLimpio);
+      sbGet("operarios",`?id=eq.${selOp.id}&pin=eq.${pinLimpio}&select=id,nombre,rol,referencia_id,avatar,activo`).then(r=>{
+        console.log("Resultado query:",JSON.stringify(r));
+        if(r.length>0&&r[0].activo!==false)onLoginOperario(r[0]);
         else{setPinErr(true);setTimeout(()=>{setPin("");setPinErr(false);},600);}
-      }).catch(()=>{setPinErr(true);setTimeout(()=>{setPin("");setPinErr(false);},600);});
+      }).catch(e=>{console.log("Error query PIN:",e.message);setPinErr(true);setTimeout(()=>{setPin("");setPinErr(false);},600);});
     }
   };
   const delDigit=()=>{setPin(p=>p.slice(0,-1));setPinErr(false);};
