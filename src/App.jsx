@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, createContext, useContext } from "react";
 import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, ComposedChart, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 
 // ─── SUPABASE ────────────────────────────────────────────────────────────────
@@ -71,6 +71,14 @@ async function uploadFoto(file, tok) {
   if (!r.ok) throw new Error(await r.text());
   return `${SB_URL}/storage/v1/object/public/fotos/${path}`;
 }
+
+// ─── BADGES / NO VISTOS ─────────────────────────────────────────────────────
+const BadgeCtx=createContext({noVistos:{total:0,porTipo:{}},refresh:()=>{}});
+async function registrarItemNuevo(tipo,itemId,paraUsuarios,tok){for(const uid of paraUsuarios)await sbPost("items_no_vistos",{para_usuario_id:String(uid),tipo,item_id:String(itemId)},tok).catch(()=>{});}
+async function marcarVistoTipo(tipo,userId,tok){await sbDelete("items_no_vistos",`para_usuario_id=eq.${userId}&tipo=eq.${tipo}`,tok).catch(()=>{});}
+async function marcarVistoItem(tipo,itemId,userId,tok){await sbDelete("items_no_vistos",`para_usuario_id=eq.${userId}&tipo=eq.${tipo}&item_id=eq.${itemId}`,tok).catch(()=>{});}
+async function contarNoVistos(userId,tok){const items=await sbGet("items_no_vistos",`?para_usuario_id=eq.${userId}&select=tipo`,tok).catch(()=>[]);const porTipo={};items.forEach(i=>{porTipo[i.tipo]=(porTipo[i.tipo]||0)+1;});return{total:items.length,porTipo};}
+async function getUserIdsPorRol(rol,tok){const[u,o]=await Promise.all([sbGet("usuarios",`?rol=eq.${rol}&select=id`,tok).catch(()=>[]),sbGet("operarios",`?rol=eq.${rol}&select=id`,tok).catch(()=>[])]);return[...u,...o].map(x=>x.id);}
 
 // ─── DATOS ESTÁTICOS ─────────────────────────────────────────────────────────
 function getTemporada() {
@@ -581,6 +589,7 @@ export default function App() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [authLoad,   setAuthLoad]   = useState(true);
   const [toast,      setToast]      = useState(null);
+  const [noVistos,   setNoVistos]   = useState({total:0,porTipo:{}});
 
   const [opDesactivado,setOpDesactivado]=useState(false);
 
@@ -655,6 +664,9 @@ export default function App() {
 
   const tok=session.access_token;
   const rol=perfil.rol;
+  const myUserId=String(perfil.id);
+  const refreshNoVistos=async()=>{if(perfil?.es_operario&&tok===SB_KEY)return;try{const nv=await contarNoVistos(myUserId,tok);setNoVistos(nv);}catch(_){}};
+  useEffect(()=>{refreshNoVistos();const iv=setInterval(refreshNoVistos,30000);return()=>clearInterval(iv);},[perfil?.id]);
   const P={perfil,tok,setPage,rol};
   const goTo=id=>{setPage(id);setDrawerOpen(false);};
 
@@ -683,7 +695,7 @@ export default function App() {
     almacen:     <AlmacenPage {...P}/>,
   };
 
-  return <>
+  return <BadgeCtx.Provider value={{noVistos,refresh:refreshNoVistos}}>
     <style>{CSS}</style>
     <div className="app">
       <Sidebar perfil={perfil} page={page} setPage={setPage} onLogout={logout}/>
@@ -710,7 +722,7 @@ export default function App() {
       <MobileNav perfil={perfil} page={page} setPage={setPage} tok={tok}/>
       {toast&&<div style={{position:"fixed",bottom:80,left:"50%",transform:"translateX(-50%)",background:"#FFFFFF",border:"1px solid rgba(16,185,129,.3)",borderRadius:12,padding:"12px 20px",color:"#A6BE59",fontSize:13,fontWeight:500,zIndex:9999,boxShadow:"0 8px 32px rgba(0,0,0,.5)",whiteSpace:"nowrap",maxWidth:"90vw"}} onClick={()=>setToast(null)}>{toast}</div>}
     </div>
-  </>;
+  </BadgeCtx.Provider>;
 }
 
 // ─── LOGIN ────────────────────────────────────────────────────────────────────
@@ -831,13 +843,16 @@ function Sidebar({perfil,page,setPage,onLogout,inDrawer,onClose}){
   const isA=rol==="admin",isJ=rol==="jardinero",isL=rol==="limpieza",isC=rol==="comercial";
   const RL={admin:"Administrador",jardinero:"Jardinero",limpieza:"Limpieza",comercial:"Comercial"};
   const av=perfil.avatar||perfil.nombre.slice(0,2).toUpperCase();
+  const{noVistos:nv}=useContext(BadgeCtx);
+  const nvMap={reservas:(nv.porTipo?.reserva||0),visitas:(nv.porTipo?.visita||0),chat:(nv.porTipo?.mensaje||0),notifs:(nv.porTipo?.notificacion||0),limpieza:(nv.porTipo?.servicio_limpieza||0)+(nv.porTipo?.servicio_limpieza_fin||0),jcheck:(nv.porTipo?.tarea_jardin||0)+(nv.porTipo?.servicio_jardineria||0)+(nv.porTipo?.servicio_jardineria_fin||0)};
   const nItem=(ico,lbl,id,badge)=>{
+    const b=badge||(nvMap[id]||0);
     const on=page===id;
     return <div key={id} className="nw">
       <button className={`nb${on?" on":""}`} onClick={()=>setPage(id)}>
         <span className="nb-ico">{typeof ico==="string"&&ico.length<=2?ico:<Icon name={ico} size={18} color={on?"#FFFFFF":"#8A8580"}/>}</span>{lbl}
       </button>
-      {badge>0&&<span className="nb-badge">{badge>9?"9+":badge}</span>}
+      {b>0&&<span className="nb-badge">{b>9?"9+":b}</span>}
     </div>;
   };
   return <aside className="sb">
@@ -3495,6 +3510,8 @@ function PanelSolicitudes({tok,perfil}){
 
 function Notifs({perfil,tok,rol}){
   const isA=rol==="admin";
+  const{refresh}=useContext(BadgeCtx);
+  useEffect(()=>{marcarVistoTipo("notificacion",String(perfil?.id),tok);setTimeout(refresh,500);},[]);
   const [notifs,setNotifs]=useState([]);const [usuarios,setUsuarios]=useState([]);
   const [dest,setDest]=useState("");const [txt,setTxt]=useState("");const [load,setLoad]=useState(true);const [saving,setSaving]=useState(false);
   useEffect(()=>{(async()=>{const n=isA?await sbGet("notificaciones","?select=*,usuarios(nombre,rol)&order=created_at.desc",tok):await sbGet("notificaciones",`?para=eq.${perfil.id}&order=created_at.desc`,tok);setNotifs(n);if(isA){const u=await sbGet("usuarios","?rol=neq.admin&select=*",tok);setUsuarios(u);}setLoad(false);})();},[]);
@@ -3965,6 +3982,7 @@ function AlmacenPage({perfil,tok,rol}){
   const [load,setLoad]=useState(true);const [saving,setSaving]=useState(false);
   const [catFiltro,setCatFiltro]=useState("todos");
   const [showNew,setShowNew]=useState(false);const [showMov,setShowMov]=useState(null);const [showHist,setShowHist]=useState(false);
+  const [showRecuento,setShowRecuento]=useState(false);const [recuentoItems,setRecuentoItems]=useState([]);const [recSaving,setRecSaving]=useState(false);
   const newVacio={nombre:"",categoria:"limpieza",unidad:"unidad",es_liquido:false,tiene_lavanderia:false,stock_minimo:"1",codigo_barras:"",stock_casa:"0",stock_almacen:"0"};
   const [newForm,setNewForm]=useState(newVacio);
   const [movForm,setMovForm]=useState({tipo:"entrada",cantidad:"1",ubicacion:"casa",concepto:""});
@@ -4013,6 +4031,27 @@ function AlmacenPage({perfil,tok,rol}){
     }catch(_){}setSaving(false);
   };
 
+  const abrirRecuento=()=>{setRecuentoItems(articulos.map(a=>({...a,real:""})));setShowRecuento(true);};
+  const aplicarRecuento=async()=>{
+    if(recSaving)return;setRecSaving(true);
+    const hoy=new Date().toISOString().split("T")[0];let n=0;
+    try{
+      for(const it of recuentoItems){
+        if(it.real===""||it.real===null)continue;
+        const real=parseFloat(it.real)||0;
+        const sistema=(parseFloat(it.stock_casa)||0)+(parseFloat(it.stock_almacen)||0);
+        const diff=real-sistema;
+        if(diff===0)continue;
+        const newAlm=Math.max(0,(parseFloat(it.stock_almacen)||0)+diff);
+        await sbPatch("almacen_articulos",`id=eq.${it.id}`,{stock_almacen:newAlm},tok).catch(()=>{});
+        await sbPost("almacen_movimientos",{articulo_id:it.id,tipo:"ajuste_inventario",cantidad:diff,concepto:`Recuento manual - ${hoy}`,creado_por:perfil.nombre},tok).catch(()=>{});
+        n++;
+      }
+    }catch(_){}
+    setRecSaving(false);setShowRecuento(false);await load_();
+    if(n>0&&typeof setToast==="function"){}// toast handled below
+  };
+
   const bajos=articulos.filter(a=>(parseFloat(a.stock_casa)||0)+(parseFloat(a.stock_almacen)||0)<=(parseFloat(a.stock_minimo)||0));
   const filtered=catFiltro==="todos"?articulos:articulos.filter(a=>a.categoria===catFiltro);
 
@@ -4024,6 +4063,7 @@ function AlmacenPage({perfil,tok,rol}){
 
       <div style={{display:"flex",gap:8,marginBottom:16,flexWrap:"wrap"}}>
         {isA&&<button className="btn bp" onClick={()=>{setNewForm(newVacio);setShowNew(true);}}>➕ Nuevo artículo</button>}
+        <button className="btn bg" onClick={abrirRecuento}>📦 Recuento</button>
       </div>
 
       <div style={{display:"flex",gap:4,overflowX:"auto",marginBottom:16,scrollbarWidth:"none"}}>
@@ -4114,6 +4154,34 @@ function AlmacenPage({perfil,tok,rol}){
       <div className="fg"><label>Concepto (opcional)</label><input className="fi" value={movForm.concepto} onChange={e=>setMovForm(v=>({...v,concepto:e.target.value}))} placeholder="Ej: Compra semanal"/></div>
       <div className="mft"><button className="btn bg" onClick={()=>setShowMov(null)}>Cancelar</button><button className="btn bp" onClick={ejecutarMov} disabled={saving}>{saving?"Guardando…":"✅ Confirmar"}</button></div>
     </div></div>}
+
+    {/* Modal Recuento */}
+    {showRecuento&&<div className="ov" onClick={()=>setShowRecuento(false)}>
+      <div className="modal" style={{maxWidth:540,maxHeight:"92vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
+        <h3>📦 Recuento de stock</h3>
+        <div style={{fontSize:12,color:"#8A8580",marginBottom:16}}>Actualiza solo los artículos que hayas contado. Deja en blanco los que no has revisado.</div>
+        {ALMACEN_CATS.filter(c=>c.id!=="todos").map(cat=>{
+          const catItems=recuentoItems.filter(a=>a.categoria===cat.id);
+          if(catItems.length===0)return null;
+          return <div key={cat.id} style={{marginBottom:16}}>
+            <div style={{fontSize:12,fontWeight:700,color:"#EC683E",textTransform:"uppercase",letterSpacing:.5,marginBottom:8}}>{cat.lbl}</div>
+            {catItems.map((it,idx)=>{
+              const globalIdx=recuentoItems.findIndex(r=>r.id===it.id);
+              const sistema=(parseFloat(it.stock_casa)||0)+(parseFloat(it.stock_almacen)||0);
+              return <div key={it.id} style={{display:"flex",alignItems:"center",gap:10,padding:"6px 0",borderBottom:"1px solid rgba(0,0,0,.04)"}}>
+                <div style={{flex:1,fontSize:13,color:"#1A1A1A"}}>{it.nombre}</div>
+                <div style={{fontSize:11,color:"#8A8580",minWidth:60,textAlign:"right"}}>Sist: {sistema}</div>
+                <input type="number" min="0" step={it.es_liquido?"0.25":"1"} value={recuentoItems[globalIdx]?.real??""} onChange={e=>setRecuentoItems(prev=>prev.map((p,i)=>i===globalIdx?{...p,real:e.target.value}:p))} placeholder="—" style={{width:70,textAlign:"center",fontSize:16,fontWeight:700,padding:"6px",borderRadius:10,border:"1.5px solid transparent",background:"#F5F3F0",fontFamily:"'Inter Tight',sans-serif",outline:"none"}}/>
+              </div>;
+            })}
+          </div>;
+        })}
+        <div className="mft">
+          <button className="btn bg" onClick={()=>setShowRecuento(false)}>Cancelar</button>
+          <button className="btn bp" onClick={aplicarRecuento} disabled={recSaving}>{recSaving?"Aplicando…":"📦 Aplicar recuento"}</button>
+        </div>
+      </div>
+    </div>}
   </>;
 }
 
@@ -5094,6 +5162,8 @@ function VisitasCoordinacion({reservaId,reservaNombre,tok,perfil}){
 // ─── RESERVAS ────────────────────────────────────────────────────────────────
 function Reservas({tok,rol,perfil}){
   const isA=rol==="admin";
+  const{refresh}=useContext(BadgeCtx);
+  useEffect(()=>{marcarVistoTipo("reserva",String(perfil?.id),tok);setTimeout(refresh,500);},[]);
   const ACTIVOS=["visita","pendiente_contrato","contrato_firmado","reserva_pagada","precio_total"];
   const [reservas,setReservas]=useState([]);
   const [filtro,setFiltro]=useState("activas");
@@ -5326,6 +5396,7 @@ function NuevaReserva({perfil,tok,setPage}){
       if(!disp.libre){setSaving(false);setBloqueadoR(disp.conflictos);return;}
       const [res]=await sbPost("reservas",{...form,precio:parseFloat(form.precio)||0,creado_por:perfil.id},tok);
       await addHistorial("reserva",res.id,`Reserva creada por ${perfil.nombre}`,perfil.nombre,tok);
+      if(rol!=="admin"){const admIds=await getUserIdsPorRol("admin",tok);registrarItemNuevo("reserva",res.id,admIds,tok);}
       const en7=new Date();en7.setDate(en7.getDate()+7);
       if(form.fecha&&form.fecha<=en7.toISOString().split("T")[0]){
         notificarRoles(["admin","comercial","limpieza","jardinero"],"🎉 Nuevo evento",`${form.nombre} el ${new Date(form.fecha+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"long"})}`,"evento-nuevo",tok);
@@ -5365,6 +5436,8 @@ const ESTADOS_VISITA = {
 function Visitas({perfil,tok,rol}){
   const isA=rol==="admin", isC=rol==="comercial";
   const puedeEditar=isA||isC;
+  const{refresh}=useContext(BadgeCtx);
+  useEffect(()=>{marcarVistoTipo("visita",String(perfil?.id),tok);setTimeout(refresh,500);},[]);
   const hoy=new Date().toISOString().split("T")[0];
 
   const [visitas,setVisitas]=useState([]);
