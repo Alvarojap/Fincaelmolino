@@ -5387,12 +5387,15 @@ function Reservas({tok,rol,perfil}){
       if(e==="cancelada"){
         const coords=await sbGet("coordinacion_servicios",`?reserva_id=eq.${id}&select=*`,tok).catch(()=>[]);
         for(const c of coords){
-          if(c.servicio_id)await sbPatch("servicios",`id=eq.${c.servicio_id}`,{estado:"cancelado"},tok).catch(()=>{});
+          if(c.servicio_id){await sbDelete("servicio_tareas",`servicio_id=eq.${c.servicio_id}`,tok).catch(()=>{});await sbDelete("servicios",`id=eq.${c.servicio_id}`,tok).catch(()=>{});}
           if(c.jardin_servicio_id)await sbPatch("jardin_servicios",`id=eq.${c.jardin_servicio_id}`,{estado:"cancelado"},tok).catch(()=>{});
-          await sbPatch("coordinacion_servicios",`id=eq.${c.id}`,{estado:"cancelado"},tok).catch(()=>{});
+          await sbDelete("coordinacion_servicios",`id=eq.${c.id}`,tok).catch(()=>{});
         }
         if(r){const ops=await sbGet("operarios","?activo=eq.true&select=id",tok).catch(()=>[]);
-          for(const op of ops)await sbPost("notificaciones",{para:op.id,txt:`❌ Reserva "${r.nombre}" cancelada. Servicios asociados cancelados.`},tok).catch(()=>{});}
+          const adms=await sbGet("usuarios","?rol=eq.admin&select=id",tok).catch(()=>[]);
+          const msg=`❌ Reserva "${r.nombre}" cancelada. Servicios asociados cancelados.`;
+          for(const u of[...ops,...adms])await sbPost("notificaciones",{para:u.id,txt:msg},tok).catch(()=>{});
+          sendPush("❌ Reserva cancelada",msg,"cancelacion");}
       }
       setReservas(prev=>prev.map(r=>r.id===id?{...r,estado:e}:r));
       setSel(p=>p?.id===id?{...p,estado:e}:p);
@@ -6221,19 +6224,24 @@ function ReservasAirbnb({perfil,tok,rol}){
   const eliminar=async id=>{
     if(!window.confirm("¿Eliminar esta reserva Airbnb?"))return;
     try{
-      // Cascading cancel
+      const ab=airbnbs.find(a=>a.id===id);
+      // 1. Cancel coordinaciones (try both string id formats)
       const coords=await sbGet("coordinacion_servicios",`?reserva_id=eq.${id}&select=*`,tok).catch(()=>[]);
       for(const c of coords){
-        if(c.servicio_id)await sbPatch("servicios",`id=eq.${c.servicio_id}`,{estado:"cancelado"},tok).catch(()=>{});
+        if(c.servicio_id){await sbDelete("servicio_tareas",`servicio_id=eq.${c.servicio_id}`,tok).catch(()=>{});await sbDelete("servicios",`id=eq.${c.servicio_id}`,tok).catch(()=>{});}
         if(c.jardin_servicio_id)await sbPatch("jardin_servicios",`id=eq.${c.jardin_servicio_id}`,{estado:"cancelado"},tok).catch(()=>{});
-        await sbPatch("coordinacion_servicios",`id=eq.${c.id}`,{estado:"cancelado"},tok).catch(()=>{});
+        await sbDelete("coordinacion_servicios",`id=eq.${c.id}`,tok).catch(()=>{});
       }
-      const ab=airbnbs.find(a=>a.id===id);
-      if(ab){const msg=`❌ Reserva Airbnb cancelada — ${ab.huesped}. Servicios asociados cancelados.`;
+      // 2. Also find auto-created services by date
+      if(ab){const srvF=await sbGet("servicios",`?fecha=eq.${ab.fecha_salida}&select=id`,tok).catch(()=>[]);
+        for(const s of srvF){await sbDelete("servicio_tareas",`servicio_id=eq.${s.id}`,tok).catch(()=>{});await sbDelete("servicios",`id=eq.${s.id}`,tok).catch(()=>{});}}
+      // 3. Notify
+      if(ab){const msg=`❌ Reserva Airbnb cancelada — ${ab.huesped} (${ab.fecha_entrada} → ${ab.fecha_salida}). Servicios cancelados.`;
         const ops=await sbGet("operarios","?activo=eq.true&select=id",tok).catch(()=>[]);
         const adms=await sbGet("usuarios","?rol=eq.admin&select=id",tok).catch(()=>[]);
         for(const u of[...ops,...adms])await sbPost("notificaciones",{para:u.id,txt:msg},tok).catch(()=>{});
-        sendPush("❌ Reserva cancelada",msg,"reserva-cancelada");}
+        sendPush("❌ Reserva cancelada",msg,"cancelacion");}
+      // 4. Delete reservation
       await sbDelete("reservas_airbnb",`id=eq.${id}`,tok);await load_();setSel(null);
     }catch(_){}
   };
