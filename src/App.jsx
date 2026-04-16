@@ -71,6 +71,8 @@ async function uploadFoto(file, tok) {
   if (!r.ok) throw new Error(await r.text());
   return `${SB_URL}/storage/v1/object/public/fotos/${path}`;
 }
+// Wrapper that always uses SB_KEY for storage (works for all users including operarios)
+async function uploadFotoSeguro(file){return uploadFoto(file,SB_KEY);}
 
 // ─── BADGES / NO VISTOS ─────────────────────────────────────────────────────
 const BadgeCtx=createContext({noVistos:{total:0,porTipo:{}},refresh:()=>{}});
@@ -1002,7 +1004,7 @@ function NotaModal({nota,setNota,foto,setFoto,onSave,onClose,tok}){
     const f=e.target.files[0];if(!f)return;
     setUploading(true);
     try{
-      const url=await uploadFoto(f,tok||SB_KEY);
+      const url=await uploadFotoSeguro(f);
       setFoto(url);
     }catch(_){
       // Fallback: read as base64
@@ -1948,7 +1950,7 @@ function DashJ({perfil,jsem,jpunt,cwk,setPage,tok}){
       <div className="fg"><label>Zona (opcional)</label><input className="fi" value={extraForm.zona} onChange={e=>setExtraForm(v=>({...v,zona:e.target.value}))} placeholder="Ej: Tejado"/></div>
       <div className="fg"><label>Foto (opcional)</label>
         <label className="pbtn">{extraForm.foto_url?"📷 Cambiar foto":"📷 Hacer foto o subir imagen"}
-          <input type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={async e=>{const f=e.target.files[0];if(!f)return;try{const url=await uploadFoto(f,tok);setExtraForm(v=>({...v,foto_url:url}));}catch(_){const r=new FileReader();r.onload=ev=>setExtraForm(v=>({...v,foto_url:ev.target.result}));r.readAsDataURL(f);}}}/>
+          <input type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={async e=>{const f=e.target.files[0];if(!f)return;try{const url=await uploadFotoSeguro(f);setExtraForm(v=>({...v,foto_url:url}));}catch(_){const r=new FileReader();r.onload=ev=>setExtraForm(v=>({...v,foto_url:ev.target.result}));r.readAsDataURL(f);}}}/>
         </label>
         {extraForm.foto_url&&<><img src={extraForm.foto_url} alt="" className="pprev"/><button className="btn br sm" style={{marginTop:8}} onClick={()=>setExtraForm(v=>({...v,foto_url:null}))}>🗑 Quitar</button></>}
       </div>
@@ -3061,7 +3063,7 @@ function Limpieza({perfil,tok,rol}){
                       📷 Cerrar zona con foto
                       <input type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={async e=>{
                         const f=e.target.files[0];if(!f)return;
-                        try{const url=await uploadFoto(f,tok||SB_KEY);await sbPost("servicio_tareas",{servicio_id:actId,tarea_id:zona.id+"_cerrada",zona:zona.nombre,done:true,completado_por:perfil.nombre,completado_ts:new Date().toISOString(),foto_url:url,es_extra:false},tok);await loadTareas(actId);}catch(_){}
+                        try{const url=await uploadFotoSeguro(f);await sbPost("servicio_tareas",{servicio_id:actId,tarea_id:zona.id+"_cerrada",zona:zona.nombre,done:true,completado_por:perfil.nombre,completado_ts:new Date().toISOString(),foto_url:url,es_extra:false},tok);await loadTareas(actId);}catch(_){}
                       }}/>
                     </label>
                     <button className="btn bg" style={{width:"100%",justifyContent:"center",marginTop:6}} onClick={async()=>{
@@ -3300,7 +3302,7 @@ function Chat({perfil,tok,rol}){
           </div>
           <div style={{display:"flex",flexDirection:"column",gap:6,flexShrink:0}}>
             <label style={{cursor:"pointer",width:44,height:44,background:"rgba(255,255,255,.06)",border:"1px solid rgba(255,255,255,.1)",borderRadius:10,color:"#EC683E",fontSize:20,display:"flex",alignItems:"center",justifyContent:"center"}}>
-              📷<input type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={async e=>{const f=e.target.files[0];if(f){try{const url=await uploadFoto(f,tok);setFotoMsg(url);}catch(_){const r=new FileReader();r.onload=ev=>setFotoMsg(ev.target.result);r.readAsDataURL(f);}}}}/>
+              📷<input type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={async e=>{const f=e.target.files[0];if(f){try{const url=await uploadFotoSeguro(f);setFotoMsg(url);}catch(_){const r=new FileReader();r.onload=ev=>setFotoMsg(ev.target.result);r.readAsDataURL(f);}}}}/>
             </label>
             <button onClick={send} style={{width:44,height:44,background:"#EC683E",border:"none",borderRadius:10,color:"#0f1117",fontSize:22,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700}}>→</button>
           </div>
@@ -3339,7 +3341,7 @@ function Chat({perfil,tok,rol}){
           </div>
           <div style={{display:"flex",flexDirection:"column",gap:6,flexShrink:0}}>
             <label style={{cursor:"pointer",width:44,height:44,background:"rgba(255,255,255,.06)",border:"1px solid rgba(255,255,255,.1)",borderRadius:10,color:"#EC683E",fontSize:20,display:"flex",alignItems:"center",justifyContent:"center"}}>
-              📷<input type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={async e=>{const f=e.target.files[0];if(f){try{const url=await uploadFoto(f,tok);setFotoMsg(url);}catch(_){const r=new FileReader();r.onload=ev=>setFotoMsg(ev.target.result);r.readAsDataURL(f);}}}}/>
+              📷<input type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={async e=>{const f=e.target.files[0];if(f){try{const url=await uploadFotoSeguro(f);setFotoMsg(url);}catch(_){const r=new FileReader();r.onload=ev=>setFotoMsg(ev.target.result);r.readAsDataURL(f);}}}}/>
             </label>
             <button onClick={send} style={{width:44,height:44,background:"#EC683E",border:"none",borderRadius:10,color:"#0f1117",fontSize:22,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700}}>→</button>
           </div>
@@ -3523,7 +3525,11 @@ function Notifs({perfil,tok,rol}){
   useEffect(()=>{marcarVistoTipo("notificacion",String(perfil?.id),tok);setTimeout(refresh,500);},[]);
   const [notifs,setNotifs]=useState([]);const [usuarios,setUsuarios]=useState([]);
   const [dest,setDest]=useState("");const [txt,setTxt]=useState("");const [load,setLoad]=useState(true);const [saving,setSaving]=useState(false);
-  useEffect(()=>{(async()=>{const n=isA?await sbGet("notificaciones","?select=*,usuarios(nombre,rol)&order=created_at.desc",tok):await sbGet("notificaciones",`?para=eq.${perfil.id}&order=created_at.desc`,tok);setNotifs(n);if(isA){const u=await sbGet("usuarios","?rol=neq.admin&select=*",tok);setUsuarios(u);}setLoad(false);})();},[]);
+  useEffect(()=>{(async()=>{try{
+    const n=isA?await sbGet("notificaciones","?select=*&order=created_at.desc",tok):await sbGet("notificaciones",`?para=eq.${perfil.id}&order=created_at.desc`,tok);
+    setNotifs(n);
+    if(isA){const[u,o]=await Promise.all([sbGet("usuarios","?rol=neq.admin&select=*",tok),sbGet("operarios","?activo=eq.true&select=*",tok).catch(()=>[])]);const opsF=o.map(op=>({id:op.id,nombre:op.nombre,rol:op.rol,avatar:op.avatar||op.nombre.slice(0,2).toUpperCase(),es_operario:true}));setUsuarios([...u,...opsF]);}
+  }catch(_){}setLoad(false);})();},[]);
   const enviar=async()=>{if(!txt.trim()||!dest||saving)return;setSaving(true);const targets=dest==="todos"?usuarios:usuarios.filter(u=>String(u.id)===dest);for(const u of targets){await sbPost("notificaciones",{para:u.id,txt},tok);sendPush("🌾 Finca El Molino",txt,`notif-${u.id}`);}setTxt("");setDest("");setSaving(false);};
   const leer=async id=>{try{await sbPatch("notificaciones",`id=eq.${id}`,{leida:true},tok);setNotifs(prev=>prev.map(n=>n.id===id?{...n,leida:true}:n));}catch(_){}};
   if(load)return <div className="loading"><div className="spin"/><span>Cargando…</span></div>;
@@ -3967,7 +3973,7 @@ function Lavanderia({perfil,tok,rol}){
       <div className="fg"><label>Fecha recogida</label><input type="date" className="fi" value={recFecha} onChange={e=>setRecFecha(e.target.value)}/></div>
       <div className="fg"><label>Coste factura (€)</label><input type="number" inputMode="decimal" className="fi" value={recCoste} onChange={e=>setRecCoste(e.target.value)} placeholder="0"/></div>
       <div className="fg"><label>Foto factura (opcional)</label>
-        <label className="pbtn">{recFoto?"📷 Cambiar":"📷 Foto factura"}<input type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={async e=>{const f=e.target.files[0];if(!f)return;try{const url=await uploadFoto(f,tok||SB_KEY);setRecFoto(url);}catch(_){const r=new FileReader();r.onload=ev=>setRecFoto(ev.target.result);r.readAsDataURL(f);}}}/></label>
+        <label className="pbtn">{recFoto?"📷 Cambiar":"📷 Foto factura"}<input type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={async e=>{const f=e.target.files[0];if(!f)return;try{const url=await uploadFotoSeguro(f);setRecFoto(url);}catch(_){const r=new FileReader();r.onload=ev=>setRecFoto(ev.target.result);r.readAsDataURL(f);}}}/></label>
         {recFoto&&<img src={recFoto} alt="" className="pprev"/>}
       </div>
       <div className="mft"><button className="btn bg" onClick={()=>setShowRecogida(null)}>Cancelar</button><button className="btn bp" onClick={recoger} disabled={saving}>{saving?"Guardando…":"✅ Confirmar"}</button></div>
@@ -3992,7 +3998,8 @@ function AlmacenPage({perfil,tok,rol}){
   const [catFiltro,setCatFiltro]=useState("todos");
   const [showNew,setShowNew]=useState(false);const [showMov,setShowMov]=useState(null);const [showHist,setShowHist]=useState(false);
   const [showRecuento,setShowRecuento]=useState(false);const [recuentoItems,setRecuentoItems]=useState([]);const [recSaving,setRecSaving]=useState(false);
-  const newVacio={nombre:"",categoria:"limpieza",unidad:"unidad",es_liquido:false,tiene_lavanderia:false,stock_minimo:"1",codigo_barras:"",stock_casa:"0",stock_almacen:"0"};
+  const [busqueda,setBusqueda]=useState("");const [showEdit,setShowEdit]=useState(null);const [editForm,setEditForm]=useState({});
+  const newVacio={nombre:"",categoria:"limpieza",unidad:"unidad",es_liquido:false,tiene_lavanderia:false,stock_minimo:"1",codigo_barras:"",stock_casa:"0",stock_almacen:"0",etiquetas:""};
   const [newForm,setNewForm]=useState(newVacio);
   const [movForm,setMovForm]=useState({tipo:"entrada",cantidad:"1",ubicacion:"casa",concepto:""});
 
@@ -4010,7 +4017,7 @@ function AlmacenPage({perfil,tok,rol}){
   const crearArticulo=async()=>{
     if(!newForm.nombre||saving)return;setSaving(true);
     try{
-      const[art]=await sbPost("almacen_articulos",{nombre:newForm.nombre,categoria:newForm.categoria,unidad:newForm.unidad,es_liquido:newForm.es_liquido,tiene_lavanderia:newForm.tiene_lavanderia,stock_minimo:parseInt(newForm.stock_minimo)||2,codigo_barras:newForm.codigo_barras||null,stock_casa:parseFloat(newForm.stock_casa)||0,stock_almacen:parseFloat(newForm.stock_almacen)||0,stock_lavanderia:0,activo:true},tok);
+      const[art]=await sbPost("almacen_articulos",{nombre:newForm.nombre,categoria:newForm.categoria,unidad:newForm.unidad,es_liquido:newForm.es_liquido,tiene_lavanderia:newForm.tiene_lavanderia,stock_minimo:parseInt(newForm.stock_minimo)||1,codigo_barras:newForm.codigo_barras||null,stock_casa:parseFloat(newForm.stock_casa)||0,stock_almacen:parseFloat(newForm.stock_almacen)||0,stock_lavanderia:0,activo:true,etiquetas:newForm.etiquetas||""},tok);
       if((parseFloat(newForm.stock_casa)||0)>0)await sbPost("almacen_movimientos",{articulo_id:art.id,tipo:"entrada",cantidad:parseFloat(newForm.stock_casa),ubicacion_destino:"casa",concepto:"Stock inicial",creado_por:perfil.nombre},tok).catch(()=>{});
       if((parseFloat(newForm.stock_almacen)||0)>0)await sbPost("almacen_movimientos",{articulo_id:art.id,tipo:"entrada",cantidad:parseFloat(newForm.stock_almacen),ubicacion_destino:"almacen",concepto:"Stock inicial",creado_por:perfil.nombre},tok).catch(()=>{});
       setShowNew(false);setNewForm(newVacio);await load_();
@@ -4040,6 +4047,20 @@ function AlmacenPage({perfil,tok,rol}){
     }catch(_){}setSaving(false);
   };
 
+  const eliminarArticulo=async(a)=>{
+    if(!window.confirm(`¿Eliminar "${a.nombre}"? Esta acción no se puede deshacer.`))return;
+    try{
+      const movs=await sbGet("almacen_movimientos",`?articulo_id=eq.${a.id}&select=id&limit=1`,tok).catch(()=>[]);
+      if(movs.length>0)await sbPatch("almacen_articulos",`id=eq.${a.id}`,{activo:false},tok);
+      else await sbDelete("almacen_articulos",`id=eq.${a.id}`,tok);
+      await load_();
+    }catch(_){}
+  };
+  const guardarEdit=async()=>{
+    if(!showEdit||saving)return;setSaving(true);
+    try{await sbPatch("almacen_articulos",`id=eq.${showEdit.id}`,{nombre:editForm.nombre,categoria:editForm.categoria,unidad:editForm.unidad,es_liquido:editForm.es_liquido,stock_minimo:parseInt(editForm.stock_minimo)||1,tiene_lavanderia:editForm.tiene_lavanderia,etiquetas:editForm.etiquetas||""},tok);setShowEdit(null);await load_();}catch(_){}setSaving(false);
+  };
+  const abrirEdit=(a)=>{setEditForm({nombre:a.nombre,categoria:a.categoria,unidad:a.unidad||"unidad",es_liquido:!!a.es_liquido,stock_minimo:String(a.stock_minimo||1),tiene_lavanderia:!!a.tiene_lavanderia,etiquetas:a.etiquetas||""});setShowEdit(a);};
   const abrirRecuento=()=>{setRecuentoItems(articulos.map(a=>({...a,real:""})));setShowRecuento(true);};
   const aplicarRecuento=async()=>{
     if(recSaving)return;setRecSaving(true);
@@ -4062,7 +4083,7 @@ function AlmacenPage({perfil,tok,rol}){
   };
 
   const bajos=articulos.filter(a=>(parseFloat(a.stock_casa)||0)+(parseFloat(a.stock_almacen)||0)<=(parseFloat(a.stock_minimo)||0));
-  const filtered=catFiltro==="todos"?articulos:articulos.filter(a=>a.categoria===catFiltro);
+  const filtered=(catFiltro==="todos"?articulos:articulos.filter(a=>a.categoria===catFiltro)).filter(a=>!busqueda||a.nombre.toLowerCase().includes(busqueda.toLowerCase())||(a.etiquetas||"").toLowerCase().includes(busqueda.toLowerCase()));
 
   if(load)return <div className="loading"><div className="spin"/><span>Cargando…</span></div>;
   return <>
@@ -4070,10 +4091,11 @@ function AlmacenPage({perfil,tok,rol}){
     <div className="pb">
       {bajos.length>0&&<div style={{background:"#FEE8E8",borderRadius:14,padding:"12px 16px",marginBottom:16,fontSize:13,color:"#F35757",fontWeight:600}}>⚠️ {bajos.length} artículo{bajos.length>1?"s":""} con stock bajo: {bajos.slice(0,5).map(a=>a.nombre).join(", ")}</div>}
 
-      <div style={{display:"flex",gap:8,marginBottom:16,flexWrap:"wrap"}}>
+      <div style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap"}}>
         {isA&&<button className="btn bp" onClick={()=>{setNewForm(newVacio);setShowNew(true);}}>➕ Nuevo artículo</button>}
         <button className="btn bg" onClick={abrirRecuento}>📦 Recuento</button>
       </div>
+      <input className="fi" value={busqueda} onChange={e=>setBusqueda(e.target.value)} placeholder="Buscar por nombre o etiqueta..." style={{marginBottom:14}}/>
 
       <div style={{display:"flex",gap:4,overflowX:"auto",marginBottom:16,scrollbarWidth:"none"}}>
         {ALMACEN_CATS.map(c=><button key={c.id} className={`btn sm${catFiltro===c.id?" bp":" bg"}`} onClick={()=>setCatFiltro(c.id)} style={{flexShrink:0}}>{c.lbl}</button>)}
@@ -4098,6 +4120,8 @@ function AlmacenPage({perfil,tok,rol}){
             <button className="btn bg sm" onClick={()=>{setMovForm({tipo:"salida",cantidad:"1",ubicacion:"casa",concepto:""});setShowMov(a);}}>− Uso</button>
             {sA>0&&<button className="btn bg sm" onClick={()=>{setMovForm({tipo:"traslado_a_casa",cantidad:"1",ubicacion:"",concepto:""});setShowMov(a);}}>📦→🏠</button>}
             {sC>0&&<button className="btn bg sm" onClick={()=>{setMovForm({tipo:"traslado_a_almacen",cantidad:"1",ubicacion:"",concepto:""});setShowMov(a);}}>🏠→📦</button>}
+            {isA&&<button className="btn bg sm" onClick={()=>abrirEdit(a)}>✏️</button>}
+            {isA&&<button className="btn br sm" onClick={()=>eliminarArticulo(a)}>🗑</button>}
           </div>
         </div>;
       })}
@@ -4145,7 +4169,31 @@ function AlmacenPage({perfil,tok,rol}){
         <div className="fg"><label>Stock inicial casa</label><input type="number" className="fi" value={newForm.stock_casa} onChange={e=>setNewForm(v=>({...v,stock_casa:e.target.value}))}/></div>
         <div className="fg"><label>Stock inicial almacén</label><input type="number" className="fi" value={newForm.stock_almacen} onChange={e=>setNewForm(v=>({...v,stock_almacen:e.target.value}))}/></div>
       </div>
+      <div className="fg"><label>Etiquetas (para búsqueda)</label><input className="fi" value={newForm.etiquetas||""} onChange={e=>setNewForm(v=>({...v,etiquetas:e.target.value}))} placeholder="#kh7 #desengrasante"/><div style={{fontSize:11,color:"#8A8580",marginTop:3}}>💡 No visibles, solo para buscar</div></div>
       <div className="mft"><button className="btn bg" onClick={()=>setShowNew(false)}>Cancelar</button><button className="btn bp" onClick={crearArticulo} disabled={saving||!newForm.nombre}>{saving?"Creando…":"➕ Crear"}</button></div>
+    </div></div>}
+
+    {/* Modal editar artículo */}
+    {showEdit&&<div className="ov" onClick={()=>setShowEdit(null)}><div className="modal" style={{maxHeight:"90vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
+      <h3>✏️ Editar artículo</h3>
+      <div className="fg"><label>Nombre</label><input className="fi" value={editForm.nombre} onChange={e=>setEditForm(v=>({...v,nombre:e.target.value}))}/></div>
+      <div className="g2">
+        <div className="fg"><label>Categoría</label><select className="fi" value={editForm.categoria} onChange={e=>setEditForm(v=>({...v,categoria:e.target.value}))}>{ALMACEN_CATS.filter(c=>c.id!=="todos").map(c=><option key={c.id} value={c.id}>{c.lbl}</option>)}</select></div>
+        <div className="fg"><label>Unidad</label><input className="fi" value={editForm.unidad} onChange={e=>setEditForm(v=>({...v,unidad:e.target.value}))}/></div>
+      </div>
+      <div className="fg"><label>Stock mínimo</label><input type="number" className="fi" value={editForm.stock_minimo} onChange={e=>setEditForm(v=>({...v,stock_minimo:e.target.value}))}/></div>
+      <div style={{display:"flex",gap:16,marginBottom:14}}>
+        <div onClick={()=>setEditForm(v=>({...v,es_liquido:!v.es_liquido}))} style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer",fontSize:13}}>
+          <div style={{width:22,height:22,borderRadius:6,border:`2px solid ${editForm.es_liquido?"#EC683E":"#BFBAB4"}`,background:editForm.es_liquido?"#EC683E":"transparent",display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:12,fontWeight:700}}>{editForm.es_liquido?"✓":""}</div>
+          Es líquido
+        </div>
+        <div onClick={()=>setEditForm(v=>({...v,tiene_lavanderia:!v.tiene_lavanderia}))} style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer",fontSize:13}}>
+          <div style={{width:22,height:22,borderRadius:6,border:`2px solid ${editForm.tiene_lavanderia?"#EC683E":"#BFBAB4"}`,background:editForm.tiene_lavanderia?"#EC683E":"transparent",display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:12,fontWeight:700}}>{editForm.tiene_lavanderia?"✓":""}</div>
+          Va a lavandería
+        </div>
+      </div>
+      <div className="fg"><label>Etiquetas</label><input className="fi" value={editForm.etiquetas||""} onChange={e=>setEditForm(v=>({...v,etiquetas:e.target.value}))} placeholder="#kh7 #desengrasante"/></div>
+      <div className="mft"><button className="btn bg" onClick={()=>setShowEdit(null)}>Cancelar</button><button className="btn bp" onClick={guardarEdit} disabled={saving}>{saving?"Guardando…":"✅ Guardar"}</button></div>
     </div></div>}
 
     {/* Modal movimiento */}
