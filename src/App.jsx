@@ -1650,7 +1650,7 @@ async function autoCobrarAirbnb(tok){
 }
 
 function DashA({reservas,jsem,jpunt,cwk,setPage,tok,perfil}){
-  useEffect(()=>{autoCobrarAirbnb(tok);ejecutarMotorCoordinacion(tok,perfil);},[]);
+  useEffect(()=>{autoCobrarAirbnb(tok);ejecutarMotorCoordinacion(tok);},[]);
   const [meteo,setMeteo]=useState(null);
   useEffect(()=>{fetchMeteo().then(d=>{if(d)setMeteo(d);});},[]);
   const temp=getTemporada();
@@ -1772,7 +1772,7 @@ function DashJ({perfil,jsem,jpunt,cwk,setPage,tok}){
       }
     }catch(_){}
   };
-  useEffect(()=>{if(tok){loadSrvActivo();const t=perfil?.es_operario?SB_KEY:tok;console.log("DashJ: buscando coordinaciones jardín...");sbGet("coordinacion_servicios","?estado=eq.servicio_creado_pendiente_fecha&select=*",t).then(r=>{const jc=r.filter(c=>c.tipo?.includes("jardin"));console.log("DashJ: encontradas:",JSON.stringify(jc));setCoordPJ(jc);}).catch(e=>console.log("DashJ error:",e.message));}},[]);
+  useEffect(()=>{if(tok){loadSrvActivo();const t=perfil?.es_operario?SB_KEY:tok;sbGet("coordinacion_servicios","?estado=in.(preguntando_si_lista,servicio_creado_pendiente_fecha)&select=*",t).then(r=>setCoordPJ(r.filter(c=>c.tipo?.includes("jardin")))).catch(()=>{});}},[]);
 
   // Cronómetro — uses timestamps from localStorage for persistence
   useEffect(()=>{
@@ -2046,7 +2046,7 @@ function DashJ({perfil,jsem,jpunt,cwk,setPage,tok}){
 }
 function DashL({perfil,setPage,tok}){
   const [coordP,setCoordP]=useState([]);const [savingC,setSavingC]=useState(false);const [showDatePick,setShowDatePick]=useState(null);const [customDate,setCustomDate]=useState("");
-  useEffect(()=>{if(tok){const t=perfil?.es_operario?SB_KEY:tok;console.log("DashL: buscando coordinaciones pendientes...");sbGet("coordinacion_servicios","?estado=eq.servicio_creado_pendiente_fecha&select=*",t).then(r=>{console.log("DashL: encontradas:",JSON.stringify(r));setCoordP(r);}).catch(e=>console.log("DashL error:",e.message));}},[]);
+  useEffect(()=>{if(tok){const t=perfil?.es_operario?SB_KEY:tok;sbGet("coordinacion_servicios","?estado=in.(preguntando_si_lista,servicio_creado_pendiente_fecha)&select=*",t).then(r=>setCoordP(r.filter(c=>!c.tipo?.includes("jardin")))).catch(()=>{});}},[]);
   const getDias=(ini,fin)=>{const ds=[];const i=new Date(ini);const f=new Date(fin);const h=new Date();let d=i>h?i:h;while(d<=f&&ds.length<7){ds.push(new Date(d));d=new Date(d.getTime()+86400000);}return ds;};
   const confirmarFecha=async(c,dia)=>{if(savingC)return;setSavingC(true);const ds=dia.toISOString().split("T")[0];
     try{await sbPatch("coordinacion_servicios",`id=eq.${c.id}`,{fecha_programada:ds,estado:"confirmado",respondido_por:perfil.nombre},tok);
@@ -5591,70 +5591,83 @@ async function obtenerProximaReserva(fecha,tok){
 const TAREAS_JARDIN_POST=[{id:"jp1",txt:"Limpiar piscina (superficie + fondo)"},{id:"jp2",txt:"Comprobar motor y luces de piscina"},{id:"jp3",txt:"Limpiar hamacas"},{id:"jp4",txt:"Limpiar zonas exteriores completas"},{id:"jp5",txt:"Soplar y retirar hojas"},{id:"jp6",txt:"Regar y revisar césped"},{id:"jp7",txt:"Limpiar barbacoa"},{id:"jp8",txt:"Ordenar utensilios"},{id:"jp9",txt:"Limpiar porches"},{id:"jp10",txt:"Retirar basura exterior"},{id:"jp11",txt:"Revisión visual general"}];
 const TAREAS_JARDIN_POST_EVENTO=[{id:"jpe1",txt:"Retirar colillas del suelo"},{id:"jpe2",txt:"Limpiar ceniceros"},{id:"jpe3",txt:"Retirar vasos y basura invitados"},{id:"jpe4",txt:"Inspección visual desperfectos"},{id:"jpe5",txt:"Comprobar invernadero"},{id:"jpe6",txt:"Revisión estado instalaciones"}];
 
-async function procesarCoordReserva(tipo,reservaId,tipoReserva,fechaOut,fechaIn,tok){
+async function notificarCoordPre(coord,rol,diasHasta,tok){
+  const ops=await sbGet("operarios",`?rol=eq.${rol}&activo=eq.true&select=id`,SB_KEY).catch(()=>[]);
+  const fechaFmt=new Date(coord.fecha_checkin_siguiente+"T12:00:00").toLocaleDateString("es-ES",{weekday:"long",day:"numeric",month:"long"});
+  const urg=diasHasta<=1?"🚨 URGENTE: ":diasHasta<=3?"⏰ ":"🏠 ";
+  const esL=rol==="limpieza";
+  const msg=`${urg}Reserva el ${fechaFmt} (en ${diasHasta} día${diasHasta!==1?"s":""}) — ¿Está ${esL?"la casa":"el jardín"} list${esL?"a":"o"}?`;
+  for(const op of ops){await sbPost("notificaciones",{para:op.id,txt:msg},tok).catch(()=>{});await registrarItemNuevo("notificacion",coord.id||coord.reserva_id,[op.id],tok);}
+  await sbPatch("coordinacion_servicios",`id=eq.${coord.id}`,{notificacion_1_enviada:true},tok).catch(()=>{});
+  sendPush(esL?"🏠 Finca El Molino":"🌿 Finca El Molino",msg,"coord-pre");
+}
+
+async function procesarCoordReserva(tipo,reservaId,tipoReserva,fechaCheckin,fechaCheckout,tok){
   try{
-    console.log("Creando coordinación:",tipo,"reserva:",reservaId,"fechaOut:",fechaOut);
-    const ventana=calcularVentanaLimpieza(fechaOut,fechaIn);
-    await sbPost("coordinacion_servicios",{tipo,reserva_id:String(reservaId),tipo_reserva:tipoReserva,fecha_checkout:fechaOut,fecha_checkin_siguiente:fechaIn||null,ventana_inicio:ventana.inicio.toISOString(),ventana_fin:ventana.fin.toISOString(),estado:"pendiente_confirmacion"},tok).catch(e=>console.log("Error coord insert:",e.message));
-    // Pre-notification 3 days before
-    const pre3=new Date(new Date(fechaOut+"T12:00:00").getTime()-3*86400000).toISOString().split("T")[0];
-    const preTipo=tipo.includes("limpieza")?"check_pre_limpieza":"check_pre_jardin";
-    await sbPost("coordinacion_servicios",{tipo:preTipo,reserva_id:String(reservaId),tipo_reserva:tipoReserva,fecha_checkout:pre3,fecha_checkin_siguiente:fechaOut,estado:"pendiente_notificacion_pre"},tok).catch(()=>{});
+    const diasHasta=Math.ceil((new Date(fechaCheckin+"T12:00:00")-new Date())/(86400000));
+    const ventana=calcularVentanaLimpieza(fechaCheckout||fechaCheckin,null);
+    const estado=diasHasta<=7?"preguntando_si_lista":"pendiente_horizonte";
+    // Limpieza pre
+    const[cLimp]=await sbPost("coordinacion_servicios",{tipo:tipo.includes("jardin")?"jardin_pre":"limpieza_pre",reserva_id:String(reservaId),tipo_reserva:tipoReserva,fecha_checkin_siguiente:fechaCheckin,fecha_checkout:fechaCheckout||fechaCheckin,ventana_inicio:ventana.inicio.toISOString(),ventana_fin:ventana.fin.toISOString(),estado},tok).catch(()=>[{}]);
+    if(diasHasta<=7&&cLimp?.id){const esJ=tipo.includes("jardin");await notificarCoordPre(cLimp,esJ?"jardinero":"limpieza",diasHasta,tok);}
+    // Post-checkout coordination (for after the event/checkout)
+    if(fechaCheckout){
+      const proxRes=await obtenerProximaReserva(fechaCheckout,tok);
+      const ventanaPost=calcularVentanaLimpieza(fechaCheckout,proxRes);
+      await sbPost("coordinacion_servicios",{tipo:tipo.includes("jardin")?"jardin_post":"limpieza_post",reserva_id:String(reservaId),tipo_reserva:tipoReserva,fecha_checkout:fechaCheckout,fecha_checkin_siguiente:proxRes,ventana_inicio:ventanaPost.inicio.toISOString(),ventana_fin:ventanaPost.fin.toISOString(),estado:"pendiente_confirmacion"},tok).catch(()=>{});
+    }
   }catch(_){}
 }
 
-async function ejecutarMotorCoordinacion(tok,perfil){
+async function ejecutarMotorCoordinacion(tok){
   const fk=`fm_motor_coord_${new Date().toISOString().split("T")[0]}_${new Date().getHours()}`;
   if(localStorage.getItem(fk))return;localStorage.setItem(fk,"1");
   const hoy=new Date().toISOString().split("T")[0];
+  const en7d=new Date(Date.now()+7*86400000).toISOString().split("T")[0];
+  const en3d=new Date(Date.now()+3*86400000).toISOString().split("T")[0];
+  const manana=new Date(Date.now()+86400000).toISOString().split("T")[0];
   try{
-    // 1. Pre-notifications (3 days before)
-    const preN=await sbGet("coordinacion_servicios",`?estado=eq.pendiente_notificacion_pre&fecha_checkout=eq.${hoy}&select=*`,tok).catch(()=>[]);
-    for(const c of preN){
-      const esLimp=c.tipo.includes("limpieza");
-      const ops=await sbGet("operarios",`?rol=eq.${esLimp?"limpieza":"jardinero"}&activo=eq.true&select=id`,tok).catch(()=>[]);
-      const msg=esLimp?"🏠 Reserva en 3 días — ¿Está la casa lista?":"🌿 Reserva en 3 días — ¿Está el jardín listo?";
-      for(const op of ops)await sbPost("notificaciones",{para:op.id,txt:msg},tok).catch(()=>{});
-      await sbPatch("coordinacion_servicios",`id=eq.${c.id}`,{estado:"notificacion_pre_enviada",notificacion_1_enviada:true},tok).catch(()=>{});
-      sendPush(esLimp?"🏠 Finca El Molino":"🌿 Finca El Molino",msg,"coord-pre");
+    // 1. Activate horizon: pendiente_horizonte entering 7-day window
+    const horiz=await sbGet("coordinacion_servicios",`?estado=eq.pendiente_horizonte&fecha_checkin_siguiente=lte.${en7d}&select=*`,tok).catch(()=>[]);
+    for(const c of horiz){
+      const diasH=Math.ceil((new Date(c.fecha_checkin_siguiente+"T12:00:00")-new Date())/(86400000));
+      await sbPatch("coordinacion_servicios",`id=eq.${c.id}`,{estado:"preguntando_si_lista"},tok).catch(()=>{});
+      const esJ=c.tipo?.includes("jardin");
+      await notificarCoordPre(c,esJ?"jardinero":"limpieza",diasH,tok);
     }
-    // 2. Post-checkout today: create services
-    const postH=await sbGet("coordinacion_servicios",`?fecha_checkout=eq.${hoy}&estado=eq.pendiente_confirmacion&select=*`,tok).catch(()=>[]);
-    for(const c of postH){
-      if(c.tipo.includes("limpieza")){
-        const tipoL=c.tipo_reserva==="airbnb"?"Airbnb":"Evento";
-        await crearLimpiezaAuto(`Limpieza post-${tipoL} — ${hoy}`,hoy,tok,"coord");
-        await sbPatch("coordinacion_servicios",`id=eq.${c.id}`,{estado:"servicio_creado_pendiente_fecha"},tok).catch(()=>{});
-      }
-      if(c.tipo.includes("jardin")){
-        const esEvento=c.tipo_reserva?.includes("evento");
-        const tareasJ=esEvento?[...TAREAS_JARDIN_POST,...TAREAS_JARDIN_POST_EVENTO]:TAREAS_JARDIN_POST;
-        const jds=await sbGet("jardineros","?activo=eq.true&select=*",tok).catch(()=>[]);const jd=jds[0]||null;
-        const[srv]=await sbPost("jardin_servicios",{nombre:`Jardín post-${esEvento?"evento":"Airbnb"} — ${hoy}`,fecha_inicio:hoy,fecha_fin:c.fecha_checkin_siguiente||hoy,jardinero_id:jd?.id||null,jardinero_nombre:jd?.nombre||"",estado:"activo",creado_por:"Sistema automático"},tok).catch(()=>[{}]);
-        if(srv?.id){for(const t of tareasJ)await sbPost("jardin_servicio_tareas",{servicio_id:srv.id,txt:t.txt,done:false},tok).catch(()=>{});}
-        await sbPatch("coordinacion_servicios",`id=eq.${c.id}`,{estado:"servicio_creado_pendiente_fecha"},tok).catch(()=>{});
-        const opsJ=await sbGet("operarios","?rol=eq.jardinero&activo=eq.true&select=id",tok).catch(()=>[]);
-        for(const op of opsJ)await sbPost("notificaciones",{para:op.id,txt:`🌿 Nuevo servicio de jardín — elige tu día`},tok).catch(()=>{});
-      }
-    }
-    // 3. Reminder 24h
-    const ayer=new Date(Date.now()-86400000).toISOString();
-    const sin24=await sbGet("coordinacion_servicios",`?estado=eq.servicio_creado_pendiente_fecha&notificacion_2_enviada=is.null&created_at=lt.${ayer}&select=*`,tok).catch(()=>[]);
-    for(const c of sin24){
-      const esL=c.tipo.includes("limpieza");const ops=await sbGet("operarios",`?rol=eq.${esL?"limpieza":"jardinero"}&activo=eq.true&select=id`,tok).catch(()=>[]);
-      for(const op of ops)await sbPost("notificaciones",{para:op.id,txt:`⏰ RECORDATORIO: Elige día para ${esL?"limpieza":"jardinería"}`},tok).catch(()=>{});
+    // 2. Reminder at 3 days — still preguntando_si_lista
+    const sin3d=await sbGet("coordinacion_servicios",`?estado=eq.preguntando_si_lista&fecha_checkin_siguiente=lte.${en3d}&notificacion_1_enviada=eq.true&notificacion_2_enviada=is.null&select=*`,tok).catch(()=>[]);
+    for(const c of sin3d){
+      const esJ=c.tipo?.includes("jardin");const rol=esJ?"jardinero":"limpieza";
+      const ops=await sbGet("operarios",`?rol=eq.${rol}&activo=eq.true&select=id`,SB_KEY).catch(()=>[]);
+      for(const op of ops)await sbPost("notificaciones",{para:op.id,txt:`⏰ RECORDATORIO: Reserva en 3 días — ¿Has decidido cuándo ${esJ?"preparar el jardín":"limpiar"}?`},tok).catch(()=>{});
       await sbPatch("coordinacion_servicios",`id=eq.${c.id}`,{notificacion_2_enviada:true},tok).catch(()=>{});
     }
-    // 4. Urgent 48h
-    const ante2=new Date(Date.now()-2*86400000).toISOString();
-    const sin48=await sbGet("coordinacion_servicios",`?estado=eq.servicio_creado_pendiente_fecha&notificacion_2_enviada=eq.true&notificacion_urgente_enviada=is.null&created_at=lt.${ante2}&select=*`,tok).catch(()=>[]);
-    for(const c of sin48){
-      const esL=c.tipo.includes("limpieza");
-      const ops=await sbGet("operarios",`?rol=eq.${esL?"limpieza":"jardinero"}&activo=eq.true&select=id`,tok).catch(()=>[]);
-      for(const op of ops)await sbPost("notificaciones",{para:op.id,txt:`🚨 URGENTE: 48h sin confirmar ${esL?"limpieza":"jardinería"}`},tok).catch(()=>{});
+    // 3. Urgent — tomorrow and not confirmed
+    const urg=await sbGet("coordinacion_servicios",`?estado=in.(preguntando_si_lista,servicio_creado_pendiente_fecha)&fecha_checkin_siguiente=lte.${manana}&notificacion_urgente_enviada=is.null&select=*`,tok).catch(()=>[]);
+    for(const c of urg){
+      const esJ=c.tipo?.includes("jardin");const rol=esJ?"jardinero":"limpieza";
+      const ops=await sbGet("operarios",`?rol=eq.${rol}&activo=eq.true&select=id`,SB_KEY).catch(()=>[]);
+      for(const op of ops)await sbPost("notificaciones",{para:op.id,txt:`🚨 URGENTE: Reserva MAÑANA — ${esJ?"jardín":"limpieza"} no confirmad${esJ?"o":"a"}.`},tok).catch(()=>{});
       const adms=await sbGet("usuarios","?rol=eq.admin&select=id",tok).catch(()=>[]);
-      for(const a of adms)await sbPost("notificaciones",{para:a.id,txt:`⚠️ Sin confirmación de ${esL?"limpieza":"jardinería"} hace 48h`},tok).catch(()=>{});
+      for(const a of adms)await sbPost("notificaciones",{para:a.id,txt:`⚠️ Reserva mañana (${c.fecha_checkin_siguiente}) — ${esJ?"jardín":"limpieza"} sin confirmar`},tok).catch(()=>{});
       await sbPatch("coordinacion_servicios",`id=eq.${c.id}`,{notificacion_urgente_enviada:true},tok).catch(()=>{});
+      sendPush("🚨 Urgente",`Reserva mañana — ${esJ?"jardín":"limpieza"} sin confirmar`,"urgente");
+    }
+    // 4. Post-checkout today: create services (unchanged logic)
+    const postH=await sbGet("coordinacion_servicios",`?fecha_checkout=eq.${hoy}&estado=eq.pendiente_confirmacion&select=*`,tok).catch(()=>[]);
+    for(const c of postH){
+      if(c.tipo?.includes("limpieza")){
+        await crearLimpiezaAuto(`Limpieza post — ${hoy}`,hoy,tok,"coord");
+        await sbPatch("coordinacion_servicios",`id=eq.${c.id}`,{estado:"servicio_creado_pendiente_fecha"},tok).catch(()=>{});
+      }
+      if(c.tipo?.includes("jardin")){
+        const esEv=c.tipo_reserva?.includes("evento");const tJ=esEv?[...TAREAS_JARDIN_POST,...TAREAS_JARDIN_POST_EVENTO]:TAREAS_JARDIN_POST;
+        const jds=await sbGet("jardineros","?activo=eq.true&select=*",tok).catch(()=>[]);const jd=jds[0]||null;
+        const[srv]=await sbPost("jardin_servicios",{nombre:`Jardín post — ${hoy}`,fecha_inicio:hoy,fecha_fin:c.fecha_checkin_siguiente||hoy,jardinero_id:jd?.id||null,jardinero_nombre:jd?.nombre||"",estado:"activo",creado_por:"Sistema automático"},tok).catch(()=>[{}]);
+        if(srv?.id){for(const t of tJ)await sbPost("jardin_servicio_tareas",{servicio_id:srv.id,txt:t.txt,done:false},tok).catch(()=>{});}
+        await sbPatch("coordinacion_servicios",`id=eq.${c.id}`,{estado:"servicio_creado_pendiente_fecha"},tok).catch(()=>{});
+      }
     }
   }catch(_){}
 }
