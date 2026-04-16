@@ -1077,7 +1077,7 @@ function Dashboard({perfil,tok,setPage,rol}){
   if(rol==="jardinero")return <DashJ perfil={perfil} jsem={jsem} jpunt={jpunt} cwk={cwk} setPage={setPage} tok={tok}/>;
   if(rol==="limpieza") return <DashL perfil={perfil} setPage={setPage}/>;
   if(rol==="comercial")return <DashC perfil={perfil} reservas={reservas} setPage={setPage}/>;
-  return <DashA reservas={reservas} jsem={jsem} jpunt={jpunt} cwk={cwk} setPage={setPage} tok={tok}/>;
+  return <DashA reservas={reservas} jsem={jsem} jpunt={jpunt} cwk={cwk} setPage={setPage} tok={tok} perfil={perfil}/>;
 }
 // ─── FINANCIAL KPIs ─────────────────────────────────────────────────────────
 function FinancialKPIs({tok}){
@@ -1436,6 +1436,7 @@ function AtencionAhora({tok,setPage}){
   const [srvLimp,setSrvLimp]=useState([]);
   const [srvJard,setSrvJard]=useState([]);
   const [stockBajos,setStockBajos]=useState([]);
+  const [coordItems,setCoordItems]=useState([]);
   const [load,setLoad]=useState(true);
 
   useEffect(()=>{
@@ -1490,6 +1491,8 @@ function AtencionAhora({tok,setPage}){
         setSrvJard(sJard);
         // Stock bajo
         try{const arts=await sbGet("almacen_articulos","?activo=eq.true&select=nombre,stock_casa,stock_almacen,stock_minimo",tok);setStockBajos(arts.filter(a=>(parseFloat(a.stock_casa)||0)+(parseFloat(a.stock_almacen)||0)<=(parseFloat(a.stock_minimo)||0)));}catch(_){}
+        // Coordinación
+        try{const ci=await sbGet("coordinacion_servicios",`?estado=in.(pendiente_confirmacion,servicio_creado_pendiente_fecha,pendiente_aprobacion_admin)&select=*&order=created_at.desc&limit=10`,tok);setCoordItems(ci);}catch(_){}
         // Alertas meteorológicas
         try{const m=await fetchMeteo();if(m?.daily){const am=[];const rAll=await sbGet("reservas",`?fecha=gte.${hoyStr}&fecha=lte.${en7Str}&select=nombre,fecha`,tok).catch(()=>[]);const aAll=await sbGet("reservas_airbnb",`?fecha_entrada=lte.${en7Str}&fecha_salida=gte.${hoyStr}&select=huesped,fecha_entrada,fecha_salida`,tok).catch(()=>[]);
           m.daily.time.forEach((f,i)=>{const rain=m.daily.precipitation_sum[i];const wind=m.daily.windspeed_10m_max[i];const evts=rAll.filter(r=>r.fecha===f);const airsD=aAll.filter(a=>a.fecha_entrada<=f&&a.fecha_salida>=f);
@@ -1504,7 +1507,7 @@ function AtencionAhora({tok,setPage}){
 
   if(load)return <div style={{display:"flex",alignItems:"center",gap:8,justifyContent:"center",padding:"20px 0",color:"#8A8580",fontSize:13}}><div className="spin" style={{width:16,height:16,borderWidth:2}}/>Cargando…</div>;
 
-  const totalItems=llegadas.length+acciones.length+solicitudes.length+srvLimp.length+srvJard.length+stockBajos.length+alertasMeteo.length;
+  const totalItems=llegadas.length+acciones.length+solicitudes.length+srvLimp.length+srvJard.length+stockBajos.length+alertasMeteo.length+coordItems.length;
   if(totalItems===0)return null;
 
   const fmtF=f=>new Date(f+"T12:00:00").toLocaleDateString("es-ES",{weekday:"short",day:"numeric",month:"short"});
@@ -1593,6 +1596,20 @@ function AtencionAhora({tok,setPage}){
       })}
     </>}
 
+    {/* COORDINACIÓN */}
+    {coordItems.length>0&&<>
+      <div style={{fontSize:11,color:"#AFA3FF",fontWeight:600,textTransform:"uppercase",letterSpacing:1,marginBottom:8,marginTop:16}}>🔄 Coordinación servicios ({coordItems.length})</div>
+      {coordItems.map(c=>{
+        const esL=c.tipo?.includes("limpieza");const est=c.estado;
+        const col=est==="pendiente_aprobacion_admin"?"#D4A017":est==="servicio_creado_pendiente_fecha"?"#EC683E":"#AFA3FF";
+        const ico=est==="pendiente_aprobacion_admin"?"🔑":est==="servicio_creado_pendiente_fecha"?"⏳":"📋";
+        return <div key={c.id} style={{padding:"8px 12px",background:`${col}10`,borderRadius:10,marginBottom:5,borderLeft:`3px solid ${col}`,fontSize:12,color:"#1A1A1A"}}>
+          <span>{ico} {esL?"Limpieza":"Jardín"} {c.tipo_reserva==="airbnb"?"Airbnb":"evento"} — {est==="pendiente_aprobacion_admin"?"Solicita día checkin":"Pendiente confirmación"}</span>
+          {c.fecha_checkout&&<span style={{color:"#8A8580",marginLeft:8}}>{new Date(c.fecha_checkout+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"})}</span>}
+        </div>;
+      })}
+    </>}
+
     {/* STOCK BAJO */}
     {stockBajos.length>0&&<>
       <div style={{fontSize:11,color:"#F35757",fontWeight:600,textTransform:"uppercase",letterSpacing:1,marginBottom:8,marginTop:16}}>📦 Stock bajo ({stockBajos.length})</div>
@@ -1629,8 +1646,8 @@ async function autoCobrarAirbnb(tok){
   }catch(_){}
 }
 
-function DashA({reservas,jsem,jpunt,cwk,setPage,tok}){
-  useEffect(()=>{autoCobrarAirbnb(tok);},[]);
+function DashA({reservas,jsem,jpunt,cwk,setPage,tok,perfil}){
+  useEffect(()=>{autoCobrarAirbnb(tok);ejecutarMotorCoordinacion(tok,perfil);},[]);
   const [meteo,setMeteo]=useState(null);
   useEffect(()=>{fetchMeteo().then(d=>{if(d)setMeteo(d);});},[]);
   const temp=getTemporada();
@@ -5495,6 +5512,90 @@ function Reservas({tok,rol,perfil}){
   </>;
 }
 
+// ─── COORDINACIÓN ───────────────────────────────────────────────────────────
+function calcularVentanaLimpieza(fechaOut,fechaIn){
+  const out=new Date(fechaOut+"T12:00:00");
+  if(!fechaIn)return{tipo:"amplia",inicio:out,fin:new Date(out.getTime()+3*86400000),requiereAprobacion:false};
+  const inn=new Date(fechaIn+"T15:00:00");const diffH=(inn-out)/(3600000);
+  if(diffH<=3)return{tipo:"critico",inicio:out,fin:inn,requiereAprobacion:true,mensaje:`⚠️ Solo ${Math.round(diffH)}h entre reservas`};
+  if(diffH<=72)return{tipo:"ajustada",inicio:out,fin:new Date(inn.getTime()-86400000),requiereAprobacion:false,mensaje:`⏰ ${Math.round(diffH)}h disponibles`};
+  return{tipo:"normal",inicio:out,fin:new Date(out.getTime()+3*86400000),finAbsoluto:new Date(inn.getTime()-86400000),requiereAprobacion:false};
+}
+async function obtenerProximaReserva(fecha,tok){
+  const[re,ra]=await Promise.all([sbGet("reservas",`?fecha=gt.${fecha}&estado=neq.cancelada&select=fecha&order=fecha.asc&limit=1`,tok).catch(()=>[]),sbGet("reservas_airbnb",`?fecha_entrada=gt.${fecha}&select=fecha_entrada&order=fecha_entrada.asc&limit=1`,tok).catch(()=>[])]);
+  const pe=re[0]?.fecha;const pa=ra[0]?.fecha_entrada;
+  if(!pe&&!pa)return null;if(!pe)return pa;if(!pa)return pe;return pe<pa?pe:pa;
+}
+const TAREAS_JARDIN_POST=[{id:"jp1",txt:"Limpiar piscina (superficie + fondo)"},{id:"jp2",txt:"Comprobar motor y luces de piscina"},{id:"jp3",txt:"Limpiar hamacas"},{id:"jp4",txt:"Limpiar zonas exteriores completas"},{id:"jp5",txt:"Soplar y retirar hojas"},{id:"jp6",txt:"Regar y revisar césped"},{id:"jp7",txt:"Limpiar barbacoa"},{id:"jp8",txt:"Ordenar utensilios"},{id:"jp9",txt:"Limpiar porches"},{id:"jp10",txt:"Retirar basura exterior"},{id:"jp11",txt:"Revisión visual general"}];
+const TAREAS_JARDIN_POST_EVENTO=[{id:"jpe1",txt:"Retirar colillas del suelo"},{id:"jpe2",txt:"Limpiar ceniceros"},{id:"jpe3",txt:"Retirar vasos y basura invitados"},{id:"jpe4",txt:"Inspección visual desperfectos"},{id:"jpe5",txt:"Comprobar invernadero"},{id:"jpe6",txt:"Revisión estado instalaciones"}];
+
+async function procesarCoordReserva(tipo,reservaId,tipoReserva,fechaOut,fechaIn,tok){
+  try{
+    const ventana=calcularVentanaLimpieza(fechaOut,fechaIn);
+    await sbPost("coordinacion_servicios",{tipo,reserva_id:String(reservaId),tipo_reserva:tipoReserva,fecha_checkout:fechaOut,fecha_checkin_siguiente:fechaIn||null,ventana_inicio:ventana.inicio.toISOString(),ventana_fin:ventana.fin.toISOString(),estado:"pendiente_confirmacion"},tok).catch(()=>{});
+    // Pre-notification 3 days before
+    const pre3=new Date(new Date(fechaOut+"T12:00:00").getTime()-3*86400000).toISOString().split("T")[0];
+    const preTipo=tipo.includes("limpieza")?"check_pre_limpieza":"check_pre_jardin";
+    await sbPost("coordinacion_servicios",{tipo:preTipo,reserva_id:String(reservaId),tipo_reserva:tipoReserva,fecha_checkout:pre3,fecha_checkin_siguiente:fechaOut,estado:"pendiente_notificacion_pre"},tok).catch(()=>{});
+  }catch(_){}
+}
+
+async function ejecutarMotorCoordinacion(tok,perfil){
+  const fk=`fm_motor_coord_${new Date().toISOString().split("T")[0]}_${new Date().getHours()}`;
+  if(localStorage.getItem(fk))return;localStorage.setItem(fk,"1");
+  const hoy=new Date().toISOString().split("T")[0];
+  try{
+    // 1. Pre-notifications (3 days before)
+    const preN=await sbGet("coordinacion_servicios",`?estado=eq.pendiente_notificacion_pre&fecha_checkout=eq.${hoy}&select=*`,tok).catch(()=>[]);
+    for(const c of preN){
+      const esLimp=c.tipo.includes("limpieza");
+      const ops=await sbGet("operarios",`?rol=eq.${esLimp?"limpieza":"jardinero"}&activo=eq.true&select=id`,tok).catch(()=>[]);
+      const msg=esLimp?"🏠 Reserva en 3 días — ¿Está la casa lista?":"🌿 Reserva en 3 días — ¿Está el jardín listo?";
+      for(const op of ops)await sbPost("notificaciones",{para:op.id,txt:msg},tok).catch(()=>{});
+      await sbPatch("coordinacion_servicios",`id=eq.${c.id}`,{estado:"notificacion_pre_enviada",notificacion_1_enviada:true},tok).catch(()=>{});
+      sendPush(esLimp?"🏠 Finca El Molino":"🌿 Finca El Molino",msg,"coord-pre");
+    }
+    // 2. Post-checkout today: create services
+    const postH=await sbGet("coordinacion_servicios",`?fecha_checkout=eq.${hoy}&estado=eq.pendiente_confirmacion&select=*`,tok).catch(()=>[]);
+    for(const c of postH){
+      if(c.tipo.includes("limpieza")){
+        const tipoL=c.tipo_reserva==="airbnb"?"Airbnb":"Evento";
+        await crearLimpiezaAuto(`Limpieza post-${tipoL} — ${hoy}`,hoy,tok,"coord");
+        await sbPatch("coordinacion_servicios",`id=eq.${c.id}`,{estado:"servicio_creado_pendiente_fecha"},tok).catch(()=>{});
+      }
+      if(c.tipo.includes("jardin")){
+        const esEvento=c.tipo_reserva?.includes("evento");
+        const tareasJ=esEvento?[...TAREAS_JARDIN_POST,...TAREAS_JARDIN_POST_EVENTO]:TAREAS_JARDIN_POST;
+        const jds=await sbGet("jardineros","?activo=eq.true&select=*",tok).catch(()=>[]);const jd=jds[0]||null;
+        const[srv]=await sbPost("jardin_servicios",{nombre:`Jardín post-${esEvento?"evento":"Airbnb"} — ${hoy}`,fecha_inicio:hoy,fecha_fin:c.fecha_checkin_siguiente||hoy,jardinero_id:jd?.id||null,jardinero_nombre:jd?.nombre||"",estado:"activo",creado_por:"Sistema automático"},tok).catch(()=>[{}]);
+        if(srv?.id){for(const t of tareasJ)await sbPost("jardin_servicio_tareas",{servicio_id:srv.id,txt:t.txt,done:false},tok).catch(()=>{});}
+        await sbPatch("coordinacion_servicios",`id=eq.${c.id}`,{estado:"servicio_creado_pendiente_fecha"},tok).catch(()=>{});
+        const opsJ=await sbGet("operarios","?rol=eq.jardinero&activo=eq.true&select=id",tok).catch(()=>[]);
+        for(const op of opsJ)await sbPost("notificaciones",{para:op.id,txt:`🌿 Nuevo servicio de jardín — elige tu día`},tok).catch(()=>{});
+      }
+    }
+    // 3. Reminder 24h
+    const ayer=new Date(Date.now()-86400000).toISOString();
+    const sin24=await sbGet("coordinacion_servicios",`?estado=eq.servicio_creado_pendiente_fecha&notificacion_2_enviada=is.null&created_at=lt.${ayer}&select=*`,tok).catch(()=>[]);
+    for(const c of sin24){
+      const esL=c.tipo.includes("limpieza");const ops=await sbGet("operarios",`?rol=eq.${esL?"limpieza":"jardinero"}&activo=eq.true&select=id`,tok).catch(()=>[]);
+      for(const op of ops)await sbPost("notificaciones",{para:op.id,txt:`⏰ RECORDATORIO: Elige día para ${esL?"limpieza":"jardinería"}`},tok).catch(()=>{});
+      await sbPatch("coordinacion_servicios",`id=eq.${c.id}`,{notificacion_2_enviada:true},tok).catch(()=>{});
+    }
+    // 4. Urgent 48h
+    const ante2=new Date(Date.now()-2*86400000).toISOString();
+    const sin48=await sbGet("coordinacion_servicios",`?estado=eq.servicio_creado_pendiente_fecha&notificacion_2_enviada=eq.true&notificacion_urgente_enviada=is.null&created_at=lt.${ante2}&select=*`,tok).catch(()=>[]);
+    for(const c of sin48){
+      const esL=c.tipo.includes("limpieza");
+      const ops=await sbGet("operarios",`?rol=eq.${esL?"limpieza":"jardinero"}&activo=eq.true&select=id`,tok).catch(()=>[]);
+      for(const op of ops)await sbPost("notificaciones",{para:op.id,txt:`🚨 URGENTE: 48h sin confirmar ${esL?"limpieza":"jardinería"}`},tok).catch(()=>{});
+      const adms=await sbGet("usuarios","?rol=eq.admin&select=id",tok).catch(()=>[]);
+      for(const a of adms)await sbPost("notificaciones",{para:a.id,txt:`⚠️ Sin confirmación de ${esL?"limpieza":"jardinería"} hace 48h`},tok).catch(()=>{});
+      await sbPatch("coordinacion_servicios",`id=eq.${c.id}`,{notificacion_urgente_enviada:true},tok).catch(()=>{});
+    }
+  }catch(_){}
+}
+
 // ─── AUTO LIMPIEZA ──────────────────────────────────────────────────────────
 async function crearLimpiezaAuto(nombre,fecha,tok,origen){
   try{
@@ -5537,7 +5638,10 @@ function NuevaReserva({perfil,tok,setPage,rol}){
       const en7=new Date();en7.setDate(en7.getDate()+7);
       if(form.fecha&&form.fecha<=en7.toISOString().split("T")[0])notificarRoles(["admin","comercial","limpieza","jardinero"],"🎉 Nuevo evento",`${form.nombre} el ${new Date(form.fecha+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"long"})}`,"evento-nuevo",tok);
       // AUTO 2 — limpieza post-evento si incluye casa
-      if(form.incluye_casa)crearLimpiezaPostEvento({nombre:form.nombre,fecha:form.fecha,id:res.id},tok,perfil);
+      // Coordinación automática
+      const proxRes=await obtenerProximaReserva(form.fecha,tok);
+      if(form.incluye_casa){crearLimpiezaPostEvento({nombre:form.nombre,fecha:form.fecha,id:res.id},tok);procesarCoordReserva("limpieza_post_evento",res.id,"evento_casa",form.fecha,proxRes,tok);}
+      procesarCoordReserva("jardin_post_evento",res.id,form.incluye_casa?"evento_casa":"evento_finca",form.fecha,proxRes,tok);
       // AUTO 5 — sugerir jardinería si >14 días
       const diasHasta=Math.ceil((new Date(form.fecha)-new Date())/(86400000));
       if(diasHasta>14)setSugJardin({nombre:form.nombre,fecha:form.fecha,fechaSug:new Date(new Date(form.fecha).getTime()-2*86400000).toISOString().split("T")[0]});
@@ -6008,8 +6112,11 @@ function ReservasAirbnb({perfil,tok,rol}){
       // Notificar si llegada próximos 7 días
       const en7=new Date();en7.setDate(en7.getDate()+7);
       if(form.fecha_entrada&&form.fecha_entrada<=en7.toISOString().split("T")[0])notificarRoles(["admin","limpieza","jardinero"],`🏠 Nueva reserva Airbnb`,`${form.huesped} llega el ${new Date(form.fecha_entrada+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"long"})}`,"airbnb-nueva",tok);
-      // AUTO 1 — limpieza post-airbnb
+      // AUTO 1 — limpieza + coordinación post-airbnb
       crearLimpiezaPostAirbnb({huesped:form.huesped,fecha_salida:form.fecha_salida},tok);
+      const proxAb=await obtenerProximaReserva(form.fecha_salida,tok);
+      procesarCoordReserva("limpieza_post_checkout","airbnb_new","airbnb",form.fecha_salida,proxAb,tok);
+      procesarCoordReserva("jardin_post_checkout","airbnb_new","airbnb",form.fecha_salida,proxAb,tok);
       setShowForm(false);setForm(formVacio);await load_();
     }catch(_){}
     setSaving(false);
