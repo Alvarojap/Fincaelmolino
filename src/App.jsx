@@ -1774,7 +1774,7 @@ function DashJ({perfil,jsem,jpunt,cwk,setPage,tok}){
       }
     }catch(_){}
   };
-  useEffect(()=>{if(tok){loadSrvActivo();sbGet("coordinacion_servicios","?estado=eq.servicio_creado_pendiente_fecha&tipo=ilike.*jardin*&select=*",tok).then(setCoordPJ).catch(()=>{});}},[]);
+  useEffect(()=>{if(tok){loadSrvActivo();const t=perfil?.es_operario?SB_KEY:tok;console.log("DashJ: buscando coordinaciones jardín...");sbGet("coordinacion_servicios","?estado=eq.servicio_creado_pendiente_fecha&select=*",t).then(r=>{const jc=r.filter(c=>c.tipo?.includes("jardin"));console.log("DashJ: encontradas:",JSON.stringify(jc));setCoordPJ(jc);}).catch(e=>console.log("DashJ error:",e.message));}},[]);
 
   // Cronómetro — uses timestamps from localStorage for persistence
   useEffect(()=>{
@@ -2048,7 +2048,7 @@ function DashJ({perfil,jsem,jpunt,cwk,setPage,tok}){
 }
 function DashL({perfil,setPage,tok}){
   const [coordP,setCoordP]=useState([]);const [savingC,setSavingC]=useState(false);const [showDatePick,setShowDatePick]=useState(null);const [customDate,setCustomDate]=useState("");
-  useEffect(()=>{if(tok)sbGet("coordinacion_servicios","?estado=eq.servicio_creado_pendiente_fecha&select=*",tok).then(setCoordP).catch(()=>{});},[]);
+  useEffect(()=>{if(tok){const t=perfil?.es_operario?SB_KEY:tok;console.log("DashL: buscando coordinaciones pendientes...");sbGet("coordinacion_servicios","?estado=eq.servicio_creado_pendiente_fecha&select=*",t).then(r=>{console.log("DashL: encontradas:",JSON.stringify(r));setCoordP(r);}).catch(e=>console.log("DashL error:",e.message));}},[]);
   const getDias=(ini,fin)=>{const ds=[];const i=new Date(ini);const f=new Date(fin);const h=new Date();let d=i>h?i:h;while(d<=f&&ds.length<7){ds.push(new Date(d));d=new Date(d.getTime()+86400000);}return ds;};
   const confirmarFecha=async(c,dia)=>{if(savingC)return;setSavingC(true);const ds=dia.toISOString().split("T")[0];
     try{await sbPatch("coordinacion_servicios",`id=eq.${c.id}`,{fecha_programada:ds,estado:"confirmado",respondido_por:perfil.nombre},tok);
@@ -5372,6 +5372,17 @@ function Reservas({tok,rol,perfil}){
       await addHistorial("reserva",id,`Estado cambiado a: ${est?.lbl||e}`,perfil?.nombre||"Admin",tok);
       const r=reservas.find(x=>x.id===id);
       if(r)notificarRoles(["admin","comercial"],`📋 Reserva actualizada`,`${r.nombre}: ${est?.lbl||e}`,"reserva-estado",tok);
+      // Cascading cancel if cancelled
+      if(e==="cancelada"){
+        const coords=await sbGet("coordinacion_servicios",`?reserva_id=eq.${id}&select=*`,tok).catch(()=>[]);
+        for(const c of coords){
+          if(c.servicio_id)await sbPatch("servicios",`id=eq.${c.servicio_id}`,{estado:"cancelado"},tok).catch(()=>{});
+          if(c.jardin_servicio_id)await sbPatch("jardin_servicios",`id=eq.${c.jardin_servicio_id}`,{estado:"cancelado"},tok).catch(()=>{});
+          await sbPatch("coordinacion_servicios",`id=eq.${c.id}`,{estado:"cancelado"},tok).catch(()=>{});
+        }
+        if(r){const ops=await sbGet("operarios","?activo=eq.true&select=id",tok).catch(()=>[]);
+          for(const op of ops)await sbPost("notificaciones",{para:op.id,txt:`❌ Reserva "${r.nombre}" cancelada. Servicios asociados cancelados.`},tok).catch(()=>{});}
+      }
       setReservas(prev=>prev.map(r=>r.id===id?{...r,estado:e}:r));
       setSel(p=>p?.id===id?{...p,estado:e}:p);
     }catch(_){}
@@ -5584,8 +5595,9 @@ const TAREAS_JARDIN_POST_EVENTO=[{id:"jpe1",txt:"Retirar colillas del suelo"},{i
 
 async function procesarCoordReserva(tipo,reservaId,tipoReserva,fechaOut,fechaIn,tok){
   try{
+    console.log("Creando coordinación:",tipo,"reserva:",reservaId,"fechaOut:",fechaOut);
     const ventana=calcularVentanaLimpieza(fechaOut,fechaIn);
-    await sbPost("coordinacion_servicios",{tipo,reserva_id:String(reservaId),tipo_reserva:tipoReserva,fecha_checkout:fechaOut,fecha_checkin_siguiente:fechaIn||null,ventana_inicio:ventana.inicio.toISOString(),ventana_fin:ventana.fin.toISOString(),estado:"pendiente_confirmacion"},tok).catch(()=>{});
+    await sbPost("coordinacion_servicios",{tipo,reserva_id:String(reservaId),tipo_reserva:tipoReserva,fecha_checkout:fechaOut,fecha_checkin_siguiente:fechaIn||null,ventana_inicio:ventana.inicio.toISOString(),ventana_fin:ventana.fin.toISOString(),estado:"pendiente_confirmacion"},tok).catch(e=>console.log("Error coord insert:",e.message));
     // Pre-notification 3 days before
     const pre3=new Date(new Date(fechaOut+"T12:00:00").getTime()-3*86400000).toISOString().split("T")[0];
     const preTipo=tipo.includes("limpieza")?"check_pre_limpieza":"check_pre_jardin";
@@ -6177,7 +6189,22 @@ function ReservasAirbnb({perfil,tok,rol}){
 
   const eliminar=async id=>{
     if(!window.confirm("¿Eliminar esta reserva Airbnb?"))return;
-    try{await sbDelete("reservas_airbnb",`id=eq.${id}`,tok);await load_();setSel(null);}catch(_){}
+    try{
+      // Cascading cancel
+      const coords=await sbGet("coordinacion_servicios",`?reserva_id=eq.${id}&select=*`,tok).catch(()=>[]);
+      for(const c of coords){
+        if(c.servicio_id)await sbPatch("servicios",`id=eq.${c.servicio_id}`,{estado:"cancelado"},tok).catch(()=>{});
+        if(c.jardin_servicio_id)await sbPatch("jardin_servicios",`id=eq.${c.jardin_servicio_id}`,{estado:"cancelado"},tok).catch(()=>{});
+        await sbPatch("coordinacion_servicios",`id=eq.${c.id}`,{estado:"cancelado"},tok).catch(()=>{});
+      }
+      const ab=airbnbs.find(a=>a.id===id);
+      if(ab){const msg=`❌ Reserva Airbnb cancelada — ${ab.huesped}. Servicios asociados cancelados.`;
+        const ops=await sbGet("operarios","?activo=eq.true&select=id",tok).catch(()=>[]);
+        const adms=await sbGet("usuarios","?rol=eq.admin&select=id",tok).catch(()=>[]);
+        for(const u of[...ops,...adms])await sbPost("notificaciones",{para:u.id,txt:msg},tok).catch(()=>{});
+        sendPush("❌ Reserva cancelada",msg,"reserva-cancelada");}
+      await sbDelete("reservas_airbnb",`id=eq.${id}`,tok);await load_();setSel(null);
+    }catch(_){}
   };
 
   const fmtRango=a=>{
