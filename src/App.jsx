@@ -82,6 +82,22 @@ async function marcarVistoItem(tipo,itemId,userId,tok){await sbDelete("items_no_
 async function contarNoVistos(userId,tok){const items=await sbGet("items_no_vistos",`?para_usuario_id=eq.${userId}&select=tipo`,tok).catch(()=>[]);const porTipo={};items.forEach(i=>{porTipo[i.tipo]=(porTipo[i.tipo]||0)+1;});return{total:items.length,porTipo};}
 async function getUserIdsPorRol(rol,tok){const[u,o]=await Promise.all([sbGet("usuarios",`?rol=eq.${rol}&select=id`,tok).catch(()=>[]),sbGet("operarios",`?rol=eq.${rol}&select=id`,tok).catch(()=>[])]);return[...u,...o].map(x=>x.id);}
 
+// ─── METEO ──────────────────────────────────────────────────────────────────
+const METEO_URL="https://api.open-meteo.com/v1/forecast?latitude=37.83&longitude=-0.97&daily=weathercode,temperature_2m_max,temperature_2m_min,precipitation_sum,windspeed_10m_max&timezone=Europe%2FMadrid&forecast_days=7";
+const METEO_CACHE_KEY="fm_meteo_cache";const METEO_TTL=3*3600000;
+function getWIcon(c){if(c===0)return"☀️";if(c<=2)return"⛅";if(c===3)return"☁️";if(c<=49)return"🌫️";if(c<=59)return"🌦️";if(c<=69)return"🌧️";if(c<=79)return"❄️";if(c<=84)return"🌧️";if(c<=99)return"⛈️";return"🌡️";}
+function getWDesc(c){if(c===0)return"Despejado";if(c<=2)return"Poco nuboso";if(c===3)return"Nublado";if(c<=49)return"Niebla";if(c<=59)return"Llovizna";if(c<=69)return"Lluvia";if(c<=79)return"Nieve";if(c<=84)return"Chubascos";if(c<=99)return"Tormenta";return"—";}
+async function fetchMeteo(){
+  try{
+    const cached=localStorage.getItem(METEO_CACHE_KEY);
+    if(cached){const{data,ts}=JSON.parse(cached);if(Date.now()-ts<METEO_TTL)return data;}
+    const r=await fetch(METEO_URL);if(!r.ok)return null;
+    const data=await r.json();
+    localStorage.setItem(METEO_CACHE_KEY,JSON.stringify({data,ts:Date.now()}));
+    return data;
+  }catch(_){return null;}
+}
+
 // ─── DATOS ESTÁTICOS ─────────────────────────────────────────────────────────
 function getTemporada() {
   const m = new Date().getMonth()+1;
@@ -1416,6 +1432,7 @@ function AtencionAhora({tok,setPage}){
   const [llegadas,setLlegadas]=useState([]);
   const [acciones,setAcciones]=useState([]);
   const [solicitudes,setSolicitudes]=useState([]);
+  const [alertasMeteo,setAlertasMeteo]=useState([]);
   const [srvLimp,setSrvLimp]=useState([]);
   const [srvJard,setSrvJard]=useState([]);
   const [stockBajos,setStockBajos]=useState([]);
@@ -1473,6 +1490,13 @@ function AtencionAhora({tok,setPage}){
         setSrvJard(sJard);
         // Stock bajo
         try{const arts=await sbGet("almacen_articulos","?activo=eq.true&select=nombre,stock_casa,stock_almacen,stock_minimo",tok);setStockBajos(arts.filter(a=>(parseFloat(a.stock_casa)||0)+(parseFloat(a.stock_almacen)||0)<=(parseFloat(a.stock_minimo)||0)));}catch(_){}
+        // Alertas meteorológicas
+        try{const m=await fetchMeteo();if(m?.daily){const am=[];const rAll=await sbGet("reservas",`?fecha=gte.${hoyStr}&fecha=lte.${en7Str}&select=nombre,fecha`,tok).catch(()=>[]);const aAll=await sbGet("reservas_airbnb",`?fecha_entrada=lte.${en7Str}&fecha_salida=gte.${hoyStr}&select=huesped,fecha_entrada,fecha_salida`,tok).catch(()=>[]);
+          m.daily.time.forEach((f,i)=>{const rain=m.daily.precipitation_sum[i];const wind=m.daily.windspeed_10m_max[i];const evts=rAll.filter(r=>r.fecha===f);const airsD=aAll.filter(a=>a.fecha_entrada<=f&&a.fecha_salida>=f);
+            if(rain>5&&evts.length>0)am.push({msg:`🌧️ Lluvia (${rain}mm) el día del evento "${evts[0].nombre}"`,fecha:f});
+            if(rain>2&&airsD.length>0)am.push({msg:`🌧️ Lluvia (${rain}mm) durante estancia de "${airsD[0].huesped}"`,fecha:f});
+            if(wind>40)am.push({msg:`💨 Viento fuerte (${wind}km/h) el ${new Date(f+"T12:00:00").toLocaleDateString("es-ES",{weekday:"long",day:"numeric"})}`,fecha:f});
+          });setAlertasMeteo(am);}}catch(_){}
       }catch(_){}
       setLoad(false);
     })();
@@ -1480,7 +1504,7 @@ function AtencionAhora({tok,setPage}){
 
   if(load)return <div style={{display:"flex",alignItems:"center",gap:8,justifyContent:"center",padding:"20px 0",color:"#8A8580",fontSize:13}}><div className="spin" style={{width:16,height:16,borderWidth:2}}/>Cargando…</div>;
 
-  const totalItems=llegadas.length+acciones.length+solicitudes.length+srvLimp.length+srvJard.length+stockBajos.length;
+  const totalItems=llegadas.length+acciones.length+solicitudes.length+srvLimp.length+srvJard.length+stockBajos.length+alertasMeteo.length;
   if(totalItems===0)return null;
 
   const fmtF=f=>new Date(f+"T12:00:00").toLocaleDateString("es-ES",{weekday:"short",day:"numeric",month:"short"});
@@ -1489,9 +1513,15 @@ function AtencionAhora({tok,setPage}){
   return <div className="card" style={{marginBottom:16}}>
     <div className="chdr"><span className="ctit">⚡ Atención ahora</span><span className="badge" style={{background:"rgba(232,85,85,.1)",color:"#F35757",border:"1px solid rgba(232,85,85,.2)"}}>{totalItems}</span></div>
 
+    {/* ALERTAS METEO */}
+    {alertasMeteo.length>0&&<>
+      <div style={{fontSize:11,color:"#7FB2FF",fontWeight:600,textTransform:"uppercase",letterSpacing:1,marginBottom:8,marginTop:4}}>🌤️ Alertas meteorológicas</div>
+      {alertasMeteo.map((a,i)=><div key={`meteo-${i}`} style={{padding:"8px 12px",background:"rgba(127,178,255,.08)",borderRadius:10,marginBottom:5,fontSize:12,color:"#5A8AD4",fontWeight:500}}>{a.msg}</div>)}
+    </>}
+
     {/* LLEGADAS */}
     {llegadas.length>0&&<>
-      <div style={{fontSize:11,color:"#EC683E",fontWeight:600,textTransform:"uppercase",letterSpacing:1,marginBottom:8,marginTop:4}}>🏠 Próximas llegadas esta semana</div>
+      <div style={{fontSize:11,color:"#EC683E",fontWeight:600,textTransform:"uppercase",letterSpacing:1,marginBottom:8,marginTop:(alertasMeteo.length>0)?16:4}}>🏠 Próximas llegadas esta semana</div>
       {llegadas.map((l,i)=>(
         <div key={`ll-${i}`} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",background:"#F5F3F0",borderRadius:8,marginBottom:5}}>
           <span style={l.tipo==="airbnb"?tagStyle("rgba(16,185,129,.15)","#10b981"):tagStyle("rgba(99,102,241,.15)","#a5b4fc")}>{l.tipo==="airbnb"?"AIRBNB":"EVENTO"}</span>
@@ -1601,6 +1631,8 @@ async function autoCobrarAirbnb(tok){
 
 function DashA({reservas,jsem,jpunt,cwk,setPage,tok}){
   useEffect(()=>{autoCobrarAirbnb(tok);},[]);
+  const [meteo,setMeteo]=useState(null);
+  useEffect(()=>{fetchMeteo().then(d=>{if(d)setMeteo(d);});},[]);
   const temp=getTemporada();
   const sj={}; jsem.forEach(r=>sj[r.tarea_id]=r);
   const actv=JARDIN_T[temp].filter(t=>tocaSemana({...t,frec:t.frec},cwk));
@@ -1612,6 +1644,21 @@ function DashA({reservas,jsem,jpunt,cwk,setPage,tok}){
   return <>
     <div className="ph"><h2>Panel administración 👋</h2><p>{new Date().toLocaleDateString("es-ES",{weekday:"long",year:"numeric",month:"long",day:"numeric"})}</p></div>
     <div className="pb">
+      {/* METEO WIDGET */}
+      {meteo?.daily&&<div className="card" style={{marginBottom:16,padding:"16px 18px"}}>
+        <div style={{fontSize:11,color:"#8A8580",fontWeight:700,textTransform:"uppercase",letterSpacing:.5,marginBottom:10}}>📍 San Javier, Murcia — Previsión 7 días</div>
+        <div style={{display:"flex",gap:8,overflowX:"auto",scrollbarWidth:"none",paddingBottom:4}}>
+          {meteo.daily.time.map((f,i)=>{const d=new Date(f+"T12:00:00");const lbl=i===0?"Hoy":i===1?"Mañ":d.toLocaleDateString("es-ES",{weekday:"short"}).slice(0,3);const tMax=Math.round(meteo.daily.temperature_2m_max[i]);const tMin=Math.round(meteo.daily.temperature_2m_min[i]);const rain=meteo.daily.precipitation_sum[i];const code=meteo.daily.weathercode[i];
+            return <div key={f} style={{minWidth:72,textAlign:"center",padding:"8px 6px",borderRadius:12,background:i===0?"rgba(236,104,62,.06)":"#F5F3F0",flex:"0 0 auto"}}>
+              <div style={{fontSize:11,fontWeight:700,color:i===0?"#EC683E":"#8A8580"}}>{lbl}</div>
+              <div style={{fontSize:24,margin:"4px 0"}}>{getWIcon(code)}</div>
+              <div style={{fontSize:13,fontWeight:700,color:"#1A1A1A"}}>{tMax}°</div>
+              <div style={{fontSize:11,color:"#8A8580"}}>{tMin}°</div>
+              {rain>0&&<div style={{fontSize:10,color:"#7FB2FF",fontWeight:600,marginTop:2}}>💧{rain}mm</div>}
+            </div>;
+          })}
+        </div>
+      </div>}
       <div className="sg">
         <SC lbl="Reservas activas" val={reservas.filter(r=>["visita","pendiente_contrato","contrato_firmado","reserva_pagada","precio_total"].includes(r.estado)).length} sub="en curso"/>
         <SC lbl="Ingresos confirmados" val={`${ing.toLocaleString("es-ES")}€`}/>
@@ -1639,6 +1686,8 @@ function DashA({reservas,jsem,jpunt,cwk,setPage,tok}){
   </>;
 }
 function DashJ({perfil,jsem,jpunt,cwk,setPage,tok}){
+  const [meteoJ,setMeteoJ]=useState(null);
+  useEffect(()=>{fetchMeteo().then(d=>{if(d?.daily){const r2=d.daily.precipitation_sum.slice(0,2);const maxR=Math.max(...r2);if(maxR>2)setMeteoJ({rain:maxR,day:r2[1]>r2[0]?"mañana":"hoy"});}});},[]);
   const temp=getTemporada();
   const sj={}; jsem.forEach(r=>sj[r.tarea_id]=r);
   const actv=JARDIN_T[temp].filter(t=>tocaSemana({...t,frec:t.frec},cwk));
@@ -1836,6 +1885,7 @@ function DashJ({perfil,jsem,jpunt,cwk,setPage,tok}){
   return <>
     <div className="ph"><h2>Hola, {perfil.nombre.split(" ")[0]} 👋</h2><p>{new Date().toLocaleDateString("es-ES",{weekday:"long",year:"numeric",month:"long",day:"numeric"})}</p></div>
     <div className="pb">
+      {meteoJ&&<div style={{background:"rgba(127,178,255,.08)",borderRadius:14,padding:"10px 14px",marginBottom:14,fontSize:13,color:"#5A8AD4",fontWeight:500}}>{meteoJ.rain>10?`💧 Lluvia abundante prevista ${meteoJ.day} (${meteoJ.rain}mm) — el riego puede ser innecesario`:`🌧️ Lluvia prevista ${meteoJ.day} (${meteoJ.rain}mm) — considera posponer el riego`}</div>}
       {/* SERVICIO ACTIVO */}
       {srvActivo&&<div className="card" style={{marginBottom:16,border:"1px solid rgba(16,185,129,.3)",background:"rgba(16,185,129,.04)"}}>
         <div className="chdr"><span className="ctit">🌿 Servicio activo</span></div>
