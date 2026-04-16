@@ -6,7 +6,7 @@ const SB_URL = "https://bqubxkuuyohuatdothwx.supabase.co";
 // Supabase anon key — segura para exponer en cliente (Row Level Security activo)
 const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJxdWJ4a3V1eW9odWF0ZG90aHd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ0NTE0MzgsImV4cCI6MjA5MDAyNzQzOH0.kwYPiTj0KOmw9RAm88DNceAYdFC3yHF4ogSzXXwSIDA";
 // Helper: obtener precio de reserva (unifica precio_total y precio)
-const getPrecioReserva=(r)=>parseFloat(r?.precio_total)||parseFloat(r?.precio)||0;
+const getPrecioReserva=(r)=>parseFloat(r?.precio_total)||(parseFloat(r?.precio_finca||0)+parseFloat(r?.precio_casa||0))||parseFloat(r?.precio)||0;
 const HDR  = { "Content-Type":"application/json","apikey":SB_KEY,"Authorization":`Bearer ${SB_KEY}` };
 const HDRA = tok => ({ ...HDR, "Authorization":`Bearer ${tok}` });
 
@@ -5399,8 +5399,13 @@ function Reservas({tok,rol,perfil}){
             <button className="btn bg sm" style={{flexShrink:0}} onClick={()=>setSel(null)}>✕</button>
           </div>
           <div className="g2" style={{marginBottom:14}}>
-            {[{l:"FECHA",v:new Date(sel.fecha).toLocaleDateString("es-ES",{day:"numeric",month:"long",year:"numeric"})},{l:"PRECIO",v:`${parseFloat(sel.precio||0).toLocaleString("es-ES")}€`,gold:true},{l:"TIPO",v:sel.tipo},{l:"CONTACTO",v:sel.contacto}].filter(x=>x.v).map(x=><div key={x.l} style={{background:"#F5F3F0",borderRadius:8,padding:11}}><div style={{fontSize:10,color:"#8A8580"}}>{x.l}</div><div style={{fontSize:x.gold?16:12,fontWeight:x.gold?700:400,color:x.gold?"#c9a84c":"#e8e6e1",marginTop:3}}>{x.v}</div></div>)}
+            {[{l:"FECHA",v:new Date(sel.fecha).toLocaleDateString("es-ES",{day:"numeric",month:"long",year:"numeric"})},{l:"TOTAL",v:`${getPrecioReserva(sel).toLocaleString("es-ES")}€`,gold:true},{l:"TIPO",v:sel.tipo},{l:"CONTACTO",v:sel.contacto}].filter(x=>x.v).map(x=><div key={x.l} style={{background:"#F5F3F0",borderRadius:8,padding:11}}><div style={{fontSize:10,color:"#8A8580"}}>{x.l}</div><div style={{fontSize:x.gold?16:12,fontWeight:x.gold?700:400,color:x.gold?"#EC683E":"#1A1A1A",marginTop:3}}>{x.v}</div></div>)}
           </div>
+          {(sel.precio_finca>0||sel.precio_casa>0)&&<div style={{background:"#F5F3F0",borderRadius:8,padding:11,marginBottom:14,fontSize:12}}>
+            <div style={{display:"flex",justifyContent:"space-between"}}><span>💰 Precio finca</span><strong>{(parseFloat(sel.precio_finca)||0).toLocaleString("es-ES")}€</strong></div>
+            {sel.incluye_casa&&<div style={{display:"flex",justifyContent:"space-between",marginTop:4}}><span>🏠 Precio casa</span><strong>{(parseFloat(sel.precio_casa)||0).toLocaleString("es-ES")}€</strong></div>}
+            <span className="badge" style={{background:sel.incluye_casa?"rgba(175,163,255,.12)":"#F0EDE8",color:sel.incluye_casa?"#AFA3FF":"#8A8580",marginTop:6,display:"inline-block"}}>{sel.incluye_casa?"Finca + Casa":"Solo finca"}</span>
+          </div>}
           {sel.obs&&<div style={{background:"#F5F3F0",borderRadius:8,padding:11,marginBottom:14}}><div style={{fontSize:10,color:"#8A8580",marginBottom:5}}>OBSERVACIONES</div><div style={{fontSize:12,color:"#1A1A1A",lineHeight:1.5}}>{sel.obs}</div></div>}
           {isA&&<><hr className="div"/>
             <div style={{fontSize:10,color:"#8A8580",marginBottom:9,textTransform:"uppercase",letterSpacing:1}}>Cambiar estado</div>
@@ -5490,26 +5495,54 @@ function Reservas({tok,rol,perfil}){
   </>;
 }
 
-function NuevaReserva({perfil,tok,setPage}){
-  const [form,setForm]=useState({nombre:"",fecha:"",tipo:"Boda",precio:"",contacto:"",obs:"",estado:"visita"});
+// ─── AUTO LIMPIEZA ──────────────────────────────────────────────────────────
+async function crearLimpiezaAuto(nombre,fecha,tok,origen){
+  try{
+    const limps=await sbGet("limpiadoras","?activa=eq.true&select=*",tok).catch(()=>[]);
+    const limp=limps[0]||null;
+    const[srv]=await sbPost("servicios",{nombre,fecha,creado_por:"Sistema automático",limpiadora_id:limp?.id||null,limpiadora_nombre:limp?.nombre||null},tok);
+    for(const zona of LIMP_ZONAS){const ts=[...(zona.tareas||[]),...(zona.subzonas?zona.subzonas.flatMap(s=>s.tareas):[])];for(const t of ts)await sbPost("servicio_tareas",{servicio_id:srv.id,tarea_id:t.id,zona:zona.nombre,es_extra:false,done:false},tok).catch(()=>{});}
+    const admIds=await getUserIdsPorRol("admin",tok);
+    const msg=`🧹 Limpieza programada: ${nombre}`;
+    for(const id of admIds)await sbPost("notificaciones",{para:id,txt:msg},tok).catch(()=>{});
+    if(limp?.operario_id)await sbPost("notificaciones",{para:limp.operario_id,txt:msg},tok).catch(()=>{});
+    sendPush("🧹 Limpieza programada",msg,"auto-limpieza");
+  }catch(_){}
+}
+async function crearLimpiezaPostEvento(reserva,tok){
+  const f=new Date(reserva.fecha+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"long"});
+  await crearLimpiezaAuto(`Limpieza post-evento — ${reserva.nombre} — ${f}`,reserva.fecha,tok,"evento");
+}
+async function crearLimpiezaPostAirbnb(airbnb,tok){
+  const f=new Date(airbnb.fecha_salida+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"long"});
+  await crearLimpiezaAuto(`Limpieza post-Airbnb — ${airbnb.huesped} — ${f}`,airbnb.fecha_salida,tok,"airbnb");
+}
+
+function NuevaReserva({perfil,tok,setPage,rol}){
+  const [form,setForm]=useState({nombre:"",fecha:"",tipo:"Boda",precio_finca:"",precio_casa:"",incluye_casa:false,contacto:"",obs:"",estado:"visita"});
   const [ok,setOk]=useState(false);const [saving,setSaving]=useState(false);
   const tipos=["Boda","Cumpleaños","Comunión","Bautizo","Aniversario","Empresa","Otro"];
   const [bloqueadoR,setBloqueadoR]=useState(null);
+  const [sugJardin,setSugJardin]=useState(null);
+  const precioTotal=(parseFloat(form.precio_finca)||0)+(form.incluye_casa?parseFloat(form.precio_casa)||0:0);
 
   const submit=async()=>{
     if(!form.nombre||!form.fecha||saving)return;setSaving(true);
     try{
       const disp=await checkDisponibilidad(form.fecha,tok);
       if(!disp.libre){setSaving(false);setBloqueadoR(disp.conflictos);return;}
-      const [res]=await sbPost("reservas",{...form,precio:parseFloat(form.precio)||0,creado_por:perfil.id},tok);
+      const [res]=await sbPost("reservas",{nombre:form.nombre,fecha:form.fecha,tipo:form.tipo,incluye_casa:form.incluye_casa,precio_finca:parseFloat(form.precio_finca)||0,precio_casa:form.incluye_casa?parseFloat(form.precio_casa)||0:0,precio_total:precioTotal,precio:precioTotal,contacto:form.contacto,obs:form.obs,estado:form.estado,creado_por:perfil.id},tok);
       await addHistorial("reserva",res.id,`Reserva creada por ${perfil.nombre}`,perfil.nombre,tok);
       if(rol!=="admin"){const admIds=await getUserIdsPorRol("admin",tok);registrarItemNuevo("reserva",res.id,admIds,tok);}
       const en7=new Date();en7.setDate(en7.getDate()+7);
-      if(form.fecha&&form.fecha<=en7.toISOString().split("T")[0]){
-        notificarRoles(["admin","comercial","limpieza","jardinero"],"🎉 Nuevo evento",`${form.nombre} el ${new Date(form.fecha+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"long"})}`,"evento-nuevo",tok);
-      }
-      setOk(true);setTimeout(()=>{setOk(false);setPage("reservas");},2000);
-      setForm({nombre:"",fecha:"",tipo:"Boda",precio:"",contacto:"",obs:"",estado:"visita"});
+      if(form.fecha&&form.fecha<=en7.toISOString().split("T")[0])notificarRoles(["admin","comercial","limpieza","jardinero"],"🎉 Nuevo evento",`${form.nombre} el ${new Date(form.fecha+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"long"})}`,"evento-nuevo",tok);
+      // AUTO 2 — limpieza post-evento si incluye casa
+      if(form.incluye_casa)crearLimpiezaPostEvento({nombre:form.nombre,fecha:form.fecha,id:res.id},tok,perfil);
+      // AUTO 5 — sugerir jardinería si >14 días
+      const diasHasta=Math.ceil((new Date(form.fecha)-new Date())/(86400000));
+      if(diasHasta>14)setSugJardin({nombre:form.nombre,fecha:form.fecha,fechaSug:new Date(new Date(form.fecha).getTime()-2*86400000).toISOString().split("T")[0]});
+      setOk(true);setTimeout(()=>{if(!sugJardin){setOk(false);setPage("reservas");}},2000);
+      setForm({nombre:"",fecha:"",tipo:"Boda",precio_finca:"",precio_casa:"",incluye_casa:false,contacto:"",obs:"",estado:"visita"});
     }catch(_){}setSaving(false);
   };
   return <>
@@ -5519,13 +5552,27 @@ function NuevaReserva({perfil,tok,setPage}){
       <div className="card">
         <div className="fg"><label>Nombre del cliente *</label><input className="fi" value={form.nombre} onChange={e=>setForm(v=>({...v,nombre:e.target.value}))} placeholder="Ej: María y Carlos García"/></div>
         <div className="g2"><div className="fg"><label>Fecha *</label><input type="date" className="fi" value={form.fecha} onChange={e=>setForm(v=>({...v,fecha:e.target.value}))}/></div><div className="fg"><label>Tipo</label><select className="fi" value={form.tipo} onChange={e=>setForm(v=>({...v,tipo:e.target.value}))}>{tipos.map(t=><option key={t}>{t}</option>)}</select></div></div>
-        <div className="g2"><div className="fg"><label>Precio (€)</label><input type="number" inputMode="numeric" className="fi" value={form.precio} onChange={e=>setForm(v=>({...v,precio:e.target.value}))} placeholder="0"/></div><div className="fg"><label>Contacto</label><input className="fi" type="tel" inputMode="tel" value={form.contacto} onChange={e=>setForm(v=>({...v,contacto:e.target.value}))} placeholder="600 000 000"/></div></div>
+        <div style={{display:"flex",gap:8,marginBottom:14}}>
+          <button className={`btn sm${!form.incluye_casa?" bp":" bg"}`} onClick={()=>setForm(v=>({...v,incluye_casa:false}))}>Solo finca</button>
+          <button className={`btn sm${form.incluye_casa?" bp":" bg"}`} onClick={()=>setForm(v=>({...v,incluye_casa:true}))}>Finca + Casa</button>
+        </div>
+        <div className="g2">
+          <div className="fg"><label>Precio finca (€)</label><input type="number" inputMode="numeric" className="fi" value={form.precio_finca} onChange={e=>setForm(v=>({...v,precio_finca:e.target.value}))} placeholder="0"/></div>
+          {form.incluye_casa&&<div className="fg"><label>Precio casa (€)</label><input type="number" inputMode="numeric" className="fi" value={form.precio_casa} onChange={e=>setForm(v=>({...v,precio_casa:e.target.value}))} placeholder="0"/></div>}
+        </div>
+        {precioTotal>0&&<div style={{fontSize:14,fontWeight:700,color:"#EC683E",marginBottom:14}}>Total: {precioTotal.toLocaleString("es-ES")}€</div>}
+        <div className="g2"><div className="fg"><label>Contacto</label><input className="fi" type="tel" inputMode="tel" value={form.contacto} onChange={e=>setForm(v=>({...v,contacto:e.target.value}))} placeholder="600 000 000"/></div></div>
         <div className="fg"><label>Estado inicial</label><select className="fi" value={form.estado} onChange={e=>setForm(v=>({...v,estado:e.target.value}))}>{ESTADOS.map(e=><option key={e.id} value={e.id}>{e.lbl}</option>)}</select></div>
         <div className="fg"><label>Observaciones</label><textarea className="fi" rows={3} value={form.obs} onChange={e=>setForm(v=>({...v,obs:e.target.value}))} placeholder="Notas, menú, decoración…"/></div>
         <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}><button className="btn bg" onClick={()=>setPage("reservas")}>Cancelar</button><button className="btn bp" onClick={submit} disabled={saving}>✓ Crear reserva</button></div>
       </div>
     </div></div>
     {bloqueadoR&&<ModalOcupado fecha={form.fecha} conflictos={bloqueadoR} tipoAccion="reserva" perfil={perfil} tok={tok} onCerrar={()=>setBloqueadoR(null)} onForzar={()=>setBloqueadoR(null)}/>}
+    {sugJardin&&<div style={{position:"fixed",bottom:80,left:"50%",transform:"translateX(-50%)",background:"#FFFFFF",borderRadius:14,padding:"14px 20px",boxShadow:"0 8px 32px rgba(0,0,0,.12)",zIndex:9999,maxWidth:"90vw",display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+      <span style={{fontSize:13,color:"#1A1A1A"}}>🌿 ¿Programar jardinería 2 días antes del evento?</span>
+      <button className="btn bp sm" onClick={()=>{setSugJardin(null);setPage("jadmin");}}>Sí, programar</button>
+      <button className="btn bg sm" onClick={()=>{setSugJardin(null);setPage("reservas");}}>No</button>
+    </div>}
   </>;
 }
 
@@ -5960,9 +6007,9 @@ function ReservasAirbnb({perfil,tok,rol}){
       },tok);
       // Notificar si llegada próximos 7 días
       const en7=new Date();en7.setDate(en7.getDate()+7);
-      if(form.fecha_entrada&&form.fecha_entrada<=en7.toISOString().split("T")[0]){
-        notificarRoles(["admin","limpieza","jardinero"],`🏠 Nueva reserva Airbnb`,`${form.huesped} llega el ${new Date(form.fecha_entrada+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"long"})}`,"airbnb-nueva",tok);
-      }
+      if(form.fecha_entrada&&form.fecha_entrada<=en7.toISOString().split("T")[0])notificarRoles(["admin","limpieza","jardinero"],`🏠 Nueva reserva Airbnb`,`${form.huesped} llega el ${new Date(form.fecha_entrada+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"long"})}`,"airbnb-nueva",tok);
+      // AUTO 1 — limpieza post-airbnb
+      crearLimpiezaPostAirbnb({huesped:form.huesped,fecha_salida:form.fecha_salida},tok);
       setShowForm(false);setForm(formVacio);await load_();
     }catch(_){}
     setSaving(false);
