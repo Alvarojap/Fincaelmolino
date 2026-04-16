@@ -1075,7 +1075,7 @@ function Dashboard({perfil,tok,setPage,rol}){
   },[]);
   if(load)return <div className="loading"><div className="spin"/><span>Cargando…</span></div>;
   if(rol==="jardinero")return <DashJ perfil={perfil} jsem={jsem} jpunt={jpunt} cwk={cwk} setPage={setPage} tok={tok}/>;
-  if(rol==="limpieza") return <DashL perfil={perfil} setPage={setPage}/>;
+  if(rol==="limpieza") return <DashL perfil={perfil} setPage={setPage} tok={tok}/>;
   if(rol==="comercial")return <DashC perfil={perfil} reservas={reservas} setPage={setPage}/>;
   return <DashA reservas={reservas} jsem={jsem} jpunt={jpunt} cwk={cwk} setPage={setPage} tok={tok} perfil={perfil}/>;
 }
@@ -1603,9 +1603,14 @@ function AtencionAhora({tok,setPage}){
         const esL=c.tipo?.includes("limpieza");const est=c.estado;
         const col=est==="pendiente_aprobacion_admin"?"#D4A017":est==="servicio_creado_pendiente_fecha"?"#EC683E":"#AFA3FF";
         const ico=est==="pendiente_aprobacion_admin"?"🔑":est==="servicio_creado_pendiente_fecha"?"⏳":"📋";
-        return <div key={c.id} style={{padding:"8px 12px",background:`${col}10`,borderRadius:10,marginBottom:5,borderLeft:`3px solid ${col}`,fontSize:12,color:"#1A1A1A"}}>
-          <span>{ico} {esL?"Limpieza":"Jardín"} {c.tipo_reserva==="airbnb"?"Airbnb":"evento"} — {est==="pendiente_aprobacion_admin"?"Solicita día checkin":"Pendiente confirmación"}</span>
-          {c.fecha_checkout&&<span style={{color:"#8A8580",marginLeft:8}}>{new Date(c.fecha_checkout+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"})}</span>}
+        return <div key={c.id} style={{padding:"10px 12px",background:`${col}10`,borderRadius:10,marginBottom:5,borderLeft:`3px solid ${col}`,fontSize:12,color:"#1A1A1A"}}>
+          <div>{ico} {esL?"Limpieza":"Jardín"} {c.tipo_reserva==="airbnb"?"Airbnb":"evento"} — {est==="pendiente_aprobacion_admin"?`${c.respondido_por||"Operario"} solicita día checkin`:"Pendiente confirmación"}</div>
+          {c.fecha_checkout&&<div style={{color:"#8A8580",marginTop:3}}>{new Date(c.fecha_checkout+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"})}</div>}
+          {est==="pendiente_aprobacion_admin"&&<div style={{display:"flex",gap:6,marginTop:8}}>
+            <button className="btn bp sm" onClick={async()=>{try{await sbPatch("coordinacion_servicios",`id=eq.${c.id}`,{estado:"confirmado"},tok);if(c.respondido_por){const ops=await sbGet("operarios",`?nombre=eq.${encodeURIComponent(c.respondido_por)}&select=id`,tok).catch(()=>[]);for(const op of ops)await sbPost("notificaciones",{para:op.id,txt:`✅ Aprobado: puedes hacer ${esL?"la limpieza":"el jardín"} el ${c.fecha_programada}`},tok).catch(()=>{});}setCoordItems(prev=>prev.filter(x=>x.id!==c.id));}catch(_){}}}>✅ Aprobar</button>
+            <button className="btn br sm" onClick={async()=>{try{await sbPatch("coordinacion_servicios",`id=eq.${c.id}`,{estado:"servicio_creado_pendiente_fecha"},tok);if(c.respondido_por){const ops=await sbGet("operarios",`?nombre=eq.${encodeURIComponent(c.respondido_por)}&select=id`,tok).catch(()=>[]);for(const op of ops)await sbPost("notificaciones",{para:op.id,txt:`❌ No aprobado día checkin. Elige otra fecha.`},tok).catch(()=>{});}setCoordItems(prev=>prev.map(x=>x.id===c.id?{...x,estado:"servicio_creado_pendiente_fecha"}:x));}catch(_){}}}>❌ Rechazar</button>
+          </div>}
+          {est==="confirmado"&&c.fecha_programada&&<div style={{color:"#A6BE59",fontWeight:600,marginTop:4}}>✅ Confirmado: {new Date(c.fecha_programada+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"long"})} por {c.respondido_por}</div>}
         </div>;
       })}
     </>}
@@ -1724,6 +1729,7 @@ function DashJ({perfil,jsem,jpunt,cwk,setPage,tok}){
   const [showFinJornada,setShowFinJornada]=useState(false);
   const [showFinSrv,setShowFinSrv]=useState(false);
   const [showNuevaJornada,setShowNuevaJornada]=useState(false);
+  const [coordPJ,setCoordPJ]=useState([]);
   const [showExtraForm,setShowExtraForm]=useState(false);
   const [extraForm,setExtraForm]=useState({txt:"",zona:"",nota:"",foto_url:null});
   const [editExtraId,setEditExtraId]=useState(null);
@@ -1768,7 +1774,7 @@ function DashJ({perfil,jsem,jpunt,cwk,setPage,tok}){
       }
     }catch(_){}
   };
-  useEffect(()=>{if(tok)loadSrvActivo();},[]);
+  useEffect(()=>{if(tok){loadSrvActivo();sbGet("coordinacion_servicios","?estado=eq.servicio_creado_pendiente_fecha&tipo=ilike.*jardin*&select=*",tok).then(setCoordPJ).catch(()=>{});}},[]);
 
   // Cronómetro — uses timestamps from localStorage for persistence
   useEffect(()=>{
@@ -1903,6 +1909,17 @@ function DashJ({perfil,jsem,jpunt,cwk,setPage,tok}){
     <div className="ph"><h2>Hola, {perfil.nombre.split(" ")[0]} 👋</h2><p>{new Date().toLocaleDateString("es-ES",{weekday:"long",year:"numeric",month:"long",day:"numeric"})}</p></div>
     <div className="pb">
       {meteoJ&&<div style={{background:"rgba(127,178,255,.08)",borderRadius:14,padding:"10px 14px",marginBottom:14,fontSize:13,color:"#5A8AD4",fontWeight:500}}>{meteoJ.rain>10?`💧 Lluvia abundante prevista ${meteoJ.day} (${meteoJ.rain}mm) — el riego puede ser innecesario`:`🌧️ Lluvia prevista ${meteoJ.day} (${meteoJ.rain}mm) — considera posponer el riego`}</div>}
+      {coordPJ.map(c=>{const dias=[];const ini=new Date(c.ventana_inicio||new Date().toISOString());const fin=new Date(c.ventana_fin||new Date(Date.now()+3*86400000).toISOString());const hoy2=new Date();let dd=ini>hoy2?ini:hoy2;while(dd<=fin&&dias.length<7){dias.push(new Date(dd));dd=new Date(dd.getTime()+86400000);}
+        return <div key={c.id} className="card" style={{marginBottom:14,border:"2px solid #A6BE59",background:"rgba(166,190,89,.04)"}}>
+          <div style={{fontSize:14,fontWeight:800,color:"#A6BE59",marginBottom:8}}>⚠️ Acción requerida</div>
+          <div style={{fontSize:14,fontWeight:600,color:"#1A1A1A",marginBottom:4}}>🌿 Servicio de jardín pendiente</div>
+          <div style={{fontSize:12,color:"#8A8580",marginBottom:10}}>📅 Ventana: {c.ventana_inicio?new Date(c.ventana_inicio).toLocaleDateString("es-ES",{day:"numeric",month:"short"}):"hoy"} — {c.ventana_fin?new Date(c.ventana_fin).toLocaleDateString("es-ES",{day:"numeric",month:"short"}):"—"}</div>
+          <div style={{fontSize:13,fontWeight:600,marginBottom:8}}>¿Qué día lo harás?</div>
+          <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+            {dias.map(d=><button key={d.toISOString()} className="btn bg" style={{padding:"10px 14px",fontSize:13,fontWeight:600}} onClick={async()=>{const ds=d.toISOString().split("T")[0];try{await sbPatch("coordinacion_servicios",`id=eq.${c.id}`,{fecha_programada:ds,estado:"confirmado",respondido_por:perfil.nombre},tok);if(c.jardin_servicio_id)await sbPatch("jardin_servicios",`id=eq.${c.jardin_servicio_id}`,{fecha_inicio:ds},tok).catch(()=>{});const adms=await sbGet("usuarios","?rol=eq.admin&select=id",tok).catch(()=>[]);for(const a of adms)await sbPost("notificaciones",{para:a.id,txt:`✅ ${perfil.nombre} confirma jardín para el ${new Date(ds+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"long"})}`},tok).catch(()=>{});setCoordPJ(prev=>prev.filter(x=>x.id!==c.id));}catch(_){}}}>{d.toLocaleDateString("es-ES",{weekday:"short",day:"numeric"})}</button>)}
+          </div>
+        </div>;
+      })}
       {/* SERVICIO ACTIVO */}
       {srvActivo&&<div className="card" style={{marginBottom:16,border:"1px solid rgba(16,185,129,.3)",background:"rgba(16,185,129,.04)"}}>
         <div className="chdr"><span className="ctit">🌿 Servicio activo</span></div>
@@ -2029,15 +2046,51 @@ function DashJ({perfil,jsem,jpunt,cwk,setPage,tok}){
     {editExtraId&&<NotaModal nota={editExtraNota} setNota={setEditExtraNota} foto={editExtraFoto} setFoto={setEditExtraFoto} onSave={saveEditExtra} onClose={()=>setEditExtraId(null)} tok={tok}/>}
   </>;
 }
-function DashL({perfil,setPage}){
+function DashL({perfil,setPage,tok}){
+  const [coordP,setCoordP]=useState([]);const [savingC,setSavingC]=useState(false);const [showDatePick,setShowDatePick]=useState(null);const [customDate,setCustomDate]=useState("");
+  useEffect(()=>{if(tok)sbGet("coordinacion_servicios","?estado=eq.servicio_creado_pendiente_fecha&select=*",tok).then(setCoordP).catch(()=>{});},[]);
+  const getDias=(ini,fin)=>{const ds=[];const i=new Date(ini);const f=new Date(fin);const h=new Date();let d=i>h?i:h;while(d<=f&&ds.length<7){ds.push(new Date(d));d=new Date(d.getTime()+86400000);}return ds;};
+  const confirmarFecha=async(c,dia)=>{if(savingC)return;setSavingC(true);const ds=dia.toISOString().split("T")[0];
+    try{await sbPatch("coordinacion_servicios",`id=eq.${c.id}`,{fecha_programada:ds,estado:"confirmado",respondido_por:perfil.nombre},tok);
+    if(c.servicio_id)await sbPatch("servicios",`id=eq.${c.servicio_id}`,{fecha:ds},tok).catch(()=>{});
+    const adms=await sbGet("usuarios","?rol=eq.admin&select=id",tok).catch(()=>[]);
+    for(const a of adms)await sbPost("notificaciones",{para:a.id,txt:`✅ ${perfil.nombre} ha confirmado limpieza para el ${new Date(ds+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"long"})}`},tok).catch(()=>{});
+    setCoordP(prev=>prev.filter(x=>x.id!==c.id));}catch(_){}setSavingC(false);};
+  const pedirPermiso=async(c)=>{if(savingC)return;setSavingC(true);
+    try{await sbPatch("coordinacion_servicios",`id=eq.${c.id}`,{estado:"pendiente_aprobacion_admin",fecha_programada:c.fecha_checkin_siguiente,hora_programada:"08:00",respondido_por:perfil.nombre},tok);
+    const adms=await sbGet("usuarios","?rol=eq.admin&select=id",tok).catch(()=>[]);
+    for(const a of adms)await sbPost("notificaciones",{para:a.id,txt:`🔑 ${perfil.nombre} solicita limpiar el día del checkin (${c.fecha_checkin_siguiente})`},tok).catch(()=>{});
+    setCoordP(prev=>prev.filter(x=>x.id!==c.id));}catch(_){}setSavingC(false);};
   return <>
     <div className="ph"><h2>Hola, {perfil.nombre.split(" ")[0]} 🧹</h2><p>{new Date().toLocaleDateString("es-ES",{weekday:"long",year:"numeric",month:"long",day:"numeric"})}</p></div>
-    <div className="pb"><div className="g2">
-      {[{ico:"🧹",t:"Mi servicio",s:"Checklist limpieza",id:"limpieza"},{ico:"📅",t:"Calendario",s:"Próximos eventos",id:"cal-limp"}].map(it=>(
-        <button key={it.id} className="card" style={{cursor:"pointer",textAlign:"left",border:"1px solid rgba(201,168,76,.15)"}} onClick={()=>setPage(it.id)}>
-          <div style={{fontSize:28,marginBottom:8}}>{it.ico}</div><div style={{fontSize:14,fontWeight:600,color:"#1A1A1A"}}>{it.t}</div><div style={{fontSize:12,color:"#8A8580",marginTop:3}}>{it.s}</div>
-        </button>))}
-    </div></div>
+    <div className="pb">
+      {coordP.map(c=>{const dias=getDias(c.ventana_inicio||new Date().toISOString(),c.ventana_fin||new Date(Date.now()+3*86400000).toISOString());
+        return <div key={c.id} className="card" style={{marginBottom:16,border:"2px solid #EC683E",background:"rgba(236,104,62,.04)"}}>
+          <div style={{fontSize:14,fontWeight:800,color:"#EC683E",marginBottom:8}}>⚠️ Acción requerida</div>
+          <div style={{fontSize:14,fontWeight:600,color:"#1A1A1A",marginBottom:4}}>🧹 {c.tipo_reserva==="airbnb"?"Limpieza post-Airbnb":"Limpieza post-evento"}</div>
+          <div style={{fontSize:12,color:"#8A8580",marginBottom:12}}>📅 Ventana: {c.ventana_inicio?new Date(c.ventana_inicio).toLocaleDateString("es-ES",{day:"numeric",month:"short"}):"hoy"} — {c.ventana_fin?new Date(c.ventana_fin).toLocaleDateString("es-ES",{day:"numeric",month:"short"}):"—"}</div>
+          <div style={{fontSize:13,fontWeight:600,color:"#1A1A1A",marginBottom:10}}>¿Qué día lo harás?</div>
+          <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:12}}>
+            {dias.map(d=><button key={d.toISOString()} className="btn bg" style={{padding:"10px 14px",fontSize:13,fontWeight:600}} onClick={()=>confirmarFecha(c,d)} disabled={savingC}>{d.toLocaleDateString("es-ES",{weekday:"short",day:"numeric"})}</button>)}
+          </div>
+          <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+            <button className="btn bg sm" onClick={()=>{setShowDatePick(c);setCustomDate("");}}>📅 Otra fecha</button>
+            {c.fecha_checkin_siguiente&&<button className="btn bg sm" onClick={()=>pedirPermiso(c)} disabled={savingC}>🔑 Pedir permiso día checkin</button>}
+          </div>
+        </div>;
+      })}
+      {showDatePick&&<div className="ov" onClick={()=>setShowDatePick(null)}><div className="modal" style={{maxWidth:360}} onClick={e=>e.stopPropagation()}>
+        <h3>📅 Elegir fecha</h3>
+        <div className="fg"><label>Fecha</label><input type="date" className="fi" value={customDate} onChange={e=>setCustomDate(e.target.value)}/></div>
+        <div className="mft"><button className="btn bg" onClick={()=>setShowDatePick(null)}>Cancelar</button><button className="btn bp" disabled={!customDate||savingC} onClick={()=>{confirmarFecha(showDatePick,new Date(customDate+"T12:00:00"));setShowDatePick(null);}}>{savingC?"…":"Confirmar"}</button></div>
+      </div></div>}
+      <div className="g2">
+        {[{ico:"🧹",t:"Mi servicio",s:"Checklist limpieza",id:"limpieza"},{ico:"📅",t:"Calendario",s:"Próximos eventos",id:"cal-limp"}].map(it=>(
+          <button key={it.id} className="card" style={{cursor:"pointer",textAlign:"left"}} onClick={()=>setPage(it.id)}>
+            <div style={{fontSize:28,marginBottom:8}}>{it.ico}</div><div style={{fontSize:14,fontWeight:600,color:"#1A1A1A"}}>{it.t}</div><div style={{fontSize:12,color:"#8A8580",marginTop:3}}>{it.s}</div>
+          </button>))}
+      </div>
+    </div>
   </>;
 }
 function DashC({perfil,reservas,setPage}){
