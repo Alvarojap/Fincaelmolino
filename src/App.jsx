@@ -2062,12 +2062,25 @@ function DashL({perfil,setPage,tok}){
   return <>
     <div className="ph"><h2>Hola, {perfil.nombre.split(" ")[0]} 🧹</h2><p>{new Date().toLocaleDateString("es-ES",{weekday:"long",year:"numeric",month:"long",day:"numeric"})}</p></div>
     <div className="pb">
-      {coordP.map(c=>{const dias=getDias(c.ventana_inicio||new Date().toISOString(),c.ventana_fin||new Date(Date.now()+3*86400000).toISOString());
+      {coordP.map(c=>{
+        const t=perfil?.es_operario?SB_KEY:tok;
+        const fechaFmt=c.fecha_checkin_siguiente?new Date(c.fecha_checkin_siguiente+"T12:00:00").toLocaleDateString("es-ES",{weekday:"long",day:"numeric",month:"long"}):"—";
+        const diasH=c.fecha_checkin_siguiente?Math.ceil((new Date(c.fecha_checkin_siguiente+"T12:00:00")-new Date())/(86400000)):0;
+        // preguntando_si_lista → ask if ready
+        if(c.estado==="preguntando_si_lista") return <div key={c.id} className="card" style={{marginBottom:16,border:"2px solid #EC683E",background:"rgba(236,104,62,.04)"}}>
+          <div style={{fontSize:14,fontWeight:800,color:"#EC683E",marginBottom:8}}>🏠 ¿Está la casa lista?</div>
+          <div style={{fontSize:13,color:"#1A1A1A",marginBottom:12}}>Reserva el {fechaFmt} — en {diasH} día{diasH!==1?"s":""}</div>
+          <div style={{display:"flex",gap:8}}>
+            <button className="btn bp" style={{flex:1,justifyContent:"center"}} disabled={savingC} onClick={async()=>{setSavingC(true);try{await sbPatch("coordinacion_servicios",`id=eq.${c.id}`,{estado:"casa_lista_confirmada",respondido_por:perfil.nombre},t);const adms=await sbGet("usuarios","?rol=eq.admin&select=id",t).catch(()=>[]);for(const a of adms)await sbPost("notificaciones",{para:a.id,txt:`✅ ${perfil.nombre} confirma: casa lista para el ${fechaFmt}`},t).catch(()=>{});setCoordP(prev=>prev.filter(x=>x.id!==c.id));}catch(_){}setSavingC(false);}}>✅ Sí, está lista</button>
+            <button className="btn br" style={{flex:1,justifyContent:"center"}} disabled={savingC} onClick={async()=>{setSavingC(true);try{const[srv]=await sbPost("servicios",{nombre:`Limpieza pre-reserva — ${fechaFmt}`,fecha:new Date().toISOString().split("T")[0],creado_por:perfil.nombre},t);for(const zona of LIMP_ZONAS){const ts=[...(zona.tareas||[]),...(zona.subzonas?zona.subzonas.flatMap(s=>s.tareas):[])];for(const ta of ts)await sbPost("servicio_tareas",{servicio_id:srv.id,tarea_id:ta.id,zona:zona.nombre,es_extra:false,done:false},t).catch(()=>{});}await sbPatch("coordinacion_servicios",`id=eq.${c.id}`,{estado:"servicio_creado_pendiente_fecha",servicio_id:srv.id},t);setCoordP(prev=>prev.map(x=>x.id===c.id?{...x,estado:"servicio_creado_pendiente_fecha",servicio_id:srv.id}:x));}catch(_){}setSavingC(false);}}>❌ No, necesita limpieza</button>
+          </div>
+        </div>;
+        // servicio_creado_pendiente_fecha → pick day
+        const dias=getDias(c.ventana_inicio||new Date().toISOString(),c.ventana_fin||new Date(Date.now()+3*86400000).toISOString());
         return <div key={c.id} className="card" style={{marginBottom:16,border:"2px solid #EC683E",background:"rgba(236,104,62,.04)"}}>
-          <div style={{fontSize:14,fontWeight:800,color:"#EC683E",marginBottom:8}}>⚠️ Acción requerida</div>
-          <div style={{fontSize:14,fontWeight:600,color:"#1A1A1A",marginBottom:4}}>🧹 {c.tipo_reserva==="airbnb"?"Limpieza post-Airbnb":"Limpieza post-evento"}</div>
-          <div style={{fontSize:12,color:"#8A8580",marginBottom:12}}>📅 Ventana: {c.ventana_inicio?new Date(c.ventana_inicio).toLocaleDateString("es-ES",{day:"numeric",month:"short"}):"hoy"} — {c.ventana_fin?new Date(c.ventana_fin).toLocaleDateString("es-ES",{day:"numeric",month:"short"}):"—"}</div>
-          <div style={{fontSize:13,fontWeight:600,color:"#1A1A1A",marginBottom:10}}>¿Qué día lo harás?</div>
+          <div style={{fontSize:14,fontWeight:800,color:"#EC683E",marginBottom:8}}>⚠️ Elige día de limpieza</div>
+          <div style={{fontSize:13,color:"#1A1A1A",marginBottom:4}}>Reserva el {fechaFmt}</div>
+          <div style={{fontSize:12,color:"#8A8580",marginBottom:10}}>📅 Ventana: {c.ventana_inicio?new Date(c.ventana_inicio).toLocaleDateString("es-ES",{day:"numeric",month:"short"}):"hoy"} — {c.ventana_fin?new Date(c.ventana_fin).toLocaleDateString("es-ES",{day:"numeric",month:"short"}):"—"}</div>
           <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:12}}>
             {dias.map(d=><button key={d.toISOString()} className="btn bg" style={{padding:"10px 14px",fontSize:13,fontWeight:600}} onClick={()=>confirmarFecha(c,d)} disabled={savingC}>{d.toLocaleDateString("es-ES",{weekday:"short",day:"numeric"})}</button>)}
           </div>
@@ -5591,26 +5604,10 @@ async function obtenerProximaReserva(fecha,tok){
 const TAREAS_JARDIN_POST=[{id:"jp1",txt:"Limpiar piscina (superficie + fondo)"},{id:"jp2",txt:"Comprobar motor y luces de piscina"},{id:"jp3",txt:"Limpiar hamacas"},{id:"jp4",txt:"Limpiar zonas exteriores completas"},{id:"jp5",txt:"Soplar y retirar hojas"},{id:"jp6",txt:"Regar y revisar césped"},{id:"jp7",txt:"Limpiar barbacoa"},{id:"jp8",txt:"Ordenar utensilios"},{id:"jp9",txt:"Limpiar porches"},{id:"jp10",txt:"Retirar basura exterior"},{id:"jp11",txt:"Revisión visual general"}];
 const TAREAS_JARDIN_POST_EVENTO=[{id:"jpe1",txt:"Retirar colillas del suelo"},{id:"jpe2",txt:"Limpiar ceniceros"},{id:"jpe3",txt:"Retirar vasos y basura invitados"},{id:"jpe4",txt:"Inspección visual desperfectos"},{id:"jpe5",txt:"Comprobar invernadero"},{id:"jpe6",txt:"Revisión estado instalaciones"}];
 
-async function notificarCoordPre(coord,rol,diasHasta,tok){
-  const ops=await sbGet("operarios",`?rol=eq.${rol}&activo=eq.true&select=id`,SB_KEY).catch(()=>[]);
-  const fechaFmt=new Date(coord.fecha_checkin_siguiente+"T12:00:00").toLocaleDateString("es-ES",{weekday:"long",day:"numeric",month:"long"});
-  const urg=diasHasta<=1?"🚨 URGENTE: ":diasHasta<=3?"⏰ ":"🏠 ";
-  const esL=rol==="limpieza";
-  const msg=`${urg}Reserva el ${fechaFmt} (en ${diasHasta} día${diasHasta!==1?"s":""}) — ¿Está ${esL?"la casa":"el jardín"} list${esL?"a":"o"}?`;
-  for(const op of ops){await sbPost("notificaciones",{para:op.id,txt:msg},tok).catch(()=>{});await registrarItemNuevo("notificacion",coord.id||coord.reserva_id,[op.id],tok);}
-  await sbPatch("coordinacion_servicios",`id=eq.${coord.id}`,{notificacion_1_enviada:true},tok).catch(()=>{});
-  sendPush(esL?"🏠 Finca El Molino":"🌿 Finca El Molino",msg,"coord-pre");
-}
-
+// procesarCoordReserva: only creates post-checkout coordination (for after the event)
+// Pre-checkin coordination is handled by the daily motor at 7d and 3d
 async function procesarCoordReserva(tipo,reservaId,tipoReserva,fechaCheckin,fechaCheckout,tok){
   try{
-    const diasHasta=Math.ceil((new Date(fechaCheckin+"T12:00:00")-new Date())/(86400000));
-    const ventana=calcularVentanaLimpieza(fechaCheckout||fechaCheckin,null);
-    const estado=diasHasta<=7?"preguntando_si_lista":"pendiente_horizonte";
-    // Limpieza pre
-    const[cLimp]=await sbPost("coordinacion_servicios",{tipo:tipo.includes("jardin")?"jardin_pre":"limpieza_pre",reserva_id:String(reservaId),tipo_reserva:tipoReserva,fecha_checkin_siguiente:fechaCheckin,fecha_checkout:fechaCheckout||fechaCheckin,ventana_inicio:ventana.inicio.toISOString(),ventana_fin:ventana.fin.toISOString(),estado},tok).catch(()=>[{}]);
-    if(diasHasta<=7&&cLimp?.id){const esJ=tipo.includes("jardin");await notificarCoordPre(cLimp,esJ?"jardinero":"limpieza",diasHasta,tok);}
-    // Post-checkout coordination (for after the event/checkout)
     if(fechaCheckout){
       const proxRes=await obtenerProximaReserva(fechaCheckout,tok);
       const ventanaPost=calcularVentanaLimpieza(fechaCheckout,proxRes);
@@ -5623,27 +5620,49 @@ async function ejecutarMotorCoordinacion(tok){
   const fk=`fm_motor_coord_${new Date().toISOString().split("T")[0]}_${new Date().getHours()}`;
   if(localStorage.getItem(fk))return;localStorage.setItem(fk,"1");
   const hoy=new Date().toISOString().split("T")[0];
-  const en7d=new Date(Date.now()+7*86400000).toISOString().split("T")[0];
   const en3d=new Date(Date.now()+3*86400000).toISOString().split("T")[0];
+  const en4d=new Date(Date.now()+4*86400000).toISOString().split("T")[0];
+  const en7d=new Date(Date.now()+7*86400000).toISOString().split("T")[0];
+  const en8d=new Date(Date.now()+8*86400000).toISOString().split("T")[0];
   const manana=new Date(Date.now()+86400000).toISOString().split("T")[0];
   try{
-    // 1. Activate horizon: pendiente_horizonte entering 7-day window
-    const horiz=await sbGet("coordinacion_servicios",`?estado=eq.pendiente_horizonte&fecha_checkin_siguiente=lte.${en7d}&select=*`,tok).catch(()=>[]);
-    for(const c of horiz){
-      const diasH=Math.ceil((new Date(c.fecha_checkin_siguiente+"T12:00:00")-new Date())/(86400000));
-      await sbPatch("coordinacion_servicios",`id=eq.${c.id}`,{estado:"preguntando_si_lista"},tok).catch(()=>{});
-      const esJ=c.tipo?.includes("jardin");
-      await notificarCoordPre(c,esJ?"jardinero":"limpieza",diasH,tok);
+    // === STEP 0: 7-day informational notification (no coordination created) ===
+    const ab7=await sbGet("reservas_airbnb",`?fecha_entrada=gte.${en7d}&fecha_entrada=lt.${en8d}&select=*`,tok).catch(()=>[]);
+    const ev7=await sbGet("reservas",`?fecha=gte.${en7d}&fecha=lt.${en8d}&estado=neq.cancelada&select=*`,tok).catch(()=>[]);
+    const all7=[...ab7.map(a=>({fecha:a.fecha_entrada,nombre:a.huesped})),...ev7.map(r=>({fecha:r.fecha,nombre:r.nombre}))];
+    for(const r of all7){
+      const fechaFmt=new Date(r.fecha+"T12:00:00").toLocaleDateString("es-ES",{weekday:"long",day:"numeric",month:"long"});
+      const ops=await sbGet("operarios","?activo=eq.true&select=id",SB_KEY).catch(()=>[]);
+      for(const op of ops)await sbPost("notificaciones",{para:op.id,txt:`📅 Aviso: reserva el ${fechaFmt} (en 7 días). En 4 días te preguntaremos si está todo listo.`},tok).catch(()=>{});
     }
-    // 2. Reminder at 3 days — still preguntando_si_lista
-    const sin3d=await sbGet("coordinacion_servicios",`?estado=eq.preguntando_si_lista&fecha_checkin_siguiente=lte.${en3d}&notificacion_1_enviada=eq.true&notificacion_2_enviada=is.null&select=*`,tok).catch(()=>[]);
-    for(const c of sin3d){
-      const esJ=c.tipo?.includes("jardin");const rol=esJ?"jardinero":"limpieza";
-      const ops=await sbGet("operarios",`?rol=eq.${rol}&activo=eq.true&select=id`,SB_KEY).catch(()=>[]);
-      for(const op of ops)await sbPost("notificaciones",{para:op.id,txt:`⏰ RECORDATORIO: Reserva en 3 días — ¿Has decidido cuándo ${esJ?"preparar el jardín":"limpiar"}?`},tok).catch(()=>{});
-      await sbPatch("coordinacion_servicios",`id=eq.${c.id}`,{notificacion_2_enviada:true},tok).catch(()=>{});
+
+    // === STEP 1: 3-day — create active coordination + ask "is it ready?" ===
+    const ab3=await sbGet("reservas_airbnb",`?fecha_entrada=gte.${en3d}&fecha_entrada=lt.${en4d}&select=*`,tok).catch(()=>[]);
+    const ev3=await sbGet("reservas",`?fecha=gte.${en3d}&fecha=lt.${en4d}&estado=neq.cancelada&select=*`,tok).catch(()=>[]);
+    const all3=[...ab3.map(a=>({id:a.id,fecha:a.fecha_entrada,nombre:a.huesped,tipo:"airbnb",incluye_casa:true})),...ev3.map(r=>({id:r.id,fecha:r.fecha,nombre:r.nombre,tipo:"evento",incluye_casa:r.incluye_casa}))];
+    for(const r of all3){
+      const fechaFmt=new Date(r.fecha+"T12:00:00").toLocaleDateString("es-ES",{weekday:"long",day:"numeric",month:"long"});
+      // Limpieza pre (only if includes house or is airbnb)
+      if(r.incluye_casa||r.tipo==="airbnb"){
+        const existeL=await sbGet("coordinacion_servicios",`?reserva_id=eq.${r.id}&tipo=eq.limpieza_pre_checkin&estado=in.(preguntando_si_lista,casa_lista_confirmada,servicio_creado_pendiente_fecha,confirmado)&select=id`,tok).catch(()=>[]);
+        if(existeL.length===0){
+          const[cL]=await sbPost("coordinacion_servicios",{tipo:"limpieza_pre_checkin",reserva_id:String(r.id),tipo_reserva:r.tipo,fecha_checkin_siguiente:r.fecha,ventana_inicio:new Date().toISOString(),ventana_fin:new Date(new Date(r.fecha+"T15:00:00").getTime()-2*3600000).toISOString(),estado:"preguntando_si_lista",notificacion_1_enviada:true},tok).catch(()=>[{}]);
+          const opsL=await sbGet("operarios","?rol=eq.limpieza&activo=eq.true&select=id",SB_KEY).catch(()=>[]);
+          for(const op of opsL){await sbPost("notificaciones",{para:op.id,txt:`🏠 Reserva en 3 días (${fechaFmt}) — ¿Está la casa lista para recibir?`},tok).catch(()=>{});if(cL?.id)await registrarItemNuevo("notificacion",cL.id,[op.id],tok);}
+          sendPush("🏠 Finca El Molino",`Reserva en 3 días — ¿Está la casa lista?`,"coord-pre-3d");
+        }
+      }
+      // Jardín pre (always — all reservation types need garden ready)
+      const existeJ=await sbGet("coordinacion_servicios",`?reserva_id=eq.${r.id}&tipo=eq.jardin_pre_checkin&estado=in.(preguntando_si_lista,jardin_listo_confirmado,servicio_creado_pendiente_fecha,confirmado)&select=id`,tok).catch(()=>[]);
+      if(existeJ.length===0){
+        const[cJ]=await sbPost("coordinacion_servicios",{tipo:"jardin_pre_checkin",reserva_id:String(r.id),tipo_reserva:r.tipo,fecha_checkin_siguiente:r.fecha,ventana_inicio:new Date().toISOString(),ventana_fin:new Date(new Date(r.fecha+"T15:00:00").getTime()-2*3600000).toISOString(),estado:"preguntando_si_lista",notificacion_1_enviada:true},tok).catch(()=>[{}]);
+        const opsJ=await sbGet("operarios","?rol=eq.jardinero&activo=eq.true&select=id",SB_KEY).catch(()=>[]);
+        for(const op of opsJ){await sbPost("notificaciones",{para:op.id,txt:`🌿 Reserva en 3 días (${fechaFmt}) — ¿Está el jardín listo para recibir?`},tok).catch(()=>{});if(cJ?.id)await registrarItemNuevo("notificacion",cJ.id,[op.id],tok);}
+        sendPush("🌿 Finca El Molino",`Reserva en 3 días — ¿Está el jardín listo?`,"coord-jardin-3d");
+      }
     }
-    // 3. Urgent — tomorrow and not confirmed
+
+    // === STEP 2: Urgent — tomorrow and not confirmed ===
     const urg=await sbGet("coordinacion_servicios",`?estado=in.(preguntando_si_lista,servicio_creado_pendiente_fecha)&fecha_checkin_siguiente=lte.${manana}&notificacion_urgente_enviada=is.null&select=*`,tok).catch(()=>[]);
     for(const c of urg){
       const esJ=c.tipo?.includes("jardin");const rol=esJ?"jardinero":"limpieza";
@@ -5654,7 +5673,8 @@ async function ejecutarMotorCoordinacion(tok){
       await sbPatch("coordinacion_servicios",`id=eq.${c.id}`,{notificacion_urgente_enviada:true},tok).catch(()=>{});
       sendPush("🚨 Urgente",`Reserva mañana — ${esJ?"jardín":"limpieza"} sin confirmar`,"urgente");
     }
-    // 4. Post-checkout today: create services (unchanged logic)
+
+    // === STEP 3: Post-checkout today — create services ===
     const postH=await sbGet("coordinacion_servicios",`?fecha_checkout=eq.${hoy}&estado=eq.pendiente_confirmacion&select=*`,tok).catch(()=>[]);
     for(const c of postH){
       if(c.tipo?.includes("limpieza")){
