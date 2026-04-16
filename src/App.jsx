@@ -3243,7 +3243,14 @@ function Chat({perfil,tok,rol}){
   const loadUnread=async()=>{
     try{const r=await sbGet("mensajes",`?para=eq.${myId}&leido=eq.false&select=de`,tok);const counts={};r.forEach(m=>{counts[String(m.de)]=(counts[String(m.de)]||0)+1;});setUnread(counts);}catch(_){}
   };
-  useEffect(()=>{sbGet("usuarios","?rol=neq.admin&select=*",tok).then(u=>{setUsuarios(u);setLoad(false);loadUnread();}).catch(()=>setLoad(false));},[]);
+  useEffect(()=>{(async()=>{try{
+    const[uNorm,uOps]=await Promise.all([
+      sbGet("usuarios","?rol=neq.admin&select=*",tok),
+      isA?sbGet("operarios","?activo=eq.true&select=*",tok).catch(()=>[]):Promise.resolve([])
+    ]);
+    const opsF=uOps.map(op=>({id:op.id,nombre:op.nombre,rol:op.rol,avatar:op.avatar||op.nombre.slice(0,2).toUpperCase(),es_operario:true}));
+    setUsuarios([...uNorm,...opsF]);loadUnread();
+  }catch(_){}setLoad(false);})();},[]);
   useEffect(()=>{
     if(!conId)return;
     const otherId=String(conId);
