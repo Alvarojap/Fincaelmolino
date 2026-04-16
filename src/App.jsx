@@ -618,18 +618,16 @@ export default function App() {
     if(opSaved){
       try{
         const op=JSON.parse(opSaved);
-        // Verify still active
-        sbGet("operarios",`?id=eq.${op.id}&select=*`).then(rows=>{
-          if(rows[0]&&rows[0].activo){
-            setSession({access_token:SB_KEY});
-            setPerfil({id:op.id,nombre:op.nombre,rol:op.rol,referencia_id:op.referencia_id,es_operario:true,avatar:op.avatar||op.nombre.slice(0,2).toUpperCase()});
-          }else{
-            localStorage.removeItem("fm_operario_session");
-            if(rows[0]&&!rows[0].activo)setOpDesactivado(true);
-          }
-        }).catch(()=>{localStorage.removeItem("fm_operario_session");});
-      }catch(_){localStorage.removeItem("fm_operario_session");}
-      setAuthLoad(false);return;
+        // Set immediately from localStorage, verify in background
+        setSession({access_token:SB_KEY});
+        setPerfil({id:op.id,nombre:op.nombre,rol:op.rol,referencia_id:op.referencia_id,es_operario:true,avatar:op.avatar||op.nombre.slice(0,2).toUpperCase()});
+        setAuthLoad(false);
+        // Background verify still active
+        sbGet("operarios",`?id=eq.${op.id}&activo=eq.true&select=id`).then(rows=>{
+          if(rows.length===0){localStorage.removeItem("fm_operario_session");setSession(null);setPerfil(null);setOpDesactivado(true);}
+        }).catch(()=>{});
+      }catch(_){localStorage.removeItem("fm_operario_session");setAuthLoad(false);}
+      return;
     }
     const saved=localStorage.getItem("fm_session");
     if(saved){
