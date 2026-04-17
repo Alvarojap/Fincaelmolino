@@ -300,29 +300,22 @@ function sendPush(title,body,tag="molino"){
   if(swReg?.active)swReg.active.postMessage({type:"NOTIFY",title,body,tag});
   else if(Notification?.permission==="granted"){try{new Notification(title,{body,tag});}catch(_){}}
 }
-async function subscribePush(userId,tok,role){
+async function subscribePush(userId,tok){
+  if(!("PushManager"in window))return;
   try{
-    if(!("PushManager"in window)||!swReg)return;
     const reg=swReady?await swReady:swReg;
     if(!reg)return;
-    let sub=await reg.pushManager.getSubscription().catch(()=>null);
+    let sub=await reg.pushManager.getSubscription();
     if(!sub){
-      try{
-        const key=Uint8Array.from(atob(VAPID_PUBLIC.replace(/-/g,"+").replace(/_/g,"/")),c=>c.charCodeAt(0));
-        sub=await swReg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:key});
-      }catch(_){return;}
+      const key=Uint8Array.from(atob(VAPID_PUBLIC.replace(/-/g,"+").replace(/_/g,"/")),c=>c.charCodeAt(0));
+      sub=await swReg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:key});
     }
-    if(!sub)return;
-    const json=sub.toJSON();
-    if(!json?.endpoint)return;
-    const body={user_id:userId,endpoint:json.endpoint};
-    if(json.keys?.p256dh)body.p256dh=json.keys.p256dh;
-    if(json.keys?.auth)body.auth=json.keys.auth;
-    if(role)body.role=role;
+    const{endpoint,keys}=sub.toJSON();
     await fetch(`${SB_URL}/rest/v1/push_subscriptions`,{
-      method:"POST",headers:{...HDRA(tok),"Prefer":"resolution=merge-duplicates,return=minimal"},
-      body:JSON.stringify(body)
-    }).catch(()=>{});
+      method:"POST",
+      headers:{...HDRA(tok),"Prefer":"resolution=merge-duplicates,return=minimal"},
+      body:JSON.stringify({user_id:userId,endpoint,p256dh:keys.p256dh,auth:keys.auth})
+    });
   }catch(_){}
 }
 async function notificarRoles(roles,titulo,cuerpo,tag,tok){
@@ -657,7 +650,7 @@ export default function App() {
           .then(rows=>{
             if(rows[0]){
               setPerfil(rows[0]);
-              subscribePush(s.user.id,s.access_token,rows[0].rol);
+              subscribePush(s.user.id,s.access_token);
               if(rows[0].rol==="admin"){autoRecurrentes(s.access_token,setToast);checkNotifDiaria(s.access_token);}
             }
           })
@@ -674,7 +667,7 @@ export default function App() {
     const rows=await sbGet("usuarios",`?id=eq.${d.user.id}&select=*`,d.access_token);
     if(rows[0])setPerfil(rows[0]);
     setPage("dashboard");
-    askPerm().then(p=>{setPerm(p);if(p==="granted")subscribePush(d.user.id,d.access_token,rows[0]?.rol);});
+    askPerm().then(p=>{setPerm(p);if(p==="granted")subscribePush(d.user.id,d.access_token);});
   };
 
   const loginOperario=(op)=>{
