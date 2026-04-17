@@ -1094,7 +1094,7 @@ function Dashboard({perfil,tok,setPage,rol}){
   if(rol==="jardinero")return <DashJ perfil={perfil} jsem={jsem} jpunt={jpunt} cwk={cwk} setPage={setPage} tok={tok}/>;
   if(rol==="limpieza") return <DashL perfil={perfil} setPage={setPage} tok={tok}/>;
   if(rol==="comercial")return <DashC perfil={perfil} reservas={reservas} setPage={setPage}/>;
-  return <DashA reservas={reservas} jsem={jsem} jpunt={jpunt} cwk={cwk} setPage={setPage} tok={tok} perfil={perfil}/>;
+  return <DashA reservas={reservas} jsem={jsem} jpunt={jpunt} cwk={cwk} setPage={setPage} tok={tok} perfil={perfil} rol={rol}/>;
 }
 // ─── FINANCIAL KPIs ─────────────────────────────────────────────────────────
 function FinancialKPIs({tok}){
@@ -1668,8 +1668,10 @@ async function autoCobrarAirbnb(tok){
   }catch(_){}
 }
 
-function DashA({reservas,jsem,jpunt,cwk,setPage,tok,perfil}){
-  useEffect(()=>{autoCobrarAirbnb(tok);ejecutarMotorCoordinacion(tok);},[]);
+function DashA({reservas,jsem,jpunt,cwk,setPage,tok,perfil,rol}){
+  const[tareasPend,setTareasPend]=useState([]);
+  useEffect(()=>{autoCobrarAirbnb(tok);ejecutarMotorCoordinacion(tok);
+    sbGet("tareas_comerciales","?estado=eq.pendiente&order=fecha_limite.asc.nullslast&limit=10&select=*",tok).then(setTareasPend).catch(()=>{});},[]);
   const [meteo,setMeteo]=useState(null);
   useEffect(()=>{fetchMeteo().then(d=>{if(d)setMeteo(d);});},[]);
   const temp=getTemporada();
@@ -1714,6 +1716,20 @@ function DashA({reservas,jsem,jpunt,cwk,setPage,tok,perfil}){
           <div style={{textAlign:"right",flexShrink:0}}><div style={{fontSize:18,fontWeight:700,color:"#EC683E"}}>{parseFloat(prox.precio||0).toLocaleString("es-ES")}€</div><SBadge e={prox.estado}/></div>
         </div>
       </div>}
+      {/* TAREAS COMERCIALES PENDIENTES */}
+      {tareasPend.length>0&&<div className="card" style={{marginBottom:16}}>
+        <div className="chdr"><span className="ctit">📋 Tareas pendientes</span><span className="badge" style={{background:"rgba(236,104,62,.1)",color:"#EC683E"}}>{tareasPend.length}</span></div>
+        {tareasPend.map(t=>{const hoyS=new Date().toISOString().split("T")[0];const u=!t.fecha_limite?"normal":t.fecha_limite<hoyS?"vencida":t.fecha_limite===hoyS?"hoy":"normal";const col=u==="vencida"?"#F35757":u==="hoy"?"#D4A017":"#A6BE59";
+          return <div key={t.id} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 0",borderBottom:"1px solid rgba(0,0,0,.04)"}}>
+            <button className="btn bp sm" style={{flexShrink:0,padding:"4px 8px"}} onClick={async()=>{try{await sbPatch("tareas_comerciales",`id=eq.${t.id}`,{estado:"hecha",completada_por:perfil.nombre,completada_ts:new Date().toISOString()},tok);if(t.entidad_tipo&&t.entidad_id)await addHistorial(t.entidad_tipo,t.entidad_id,`Tarea completada: "${t.titulo}"`,perfil.nombre,tok);setTareasPend(prev=>prev.filter(x=>x.id!==t.id));}catch(_){}}}>✓</button>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:13,fontWeight:600,color:"#1A1A1A",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{TAREA_TIPOS[t.tipo]||"📋"} {t.titulo}</div>
+              <div style={{fontSize:11,color:"#8A8580"}}>{t.entidad_nombre}{t.fecha_limite?` · `:""}{t.fecha_limite&&<span style={{color:col,fontWeight:600}}>{u==="vencida"?"⚠️ ":""}📅 {new Date(t.fecha_limite+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"})}</span>}</div>
+            </div>
+          </div>;
+        })}
+      </div>}
+
       <div className="g2">
         <div className="card"><div className="chdr"><span className="ctit">🌿 Jardín esta semana</span><button className="btn bg sm" onClick={()=>setPage("jcheck")}>Ver</button></div>{actv.slice(0,5).map(t=><MTask key={t.id} lbl={t.txt} done={sj[t.id]?.done}/>)}</div>
         <div className="card"><div className="chdr"><span className="ctit">📅 Próximas reservas</span><button className="btn bg sm" onClick={()=>setPage("reservas")}>Ver</button></div>
@@ -5438,6 +5454,64 @@ function VisitasCoordinacion({reservaId,reservaNombre,tok,perfil}){
   </div>;
 }
 
+// ─── TAREAS COMERCIALES ──────────────────────────────────────────────────────
+function AsignarUsuario({tok,value,onChange}){
+  const[usuarios,setUsuarios]=useState([]);
+  useEffect(()=>{sbGet("usuarios","?rol=in.(admin,comercial)&select=id,nombre,rol",tok).then(setUsuarios).catch(()=>{});},[]);
+  return <select className="fi" value={value||""} onChange={e=>{const u=usuarios.find(x=>x.id===e.target.value);onChange(e.target.value,u?.nombre||"");}}><option value="">Sin asignar</option>{usuarios.map(u=><option key={u.id} value={u.id}>{u.nombre} ({u.rol})</option>)}</select>;
+}
+const TAREA_TIPOS={llamada:"📞",whatsapp:"💬",email:"📧",seguimiento:"📋",cobro:"💰",contrato:"📄",otro:"🔧"};
+function TareasComerciales({entidad_tipo,entidad_id,entidad_nombre,tok,perfil,rol}){
+  const isA=rol==="admin";const isC=rol==="comercial";
+  const[tareas,setTareas]=useState([]);const[showForm,setShowForm]=useState(false);const[saving,setSaving]=useState(false);
+  const[form,setForm]=useState({tipo:"llamada",titulo:"",descripcion:"",fecha_limite:"",asignado_a:perfil?.id,asignado_nombre:perfil?.nombre});
+  const hoy=new Date().toISOString().split("T")[0];
+  const cargar=async()=>{let q=`?entidad_tipo=eq.${entidad_tipo}&entidad_id=eq.${entidad_id}&order=fecha_limite.asc.nullslast`;if(isC&&!isA)q+=`&or=(creado_por.eq.${perfil.nombre},asignado_a.eq.${perfil.id})`;const t=await sbGet("tareas_comerciales",q+="&select=*",tok).catch(()=>[]);setTareas(t);};
+  useEffect(()=>{cargar();},[entidad_id]);
+  const crear=async()=>{if(!form.titulo||saving)return;setSaving(true);try{await sbPost("tareas_comerciales",{...form,entidad_tipo,entidad_id:String(entidad_id),entidad_nombre,estado:"pendiente",creado_por:perfil.nombre},tok);await addHistorial(entidad_tipo,entidad_id,`Tarea creada: "${form.titulo}"`,perfil.nombre,tok);setForm({tipo:"llamada",titulo:"",descripcion:"",fecha_limite:"",asignado_a:perfil?.id,asignado_nombre:perfil?.nombre});setShowForm(false);await cargar();}catch(_){}setSaving(false);};
+  const marcarHecha=async(t)=>{try{await sbPatch("tareas_comerciales",`id=eq.${t.id}`,{estado:"hecha",completada_por:perfil.nombre,completada_ts:new Date().toISOString()},tok);await addHistorial(entidad_tipo,entidad_id,`Tarea completada: "${t.titulo}"`,perfil.nombre,tok);await cargar();}catch(_){}};
+  const eliminar=async(id)=>{try{await sbDelete("tareas_comerciales",`id=eq.${id}`,tok);await cargar();}catch(_){}};
+  const pend=tareas.filter(t=>t.estado==="pendiente");const hechas=tareas.filter(t=>t.estado==="hecha");
+  const urgencia=(t)=>{if(!t.fecha_limite)return"normal";if(t.fecha_limite<hoy)return"vencida";if(t.fecha_limite===hoy)return"hoy";const d=Math.ceil((new Date(t.fecha_limite+"T12:00:00")-new Date())/(86400000));return d<=3?"proxima":"normal";};
+  const colUrg={vencida:"#F35757",hoy:"#D4A017",proxima:"#D4A017",normal:"#A6BE59"};
+  return <div style={{marginTop:16,borderTop:"1px solid rgba(0,0,0,.06)",paddingTop:14}}>
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+      <span style={{fontSize:13,color:"#8A8580"}}>{pend.length} pendiente{pend.length!==1?"s":""}</span>
+      <button className="btn bp sm" onClick={()=>setShowForm(!showForm)}>+ Tarea</button>
+    </div>
+    {showForm&&<div style={{background:"#F5F3F0",borderRadius:12,padding:14,marginBottom:14}}>
+      <div className="g2">
+        <div className="fg"><label>Tipo</label><select className="fi" value={form.tipo} onChange={e=>setForm(v=>({...v,tipo:e.target.value}))}>{Object.entries(TAREA_TIPOS).map(([k,v])=><option key={k} value={k}>{v} {k}</option>)}</select></div>
+        <div className="fg"><label>Fecha límite</label><input type="date" className="fi" value={form.fecha_limite} onChange={e=>setForm(v=>({...v,fecha_limite:e.target.value}))}/></div>
+      </div>
+      <div className="fg"><label>Título *</label><input className="fi" value={form.titulo} onChange={e=>setForm(v=>({...v,titulo:e.target.value}))} placeholder="Ej: Llamar para confirmar seña"/></div>
+      <div className="fg"><label>Notas</label><textarea className="fi" rows={2} value={form.descripcion} onChange={e=>setForm(v=>({...v,descripcion:e.target.value}))} placeholder="Instrucciones…"/></div>
+      {isA&&<div className="fg"><label>Asignar a</label><AsignarUsuario tok={tok} value={form.asignado_a} onChange={(id,n)=>setForm(v=>({...v,asignado_a:id,asignado_nombre:n}))}/></div>}
+      <div style={{display:"flex",gap:8}}><button className="btn bg sm" onClick={()=>setShowForm(false)}>Cancelar</button><button className="btn bp sm" onClick={crear} disabled={saving||!form.titulo}>{saving?"…":"✓ Crear"}</button></div>
+    </div>}
+    {pend.length===0&&!showForm&&<div style={{color:"#8A8580",fontSize:12,textAlign:"center",padding:"14px 0"}}>Sin tareas pendientes ✅</div>}
+    {pend.map(t=>{const u=urgencia(t);const col=colUrg[u];return <div key={t.id} style={{background:"#fff",borderRadius:12,padding:"10px 12px",marginBottom:6,borderLeft:`3px solid ${col}`,boxShadow:"0 1px 4px rgba(0,0,0,.04)"}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8}}>
+        <div style={{minWidth:0}}>
+          <div style={{fontSize:13,fontWeight:600,color:"#1A1A1A"}}>{TAREA_TIPOS[t.tipo]} {t.titulo}</div>
+          {t.descripcion&&<div style={{fontSize:11,color:"#8A8580",marginTop:2}}>{t.descripcion}</div>}
+          <div style={{display:"flex",gap:8,marginTop:4,flexWrap:"wrap"}}>
+            {t.fecha_limite&&<span style={{fontSize:11,color:col,fontWeight:600}}>{u==="vencida"?"⚠️ Vencida":u==="hoy"?"🔴 Hoy":""} 📅 {new Date(t.fecha_limite+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"})}</span>}
+            {t.asignado_nombre&&<span style={{fontSize:11,color:"#8A8580"}}>👤 {t.asignado_nombre}</span>}
+          </div>
+        </div>
+        <div style={{display:"flex",gap:4,flexShrink:0}}>
+          <button className="btn bp sm" onClick={()=>marcarHecha(t)}>✓</button>
+          {isA&&<button className="btn br sm" onClick={()=>eliminar(t.id)}>🗑</button>}
+        </div>
+      </div>
+    </div>;})}
+    {hechas.length>0&&<details style={{marginTop:10}}><summary style={{fontSize:12,color:"#8A8580",cursor:"pointer"}}>✅ {hechas.length} completada{hechas.length!==1?"s":""}</summary>
+      {hechas.map(t=><div key={t.id} style={{padding:"6px 10px",opacity:.6,fontSize:12,color:"#8A8580",borderBottom:"1px solid rgba(0,0,0,.04)"}}>✅ {TAREA_TIPOS[t.tipo]} {t.titulo} <span style={{fontSize:10}}>— {t.completada_por} · {fmtDT(t.completada_ts)}</span></div>)}
+    </details>}
+  </div>;
+}
+
 // ─── RESERVAS ────────────────────────────────────────────────────────────────
 function Reservas({tok,rol,perfil}){
   const isA=rol==="admin";
@@ -5640,6 +5714,7 @@ function Reservas({tok,rol,perfil}){
               </>;
             })()}
           </>}
+          <TareasComerciales entidad_tipo="reserva" entidad_id={sel.id} entidad_nombre={sel.nombre} tok={tok} perfil={perfil||{nombre:"Admin"}} rol={rol}/>
           <Historial entidad_tipo="reserva" entidad_id={sel.id} tok={tok} perfil={perfil||{nombre:"Admin"}}/>
           <Documentos entidad_tipo="reserva" entidad_id={sel.id} tok={tok} perfil={perfil||{nombre:"Admin"}}/>
           <VisitasCoordinacion reservaId={sel.id} reservaNombre={sel.nombre} tok={tok} perfil={perfil||{nombre:"Admin"}}/>
@@ -6211,6 +6286,7 @@ function Visitas({perfil,tok,rol}){
 
         {sel.creado_por&&<div style={{marginTop:12,fontSize:11,color:"#BFBAB4",textAlign:"right"}}>Creada por {sel.creado_por}</div>}
 
+        <TareasComerciales entidad_tipo="visita" entidad_id={sel.id} entidad_nombre={sel.nombre} tok={tok} perfil={perfil} rol={rol}/>
         <Historial entidad_tipo="visita" entidad_id={sel.id} tok={tok} perfil={perfil}/>
         <Documentos entidad_tipo="visita" entidad_id={sel.id} tok={tok} perfil={perfil}/>
       </div>
