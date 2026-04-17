@@ -1440,73 +1440,66 @@ function FinancialCharts({tok}){
 
 // ─── ATENCIÓN AHORA ─────────────────────────────────────────────────────────
 function AtencionAhora({tok,setPage}){
-  const [llegadas,setLlegadas]=useState([]);
-  const [acciones,setAcciones]=useState([]);
+  const [llegadasHoy,setLlegadasHoy]=useState([]);
+  const [checkoutsHoy,setCheckoutsHoy]=useState([]);
+  const [eventosProx,setEventosProx]=useState([]);
+  const [cobrosUrg,setCobrosUrg]=useState([]);
+  const [coordItems,setCoordItems]=useState([]);
+  const [tareasUrg,setTareasUrg]=useState([]);
+  const [stockBajos,setStockBajos]=useState([]);
   const [solicitudes,setSolicitudes]=useState([]);
   const [alertasMeteo,setAlertasMeteo]=useState([]);
   const [srvLimp,setSrvLimp]=useState([]);
   const [srvJard,setSrvJard]=useState([]);
-  const [stockBajos,setStockBajos]=useState([]);
-  const [coordItems,setCoordItems]=useState([]);
   const [load,setLoad]=useState(true);
 
   useEffect(()=>{
     (async()=>{
       try{
-        const hoy=new Date();
-        const hoyStr=hoy.toISOString().split("T")[0];
-        const en7=new Date(hoy);en7.setDate(en7.getDate()+7);
-        const en7Str=en7.toISOString().split("T")[0];
-        const ACTIVOS=["visita","pendiente_contrato","contrato_firmado","reserva_pagada","precio_total"];
+        const hoy=new Date();const hoyStr=hoy.toISOString().split("T")[0];
+        const en7=new Date(hoy);en7.setDate(en7.getDate()+7);const en7Str=en7.toISOString().split("T")[0];
+        const en30=new Date(hoy);en30.setDate(en30.getDate()+30);const en30Str=en30.toISOString().split("T")[0];
 
-        const [airbnbs,reservas,visitas,sols,sLimp,sJard]=await Promise.all([
-          sbGet("reservas_airbnb",`?fecha_entrada=gte.${hoyStr}&fecha_entrada=lte.${en7Str}&select=*`,tok),
-          sbGet("reservas",`?fecha=gte.${hoyStr}&fecha=lte.${en7Str}&select=*`,tok),
-          sbGet("visitas",`?fecha=gte.${hoyStr}&fecha=lte.${en7Str}&estado=eq.pendiente&select=*`,tok).catch(()=>[]),
+        const [airbnbs,reservas,sols,sLimp,sJard]=await Promise.all([
+          sbGet("reservas_airbnb",`?fecha_entrada=lte.${en7Str}&fecha_salida=gte.${hoyStr}&select=*`,tok).catch(()=>[]),
+          sbGet("reservas",`?select=*`,tok).catch(()=>[]),
           sbGet("solicitudes_desbloqueo","?estado=eq.pendiente&select=*&order=created_at.desc",tok).catch(()=>[]),
-          sbGet("servicios","?select=*",tok).catch(()=>[]),
+          sbGet("servicios","?estado=eq.en_curso&select=*",tok).catch(()=>[]),
           sbGet("jardin_servicios","?estado=eq.activo&select=*",tok).catch(()=>[]),
         ]);
 
-        // Llegadas
-        const ll=[];
-        for(const a of airbnbs){
-          const noches=Math.round((new Date(a.fecha_salida)-new Date(a.fecha_entrada))/(86400000));
-          ll.push({tipo:"airbnb",nombre:a.huesped,fecha:a.fecha_entrada,detalle:`${noches} noche${noches!==1?"s":""}${a.personas?` · ${a.personas} pers.`:""}`});
-        }
-        for(const r of reservas.filter(r=>ACTIVOS.includes(r.estado))){
-          ll.push({tipo:"evento",nombre:r.nombre,fecha:r.fecha,detalle:r.tipo||"Evento"});
-        }
-        ll.sort((a,b)=>a.fecha.localeCompare(b.fecha));
-        setLlegadas(ll);
+        // LLEGADAS HOY — Airbnb con fecha_entrada = hoy
+        setLlegadasHoy(airbnbs.filter(a=>a.fecha_entrada===hoyStr).map(a=>{
+          const noches=Math.round((new Date(a.fecha_salida)-new Date(a.fecha_entrada))/86400000);
+          return{nombre:a.huesped,detalle:`${noches} noche${noches!==1?"s":""}${a.personas?` · ${a.personas} pers.`:""}`};
+        }));
 
-        // Acciones requeridas
-        const acc=[];
-        const todasRes=await sbGet("reservas","?select=*",tok);
-        for(const r of todasRes){
-          if(r.estado==="cancelada"||r.estado==="finalizada")continue;
-          if(!r.contrato_firmado){
-            acc.push({tipo:"contrato",nombre:r.nombre,fecha:r.fecha,detalle:"Contrato pendiente de firma",id:r.id});
-          }else if(r.estado==="contrato_firmado"&&!r.seña_cobrada){
-            acc.push({tipo:"seña",nombre:r.nombre,fecha:r.fecha,detalle:"Señal pendiente de cobro",id:r.id});
-          }
-        }
-        for(const v of visitas){
-          acc.push({tipo:"visita",nombre:v.nombre,fecha:v.fecha,detalle:`Visita ${v.hora?.slice(0,5)||""} · ${v.tipo_evento||""}`.trim(),esCoord:!!v.es_coordinacion});
-        }
-        acc.sort((a,b)=>a.fecha.localeCompare(b.fecha));
-        setAcciones(acc);
+        // CHECKOUTS HOY — Airbnb con fecha_salida = hoy
+        setCheckoutsHoy(airbnbs.filter(a=>a.fecha_salida===hoyStr).map(a=>({nombre:a.huesped})));
+
+        // EVENTOS PRÓXIMOS 7 días — reservas activas
+        const activas=reservas.filter(r=>!["cancelada","finalizada"].includes(r.estado));
+        setEventosProx(activas.filter(r=>r.fecha>=hoyStr&&r.fecha<=en7Str));
+
+        // COBROS URGENTES — reservas sin pago completo en menos de 30 días
+        setCobrosUrg(activas.filter(r=>r.estado_pago!=="pagado_completo"&&!r.seña_cobrada&&r.fecha>=hoyStr&&r.fecha<=en30Str));
 
         setSolicitudes(sols);
-        setSrvLimp(sLimp.filter(s=>s.estado==="en_curso"));
+        setSrvLimp(sLimp);
         setSrvJard(sJard);
+
         // Stock bajo
-        try{const arts=await sbGet("almacen_articulos","?activo=eq.true&select=nombre,stock_casa,stock_almacen,stock_minimo",tok);setStockBajos(arts.filter(a=>(parseFloat(a.stock_casa)||0)+(parseFloat(a.stock_almacen)||0)<=(parseFloat(a.stock_minimo)||0)));}catch(_){}
-        // Coordinación
-        try{const ci=await sbGet("coordinacion_servicios",`?estado=in.(pendiente_confirmacion,servicio_creado_pendiente_fecha,pendiente_aprobacion_admin)&select=*&order=created_at.desc&limit=10`,tok);setCoordItems(ci);}catch(_){}
+        try{const arts=await sbGet("almacen_articulos","?activo=eq.true&select=nombre,stock_casa,stock_almacen,stock_minimo",tok);setStockBajos(arts.filter(a=>a.activo!==false&&(parseFloat(a.stock_casa||0)+parseFloat(a.stock_almacen||0))<=(parseFloat(a.stock_minimo||1))));}catch(_){}
+
+        // Tareas urgentes — pendientes vencidas o que vencen hoy
+        try{const tu=await sbGet("tareas_comerciales",`?estado=eq.pendiente&fecha_limite=lte.${hoyStr}&order=fecha_limite.asc`,tok);setTareasUrg(tu);}catch(_){}
+
+        // Coordinaciones pendientes — SOLO estados que requieren acción real
+        try{const ci=await sbGet("coordinacion_servicios",`?estado=in.(preguntando_si_lista,servicio_creado_pendiente_fecha,pendiente_aprobacion_admin)&select=*&order=created_at.desc&limit=10`,tok);setCoordItems(ci);}catch(_){}
+
         // Alertas meteorológicas
-        try{const m=await fetchMeteo();if(m?.daily){const am=[];const rAll=await sbGet("reservas",`?fecha=gte.${hoyStr}&fecha=lte.${en7Str}&select=nombre,fecha`,tok).catch(()=>[]);const aAll=await sbGet("reservas_airbnb",`?fecha_entrada=lte.${en7Str}&fecha_salida=gte.${hoyStr}&select=huesped,fecha_entrada,fecha_salida`,tok).catch(()=>[]);
-          m.daily.time.forEach((f,i)=>{const rain=m.daily.precipitation_sum[i];const wind=m.daily.windspeed_10m_max[i];const evts=rAll.filter(r=>r.fecha===f);const airsD=aAll.filter(a=>a.fecha_entrada<=f&&a.fecha_salida>=f);
+        try{const m=await fetchMeteo();if(m?.daily){const am=[];const rAll=activas.filter(r=>r.fecha>=hoyStr&&r.fecha<=en7Str);
+          m.daily.time.forEach((f,i)=>{const rain=m.daily.precipitation_sum[i];const wind=m.daily.windspeed_10m_max[i];const evts=rAll.filter(r=>r.fecha===f);const airsD=airbnbs.filter(a=>a.fecha_entrada<=f&&a.fecha_salida>=f);
             if(rain>5&&evts.length>0)am.push({msg:`🌧️ Lluvia (${rain}mm) el día del evento "${evts[0].nombre}"`,fecha:f});
             if(rain>2&&airsD.length>0)am.push({msg:`🌧️ Lluvia (${rain}mm) durante estancia de "${airsD[0].huesped}"`,fecha:f});
             if(wind>40)am.push({msg:`💨 Viento fuerte (${wind}km/h) el ${new Date(f+"T12:00:00").toLocaleDateString("es-ES",{weekday:"long",day:"numeric"})}`,fecha:f});
@@ -1518,73 +1511,100 @@ function AtencionAhora({tok,setPage}){
 
   if(load)return <div style={{display:"flex",alignItems:"center",gap:8,justifyContent:"center",padding:"20px 0",color:"#8A8580",fontSize:13}}><div className="spin" style={{width:16,height:16,borderWidth:2}}/>Cargando…</div>;
 
-  const totalItems=llegadas.length+acciones.length+solicitudes.length+srvLimp.length+srvJard.length+stockBajos.length+alertasMeteo.length+coordItems.length;
-  if(totalItems===0)return null;
+  const totalItems=llegadasHoy.length+checkoutsHoy.length+eventosProx.length+cobrosUrg.length+coordItems.length+tareasUrg.length+stockBajos.length+solicitudes.length+alertasMeteo.length+srvLimp.length+srvJard.length;
+  if(totalItems===0)return <div className="card" style={{marginBottom:16,textAlign:"center",padding:"24px 16px"}}>
+    <div style={{fontSize:28,marginBottom:8}}>✅</div>
+    <div style={{fontSize:15,fontWeight:600,color:"#1A1A1A"}}>Todo en orden</div>
+    <div style={{fontSize:12,color:"#8A8580",marginTop:4}}>No hay acciones pendientes ahora mismo</div>
+  </div>;
 
   const fmtF=f=>new Date(f+"T12:00:00").toLocaleDateString("es-ES",{weekday:"short",day:"numeric",month:"short"});
   const tagStyle=(bg,col)=>({display:"inline-block",fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:4,background:bg,color:col,letterSpacing:.5,flexShrink:0});
+  let secIdx=0;const secMt=()=>secIdx++>0?16:4;
 
   return <div className="card" style={{marginBottom:16}}>
     <div className="chdr"><span className="ctit">⚡ Atención ahora</span><span className="badge" style={{background:"rgba(232,85,85,.1)",color:"#F35757",border:"1px solid rgba(232,85,85,.2)"}}>{totalItems}</span></div>
 
     {/* ALERTAS METEO */}
     {alertasMeteo.length>0&&<>
-      <div style={{fontSize:11,color:"#7FB2FF",fontWeight:600,textTransform:"uppercase",letterSpacing:1,marginBottom:8,marginTop:4}}>🌤️ Alertas meteorológicas</div>
+      <div style={{fontSize:11,color:"#7FB2FF",fontWeight:600,textTransform:"uppercase",letterSpacing:1,marginBottom:8,marginTop:secMt()}}>🌤️ Alertas meteorológicas</div>
       {alertasMeteo.map((a,i)=><div key={`meteo-${i}`} style={{padding:"8px 12px",background:"rgba(127,178,255,.08)",borderRadius:10,marginBottom:5,fontSize:12,color:"#5A8AD4",fontWeight:500}}>{a.msg}</div>)}
     </>}
 
-    {/* LLEGADAS */}
-    {llegadas.length>0&&<>
-      <div style={{fontSize:11,color:"#EC683E",fontWeight:600,textTransform:"uppercase",letterSpacing:1,marginBottom:8,marginTop:(alertasMeteo.length>0)?16:4}}>🏠 Próximas llegadas esta semana</div>
-      {llegadas.map((l,i)=>(
-        <div key={`ll-${i}`} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",background:"#F5F3F0",borderRadius:8,marginBottom:5}}>
-          <span style={l.tipo==="airbnb"?tagStyle("rgba(16,185,129,.15)","#10b981"):tagStyle("rgba(99,102,241,.15)","#a5b4fc")}>{l.tipo==="airbnb"?"AIRBNB":"EVENTO"}</span>
+    {/* LLEGADAS HOY */}
+    {llegadasHoy.length>0&&<>
+      <div style={{fontSize:11,color:"#10b981",fontWeight:600,textTransform:"uppercase",letterSpacing:1,marginBottom:8,marginTop:secMt()}}>🏠 Llegadas hoy ({llegadasHoy.length})</div>
+      {llegadasHoy.map((l,i)=>(
+        <div key={`lh-${i}`} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",background:"#F5F3F0",borderRadius:8,marginBottom:5}}>
+          <span style={tagStyle("rgba(16,185,129,.15)","#10b981")}>CHECKIN</span>
           <div style={{flex:1,minWidth:0}}>
             <div style={{fontSize:13,color:"#1A1A1A",fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{l.nombre}</div>
             <div style={{fontSize:11,color:"#8A8580"}}>{l.detalle}</div>
           </div>
-          <div style={{fontSize:12,color:"#8A8580",flexShrink:0}}>📅 {fmtF(l.fecha)}</div>
         </div>
       ))}
     </>}
 
-    {/* ACCIONES */}
-    {acciones.length>0&&<>
-      <div style={{fontSize:11,color:"#D4A017",fontWeight:600,textTransform:"uppercase",letterSpacing:1,marginBottom:8,marginTop:llegadas.length>0?16:4}}>📋 Requieren acción</div>
-      {acciones.map((a,i)=>(
-        <div key={`ac-${i}`} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",background:"#F5F3F0",borderRadius:8,marginBottom:5,cursor:a.tipo==="visita"?"pointer":a.id?"pointer":"default"}} onClick={()=>{if(a.tipo==="visita")setPage("visitas");else if(a.id)setPage("reservas");}}>
-          <span style={{fontSize:16,flexShrink:0}}>{a.tipo==="contrato"?"✍️":a.tipo==="seña"?"💰":"👁"}</span>
+    {/* CHECKOUTS HOY */}
+    {checkoutsHoy.length>0&&<>
+      <div style={{fontSize:11,color:"#EC683E",fontWeight:600,textTransform:"uppercase",letterSpacing:1,marginBottom:8,marginTop:secMt()}}>🚪 Checkouts hoy ({checkoutsHoy.length})</div>
+      {checkoutsHoy.map((c,i)=>(
+        <div key={`co-${i}`} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",background:"#F5F3F0",borderRadius:8,marginBottom:5}}>
+          <span style={tagStyle("rgba(236,104,62,.15)","#EC683E")}>CHECKOUT</span>
+          <div style={{fontSize:13,color:"#1A1A1A",fontWeight:500}}>{c.nombre}</div>
+        </div>
+      ))}
+    </>}
+
+    {/* EVENTOS PRÓXIMOS 7 DÍAS */}
+    {eventosProx.length>0&&<>
+      <div style={{fontSize:11,color:"#6366f1",fontWeight:600,textTransform:"uppercase",letterSpacing:1,marginBottom:8,marginTop:secMt()}}>📅 Eventos próximos 7 días ({eventosProx.length})</div>
+      {eventosProx.map(r=>(
+        <div key={`ep-${r.id}`} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",background:"#F5F3F0",borderRadius:8,marginBottom:5,cursor:"pointer"}} onClick={()=>setPage("reservas")}>
+          <span style={tagStyle("rgba(99,102,241,.15)","#a5b4fc")}>EVENTO</span>
           <div style={{flex:1,minWidth:0}}>
-            <div style={{display:"flex",alignItems:"center",gap:6}}>
-              <div style={{fontSize:13,color:"#1A1A1A",fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",flex:1,minWidth:0}}>{a.nombre}</div>
-              {a.esCoord&&<span style={{fontSize:9,padding:"2px 6px",borderRadius:4,background:"rgba(99,102,241,.15)",color:"#a5b4fc",flexShrink:0,fontWeight:600}}>📋 Coordinación</span>}
-            </div>
-            <div style={{fontSize:11,color:"#D4A017"}}>{a.detalle}</div>
+            <div style={{fontSize:13,color:"#1A1A1A",fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.nombre}</div>
+            <div style={{fontSize:11,color:"#8A8580"}}>{r.tipo||"Evento"} · {r.estado}</div>
           </div>
-          <div style={{fontSize:12,color:"#8A8580",flexShrink:0}}>📅 {fmtF(a.fecha)}</div>
+          <div style={{fontSize:12,color:"#8A8580",flexShrink:0}}>{fmtF(r.fecha)}</div>
+        </div>
+      ))}
+    </>}
+
+    {/* COBROS URGENTES */}
+    {cobrosUrg.length>0&&<>
+      <div style={{fontSize:11,color:"#D4A017",fontWeight:600,textTransform:"uppercase",letterSpacing:1,marginBottom:8,marginTop:secMt()}}>💰 Cobros pendientes ({cobrosUrg.length})</div>
+      {cobrosUrg.map(r=>(
+        <div key={`cu-${r.id}`} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",background:"#F5F3F0",borderRadius:8,marginBottom:5,cursor:"pointer"}} onClick={()=>setPage("reservas")}>
+          <span style={{fontSize:16,flexShrink:0}}>💰</span>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontSize:13,color:"#1A1A1A",fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.nombre}</div>
+            <div style={{fontSize:11,color:"#D4A017"}}>{!r.seña_cobrada?"Señal pendiente":"Pago pendiente"} · {r.estado}</div>
+          </div>
+          <div style={{fontSize:12,color:"#8A8580",flexShrink:0}}>{fmtF(r.fecha)}</div>
         </div>
       ))}
     </>}
 
     {/* SOLICITUDES */}
     {solicitudes.length>0&&<>
-      <div style={{fontSize:11,color:"#F35757",fontWeight:600,textTransform:"uppercase",letterSpacing:1,marginBottom:8,marginTop:(llegadas.length+acciones.length)>0?16:4}}>🔓 Solicitudes de desbloqueo</div>
+      <div style={{fontSize:11,color:"#F35757",fontWeight:600,textTransform:"uppercase",letterSpacing:1,marginBottom:8,marginTop:secMt()}}>🔓 Solicitudes de desbloqueo</div>
       {solicitudes.map(s=>{
-        const fF=new Date(s.fecha+"T12:00:00").toLocaleDateString("es-ES",{weekday:"short",day:"numeric",month:"short"});
+        const fF=s.fecha?fmtF(s.fecha):"";
         return <div key={s.id} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",background:"#F5F3F0",borderRadius:8,marginBottom:5,cursor:"pointer"}} onClick={()=>setPage("notifs")}>
           <span style={{fontSize:16,flexShrink:0}}>🔒</span>
           <div style={{flex:1,minWidth:0}}>
             <div style={{fontSize:13,color:"#1A1A1A",fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{s.solicitado_por}</div>
             <div style={{fontSize:11,color:"#F35757"}}>{s.motivo||"Solicitud de desbloqueo"}</div>
           </div>
-          <div style={{fontSize:12,color:"#8A8580",flexShrink:0}}>📅 {fF}</div>
+          {fF&&<div style={{fontSize:12,color:"#8A8580",flexShrink:0}}>📅 {fF}</div>}
         </div>;
       })}
     </>}
 
     {/* SERVICIOS ACTIVOS */}
     {(srvLimp.length>0||srvJard.length>0)&&<>
-      <div style={{fontSize:11,color:"#6366f1",fontWeight:600,textTransform:"uppercase",letterSpacing:1,marginBottom:8,marginTop:(llegadas.length+acciones.length+solicitudes.length)>0?16:4}}>🧹 Servicios activos</div>
+      <div style={{fontSize:11,color:"#6366f1",fontWeight:600,textTransform:"uppercase",letterSpacing:1,marginBottom:8,marginTop:secMt()}}>🧹 Servicios activos</div>
       {srvLimp.map(s=>(
         <div key={`sl-${s.id}`} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",background:"#F5F3F0",borderRadius:8,marginBottom:5,cursor:"pointer"}} onClick={()=>setPage("limpieza")}>
           <span style={tagStyle("rgba(99,102,241,.15)","#a5b4fc")}>LIMPIEZA</span>
@@ -1607,9 +1627,9 @@ function AtencionAhora({tok,setPage}){
       })}
     </>}
 
-    {/* COORDINACIÓN */}
+    {/* COORDINACIÓN PENDIENTE */}
     {coordItems.length>0&&<>
-      <div style={{fontSize:11,color:"#AFA3FF",fontWeight:600,textTransform:"uppercase",letterSpacing:1,marginBottom:8,marginTop:16}}>🔄 Coordinación servicios ({coordItems.length})</div>
+      <div style={{fontSize:11,color:"#AFA3FF",fontWeight:600,textTransform:"uppercase",letterSpacing:1,marginBottom:8,marginTop:secMt()}}>🔄 Coordinación pendiente ({coordItems.length})</div>
       {coordItems.map(c=>{
         const esL=c.tipo?.includes("limpieza");const est=c.estado;
         const col=est==="pendiente_aprobacion_admin"?"#D4A017":est==="servicio_creado_pendiente_fecha"?"#EC683E":"#AFA3FF";
@@ -1621,14 +1641,27 @@ function AtencionAhora({tok,setPage}){
             <button className="btn bp sm" onClick={async()=>{try{await sbPatch("coordinacion_servicios",`id=eq.${c.id}`,{estado:"confirmado"},tok);if(c.respondido_por){const ops=await sbGet("operarios",`?nombre=eq.${encodeURIComponent(c.respondido_por)}&select=id`,tok).catch(()=>[]);for(const op of ops)await sbPost("notificaciones",{para:op.id,txt:`✅ Aprobado: puedes hacer ${esL?"la limpieza":"el jardín"} el ${c.fecha_programada}`},tok).catch(()=>{});}setCoordItems(prev=>prev.filter(x=>x.id!==c.id));}catch(_){}}}>✅ Aprobar</button>
             <button className="btn br sm" onClick={async()=>{try{await sbPatch("coordinacion_servicios",`id=eq.${c.id}`,{estado:"servicio_creado_pendiente_fecha"},tok);if(c.respondido_por){const ops=await sbGet("operarios",`?nombre=eq.${encodeURIComponent(c.respondido_por)}&select=id`,tok).catch(()=>[]);for(const op of ops)await sbPost("notificaciones",{para:op.id,txt:`❌ No aprobado día checkin. Elige otra fecha.`},tok).catch(()=>{});}setCoordItems(prev=>prev.map(x=>x.id===c.id?{...x,estado:"servicio_creado_pendiente_fecha"}:x));}catch(_){}}}>❌ Rechazar</button>
           </div>}
-          {est==="confirmado"&&c.fecha_programada&&<div style={{color:"#A6BE59",fontWeight:600,marginTop:4}}>✅ Confirmado: {new Date(c.fecha_programada+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"long"})} por {c.respondido_por}</div>}
         </div>;
       })}
     </>}
 
+    {/* TAREAS URGENTES */}
+    {tareasUrg.length>0&&<>
+      <div style={{fontSize:11,color:"#F35757",fontWeight:600,textTransform:"uppercase",letterSpacing:1,marginBottom:8,marginTop:secMt()}}>🔥 Tareas urgentes ({tareasUrg.length})</div>
+      {tareasUrg.map(t=>(
+        <div key={`tu-${t.id}`} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",background:"#FEE8E8",borderRadius:8,marginBottom:5,cursor:"pointer"}} onClick={()=>setPage("reservas")}>
+          <span style={{fontSize:16,flexShrink:0}}>📌</span>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontSize:13,color:"#1A1A1A",fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.titulo||t.descripcion}</div>
+            <div style={{fontSize:11,color:"#F35757"}}>Vence {fmtF(t.fecha_limite)}</div>
+          </div>
+        </div>
+      ))}
+    </>}
+
     {/* STOCK BAJO */}
     {stockBajos.length>0&&<>
-      <div style={{fontSize:11,color:"#F35757",fontWeight:600,textTransform:"uppercase",letterSpacing:1,marginBottom:8,marginTop:16}}>📦 Stock bajo ({stockBajos.length})</div>
+      <div style={{fontSize:11,color:"#F35757",fontWeight:600,textTransform:"uppercase",letterSpacing:1,marginBottom:8,marginTop:secMt()}}>📦 Stock bajo ({stockBajos.length})</div>
       <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
         {stockBajos.map(a=><span key={a.nombre} className="badge" style={{background:"#FEE8E8",color:"#F35757",cursor:"pointer"}} onClick={()=>setPage("almacen")}>{a.nombre}</span>)}
       </div>
