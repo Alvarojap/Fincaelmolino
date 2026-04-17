@@ -7,6 +7,24 @@ const SB_URL = "https://bqubxkuuyohuatdothwx.supabase.co";
 const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJxdWJ4a3V1eW9odWF0ZG90aHd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ0NTE0MzgsImV4cCI6MjA5MDAyNzQzOH0.kwYPiTj0KOmw9RAm88DNceAYdFC3yHF4ogSzXXwSIDA";
 // Helper: obtener precio de reserva (unifica precio_total y precio)
 const getPrecioReserva=(r)=>parseFloat(r?.precio_total)||(parseFloat(r?.precio_finca||0)+parseFloat(r?.precio_casa||0))||parseFloat(r?.precio)||0;
+async function calcularRentabilidadReserva(reserva,tok){
+  const id=reserva.id;const pt=getPrecioReserva(reserva);
+  const[sL,sJ,lav,gst,cfg]=await Promise.all([
+    sbGet("servicios",`?reserva_vinculada_id=eq.${id}&select=nombre,coste_calculado`,tok).catch(()=>[]),
+    sbGet("jardin_servicios",`?reserva_vinculada_id=eq.${id}&select=nombre,coste_total`,tok).catch(()=>[]),
+    sbGet("lavanderia",`?reserva_vinculada_id=eq.${id}&select=coste`,tok).catch(()=>[]),
+    sbGet("gastos",`?reserva_vinculada_id=eq.${id}&select=concepto,importe,categoria`,tok).catch(()=>[]),
+    sbGet("configuracion","?select=*",tok).catch(()=>[]),
+  ]);
+  const c={};cfg.forEach(x=>c[x.clave]=x.valor);const comPct=parseFloat(c.comision_pct)||10;
+  const com=pt*(comPct/100);
+  const cL=sL.reduce((s,r)=>s+(parseFloat(r.coste_calculado)||0),0);
+  const cJ=sJ.reduce((s,r)=>s+(parseFloat(r.coste_total)||0),0);
+  const cLav=lav.reduce((s,r)=>s+(parseFloat(r.coste)||0),0);
+  const cOtros=gst.filter(g=>g.categoria!=="comision").reduce((s,g)=>s+(parseFloat(g.importe)||0),0);
+  const totalC=cL+cJ+cLav+cOtros+com;const ben=pt-totalC;
+  return{precioTotal:pt,precioFinca:parseFloat(reserva.precio_finca)||0,precioCasa:parseFloat(reserva.precio_casa)||0,costeLimpieza:cL,costeJardin:cJ,costeLavanderia:cLav,comision:com,comisionPct:comPct,otrosGastos:cOtros,totalCostes:totalC,beneficio:ben,margen:pt>0?Math.round(ben/pt*100):0,nLimp:sL.length,nJard:sJ.length};
+}
 const HDR  = { "Content-Type":"application/json","apikey":SB_KEY,"Authorization":`Bearer ${SB_KEY}` };
 const HDRA = tok => ({ ...HDR, "Authorization":`Bearer ${tok}` });
 
@@ -5431,6 +5449,7 @@ function Reservas({tok,rol,perfil}){
   const [sel,setSel]=useState(null);
   const [load,setLoad]=useState(true);
   const [showSeña,setShowSeña]=useState(false);
+  const [showRent,setShowRent]=useState(false);const [rentData,setRentData]=useState(null);const [loadRent,setLoadRent]=useState(false);
   const [señaImporte,setSeñaImporte]=useState("");
   const [showPagoTotal,setShowPagoTotal]=useState(false);
   const [cobroSaving,setCobroSaving]=useState(false);
@@ -5589,6 +5608,7 @@ function Reservas({tok,rol,perfil}){
               </button>)}
             </div>
             <hr className="div"/>
+            <button className="btn bg" style={{width:"100%",justifyContent:"center",marginBottom:8}} onClick={async()=>{setLoadRent(true);setShowRent(true);const d=await calcularRentabilidadReserva(sel,tok);setRentData(d);setLoadRent(false);}}>💰 Ver rentabilidad</button>
             <button className="btn br" style={{width:"100%",justifyContent:"center"}} onClick={()=>del(sel.id)}>🗑 Eliminar reserva</button>
             {/* ── CONTROLES DE COBRO ── */}
             <hr className="div"/>
@@ -5666,6 +5686,34 @@ function Reservas({tok,rol,perfil}){
         </div>
       </div>
     </div>}
+    {/* MODAL RENTABILIDAD */}
+    {showRent&&<div className="ov" onClick={()=>{setShowRent(false);setRentData(null);}}><div className="modal" style={{maxWidth:460}} onClick={e=>e.stopPropagation()}>
+      <h3>💰 Rentabilidad — {sel?.nombre}</h3>
+      {loadRent?<div className="loading"><div className="spin"/></div>
+      :rentData?<>
+        <div style={{fontSize:11,color:"#8A8580",marginBottom:12}}>📅 {sel?.fecha?new Date(sel.fecha+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"long",year:"numeric"}):"—"}</div>
+        <div style={{background:"#F5F3F0",borderRadius:12,padding:14,marginBottom:14}}>
+          <div style={{fontSize:12,fontWeight:700,color:"#8A8580",textTransform:"uppercase",letterSpacing:.5,marginBottom:8}}>Ingresos</div>
+          {rentData.precioFinca>0&&<div style={{display:"flex",justifyContent:"space-between",fontSize:13,padding:"4px 0"}}><span>Finca</span><strong>{Math.round(rentData.precioFinca).toLocaleString("es-ES")}€</strong></div>}
+          {rentData.precioCasa>0&&<div style={{display:"flex",justifyContent:"space-between",fontSize:13,padding:"4px 0"}}><span>Casa</span><strong>{Math.round(rentData.precioCasa).toLocaleString("es-ES")}€</strong></div>}
+          <div style={{display:"flex",justifyContent:"space-between",fontSize:14,fontWeight:700,padding:"6px 0",borderTop:"1px solid rgba(0,0,0,.06)",marginTop:4}}><span>TOTAL</span><strong style={{color:"#EC683E"}}>{Math.round(rentData.precioTotal).toLocaleString("es-ES")}€</strong></div>
+        </div>
+        <div style={{background:"#F5F3F0",borderRadius:12,padding:14,marginBottom:14}}>
+          <div style={{fontSize:12,fontWeight:700,color:"#8A8580",textTransform:"uppercase",letterSpacing:.5,marginBottom:8}}>Costes directos</div>
+          <div style={{display:"flex",justifyContent:"space-between",fontSize:13,padding:"4px 0"}}><span>🧹 Limpieza ({rentData.nLimp})</span><strong>{Math.round(rentData.costeLimpieza).toLocaleString("es-ES")}€</strong></div>
+          <div style={{display:"flex",justifyContent:"space-between",fontSize:13,padding:"4px 0"}}><span>🌿 Jardinería ({rentData.nJard})</span><strong>{Math.round(rentData.costeJardin).toLocaleString("es-ES")}€</strong></div>
+          <div style={{display:"flex",justifyContent:"space-between",fontSize:13,padding:"4px 0"}}><span>🧺 Lavandería</span><strong>{Math.round(rentData.costeLavanderia).toLocaleString("es-ES")}€</strong></div>
+          <div style={{display:"flex",justifyContent:"space-between",fontSize:13,padding:"4px 0"}}><span>🤝 Comisión {rentData.comisionPct}%</span><strong>{Math.round(rentData.comision).toLocaleString("es-ES")}€</strong></div>
+          {rentData.otrosGastos>0&&<div style={{display:"flex",justifyContent:"space-between",fontSize:13,padding:"4px 0"}}><span>📋 Otros</span><strong>{Math.round(rentData.otrosGastos).toLocaleString("es-ES")}€</strong></div>}
+          <div style={{display:"flex",justifyContent:"space-between",fontSize:14,fontWeight:700,padding:"6px 0",borderTop:"1px solid rgba(0,0,0,.06)",marginTop:4}}><span>TOTAL COSTES</span><strong style={{color:"#F35757"}}>{Math.round(rentData.totalCostes).toLocaleString("es-ES")}€</strong></div>
+        </div>
+        <div style={{background:rentData.beneficio>=0?"rgba(166,190,89,.08)":"rgba(243,87,87,.08)",borderRadius:12,padding:14,textAlign:"center"}}>
+          <div style={{fontSize:22,fontWeight:800,color:rentData.beneficio>=0?"#A6BE59":"#F35757"}}>{Math.round(rentData.beneficio).toLocaleString("es-ES")}€</div>
+          <div style={{fontSize:12,color:"#8A8580",marginTop:4}}>Beneficio neto · Margen {rentData.margen}%</div>
+        </div>
+        <div className="mft"><button className="btn bg" style={{width:"100%",justifyContent:"center"}} onClick={()=>{setShowRent(false);setRentData(null);}}>Cerrar</button></div>
+      </>:<div style={{color:"#8A8580",fontSize:13,textAlign:"center",padding:20}}>No se pudieron cargar los datos</div>}
+    </div></div>}
   </>;
 }
 
@@ -5762,7 +5810,7 @@ async function ejecutarMotorCoordinacion(tok){
       const ventanaPreferida=new Date(new Date(r.fecha+"T13:00:00").getTime()+3*86400000).toISOString();
       const ventanaAbs=prox?new Date(new Date(prox+"T15:00:00").getTime()-86400000).toISOString():new Date(Date.now()+14*86400000).toISOString();
       // Create service automatically
-      await crearLimpiezaAuto(`Limpieza post-${r.tipo==="airbnb"?"Airbnb":"evento"} — ${r.nombre}`,hoy,tok,"checkout");
+      await crearLimpiezaAuto(`Limpieza post-${r.tipo==="airbnb"?"Airbnb":"evento"} — ${r.nombre}`,hoy,tok,"checkout",r.id);
       const[cL]=await sbPost("coordinacion_servicios",{tipo:"limpieza_post",reserva_id:String(r.id),tipo_reserva:r.tipo,fecha_checkout:r.fecha,fecha_checkin_siguiente:prox,ventana_inicio:new Date(r.fecha+"T13:00:00").toISOString(),ventana_fin:ventanaPreferida,ventana_absoluta:ventanaAbs,estado:"servicio_creado_pendiente_fecha"},tok).catch(()=>[{}]);
       const ops=await sbGet("operarios","?rol=eq.limpieza&activo=eq.true&select=id",SB_KEY).catch(()=>[]);
       for(const op of ops)await sbPost("notificaciones",{para:op.id,txt:`🧹 Checkout hoy — ¿Qué día harás la limpieza?`},tok).catch(()=>{});
@@ -5777,7 +5825,7 @@ async function ejecutarMotorCoordinacion(tok){
       const ventanaAbs=prox?new Date(new Date(prox+"T15:00:00").getTime()-86400000).toISOString():new Date(Date.now()+14*86400000).toISOString();
       const esEv=r.tipo.includes("evento");const tJ=esEv?TAREAS_JARDIN_POST:TAREAS_JARDIN_PRE;
       const jds=await sbGet("jardineros","?activo=eq.true&select=*",tok).catch(()=>[]);const jd=jds[0]||null;
-      const[srv]=await sbPost("jardin_servicios",{nombre:`Jardín post — ${r.nombre}`,fecha_inicio:hoy,fecha_fin:prox||hoy,jardinero_id:jd?.id||null,jardinero_nombre:jd?.nombre||"",estado:"activo",creado_por:"Sistema automático"},tok).catch(()=>[{}]);
+      const[srv]=await sbPost("jardin_servicios",{nombre:`Jardín post — ${r.nombre}`,fecha_inicio:hoy,fecha_fin:prox||hoy,jardinero_id:jd?.id||null,jardinero_nombre:jd?.nombre||"",estado:"activo",creado_por:"Sistema automático",reserva_vinculada_id:String(r.id)},tok).catch(()=>[{}]);
       if(srv?.id){for(const t of tJ)await sbPost("jardin_servicio_tareas",{servicio_id:srv.id,txt:t.txt,done:false},tok).catch(()=>{});}
       await sbPost("coordinacion_servicios",{tipo:"jardin_post",reserva_id:String(r.id),tipo_reserva:r.tipo,fecha_checkout:r.fecha,fecha_checkin_siguiente:prox,ventana_inicio:new Date(r.fecha+"T13:00:00").toISOString(),ventana_fin:ventanaPreferida,ventana_absoluta:ventanaAbs,jardin_servicio_id:srv?.id||null,estado:"servicio_creado_pendiente_fecha"},tok).catch(()=>{});
       const ops=await sbGet("operarios","?rol=eq.jardinero&activo=eq.true&select=id",SB_KEY).catch(()=>[]);
@@ -5799,11 +5847,13 @@ async function ejecutarMotorCoordinacion(tok){
 }
 
 // ─── AUTO LIMPIEZA ──────────────────────────────────────────────────────────
-async function crearLimpiezaAuto(nombre,fecha,tok,origen){
+async function crearLimpiezaAuto(nombre,fecha,tok,origen,reservaVinculadaId){
   try{
     const limps=await sbGet("limpiadoras","?activa=eq.true&select=*",tok).catch(()=>[]);
     const limp=limps[0]||null;
-    const[srv]=await sbPost("servicios",{nombre,fecha,creado_por:"Sistema automático",limpiadora_id:limp?.id||null,limpiadora_nombre:limp?.nombre||null},tok);
+    const srvData={nombre,fecha,creado_por:"Sistema automático",limpiadora_id:limp?.id||null,limpiadora_nombre:limp?.nombre||null};
+    if(reservaVinculadaId)srvData.reserva_vinculada_id=String(reservaVinculadaId);
+    const[srv]=await sbPost("servicios",srvData,tok);
     for(const zona of LIMP_ZONAS){const ts=[...(zona.tareas||[]),...(zona.subzonas?zona.subzonas.flatMap(s=>s.tareas):[])];for(const t of ts)await sbPost("servicio_tareas",{servicio_id:srv.id,tarea_id:t.id,zona:zona.nombre,es_extra:false,done:false},tok).catch(()=>{});}
     const admIds=await getUserIdsPorRol("admin",tok);
     const msg=`🧹 Limpieza programada: ${nombre}`;
