@@ -4112,6 +4112,7 @@ function Lavanderia({perfil,tok,rol}){
   const [items,setItems]=useState([]);const [notas,setNotas]=useState("");const [envErr,setEnvErr]=useState("");
   const [recFecha,setRecFecha]=useState(hoyStr);const [recCoste,setRecCoste]=useState("");const [recFoto,setRecFoto]=useState(null);
   const [checkItems,setCheckItems]=useState([]);
+  const [showDiscrepancias,setShowDiscrepancias]=useState(null);const [fuentes,setFuentes]=useState({});
 
   const load_=async()=>{
     try{
@@ -4124,18 +4125,37 @@ function Lavanderia({perfil,tok,rol}){
   };
   useEffect(()=>{load_();},[]);
 
+  const verificarEnvioLav=(filled)=>{
+    const disc=[];
+    for(const i of filled){
+      const art=articulos.find(a=>a.id===i.id);
+      const sC=parseFloat(art?.stock_casa||0),sA=parseFloat(art?.stock_almacen||0);
+      if(sC<i.cantidad)disc.push({...i,articulo_id:i.id,stock_casa:sC,stock_almacen:sA,diferencia:i.cantidad-sC});
+    }
+    return disc;
+  };
   const enviar=async()=>{
     const filled=items.filter(i=>i.cantidad>0);
     if(filled.length===0||saving)return;setEnvErr("");
-    // Verify stock
-    for(const i of filled){const art=articulos.find(a=>a.id===i.id);const v=verificarStock(art||i,"casa",i.cantidad);if(!v.ok){setEnvErr(v.msg);return;}}
-    setSaving(true);
+    const disc=verificarEnvioLav(filled);
+    if(disc.length>0){setFuentes(disc.reduce((o,d)=>({...o,[d.articulo_id]:"casa"}),{}));setShowDiscrepancias(disc);return;}
+    await ejecutarEnvio(filled,{});
+  };
+  const ejecutarEnvio=async(filledOrig,fuentesMap)=>{
+    const filled=filledOrig||items.filter(i=>i.cantidad>0);
+    if(filled.length===0)return;setSaving(true);
     try{
-      await sbPost("lavanderia",{fecha_envio:hoyStr,items:filled.map(i=>({articulo_id:i.id,nombre:i.nombre,cantidad:i.cantidad})),estado:"en_lavanderia",creado_por:perfil.nombre,notas:notas||null},tok);
-      for(const i of filled){const art=articulos.find(a=>a.id===i.id);
-        await sbPatch("almacen_articulos",`id=eq.${i.id}`,{stock_casa:Math.max(0,(parseFloat(art?.stock_casa)||0)-i.cantidad),stock_lavanderia:(parseFloat(art?.stock_lavanderia)||0)+i.cantidad},tok).catch(()=>{});
-        await sbPost("almacen_movimientos",{articulo_id:i.id,tipo:"lavanderia_envio",cantidad:i.cantidad,ubicacion_origen:"casa",ubicacion_destino:"lavanderia",concepto:`Envío lavandería — ${hoyStr}`,creado_por:perfil.nombre},tok).catch(()=>{});}
-      setShowEnvio(false);setItems([]);setNotas("");await load_();
+      await sbPost("lavanderia",{fecha_envio:hoyStr,items:filled.map(i=>({articulo_id:i.id||i.articulo_id,nombre:i.nombre,cantidad:i.cantidad})),estado:"en_lavanderia",creado_por:perfil.nombre,notas:notas||null},tok);
+      for(const i of filled){
+        const aid=i.id||i.articulo_id;const art=articulos.find(a=>a.id===aid);
+        const fuente=fuentesMap[aid]||"casa";
+        const campo=fuente==="casa"?"stock_casa":"stock_almacen";
+        const stockOrigen=parseFloat(art?.[campo]||0);
+        const stockNuevo=Math.max(0,stockOrigen-i.cantidad);
+        await sbPatch("almacen_articulos",`id=eq.${aid}`,{[campo]:stockNuevo,stock_lavanderia:(parseFloat(art?.stock_lavanderia||0))+i.cantidad},tok).catch(()=>{});
+        await sbPost("almacen_movimientos",{articulo_id:aid,tipo:"lavanderia_envio",cantidad:i.cantidad,ubicacion_origen:fuente,ubicacion_destino:"lavanderia",concepto:`Envío lavandería — ${hoyStr}`,creado_por:perfil.nombre},tok).catch(()=>{});
+      }
+      setShowEnvio(false);setShowDiscrepancias(null);setItems([]);setNotas("");setFuentes({});await load_();
     }catch(_){}setSaving(false);
   };
 
@@ -4150,7 +4170,12 @@ function Lavanderia({perfil,tok,rol}){
         await sbPatch("almacen_articulos",`id=eq.${i.articulo_id}`,{stock_lavanderia:Math.max(0,(parseFloat(art?.stock_lavanderia)||0)-i.cantidad_recibida),stock_almacen:(parseFloat(art?.stock_almacen)||0)+i.cantidad_recibida},tok).catch(()=>{});
         await sbPost("almacen_movimientos",{articulo_id:i.articulo_id,tipo:"lavanderia_retorno",cantidad:i.cantidad_recibida,ubicacion_origen:"lavanderia",ubicacion_destino:"almacen",concepto:`Recogida lavandería — ${recFecha}`,creado_por:perfil.nombre},tok).catch(()=>{});}}
       if(coste>0)await sbPost("gastos",{fecha:hoyStr,categoria:"Otros",concepto:`Lavandería — ${showRecogida.fecha_envio}`,importe:coste,origen:"auto_lavanderia"},tok).catch(()=>{});
-      if(incidencias.length>0){const adms=await sbGet("usuarios","?rol=eq.admin&select=id",tok).catch(()=>[]);const msg=`⚠️ Incidencias lavandería: ${incidencias.map(i=>`${i.nombre} — faltan ${i.faltan}`).join(", ")}`;for(const a of adms)await sbPost("notificaciones",{para:a.id,txt:msg},tok).catch(()=>{});}
+      if(incidencias.length>0){
+        const msgInc=`⚠️ Incidencia lavandería ${new Date().toLocaleDateString("es-ES")}: `+incidencias.map(i=>`${i.nombre} — enviadas ${i.enviadas}, recibidas ${i.recibidas} (faltan ${i.faltan}${i.nota?": "+i.nota:""})`).join(" | ");
+        const adms=await sbGet("usuarios","?rol=eq.admin&select=id",tok).catch(()=>[]);
+        for(const a of adms)await sbPost("notificaciones",{para:a.id,txt:msgInc},tok).catch(()=>{});
+        sendPush("⚠️ Incidencia lavandería",msgInc,"lavanderia-incidencia");
+      }
       setShowRecogida(null);await load_();
     }catch(_){}setSaving(false);
   };
@@ -4178,10 +4203,14 @@ function Lavanderia({perfil,tok,rol}){
 
       {historial.length>0&&<>
         <div style={{fontSize:11,color:"#8A8580",textTransform:"uppercase",letterSpacing:1,fontWeight:700,marginTop:24,marginBottom:10}}>Historial</div>
-        {historial.slice(0,10).map(e=><div key={e.id} className="card" style={{marginBottom:8,opacity:.7}}>
-          <div style={{fontSize:13,fontWeight:600,color:"#1A1A1A"}}>{new Date(e.fecha_envio+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"})} → {e.fecha_recogida?new Date(e.fecha_recogida+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"}):"—"}</div>
+        {historial.slice(0,10).map(e=>{const inc=e.incidencias_recogida||[];return<div key={e.id} className="card" style={{marginBottom:8,opacity:inc.length>0?1:.7,borderLeft:inc.length>0?"3px solid #D4A017":"none"}}>
+          <div style={{fontSize:13,fontWeight:600,color:"#1A1A1A"}}>✅ {new Date(e.fecha_envio+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"})} → {e.fecha_recogida?new Date(e.fecha_recogida+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"}):"—"}</div>
           <div style={{fontSize:12,color:"#8A8580"}}>{(e.items||[]).map(i=>`${i.nombre} ×${i.cantidad}`).join(", ")}{e.coste?` · ${parseFloat(e.coste).toLocaleString("es-ES")}€`:""}</div>
-        </div>)}
+          {inc.length>0&&<div style={{marginTop:6,padding:"6px 10px",background:"#FEF3CD",borderRadius:8,fontSize:12}}>
+            <div style={{fontWeight:600,color:"#856404",marginBottom:4}}>⚠️ Incidencias:</div>
+            {inc.map((ic,j)=><div key={j} style={{color:"#856404"}}>• {ic.nombre}: falta {ic.faltan}{ic.nota?` (${ic.nota})`:""}</div>)}
+          </div>}
+        </div>})}
       </>}
     </div>
 
@@ -4222,6 +4251,28 @@ function Lavanderia({perfil,tok,rol}){
         {recFoto&&<img src={recFoto} alt="" className="pprev"/>}
       </div>
       <div className="mft"><button className="btn bg" onClick={()=>setShowRecogida(null)}>Cancelar</button><button className="btn bp" onClick={recoger} disabled={saving}>{saving?"Guardando…":"✅ Confirmar recogida"}</button></div>
+    </div></div>}
+
+    {showDiscrepancias&&<div className="ov" onClick={()=>setShowDiscrepancias(null)}><div className="modal" style={{maxHeight:"90vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
+      <h3 style={{color:"#D4A017"}}>⚠️ Discrepancias en el envío</h3>
+      <div style={{fontSize:13,color:"#8A8580",marginBottom:14}}>Hay artículos que superan el stock en casa:</div>
+      {showDiscrepancias.map(d=>{const f=fuentes[d.articulo_id]||"casa";return<div key={d.articulo_id} style={{background:"#FEF3CD",borderRadius:10,padding:"12px 14px",marginBottom:10}}>
+        <div style={{fontWeight:600,fontSize:14,color:"#1A1A1A",marginBottom:6}}>{d.nombre}</div>
+        <div style={{display:"flex",gap:16,fontSize:13,color:"#856404",marginBottom:8,flexWrap:"wrap"}}>
+          <span>Envías: <strong>{d.cantidad}</strong></span>
+          <span>En casa: <strong>{d.stock_casa}</strong></span>
+          <span>Diferencia: <strong style={{color:"#D4A017"}}>+{d.diferencia}</strong></span>
+        </div>
+        <div style={{display:"flex",gap:8}}>
+          <button className={f==="casa"?"btn bp sm":"btn bg sm"} onClick={()=>setFuentes(p=>({...p,[d.articulo_id]:"casa"}))}>🏠 Casa</button>
+          <button className={f==="almacen"?"btn bp sm":"btn bg sm"} onClick={()=>setFuentes(p=>({...p,[d.articulo_id]:"almacen"}))} disabled={d.stock_almacen<d.diferencia}>📦 Almacén{d.stock_almacen>0?` (${d.stock_almacen})`:""}</button>
+        </div>
+      </div>})}
+      <div style={{fontSize:12,color:"#8A8580",background:"#F5F3F0",borderRadius:8,padding:"10px 12px",marginTop:6}}>💡 Pulsa "Almacén" si el artículo viene del almacén, no de la casa. O revisa el conteo y vuelve a intentarlo.</div>
+      <div className="mft">
+        <button className="btn bg" onClick={()=>setShowDiscrepancias(null)}>← Revisar conteo</button>
+        <button className="btn bp" onClick={()=>ejecutarEnvio(items.filter(i=>i.cantidad>0),fuentes)} disabled={saving}>{saving?"Enviando…":"Enviar igualmente →"}</button>
+      </div>
     </div></div>}
   </>;
 }
