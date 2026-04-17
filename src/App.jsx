@@ -101,16 +101,25 @@ async function contarNoVistos(userId,tok){const items=await sbGet("items_no_vist
 async function getUserIdsPorRol(rol,tok){const[u,o]=await Promise.all([sbGet("usuarios",`?rol=eq.${rol}&select=id`,tok).catch(()=>[]),sbGet("operarios",`?rol=eq.${rol}&select=id`,tok).catch(()=>[])]);return[...u,...o].map(x=>x.id);}
 
 // ─── METEO ──────────────────────────────────────────────────────────────────
-const METEO_URL="https://api.open-meteo.com/v1/forecast?latitude=37.7947&longitude=-0.8339&daily=weathercode,temperature_2m_max,temperature_2m_min,precipitation_sum,windspeed_10m_max&timezone=Europe%2FMadrid&forecast_days=7";
+const AEMET_KEY="eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhbHZhcm9AamFwZXN0dWRpby5jb20iLCJqdGkiOiJhOWM4MGQxNy0yYzBkLTRiN2UtOWU0YS00MTAxYTA4NDQ5ZTMiLCJpc3MiOiJBRU1FVCIsImlhdCI6MTc3NjQ0Mzg5NCwidXNlcklkIjoiYTljODBkMTctMmMwZC00YjdlLTllNGEtNDEwMWEwODQ0OWUzIiwicm9sZSI6IiJ9.aYPcxavIRu6S2j3cp4Sa5TdO5HKS-j0auapg1tzHFEs";
+const AEMET_MUNICIPIO="30027";
 const METEO_CACHE_KEY="fm_meteo_cache";const METEO_TTL=3*3600000;
-function getWIcon(code){const n=parseInt(code);console.log("Weathercode recibido:",code,"→ parseInt:",n);if(n===0)return"☀️";if(n===1)return"🌤️";if(n===2)return"⛅";if(n===3)return"☁️";if(n===45||n===48)return"🌫️";if(n>=51&&n<=57)return"🌦️";if(n>=61&&n<=67)return"🌧️";if(n>=71&&n<=77)return"❄️";if(n>=80&&n<=82)return"🌧️";if(n===85||n===86)return"🌨️";if(n>=95)return"⛈️";return"⛅";}
-function getWDesc(code){const n=parseInt(code);if(n===0)return"Despejado";if(n===1)return"Poco nuboso";if(n===2)return"Parcialmente nublado";if(n===3)return"Nublado";if(n===45||n===48)return"Niebla";if(n>=51&&n<=57)return"Llovizna";if(n>=61&&n<=67)return"Lluvia";if(n>=71&&n<=77)return"Nieve";if(n>=80&&n<=82)return"Chubascos";if(n>=95&&n<=99)return"Tormenta";return"Variable";}
+function getWIcon(codigo){const c=String(codigo).replace("n","");const n=parseInt(c);if(n===11)return"☀️";if(n===12)return"🌤️";if(n===13)return"🌤️";if(n===14)return"⛅";if(n===15)return"☁️";if(n===16)return"☁️";if(n===17)return"🌫️";if(n===23)return"🌦️";if(n===24||n===25||n===26)return"🌧️";if(n===33)return"🌦️";if(n>=43&&n<=46)return"⛈️";if(n>=51&&n<=54)return"⛈️";if(n===71)return"🌦️";if(n>=72&&n<=74)return"🌧️";return"⛅";}
+function getWDesc(codigo){const c=String(codigo).replace("n","");const n=parseInt(c);if(n===11)return"Despejado";if(n===12)return"Poco nuboso";if(n===13)return"Intervalos nubosos";if(n===14)return"Nuboso";if(n===15)return"Muy nuboso";if(n===16)return"Cubierto";if(n===17)return"Nubes altas";if(n===23||n===71)return"Intervalos con lluvia";if(n===24||n===72)return"Nuboso con lluvia";if(n===25||n===73)return"Muy nuboso con lluvia";if(n===26||n===74)return"Cubierto con lluvia";if(n===33)return"Intervalos con nieve";if(n>=43&&n<=46)return"Tormenta";if(n>=51&&n<=54)return"Tormenta";return"Variable";}
 async function fetchMeteo(){
   try{
     const cached=localStorage.getItem(METEO_CACHE_KEY);
     if(cached){const{data,ts}=JSON.parse(cached);if(Date.now()-ts<METEO_TTL)return data;}
-    const r=await fetch(METEO_URL);if(!r.ok)return null;
-    const data=await r.json();
+    const r1=await fetch(`https://opendata.aemet.es/opendata/api/prediccion/especifica/municipio/diaria/${AEMET_MUNICIPIO}/?api_key=${AEMET_KEY}`,{headers:{"Accept":"application/json"}});
+    const meta=await r1.json();if(!meta.datos)return null;
+    const r2=await fetch(meta.datos);const raw=await r2.json();
+    const dias=(raw[0]?.prediccion?.dia||[]).slice(0,7);
+    const data=dias.map(dia=>{
+      const cielo=dia.estadoCielo||[];const cieloDia=cielo.find(e=>e.periodo==="00-24"||e.periodo==="00-12")||cielo[0]||{};
+      const precip=dia.probPrecipitacion||[];const precipDia=precip.find(p=>p.periodo==="00-24"||p.periodo==="00-12")||precip[0]||{};
+      const viento=dia.viento||[];const vientoDia=viento.find(v=>v.periodo==="00-24"||v.periodo==="00-12")||viento[0]||{};
+      return{fecha:dia.fecha?.split("T")[0],tempMax:dia.temperatura?.maxima,tempMin:dia.temperatura?.minima,precipitacion:parseInt(precipDia.value||0),estadoCielo:cieloDia.value||"11",descripcion:cieloDia.descripcion||"Despejado",viento:parseInt(vientoDia.velocidad||0)};
+    });
     localStorage.setItem(METEO_CACHE_KEY,JSON.stringify({data,ts:Date.now()}));
     return data;
   }catch(_){return null;}
@@ -1498,10 +1507,10 @@ function AtencionAhora({tok,setPage}){
         try{const ci=await sbGet("coordinacion_servicios",`?estado=in.(preguntando_si_lista,servicio_creado_pendiente_fecha,pendiente_aprobacion_admin)&select=*&order=created_at.desc&limit=10`,tok);setCoordItems(ci);}catch(_){}
 
         // Alertas meteorológicas
-        try{const m=await fetchMeteo();if(m?.daily){const am=[];const rAll=activas.filter(r=>r.fecha>=hoyStr&&r.fecha<=en7Str);
-          m.daily.time.forEach((f,i)=>{const rain=m.daily.precipitation_sum[i];const wind=m.daily.windspeed_10m_max[i];const evts=rAll.filter(r=>r.fecha===f);const airsD=airbnbs.filter(a=>a.fecha_entrada<=f&&a.fecha_salida>=f);
-            if(rain>5&&evts.length>0)am.push({msg:`🌧️ Lluvia (${rain}mm) el día del evento "${evts[0].nombre}"`,fecha:f});
-            if(rain>2&&airsD.length>0)am.push({msg:`🌧️ Lluvia (${rain}mm) durante estancia de "${airsD[0].huesped}"`,fecha:f});
+        try{const dias=await fetchMeteo();if(dias&&dias.length>0){const am=[];const rAll=activas.filter(r=>r.fecha>=hoyStr&&r.fecha<=en7Str);
+          dias.forEach(d=>{const f=d.fecha;const rain=d.precipitacion;const wind=d.viento;const evts=rAll.filter(r=>r.fecha===f);const airsD=airbnbs.filter(a=>a.fecha_entrada<=f&&a.fecha_salida>=f);
+            if(rain>40&&evts.length>0)am.push({msg:`🌧️ Prob. lluvia ${rain}% el día del evento "${evts[0].nombre}"`,fecha:f});
+            if(rain>30&&airsD.length>0)am.push({msg:`🌧️ Prob. lluvia ${rain}% durante estancia de "${airsD[0].huesped}"`,fecha:f});
             if(wind>40)am.push({msg:`💨 Viento fuerte (${wind}km/h) el ${new Date(f+"T12:00:00").toLocaleDateString("es-ES",{weekday:"long",day:"numeric"})}`,fecha:f});
           });setAlertasMeteo(am);}}catch(_){}
       }catch(_){}
@@ -1714,19 +1723,20 @@ function DashA({reservas,jsem,jpunt,cwk,setPage,tok,perfil,rol}){
     <div className="ph"><h2>Panel administración 👋</h2><p>{new Date().toLocaleDateString("es-ES",{weekday:"long",year:"numeric",month:"long",day:"numeric"})}</p></div>
     <div className="pb">
       {/* METEO WIDGET */}
-      {meteo?.daily&&<div className="card" style={{marginBottom:16,padding:"16px 18px"}}>
+      {meteo&&meteo.length>0&&<div className="card" style={{marginBottom:16,padding:"16px 18px"}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-          <div style={{fontSize:11,color:"#8A8580",fontWeight:700,textTransform:"uppercase",letterSpacing:.5}}>📍 San Javier, Murcia — Previsión 7 días</div>
+          <div style={{fontSize:11,color:"#8A8580",fontWeight:700,textTransform:"uppercase",letterSpacing:.5}}>📍 San Javier, Murcia — AEMET 7 días</div>
           <button onClick={()=>{localStorage.removeItem("fm_meteo_cache");cargarMeteo();}} style={{fontSize:10,padding:"2px 6px",opacity:.5,cursor:"pointer",background:"none",border:"1px solid #BFBAB4",borderRadius:4,color:"#8A8580"}}>🔄</button>
         </div>
         <div style={{display:"flex",gap:8,overflowX:"auto",scrollbarWidth:"none",paddingBottom:4}}>
-          {meteo.daily.time.map((f,i)=>{const d=new Date(f+"T12:00:00");const lbl=i===0?"Hoy":i===1?"Mañ":d.toLocaleDateString("es-ES",{weekday:"short"}).slice(0,3);const tMax=Math.round(meteo.daily.temperature_2m_max[i]);const tMin=Math.round(meteo.daily.temperature_2m_min[i]);const rain=meteo.daily.precipitation_sum[i];const code=meteo.daily.weathercode[i];
-            return <div key={f} style={{minWidth:72,textAlign:"center",padding:"8px 6px",borderRadius:12,background:i===0?"rgba(236,104,62,.06)":"#F5F3F0",flex:"0 0 auto"}}>
+          {meteo.map((dia,i)=>{const d=new Date(dia.fecha+"T12:00:00");const lbl=i===0?"Hoy":i===1?"Mañ":d.toLocaleDateString("es-ES",{weekday:"short"}).slice(0,3);const tMax=Math.round(dia.tempMax);const tMin=Math.round(dia.tempMin);
+            return <div key={dia.fecha} style={{minWidth:72,textAlign:"center",padding:"8px 6px",borderRadius:12,background:i===0?"rgba(236,104,62,.06)":"#F5F3F0",flex:"0 0 auto"}}>
               <div style={{fontSize:11,fontWeight:700,color:i===0?"#EC683E":"#8A8580"}}>{lbl}</div>
-              <div style={{fontSize:24,margin:"4px 0"}}>{getWIcon(code)}</div>
+              <div style={{fontSize:24,margin:"4px 0"}}>{getWIcon(dia.estadoCielo)}</div>
               <div style={{fontSize:13,fontWeight:700,color:"#1A1A1A"}}>{tMax}°</div>
               <div style={{fontSize:11,color:"#8A8580"}}>{tMin}°</div>
-              {rain>0&&<div style={{fontSize:10,color:"#7FB2FF",fontWeight:600,marginTop:2}}>💧{rain}mm</div>}
+              {dia.precipitacion>10&&<div style={{fontSize:10,color:"#7FB2FF",fontWeight:600,marginTop:2}}>💧{dia.precipitacion}%</div>}
+              <div style={{fontSize:9,color:"#BFBAB4",marginTop:2}}>{dia.descripcion}</div>
             </div>;
           })}
         </div>
@@ -1773,7 +1783,7 @@ function DashA({reservas,jsem,jpunt,cwk,setPage,tok,perfil,rol}){
 }
 function DashJ({perfil,jsem,jpunt,cwk,setPage,tok}){
   const [meteoJ,setMeteoJ]=useState(null);
-  useEffect(()=>{fetchMeteo().then(d=>{if(d?.daily){const r2=d.daily.precipitation_sum.slice(0,2);const maxR=Math.max(...r2);if(maxR>2)setMeteoJ({rain:maxR,day:r2[1]>r2[0]?"mañana":"hoy"});}});},[]);
+  useEffect(()=>{fetchMeteo().then(dias=>{if(dias&&dias.length>=2){const r0=dias[0].precipitacion,r1=dias[1].precipitacion;const maxR=Math.max(r0,r1);if(maxR>30)setMeteoJ({rain:maxR,day:r1>r0?"mañana":"hoy"});}});},[]);
   const temp=getTemporada();
   const sj={}; jsem.forEach(r=>sj[r.tarea_id]=r);
   const actv=JARDIN_T[temp].filter(t=>tocaSemana({...t,frec:t.frec},cwk));
