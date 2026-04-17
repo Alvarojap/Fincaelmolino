@@ -490,6 +490,7 @@ hr.div{border:none;border-top:1px solid rgba(0,0,0,.06);margin:16px 0}
 .cd.today{border-color:#EC683E;color:#EC683E;font-weight:800;background:rgba(236,104,62,.06)}
 .cd.hasev{background:rgba(175,163,255,.12);border-color:rgba(175,163,255,.35)}
 .cd.sel{border-color:#EC683E;background:rgba(236,104,62,.1);box-shadow:0 0 0 3px rgba(236,104,62,.12)}
+.cd.bloqueado{background:rgba(99,102,241,.06)!important;border-color:rgba(99,102,241,.2)!important;cursor:not-allowed}
 .cdot{width:5px;height:5px;border-radius:50%;margin-top:2px}
 .cnav{display:flex;align-items:center;gap:12px;margin-bottom:12px}
 .cnav button{background:none;border:none;color:#EC683E;cursor:pointer;font-size:22px;padding:6px 10px;border-radius:10px;line-height:1;transition:all .15s ease}
@@ -3539,7 +3540,6 @@ function Chat({perfil,tok,rol}){
 
 // ─── DISPONIBILIDAD ───────────────────────────────────────────────────────────
 async function checkDisponibilidad(fecha, tok){
-  // Returns {libre, conflictos:[{tipo,nombre,detalle}]}
   const [reservas, airbnbs] = await Promise.all([
     sbGet("reservas", `?fecha=eq.${fecha}&select=nombre,tipo,estado`, tok),
     sbGet("reservas_airbnb", `?fecha_entrada=lte.${fecha}&fecha_salida=gte.${fecha}&select=huesped,fecha_entrada,fecha_salida`, tok),
@@ -3548,6 +3548,16 @@ async function checkDisponibilidad(fecha, tok){
     ...reservas.filter(r=>["visita","pendiente_contrato","contrato_firmado","reserva_pagada","precio_total"].includes(r.estado)).map(r=>({tipo:"evento",nombre:r.nombre,detalle:`Evento: ${r.tipo||""}`,color:"#6366f1"})),
     ...airbnbs.map(a=>({tipo:"airbnb",nombre:"Alojamiento turístico",detalle:`Airbnb: ${a.huesped}`,color:"#A6BE59"})),
   ];
+  // Check blocked days from events with house
+  const diaAntes=new Date(new Date(fecha+"T12:00:00").getTime()+86400000).toISOString().split("T")[0];
+  const diaDespues=new Date(new Date(fecha+"T12:00:00").getTime()-86400000).toISOString().split("T")[0];
+  const evAdj=await sbGet("reservas",`?incluye_casa=eq.true&estado=neq.cancelada&fecha=in.(${diaAntes},${diaDespues})&select=nombre,fecha,bloqueo_dia_anterior,bloqueo_dia_posterior,dia_anterior_desbloqueado,dia_posterior_desbloqueado`,tok).catch(()=>[]);
+  for(const r of evAdj){
+    const esDiaAntes=r.fecha===diaAntes; // evento es mañana → hoy es día anterior
+    const esDiaDespues=r.fecha===diaDespues; // evento fue ayer → hoy es día posterior
+    if(esDiaAntes&&r.bloqueo_dia_anterior&&!r.dia_anterior_desbloqueado)conflictos.push({tipo:"bloqueo_evento",nombre:`Bloqueado: día previo a "${r.nombre}"`,detalle:"Día anterior al evento con casa",color:"#6366f1"});
+    if(esDiaDespues&&r.bloqueo_dia_posterior&&!r.dia_posterior_desbloqueado)conflictos.push({tipo:"bloqueo_evento",nombre:`Bloqueado: día posterior a "${r.nombre}"`,detalle:"Día posterior al evento con casa",color:"#6366f1"});
+  }
   return {libre:conflictos.length===0, conflictos};
 }
 
@@ -4975,6 +4985,12 @@ function CalBase({tok,rol="admin"}){
 
   // Dates blocked by airbnb
   const airbnbDates=airbnbFechas(airbnbs);
+  // Dates blocked by events with house
+  const fechasBloq=new Set();
+  reservas.forEach(r=>{if(r.incluye_casa&&r.estado!=="cancelada"){
+    if(r.bloqueo_dia_anterior&&!r.dia_anterior_desbloqueado){const d=new Date(new Date(r.fecha+"T12:00:00").getTime()-86400000).toISOString().split("T")[0];fechasBloq.add(d);}
+    if(r.bloqueo_dia_posterior&&!r.dia_posterior_desbloqueado){const d=new Date(new Date(r.fecha+"T12:00:00").getTime()+86400000).toISOString().split("T")[0];fechasBloq.add(d);}
+  }});
 
   // Reservas normales para un día
   const grReservas=d=>reservas.filter(r=>r.fecha===ds(d));
@@ -5069,10 +5085,12 @@ function CalBase({tok,rol="admin"}){
           const isBusq=resultadoBusqueda&&fecha===resultadoBusqueda.fecha;
           const hasAir=airD.length>0;
           const hasRsv=rsv.length>0;
+          const esBloq=fechasBloq.has(fecha);
           return <div key={d}
-            className={`cd${isT?" today":""}${(hasRsv||hasAir)?" hasev":""}${sel===d?" sel":""}`}
+            className={`cd${isT?" today":""}${(hasRsv||hasAir)?" hasev":""}${esBloq?" bloqueado":""}${sel===d?" sel":""}`}
             style={{
-              ...(isBusq?{boxShadow:"0 0 0 2px #c9a84c",background:"rgba(201,168,76,.12)"}:{}),
+              ...(isBusq?{boxShadow:"0 0 0 2px #EC683E",background:"rgba(236,104,62,.12)"}:{}),
+              ...(esBloq&&!hasRsv&&!hasAir?{background:"rgba(99,102,241,.06)",borderColor:"rgba(99,102,241,.2)"}:{}),
               // Airbnb days: reddish tint (for comercial just shows blocked, no info)
               ...(hasAir&&!hasRsv?{background:"rgba(232,85,85,.08)"}:{}),
             }}
@@ -5081,6 +5099,7 @@ function CalBase({tok,rol="admin"}){
             {hasRsv&&<div className="cdot" style={{background:ESTADOS.find(e=>e.id===rsv[0].estado)?.col||"#6366f1"}}/>}
             {hasAir&&!hasRsv&&<div className="cdot" style={{background:"#F35757"}}/>}
             {hasAir&&hasRsv&&<div style={{display:"flex",gap:2,marginTop:2}}><div className="cdot" style={{background:ESTADOS.find(e=>e.id===rsv[0].estado)?.col||"#6366f1"}}/><div className="cdot" style={{background:"#F35757"}}/></div>}
+            {esBloq&&!hasRsv&&!hasAir&&<span style={{fontSize:7,marginTop:1}}>🔒</span>}
           </div>;
         })}
       </div>
@@ -5089,8 +5108,9 @@ function CalBase({tok,rol="admin"}){
     {/* LEYENDA */}
     <div style={{display:"flex",gap:12,marginTop:8,marginBottom:4,flexWrap:"wrap"}}>
       <div style={{display:"flex",alignItems:"center",gap:5,fontSize:11,color:"#8A8580"}}><div style={{width:8,height:8,borderRadius:"50%",background:"#6366f1"}}/> Evento</div>
-      {(isA||isL||isJ)&&<div style={{display:"flex",alignItems:"center",gap:5,fontSize:11,color:"#8A8580"}}><div style={{width:8,height:8,borderRadius:"50%",background:"#F35757"}}/> {isC?"Bloqueado":"Airbnb"}</div>}
+      {(isA||isL||isJ)&&<div style={{display:"flex",alignItems:"center",gap:5,fontSize:11,color:"#8A8580"}}><div style={{width:8,height:8,borderRadius:"50%",background:"#F35757"}}/> Airbnb</div>}
       {isC&&<div style={{display:"flex",alignItems:"center",gap:5,fontSize:11,color:"#8A8580"}}><div style={{width:8,height:8,borderRadius:"50%",background:"#F35757"}}/> No disponible</div>}
+      <div style={{display:"flex",alignItems:"center",gap:5,fontSize:11,color:"#8A8580"}}><span style={{fontSize:10}}>🔒</span> Bloqueado</div>
     </div>
 
     {/* DETALLE DÍA SELECCIONADO */}
@@ -5553,6 +5573,12 @@ function Reservas({tok,rol,perfil}){
             <div style={{display:"flex",justifyContent:"space-between"}}><span>💰 Precio finca</span><strong>{(parseFloat(sel.precio_finca)||0).toLocaleString("es-ES")}€</strong></div>
             {sel.incluye_casa&&<div style={{display:"flex",justifyContent:"space-between",marginTop:4}}><span>🏠 Precio casa</span><strong>{(parseFloat(sel.precio_casa)||0).toLocaleString("es-ES")}€</strong></div>}
             <span className="badge" style={{background:sel.incluye_casa?"rgba(175,163,255,.12)":"#F0EDE8",color:sel.incluye_casa?"#AFA3FF":"#8A8580",marginTop:6,display:"inline-block"}}>{sel.incluye_casa?"Finca + Casa":"Solo finca"}</span>
+            {isA&&sel.incluye_casa&&<div style={{display:"flex",gap:6,marginTop:8,flexWrap:"wrap"}}>
+              {sel.bloqueo_dia_anterior&&!sel.dia_anterior_desbloqueado&&<button className="btn bg sm" onClick={async()=>{try{await sbPatch("reservas",`id=eq.${sel.id}`,{dia_anterior_desbloqueado:true},tok);setSel(p=>({...p,dia_anterior_desbloqueado:true}));setReservas(prev=>prev.map(r=>r.id===sel.id?{...r,dia_anterior_desbloqueado:true}:r));}catch(_){}}}>🔓 Desbloquear día anterior</button>}
+              {sel.bloqueo_dia_posterior&&!sel.dia_posterior_desbloqueado&&<button className="btn bg sm" onClick={async()=>{try{await sbPatch("reservas",`id=eq.${sel.id}`,{dia_posterior_desbloqueado:true},tok);setSel(p=>({...p,dia_posterior_desbloqueado:true}));setReservas(prev=>prev.map(r=>r.id===sel.id?{...r,dia_posterior_desbloqueado:true}:r));}catch(_){}}}>🔓 Desbloquear día posterior</button>}
+              {sel.dia_anterior_desbloqueado&&<span style={{fontSize:11,color:"#A6BE59"}}>✅ Día anterior desbloqueado</span>}
+              {sel.dia_posterior_desbloqueado&&<span style={{fontSize:11,color:"#A6BE59"}}>✅ Día posterior desbloqueado</span>}
+            </div>}
           </div>}
           {sel.obs&&<div style={{background:"#F5F3F0",borderRadius:8,padding:11,marginBottom:14}}><div style={{fontSize:10,color:"#8A8580",marginBottom:5}}>OBSERVACIONES</div><div style={{fontSize:12,color:"#1A1A1A",lineHeight:1.5}}>{sel.obs}</div></div>}
           {isA&&<><hr className="div"/>
@@ -5808,7 +5834,7 @@ function NuevaReserva({perfil,tok,setPage,rol}){
     try{
       const disp=await checkDisponibilidad(form.fecha,tok);
       if(!disp.libre){setSaving(false);setBloqueadoR(disp.conflictos);return;}
-      const [res]=await sbPost("reservas",{nombre:form.nombre,fecha:form.fecha,tipo:form.tipo,incluye_casa:form.incluye_casa,precio_finca:parseFloat(form.precio_finca)||0,precio_casa:form.incluye_casa?parseFloat(form.precio_casa)||0:0,precio_total:precioTotal,precio:precioTotal,contacto:form.contacto,obs:form.obs,estado:form.estado,creado_por:perfil.id},tok);
+      const [res]=await sbPost("reservas",{nombre:form.nombre,fecha:form.fecha,tipo:form.tipo,incluye_casa:form.incluye_casa,precio_finca:parseFloat(form.precio_finca)||0,precio_casa:form.incluye_casa?parseFloat(form.precio_casa)||0:0,precio_total:precioTotal,precio:precioTotal,contacto:form.contacto,obs:form.obs,estado:form.estado,creado_por:perfil.id,bloqueo_dia_anterior:form.incluye_casa||false,bloqueo_dia_posterior:form.incluye_casa||false},tok);
       await addHistorial("reserva",res.id,`Reserva creada por ${perfil.nombre}`,perfil.nombre,tok);
       if(rol!=="admin"){const admIds=await getUserIdsPorRol("admin",tok);registrarItemNuevo("reserva",res.id,admIds,tok);}
       const en7=new Date();en7.setDate(en7.getDate()+7);
