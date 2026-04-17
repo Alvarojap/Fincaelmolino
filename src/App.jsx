@@ -311,11 +311,12 @@ async function subscribePush(userId,tok){
       sub=await swReg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:key});
     }
     const{endpoint,keys}=sub.toJSON();
+    await fetch(`${SB_URL}/rest/v1/push_subscriptions?user_id=eq.${userId}`,{method:"DELETE",headers:HDRA(tok)}).catch(()=>{});
     await fetch(`${SB_URL}/rest/v1/push_subscriptions`,{
       method:"POST",
-      headers:{...HDRA(tok),"Prefer":"resolution=merge-duplicates,return=minimal"},
+      headers:{...HDRA(tok),"Prefer":"return=minimal"},
       body:JSON.stringify({user_id:String(userId),endpoint,p256dh:keys?.p256dh,auth:keys?.auth})
-    });
+    }).catch(()=>{});
   }catch(_){}
 }
 async function notificarRoles(roles,titulo,cuerpo,tag,tok){
