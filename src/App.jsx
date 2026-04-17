@@ -101,10 +101,10 @@ async function contarNoVistos(userId,tok){const items=await sbGet("items_no_vist
 async function getUserIdsPorRol(rol,tok){const[u,o]=await Promise.all([sbGet("usuarios",`?rol=eq.${rol}&select=id`,tok).catch(()=>[]),sbGet("operarios",`?rol=eq.${rol}&select=id`,tok).catch(()=>[])]);return[...u,...o].map(x=>x.id);}
 
 // ─── METEO ──────────────────────────────────────────────────────────────────
-const METEO_URL="https://api.open-meteo.com/v1/forecast?latitude=37.83&longitude=-0.97&daily=weathercode,temperature_2m_max,temperature_2m_min,precipitation_sum,windspeed_10m_max&timezone=Europe%2FMadrid&forecast_days=7";
+const METEO_URL="https://api.open-meteo.com/v1/forecast?latitude=37.7947&longitude=-0.8339&daily=weathercode,temperature_2m_max,temperature_2m_min,precipitation_sum,windspeed_10m_max&timezone=Europe%2FMadrid&forecast_days=7";
 const METEO_CACHE_KEY="fm_meteo_cache";const METEO_TTL=3*3600000;
-function getWIcon(c){if(c===0)return"☀️";if(c<=2)return"⛅";if(c===3)return"☁️";if(c<=49)return"🌫️";if(c<=59)return"🌦️";if(c<=69)return"🌧️";if(c<=79)return"❄️";if(c<=84)return"🌧️";if(c<=99)return"⛈️";return"🌡️";}
-function getWDesc(c){if(c===0)return"Despejado";if(c<=2)return"Poco nuboso";if(c===3)return"Nublado";if(c<=49)return"Niebla";if(c<=59)return"Llovizna";if(c<=69)return"Lluvia";if(c<=79)return"Nieve";if(c<=84)return"Chubascos";if(c<=99)return"Tormenta";return"—";}
+function getWIcon(c){if(c===0)return"☀️";if(c===1)return"🌤️";if(c===2)return"⛅";if(c===3)return"☁️";if(c===45||c===48)return"🌫️";if(c>=51&&c<=57)return"🌦️";if(c>=61&&c<=67)return"🌧️";if(c>=71&&c<=77)return"❄️";if(c>=80&&c<=82)return"🌧️";if(c===85||c===86)return"🌨️";if(c>=95&&c<=99)return"⛈️";return"⛅";}
+function getWDesc(c){if(c===0)return"Despejado";if(c===1)return"Poco nuboso";if(c===2)return"Parcialmente nublado";if(c===3)return"Nublado";if(c===45||c===48)return"Niebla";if(c>=51&&c<=57)return"Llovizna";if(c>=61&&c<=67)return"Lluvia";if(c>=71&&c<=77)return"Nieve";if(c>=80&&c<=82)return"Chubascos";if(c>=95&&c<=99)return"Tormenta";return"Variable";}
 async function fetchMeteo(){
   try{
     const cached=localStorage.getItem(METEO_CACHE_KEY);
@@ -1700,7 +1700,8 @@ function DashA({reservas,jsem,jpunt,cwk,setPage,tok,perfil,rol}){
   useEffect(()=>{autoCobrarAirbnb(tok);ejecutarMotorCoordinacion(tok);
     sbGet("tareas_comerciales","?estado=eq.pendiente&order=fecha_limite.asc.nullslast&limit=10&select=*",tok).then(setTareasPend).catch(()=>{});},[]);
   const [meteo,setMeteo]=useState(null);
-  useEffect(()=>{fetchMeteo().then(d=>{if(d)setMeteo(d);});},[]);
+  const cargarMeteo=()=>fetchMeteo().then(d=>{if(d)setMeteo(d);});
+  useEffect(()=>{cargarMeteo();},[]);
   const temp=getTemporada();
   const sj={}; jsem.forEach(r=>sj[r.tarea_id]=r);
   const actv=JARDIN_T[temp].filter(t=>tocaSemana({...t,frec:t.frec},cwk));
@@ -1714,7 +1715,10 @@ function DashA({reservas,jsem,jpunt,cwk,setPage,tok,perfil,rol}){
     <div className="pb">
       {/* METEO WIDGET */}
       {meteo?.daily&&<div className="card" style={{marginBottom:16,padding:"16px 18px"}}>
-        <div style={{fontSize:11,color:"#8A8580",fontWeight:700,textTransform:"uppercase",letterSpacing:.5,marginBottom:10}}>📍 San Javier, Murcia — Previsión 7 días</div>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+          <div style={{fontSize:11,color:"#8A8580",fontWeight:700,textTransform:"uppercase",letterSpacing:.5}}>📍 San Javier, Murcia — Previsión 7 días</div>
+          <button onClick={()=>{localStorage.removeItem("fm_meteo_cache");cargarMeteo();}} style={{fontSize:10,padding:"2px 6px",opacity:.5,cursor:"pointer",background:"none",border:"1px solid #BFBAB4",borderRadius:4,color:"#8A8580"}}>🔄</button>
+        </div>
         <div style={{display:"flex",gap:8,overflowX:"auto",scrollbarWidth:"none",paddingBottom:4}}>
           {meteo.daily.time.map((f,i)=>{const d=new Date(f+"T12:00:00");const lbl=i===0?"Hoy":i===1?"Mañ":d.toLocaleDateString("es-ES",{weekday:"short"}).slice(0,3);const tMax=Math.round(meteo.daily.temperature_2m_max[i]);const tMin=Math.round(meteo.daily.temperature_2m_min[i]);const rain=meteo.daily.precipitation_sum[i];const code=meteo.daily.weathercode[i];
             return <div key={f} style={{minWidth:72,textAlign:"center",padding:"8px 6px",borderRadius:12,background:i===0?"rgba(236,104,62,.06)":"#F5F3F0",flex:"0 0 auto"}}>
