@@ -311,7 +311,7 @@ async function subscribePush(userId,tok){
       sub=await swReg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:key});
     }
     const{endpoint,keys}=sub.toJSON();
-    await fetch(`${SB_URL}/rest/v1/push_subscriptions?user_id=eq.${userId}`,{method:"DELETE",headers:HDRA(tok)}).catch(()=>{});
+    await fetch(`${SB_URL}/rest/v1/push_subscriptions?user_id=eq.${encodeURIComponent(String(userId))}`,{method:"DELETE",headers:HDRA(tok)}).catch(()=>{});
     await fetch(`${SB_URL}/rest/v1/push_subscriptions`,{
       method:"POST",
       headers:{...HDRA(tok),"Prefer":"return=minimal"},
@@ -691,7 +691,7 @@ export default function App() {
   // Badge polling — must be before any conditional return to keep hooks order stable
   const tok=session?.access_token||SB_KEY;
   const myUserId=perfil?String(perfil.id):null;
-  const refreshNoVistos=async()=>{if(!perfil||!myUserId)return;try{const nv=await contarNoVistos(myUserId,tok);setNoVistos(nv);}catch(_){}};
+  const refreshNoVistos=async()=>{if(!perfil||!myUserId||!tok)return;try{const tokenQ=perfil?.es_operario?SB_KEY:tok;const nv=await contarNoVistos(myUserId,tokenQ);setNoVistos(nv);}catch(_){}};
   useEffect(()=>{if(!perfil)return;refreshNoVistos();const iv=setInterval(refreshNoVistos,30000);return()=>clearInterval(iv);},[perfil?.id]);
 
   if(authLoad)return <><style>{CSS}</style><div className="loading"><div className="spin"/><span>Cargando…</span></div></>;
@@ -1464,7 +1464,7 @@ function AtencionAhora({tok,setPage}){
           sbGet("reservas_airbnb",`?fecha_entrada=lte.${en7Str}&fecha_salida=gte.${hoyStr}&select=*`,tok).catch(()=>[]),
           sbGet("reservas",`?select=*`,tok).catch(()=>[]),
           sbGet("solicitudes_desbloqueo","?estado=eq.pendiente&select=*&order=created_at.desc",tok).catch(()=>[]),
-          sbGet("servicios","?estado=eq.en_curso&select=*",tok).catch(()=>[]),
+          sbGet("servicios","?estado=neq.cancelado&estado=neq.finalizado&select=*",tok).catch(()=>[]),
           sbGet("jardin_servicios","?estado=eq.activo&select=*",tok).catch(()=>[]),
         ]);
 
