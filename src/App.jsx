@@ -1907,14 +1907,38 @@ function DashJ({perfil,jsem,jpunt,cwk,setPage,tok}){
     <div className="ph"><h2>Hola, {perfil.nombre.split(" ")[0]} 👋</h2><p>{new Date().toLocaleDateString("es-ES",{weekday:"long",year:"numeric",month:"long",day:"numeric"})}</p></div>
     <div className="pb">
       {meteoJ&&<div style={{background:"rgba(127,178,255,.08)",borderRadius:14,padding:"10px 14px",marginBottom:14,fontSize:13,color:"#5A8AD4",fontWeight:500}}>{meteoJ.rain>10?`💧 Lluvia abundante prevista ${meteoJ.day} (${meteoJ.rain}mm) — el riego puede ser innecesario`:`🌧️ Lluvia prevista ${meteoJ.day} (${meteoJ.rain}mm) — considera posponer el riego`}</div>}
-      {coordPJ.map(c=>{const dias=[];const ini=new Date(c.ventana_inicio||new Date().toISOString());const fin=new Date(c.ventana_fin||new Date(Date.now()+3*86400000).toISOString());const hoy2=new Date();let dd=ini>hoy2?ini:hoy2;while(dd<=fin&&dias.length<7){dias.push(new Date(dd));dd=new Date(dd.getTime()+86400000);}
+      {coordPJ.map(c=>{
+        const tQ=perfil?.es_operario?SB_KEY:tok;
+        const fechaFmt=c.fecha_checkin_siguiente?new Date(c.fecha_checkin_siguiente+"T12:00:00").toLocaleDateString("es-ES",{weekday:"long",day:"numeric",month:"long"}):"—";
+        const diasH=c.fecha_checkin_siguiente?Math.ceil((new Date(c.fecha_checkin_siguiente+"T12:00:00")-new Date())/(86400000)):0;
+        const esPost=c.tipo?.includes("post");
+        const confirmarJ=async(ds)=>{
+          const tareas=esPost?TAREAS_JARDIN_POST:TAREAS_JARDIN_PRE;
+          const jds=await sbGet("jardineros","?activo=eq.true&select=*",tQ).catch(()=>[]);const jd=jds[0]||null;
+          const[srv]=await sbPost("jardin_servicios",{nombre:`${esPost?"Jardín post":"Jardín pre"} — ${ds}`,fecha_inicio:ds,fecha_fin:ds,jardinero_id:jd?.id||null,jardinero_nombre:jd?.nombre||"",estado:"activo",creado_por:perfil.nombre,modalidad_pago:jd?.modalidad||"precio_fijo_servicio"},tQ).catch(()=>[{}]);
+          if(srv?.id){for(const t of tareas)await sbPost("jardin_servicio_tareas",{servicio_id:srv.id,txt:t.txt,done:false,añadida_por_jardinero:false},tQ).catch(()=>{});}
+          await sbPatch("coordinacion_servicios",`id=eq.${c.id}`,{estado:"confirmado",fecha_programada:ds,jardin_servicio_id:srv?.id||null,respondido_por:perfil.nombre},tQ);
+          const adms=await sbGet("usuarios","?rol=eq.admin&select=id",tQ).catch(()=>[]);
+          for(const a of adms)await sbPost("notificaciones",{para:a.id,txt:`🌿 ${perfil.nombre} realizará jardín el ${new Date(ds+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"long"})}`},tQ).catch(()=>{});
+          setCoordPJ(prev=>prev.filter(x=>x.id!==c.id));
+        };
+        // preguntando_si_lista → ask if ready
+        if(c.estado==="preguntando_si_lista") return <div key={c.id} className="card" style={{marginBottom:14,border:"2px solid #A6BE59",background:"rgba(166,190,89,.04)"}}>
+          <div style={{fontSize:14,fontWeight:800,color:"#A6BE59",marginBottom:8}}>🌿 ¿Está el jardín listo?</div>
+          <div style={{fontSize:13,color:"#1A1A1A",marginBottom:12}}>Reserva el {fechaFmt} — en {diasH} día{diasH!==1?"s":""}</div>
+          <div style={{display:"flex",gap:8}}>
+            <button className="btn bp" style={{flex:1,justifyContent:"center",background:"#A6BE59"}} onClick={async()=>{try{await sbPatch("coordinacion_servicios",`id=eq.${c.id}`,{estado:"listo_confirmado",respondido_por:perfil.nombre},tQ);const adms=await sbGet("usuarios","?rol=eq.admin&select=id",tQ).catch(()=>[]);for(const a of adms)await sbPost("notificaciones",{para:a.id,txt:`✅ ${perfil.nombre} confirma: jardín listo para el ${fechaFmt}`},tQ).catch(()=>{});setCoordPJ(prev=>prev.filter(x=>x.id!==c.id));}catch(_){}}}>✅ Sí, está listo</button>
+            <button className="btn br" style={{flex:1,justifyContent:"center"}} onClick={()=>{setCoordPJ(prev=>prev.map(x=>x.id===c.id?{...x,estado:"servicio_creado_pendiente_fecha"}:x));}}>❌ No, necesita servicio</button>
+          </div>
+        </div>;
+        // servicio_creado_pendiente_fecha → pick day + create service
+        const dias=[];const ini=new Date(c.ventana_inicio||new Date().toISOString());const fin=new Date(c.ventana_fin||new Date(Date.now()+3*86400000).toISOString());const hoy2=new Date();let dd=ini>hoy2?ini:hoy2;while(dd<=fin&&dias.length<7){dias.push(new Date(dd));dd=new Date(dd.getTime()+86400000);}
         return <div key={c.id} className="card" style={{marginBottom:14,border:"2px solid #A6BE59",background:"rgba(166,190,89,.04)"}}>
-          <div style={{fontSize:14,fontWeight:800,color:"#A6BE59",marginBottom:8}}>⚠️ Acción requerida</div>
-          <div style={{fontSize:14,fontWeight:600,color:"#1A1A1A",marginBottom:4}}>🌿 Servicio de jardín pendiente</div>
-          <div style={{fontSize:12,color:"#8A8580",marginBottom:10}}>📅 Ventana: {c.ventana_inicio?new Date(c.ventana_inicio).toLocaleDateString("es-ES",{day:"numeric",month:"short"}):"hoy"} — {c.ventana_fin?new Date(c.ventana_fin).toLocaleDateString("es-ES",{day:"numeric",month:"short"}):"—"}</div>
-          <div style={{fontSize:13,fontWeight:600,marginBottom:8}}>¿Qué día lo harás?</div>
+          <div style={{fontSize:14,fontWeight:800,color:"#A6BE59",marginBottom:8}}>🌿 Elige día de jardín</div>
+          <div style={{fontSize:13,color:"#1A1A1A",marginBottom:4}}>Reserva el {fechaFmt}</div>
+          <div style={{fontSize:12,color:"#8A8580",marginBottom:10}}>📅 Ventana preferida</div>
           <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-            {dias.map(d=><button key={d.toISOString()} className="btn bg" style={{padding:"10px 14px",fontSize:13,fontWeight:600}} onClick={async()=>{const ds=d.toISOString().split("T")[0];try{await sbPatch("coordinacion_servicios",`id=eq.${c.id}`,{fecha_programada:ds,estado:"confirmado",respondido_por:perfil.nombre},tok);if(c.jardin_servicio_id)await sbPatch("jardin_servicios",`id=eq.${c.jardin_servicio_id}`,{fecha_inicio:ds},tok).catch(()=>{});const adms=await sbGet("usuarios","?rol=eq.admin&select=id",tok).catch(()=>[]);for(const a of adms)await sbPost("notificaciones",{para:a.id,txt:`✅ ${perfil.nombre} confirma jardín para el ${new Date(ds+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"long"})}`},tok).catch(()=>{});setCoordPJ(prev=>prev.filter(x=>x.id!==c.id));}catch(_){}}}>{d.toLocaleDateString("es-ES",{weekday:"short",day:"numeric"})}</button>)}
+            {dias.map(d=><button key={d.toISOString()} className="btn bg" style={{padding:"10px 14px",fontSize:13,fontWeight:600}} onClick={()=>confirmarJ(d.toISOString().split("T")[0])}>{d.toLocaleDateString("es-ES",{weekday:"short",day:"numeric"})}</button>)}
           </div>
         </div>;
       })}
@@ -5603,6 +5627,41 @@ const TAREAS_JARDIN_POST=[...TAREAS_JARDIN_PRE,...TAREAS_JARDIN_POST_EXTRA];
 // No creates coordination at reservation time — motor handles everything
 async function procesarCoordReserva(){}
 
+async function ejecutarCoordInmediata(reservaId,fecha,tipoReserva,incluyeCasa,tok){
+  try{
+    const ventanaFin=new Date(new Date(fecha+"T15:00:00").getTime()-86400000).toISOString();
+    const fechaFmt=new Date(fecha+"T12:00:00").toLocaleDateString("es-ES",{weekday:"long",day:"numeric",month:"long"});
+    const diasH=Math.ceil((new Date(fecha+"T12:00:00")-new Date())/(86400000));
+    // Limpieza pre (airbnb or evento_casa)
+    if(incluyeCasa||tipoReserva==="airbnb"){
+      await sbPost("coordinacion_servicios",{tipo:"limpieza_pre",reserva_id:String(reservaId||""),tipo_reserva:tipoReserva,fecha_checkin_siguiente:fecha,ventana_inicio:new Date().toISOString(),ventana_fin:ventanaFin,estado:"preguntando_si_lista",notificacion_1_enviada:true},tok).catch(()=>{});
+      const ops=await sbGet("operarios","?rol=eq.limpieza&activo=eq.true&select=id",SB_KEY).catch(()=>[]);
+      for(const op of ops)await sbPost("notificaciones",{para:op.id,txt:`🏠 Reserva en ${diasH} día${diasH!==1?"s":""} (${fechaFmt}) — ¿Está la casa lista?`},tok).catch(()=>{});
+      sendPush("🏠 Finca El Molino","Reserva próxima — ¿Está la casa lista?","coord-imm-limp");
+    }
+    // Jardín pre (always)
+    await sbPost("coordinacion_servicios",{tipo:"jardin_pre",reserva_id:String(reservaId||""),tipo_reserva:tipoReserva,fecha_checkin_siguiente:fecha,ventana_inicio:new Date().toISOString(),ventana_fin:ventanaFin,estado:"preguntando_si_lista",notificacion_1_enviada:true},tok).catch(()=>{});
+    const opsJ=await sbGet("operarios","?rol=eq.jardinero&activo=eq.true&select=id",SB_KEY).catch(()=>[]);
+    for(const op of opsJ)await sbPost("notificaciones",{para:op.id,txt:`🌿 Reserva en ${diasH} día${diasH!==1?"s":""} (${fechaFmt}) — ¿Está el jardín listo?`},tok).catch(()=>{});
+    sendPush("🌿 Finca El Molino","Reserva próxima — ¿Está el jardín listo?","coord-imm-jard");
+  }catch(_){}
+}
+
+async function verificarConflictosNuevaReserva(fechaEntrada,tok){
+  try{
+    const fechaDiaAntes=new Date(new Date(fechaEntrada+"T12:00:00").getTime()-86400000).toISOString().split("T")[0];
+    const coords=await sbGet("coordinacion_servicios",`?estado=eq.confirmado&fecha_programada=gte.${fechaDiaAntes}&fecha_programada=lte.${fechaEntrada}&select=*`,tok).catch(()=>[]);
+    for(const c of coords){
+      if(c.servicio_id)await sbPatch("servicios",`id=eq.${c.servicio_id}`,{estado:"cancelado"},tok).catch(()=>{});
+      if(c.jardin_servicio_id)await sbPatch("jardin_servicios",`id=eq.${c.jardin_servicio_id}`,{estado:"cancelado"},tok).catch(()=>{});
+      await sbPatch("coordinacion_servicios",`id=eq.${c.id}`,{estado:"servicio_creado_pendiente_fecha",fecha_programada:null},tok).catch(()=>{});
+      const esL=c.tipo?.includes("limpieza");
+      const ops=await sbGet("operarios",`?rol=eq.${esL?"limpieza":"jardinero"}&activo=eq.true&select=id`,SB_KEY).catch(()=>[]);
+      for(const op of ops)await sbPost("notificaciones",{para:op.id,txt:`⚠️ Nueva reserva — el día que tenías programado ya no está disponible. Elige nuevo día.`},tok).catch(()=>{});
+    }
+  }catch(_){}
+}
+
 async function ejecutarMotorCoordinacion(tok){
   const fk=`fm_motor_coord_${new Date().toISOString().split("T")[0]}_${new Date().getHours()}`;
   if(localStorage.getItem(fk))return;localStorage.setItem(fk,"1");
@@ -5725,11 +5784,10 @@ function NuevaReserva({perfil,tok,setPage,rol}){
       if(rol!=="admin"){const admIds=await getUserIdsPorRol("admin",tok);registrarItemNuevo("reserva",res.id,admIds,tok);}
       const en7=new Date();en7.setDate(en7.getDate()+7);
       if(form.fecha&&form.fecha<=en7.toISOString().split("T")[0])notificarRoles(["admin","comercial","limpieza","jardinero"],"🎉 Nuevo evento",`${form.nombre} el ${new Date(form.fecha+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"long"})}`,"evento-nuevo",tok);
-      // AUTO 2 — limpieza post-evento si incluye casa
-      // Coordinación automática
-      const proxRes=await obtenerProximaReserva(form.fecha,tok);
-      if(form.incluye_casa){crearLimpiezaPostEvento({nombre:form.nombre,fecha:form.fecha,id:res.id},tok);procesarCoordReserva("limpieza_post_evento",res.id,"evento_casa",form.fecha,proxRes,tok);}
-      procesarCoordReserva("jardin_post_evento",res.id,form.incluye_casa?"evento_casa":"evento_finca",form.fecha,proxRes,tok);
+      // Coordinación inmediata si ≤3 días
+      const diasHastaEv=Math.ceil((new Date(form.fecha+"T12:00:00")-new Date())/(86400000));
+      if(diasHastaEv<=3)await ejecutarCoordInmediata(res.id,form.fecha,form.incluye_casa?"evento_casa":"evento_finca",form.incluye_casa,tok);
+      await verificarConflictosNuevaReserva(form.fecha,tok);
       // AUTO 5 — sugerir jardinería si >14 días
       const diasHasta=Math.ceil((new Date(form.fecha)-new Date())/(86400000));
       if(diasHasta>14)setSugJardin({nombre:form.nombre,fecha:form.fecha,fechaSug:new Date(new Date(form.fecha).getTime()-2*86400000).toISOString().split("T")[0]});
@@ -6200,11 +6258,10 @@ function ReservasAirbnb({perfil,tok,rol}){
       // Notificar si llegada próximos 7 días
       const en7=new Date();en7.setDate(en7.getDate()+7);
       if(form.fecha_entrada&&form.fecha_entrada<=en7.toISOString().split("T")[0])notificarRoles(["admin","limpieza","jardinero"],`🏠 Nueva reserva Airbnb`,`${form.huesped} llega el ${new Date(form.fecha_entrada+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"long"})}`,"airbnb-nueva",tok);
-      // AUTO 1 — limpieza + coordinación post-airbnb
-      crearLimpiezaPostAirbnb({huesped:form.huesped,fecha_salida:form.fecha_salida},tok);
-      const proxAb=await obtenerProximaReserva(form.fecha_salida,tok);
-      procesarCoordReserva("limpieza_post_checkout","airbnb_new","airbnb",form.fecha_salida,proxAb,tok);
-      procesarCoordReserva("jardin_post_checkout","airbnb_new","airbnb",form.fecha_salida,proxAb,tok);
+      // Coordinación inmediata si ≤3 días
+      const diasHastaAb=Math.ceil((new Date(form.fecha_entrada+"T12:00:00")-new Date())/(86400000));
+      if(diasHastaAb<=3)await ejecutarCoordInmediata(null,form.fecha_entrada,"airbnb",true,tok);
+      await verificarConflictosNuevaReserva(form.fecha_entrada,tok);
       setShowForm(false);setForm(formVacio);await load_();
     }catch(_){}
     setSaving(false);
