@@ -314,7 +314,7 @@ async function subscribePush(userId,tok){
     await fetch(`${SB_URL}/rest/v1/push_subscriptions`,{
       method:"POST",
       headers:{...HDRA(tok),"Prefer":"resolution=merge-duplicates,return=minimal"},
-      body:JSON.stringify({user_id:userId,endpoint,p256dh:keys.p256dh,auth:keys.auth})
+      body:JSON.stringify({user_id:String(userId),endpoint,p256dh:keys?.p256dh,auth:keys?.auth})
     });
   }catch(_){}
 }
