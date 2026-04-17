@@ -103,8 +103,8 @@ async function getUserIdsPorRol(rol,tok){const[u,o]=await Promise.all([sbGet("us
 // ─── METEO ──────────────────────────────────────────────────────────────────
 const METEO_URL="https://api.open-meteo.com/v1/forecast?latitude=37.7947&longitude=-0.8339&daily=weathercode,temperature_2m_max,temperature_2m_min,precipitation_sum,windspeed_10m_max&timezone=Europe%2FMadrid&forecast_days=7";
 const METEO_CACHE_KEY="fm_meteo_cache";const METEO_TTL=3*3600000;
-function getWIcon(c){if(c===0)return"☀️";if(c===1)return"🌤️";if(c===2)return"⛅";if(c===3)return"☁️";if(c===45||c===48)return"🌫️";if(c>=51&&c<=57)return"🌦️";if(c>=61&&c<=67)return"🌧️";if(c>=71&&c<=77)return"❄️";if(c>=80&&c<=82)return"🌧️";if(c===85||c===86)return"🌨️";if(c>=95&&c<=99)return"⛈️";return"⛅";}
-function getWDesc(c){if(c===0)return"Despejado";if(c===1)return"Poco nuboso";if(c===2)return"Parcialmente nublado";if(c===3)return"Nublado";if(c===45||c===48)return"Niebla";if(c>=51&&c<=57)return"Llovizna";if(c>=61&&c<=67)return"Lluvia";if(c>=71&&c<=77)return"Nieve";if(c>=80&&c<=82)return"Chubascos";if(c>=95&&c<=99)return"Tormenta";return"Variable";}
+function getWIcon(code){const n=parseInt(code);if(n===0)return"☀️";if(n===1)return"🌤️";if(n===2)return"⛅";if(n===3)return"☁️";if(n===45||n===48)return"🌫️";if(n>=51&&n<=57)return"🌦️";if(n>=61&&n<=67)return"🌧️";if(n>=71&&n<=77)return"❄️";if(n>=80&&n<=82)return"🌧️";if(n===85||n===86)return"🌨️";if(n>=95&&n<=99)return"⛈️";return"⛅";}
+function getWDesc(code){const n=parseInt(code);if(n===0)return"Despejado";if(n===1)return"Poco nuboso";if(n===2)return"Parcialmente nublado";if(n===3)return"Nublado";if(n===45||n===48)return"Niebla";if(n>=51&&n<=57)return"Llovizna";if(n>=61&&n<=67)return"Lluvia";if(n>=71&&n<=77)return"Nieve";if(n>=80&&n<=82)return"Chubascos";if(n>=95&&n<=99)return"Tormenta";return"Variable";}
 async function fetchMeteo(){
   try{
     const cached=localStorage.getItem(METEO_CACHE_KEY);
@@ -1701,7 +1701,7 @@ function DashA({reservas,jsem,jpunt,cwk,setPage,tok,perfil,rol}){
     sbGet("tareas_comerciales","?estado=eq.pendiente&order=fecha_limite.asc.nullslast&limit=10&select=*",tok).then(setTareasPend).catch(()=>{});},[]);
   const [meteo,setMeteo]=useState(null);
   const cargarMeteo=()=>fetchMeteo().then(d=>{if(d)setMeteo(d);});
-  useEffect(()=>{cargarMeteo();},[]);
+  useEffect(()=>{localStorage.removeItem("fm_meteo_cache");cargarMeteo();},[]);
   const temp=getTemporada();
   const sj={}; jsem.forEach(r=>sj[r.tarea_id]=r);
   const actv=JARDIN_T[temp].filter(t=>tocaSemana({...t,frec:t.frec},cwk));
