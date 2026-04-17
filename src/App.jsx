@@ -1727,7 +1727,8 @@ function DashJ({perfil,jsem,jpunt,cwk,setPage,tok}){
   const [showFinJornada,setShowFinJornada]=useState(false);
   const [showFinSrv,setShowFinSrv]=useState(false);
   const [showNuevaJornada,setShowNuevaJornada]=useState(false);
-  const [coordPJ,setCoordPJ]=useState([]);
+  const [coordPJ,setCoordPJ]=useState([]);const [savingCoord,setSavingCoord]=useState(false);
+  const [srvJardinActivos,setSrvJardinActivos]=useState([]);
   const [showExtraForm,setShowExtraForm]=useState(false);
   const [extraForm,setExtraForm]=useState({txt:"",zona:"",nota:"",foto_url:null});
   const [editExtraId,setEditExtraId]=useState(null);
@@ -1772,7 +1773,17 @@ function DashJ({perfil,jsem,jpunt,cwk,setPage,tok}){
       }
     }catch(_){}
   };
-  useEffect(()=>{if(tok){loadSrvActivo();const t=perfil?.es_operario?SB_KEY:tok;sbGet("coordinacion_servicios","?estado=in.(preguntando_si_lista,servicio_creado_pendiente_fecha)&select=*",t).then(r=>setCoordPJ(r.filter(c=>c.tipo?.includes("jardin")))).catch(()=>{});}},[]);
+  const loadCoordYServicios=async()=>{
+    const t=perfil?.es_operario?SB_KEY:tok;
+    // Coordinaciones pendientes
+    sbGet("coordinacion_servicios","?estado=in.(preguntando_si_lista,servicio_creado_pendiente_fecha)&select=*",t).then(r=>setCoordPJ(r.filter(c=>c.tipo?.includes("jardin")))).catch(()=>{});
+    // Servicios activos de jardinería (from coord or admin)
+    try{const srvs=await sbGet("jardin_servicios",`?jardinero_id=eq.${jId}&estado=eq.activo&select=*`,t).catch(()=>[]);
+      for(const s of srvs){s._tareas=await sbGet("jardin_servicio_tareas",`?servicio_id=eq.${s.id}&select=*&order=created_at.asc`,t).catch(()=>[]);}
+      setSrvJardinActivos(srvs.filter(s=>!srvActivo||s.id!==srvActivo?.id));// exclude the main active one
+    }catch(_){}
+  };
+  useEffect(()=>{if(tok){loadSrvActivo();loadCoordYServicios();}},[]);
 
   // Cronómetro — uses timestamps from localStorage for persistence
   useEffect(()=>{
@@ -1913,22 +1924,23 @@ function DashJ({perfil,jsem,jpunt,cwk,setPage,tok}){
         const diasH=c.fecha_checkin_siguiente?Math.ceil((new Date(c.fecha_checkin_siguiente+"T12:00:00")-new Date())/(86400000)):0;
         const esPost=c.tipo?.includes("post");
         const confirmarJ=async(ds)=>{
-          const tareas=esPost?TAREAS_JARDIN_POST:TAREAS_JARDIN_PRE;
+          if(savingCoord)return;setSavingCoord(true);
+          try{const tareas=esPost?TAREAS_JARDIN_POST:TAREAS_JARDIN_PRE;
           const jds=await sbGet("jardineros","?activo=eq.true&select=*",tQ).catch(()=>[]);const jd=jds[0]||null;
           const[srv]=await sbPost("jardin_servicios",{nombre:`${esPost?"Jardín post":"Jardín pre"} — ${ds}`,fecha_inicio:ds,fecha_fin:ds,jardinero_id:jd?.id||null,jardinero_nombre:jd?.nombre||"",estado:"activo",creado_por:perfil.nombre,modalidad_pago:jd?.modalidad||"precio_fijo_servicio"},tQ).catch(()=>[{}]);
           if(srv?.id){for(const t of tareas)await sbPost("jardin_servicio_tareas",{servicio_id:srv.id,txt:t.txt,done:false,añadida_por_jardinero:false},tQ).catch(()=>{});}
           await sbPatch("coordinacion_servicios",`id=eq.${c.id}`,{estado:"confirmado",fecha_programada:ds,jardin_servicio_id:srv?.id||null,respondido_por:perfil.nombre},tQ);
           const adms=await sbGet("usuarios","?rol=eq.admin&select=id",tQ).catch(()=>[]);
           for(const a of adms)await sbPost("notificaciones",{para:a.id,txt:`🌿 ${perfil.nombre} realizará jardín el ${new Date(ds+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"long"})}`},tQ).catch(()=>{});
-          setCoordPJ(prev=>prev.filter(x=>x.id!==c.id));
+          setCoordPJ(prev=>prev.filter(x=>x.id!==c.id));await loadCoordYServicios();}catch(_){}setSavingCoord(false);
         };
         // preguntando_si_lista → ask if ready
         if(c.estado==="preguntando_si_lista") return <div key={c.id} className="card" style={{marginBottom:14,border:"2px solid #A6BE59",background:"rgba(166,190,89,.04)"}}>
           <div style={{fontSize:14,fontWeight:800,color:"#A6BE59",marginBottom:8}}>🌿 ¿Está el jardín listo?</div>
           <div style={{fontSize:13,color:"#1A1A1A",marginBottom:12}}>Reserva el {fechaFmt} — en {diasH} día{diasH!==1?"s":""}</div>
           <div style={{display:"flex",gap:8}}>
-            <button className="btn bp" style={{flex:1,justifyContent:"center",background:"#A6BE59"}} onClick={async()=>{try{await sbPatch("coordinacion_servicios",`id=eq.${c.id}`,{estado:"listo_confirmado",respondido_por:perfil.nombre},tQ);const adms=await sbGet("usuarios","?rol=eq.admin&select=id",tQ).catch(()=>[]);for(const a of adms)await sbPost("notificaciones",{para:a.id,txt:`✅ ${perfil.nombre} confirma: jardín listo para el ${fechaFmt}`},tQ).catch(()=>{});setCoordPJ(prev=>prev.filter(x=>x.id!==c.id));}catch(_){}}}>✅ Sí, está listo</button>
-            <button className="btn br" style={{flex:1,justifyContent:"center"}} onClick={()=>{setCoordPJ(prev=>prev.map(x=>x.id===c.id?{...x,estado:"servicio_creado_pendiente_fecha"}:x));}}>❌ No, necesita servicio</button>
+            <button className="btn bp" style={{flex:1,justifyContent:"center",background:"#A6BE59"}} disabled={savingCoord} onClick={async()=>{setSavingCoord(true);try{await sbPatch("coordinacion_servicios",`id=eq.${c.id}`,{estado:"listo_confirmado",respondido_por:perfil.nombre},tQ);const adms=await sbGet("usuarios","?rol=eq.admin&select=id",tQ).catch(()=>[]);for(const a of adms)await sbPost("notificaciones",{para:a.id,txt:`✅ ${perfil.nombre} confirma: jardín listo para el ${fechaFmt}`},tQ).catch(()=>{});setCoordPJ(prev=>prev.filter(x=>x.id!==c.id));}catch(_){}setSavingCoord(false);}}>{savingCoord?<div className="spin" style={{width:16,height:16,borderWidth:2}}/>:"✅ Sí, está listo"}</button>
+            <button className="btn br" style={{flex:1,justifyContent:"center"}} disabled={savingCoord} onClick={()=>{setCoordPJ(prev=>prev.map(x=>x.id===c.id?{...x,estado:"servicio_creado_pendiente_fecha"}:x));}}>❌ No, necesita servicio</button>
           </div>
         </div>;
         // servicio_creado_pendiente_fecha → pick day + create service
@@ -1938,7 +1950,7 @@ function DashJ({perfil,jsem,jpunt,cwk,setPage,tok}){
           <div style={{fontSize:13,color:"#1A1A1A",marginBottom:4}}>Reserva el {fechaFmt}</div>
           <div style={{fontSize:12,color:"#8A8580",marginBottom:10}}>📅 Ventana preferida</div>
           <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-            {dias.map(d=><button key={d.toISOString()} className="btn bg" style={{padding:"10px 14px",fontSize:13,fontWeight:600}} onClick={()=>confirmarJ(d.toISOString().split("T")[0])}>{d.toLocaleDateString("es-ES",{weekday:"short",day:"numeric"})}</button>)}
+            {dias.map(d=><button key={d.toISOString()} className="btn bg" style={{padding:"10px 14px",fontSize:13,fontWeight:600}} disabled={savingCoord} onClick={()=>confirmarJ(d.toISOString().split("T")[0])}>{d.toLocaleDateString("es-ES",{weekday:"short",day:"numeric"})}</button>)}
           </div>
         </div>;
       })}
@@ -2005,6 +2017,23 @@ function DashJ({perfil,jsem,jpunt,cwk,setPage,tok}){
         {/* Completar servicio */}
         {tareasAdminOk&&(!jornadaId||jornadaFin)&&<button className="btn bp" style={{width:"100%",justifyContent:"center",padding:"14px",fontSize:15,marginTop:12,background:"#A6BE59"}} onClick={()=>setShowFinSrv(true)}>✅ Marcar servicio completado</button>}
       </div>}
+
+      {/* Servicios de jardín activos (from coordinación) */}
+      {srvJardinActivos.map(s=>{const tareas=s._tareas||[];const hechas=tareas.filter(t=>t.done).length;const tQ=perfil?.es_operario?SB_KEY:tok;
+        return <div key={s.id} className="card" style={{marginBottom:14,border:"1px solid rgba(166,190,89,.3)",background:"rgba(166,190,89,.04)"}}>
+          <div className="chdr"><span className="ctit">🌿 {s.nombre}</span><span className="badge" style={{background:"rgba(166,190,89,.1)",color:"#A6BE59"}}>{hechas}/{tareas.length}</span></div>
+          {s.fecha_inicio&&<div style={{fontSize:11,color:"#8A8580",marginBottom:8}}>📅 {new Date(s.fecha_inicio+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"})}</div>}
+          <div className="prog" style={{marginBottom:10,height:6}}><div className="pfill" style={{width:`${tareas.length?(hechas/tareas.length)*100:0}%`}}/></div>
+          {tareas.map(t=><div key={t.id} className={`cli${t.done?" done":""}`} style={{marginBottom:4}}>
+            <div className={`chk${t.done?" on":""}`} onClick={async()=>{try{await sbPatch("jardin_servicio_tareas",`id=eq.${t.id}`,{done:!t.done,completado_por:!t.done?perfil.nombre:null,completado_ts:!t.done?new Date().toISOString():null},tQ);await loadCoordYServicios();}catch(_){}}} style={{cursor:"pointer"}}/>
+            <div style={{flex:1,minWidth:0}}>
+              <div className={`tl${t.done?" done":""}`}>{t.txt}</div>
+              {t.done&&<div className="tm">✓ {t.completado_por}</div>}
+            </div>
+          </div>)}
+          {hechas===tareas.length&&tareas.length>0&&<button className="btn bp" style={{width:"100%",justifyContent:"center",marginTop:8,background:"#A6BE59"}} onClick={async()=>{try{await sbPatch("jardin_servicios",`id=eq.${s.id}`,{estado:"completado"},tQ);const adms=await sbGet("usuarios","?rol=eq.admin&select=id",tQ).catch(()=>[]);for(const a of adms)await sbPost("notificaciones",{para:a.id,txt:`✅ ${perfil.nombre} ha completado "${s.nombre}"`},tQ).catch(()=>{});await loadCoordYServicios();}catch(_){}}}>✅ Marcar como completado</button>}
+        </div>;
+      })}
 
       {/* Checklist semanal solo si NO hay servicio activo */}
       {!srvActivo&&<>
@@ -2095,7 +2124,7 @@ function DashL({perfil,setPage,tok}){
           <div style={{fontSize:14,fontWeight:800,color:"#EC683E",marginBottom:8}}>🏠 ¿Está la casa lista?</div>
           <div style={{fontSize:13,color:"#1A1A1A",marginBottom:12}}>Reserva el {fechaFmt} — en {diasH} día{diasH!==1?"s":""}</div>
           <div style={{display:"flex",gap:8}}>
-            <button className="btn bp" style={{flex:1,justifyContent:"center"}} disabled={savingC} onClick={async()=>{setSavingC(true);try{await sbPatch("coordinacion_servicios",`id=eq.${c.id}`,{estado:"casa_lista_confirmada",respondido_por:perfil.nombre},t);const adms=await sbGet("usuarios","?rol=eq.admin&select=id",t).catch(()=>[]);for(const a of adms)await sbPost("notificaciones",{para:a.id,txt:`✅ ${perfil.nombre} confirma: casa lista para el ${fechaFmt}`},t).catch(()=>{});setCoordP(prev=>prev.filter(x=>x.id!==c.id));}catch(_){}setSavingC(false);}}>✅ Sí, está lista</button>
+            <button className="btn bp" style={{flex:1,justifyContent:"center"}} disabled={savingC} onClick={async()=>{setSavingC(true);try{await sbPatch("coordinacion_servicios",`id=eq.${c.id}`,{estado:"casa_lista_confirmada",respondido_por:perfil.nombre},t);const adms=await sbGet("usuarios","?rol=eq.admin&select=id",t).catch(()=>[]);for(const a of adms)await sbPost("notificaciones",{para:a.id,txt:`✅ ${perfil.nombre} confirma: casa lista para el ${fechaFmt}`},t).catch(()=>{});setCoordP(prev=>prev.filter(x=>x.id!==c.id));}catch(_){}setSavingC(false);}}>{savingC?<div className="spin" style={{width:16,height:16,borderWidth:2}}/>:"✅ Sí, está lista"}</button>
             <button className="btn br" style={{flex:1,justifyContent:"center"}} disabled={savingC} onClick={async()=>{setSavingC(true);try{const[srv]=await sbPost("servicios",{nombre:`Limpieza pre-reserva — ${fechaFmt}`,fecha:new Date().toISOString().split("T")[0],creado_por:perfil.nombre},t);for(const zona of LIMP_ZONAS){const ts=[...(zona.tareas||[]),...(zona.subzonas?zona.subzonas.flatMap(s=>s.tareas):[])];for(const ta of ts)await sbPost("servicio_tareas",{servicio_id:srv.id,tarea_id:ta.id,zona:zona.nombre,es_extra:false,done:false},t).catch(()=>{});}await sbPatch("coordinacion_servicios",`id=eq.${c.id}`,{estado:"servicio_creado_pendiente_fecha",servicio_id:srv.id},t);setCoordP(prev=>prev.map(x=>x.id===c.id?{...x,estado:"servicio_creado_pendiente_fecha",servicio_id:srv.id}:x));}catch(_){}setSavingC(false);}}>❌ No, necesita limpieza</button>
           </div>
         </div>;
