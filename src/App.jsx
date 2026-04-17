@@ -4116,8 +4116,9 @@ function Lavanderia({perfil,tok,rol}){
   const [envios,setEnvios]=useState([]);const [articulos,setArticulos]=useState([]);
   const [load,setLoad]=useState(true);const [saving,setSaving]=useState(false);
   const [showEnvio,setShowEnvio]=useState(false);const [showRecogida,setShowRecogida]=useState(null);
-  const [items,setItems]=useState([]);const [notas,setNotas]=useState("");
+  const [items,setItems]=useState([]);const [notas,setNotas]=useState("");const [envErr,setEnvErr]=useState("");
   const [recFecha,setRecFecha]=useState(hoyStr);const [recCoste,setRecCoste]=useState("");const [recFoto,setRecFoto]=useState(null);
+  const [checkItems,setCheckItems]=useState([]);
 
   const load_=async()=>{
     try{
@@ -4132,22 +4133,31 @@ function Lavanderia({perfil,tok,rol}){
 
   const enviar=async()=>{
     const filled=items.filter(i=>i.cantidad>0);
-    if(filled.length===0||saving)return;setSaving(true);
+    if(filled.length===0||saving)return;setEnvErr("");
+    // Verify stock
+    for(const i of filled){const art=articulos.find(a=>a.id===i.id);const v=verificarStock(art||i,"casa",i.cantidad);if(!v.ok){setEnvErr(v.msg);return;}}
+    setSaving(true);
     try{
       await sbPost("lavanderia",{fecha_envio:hoyStr,items:filled.map(i=>({articulo_id:i.id,nombre:i.nombre,cantidad:i.cantidad})),estado:"en_lavanderia",creado_por:perfil.nombre,notas:notas||null},tok);
-      for(const i of filled){await sbPatch("almacen_articulos",`id=eq.${i.id}`,{stock_casa:(parseFloat(articulos.find(a=>a.id===i.id)?.stock_casa)||0)-i.cantidad,stock_lavanderia:(parseFloat(articulos.find(a=>a.id===i.id)?.stock_lavanderia)||0)+i.cantidad},tok).catch(()=>{});}
+      for(const i of filled){const art=articulos.find(a=>a.id===i.id);
+        await sbPatch("almacen_articulos",`id=eq.${i.id}`,{stock_casa:Math.max(0,(parseFloat(art?.stock_casa)||0)-i.cantidad),stock_lavanderia:(parseFloat(art?.stock_lavanderia)||0)+i.cantidad},tok).catch(()=>{});
+        await sbPost("almacen_movimientos",{articulo_id:i.id,tipo:"lavanderia_envio",cantidad:i.cantidad,ubicacion_origen:"casa",ubicacion_destino:"lavanderia",concepto:`Envío lavandería — ${hoyStr}`,creado_por:perfil.nombre},tok).catch(()=>{});}
       setShowEnvio(false);setItems([]);setNotas("");await load_();
     }catch(_){}setSaving(false);
   };
 
+  const abrirRecogida=(lav)=>{setCheckItems((lav.items||[]).map(i=>({...i,cantidad_recibida:i.cantidad,nota:""})));setRecFecha(hoyStr);setRecCoste("");setRecFoto(null);setShowRecogida(lav);};
   const recoger=async()=>{
     if(!showRecogida||saving)return;setSaving(true);
     const coste=parseFloat(recCoste)||0;
+    const incidencias=checkItems.filter(i=>i.cantidad_recibida<i.cantidad).map(i=>({articulo_id:i.articulo_id,nombre:i.nombre,enviadas:i.cantidad,recibidas:i.cantidad_recibida,faltan:i.cantidad-i.cantidad_recibida,nota:i.nota}));
     try{
-      await sbPatch("lavanderia",`id=eq.${showRecogida.id}`,{estado:"recogido",fecha_recogida:recFecha,coste,factura_url:recFoto||null},tok);
-      if(coste>0)await sbPost("gastos",{fecha:hoyStr,categoria:"Otros",concepto:`Lavandería - ${showRecogida.fecha_envio}`,importe:coste,origen:"manual"},tok).catch(()=>{});
-      const itemsR=showRecogida.items||[];
-      for(const i of itemsR){await sbPatch("almacen_articulos",`id=eq.${i.articulo_id}`,{stock_lavanderia:Math.max(0,(parseFloat(articulos.find(a=>a.id===i.articulo_id)?.stock_lavanderia)||0)-i.cantidad),stock_almacen:(parseFloat(articulos.find(a=>a.id===i.articulo_id)?.stock_almacen)||0)+i.cantidad},tok).catch(()=>{});}
+      await sbPatch("lavanderia",`id=eq.${showRecogida.id}`,{estado:"recogido",fecha_recogida:recFecha,coste,factura_url:recFoto||null,checklist_recogida:checkItems,incidencias_recogida:incidencias,checklist_completado:true},tok);
+      for(const i of checkItems){if(i.cantidad_recibida>0){const art=articulos.find(a=>a.id===i.articulo_id);
+        await sbPatch("almacen_articulos",`id=eq.${i.articulo_id}`,{stock_lavanderia:Math.max(0,(parseFloat(art?.stock_lavanderia)||0)-i.cantidad_recibida),stock_almacen:(parseFloat(art?.stock_almacen)||0)+i.cantidad_recibida},tok).catch(()=>{});
+        await sbPost("almacen_movimientos",{articulo_id:i.articulo_id,tipo:"lavanderia_retorno",cantidad:i.cantidad_recibida,ubicacion_origen:"lavanderia",ubicacion_destino:"almacen",concepto:`Recogida lavandería — ${recFecha}`,creado_por:perfil.nombre},tok).catch(()=>{});}}
+      if(coste>0)await sbPost("gastos",{fecha:hoyStr,categoria:"Otros",concepto:`Lavandería — ${showRecogida.fecha_envio}`,importe:coste,origen:"auto_lavanderia"},tok).catch(()=>{});
+      if(incidencias.length>0){const adms=await sbGet("usuarios","?rol=eq.admin&select=id",tok).catch(()=>[]);const msg=`⚠️ Incidencias lavandería: ${incidencias.map(i=>`${i.nombre} — faltan ${i.faltan}`).join(", ")}`;for(const a of adms)await sbPost("notificaciones",{para:a.id,txt:msg},tok).catch(()=>{});}
       setShowRecogida(null);await load_();
     }catch(_){}setSaving(false);
   };
@@ -4169,7 +4179,7 @@ function Lavanderia({perfil,tok,rol}){
             {e.notas&&<div style={{fontSize:11,color:"#8A8580",marginTop:2}}>{e.notas}</div>}
             <div style={{fontSize:11,color:"#BFBAB4",marginTop:3}}>Por {e.creado_por}</div>
           </div>
-          <button className="btn bp sm" onClick={()=>{setRecFecha(hoyStr);setRecCoste("");setRecFoto(null);setShowRecogida(e);}}>✅ Recogido</button>
+          <button className="btn bp sm" onClick={()=>abrirRecogida(e)}>✅ Recogido</button>
         </div>
       </div>)}
 
@@ -4196,20 +4206,36 @@ function Lavanderia({perfil,tok,rol}){
       <div className="mft"><button className="btn bg" onClick={()=>setShowEnvio(false)}>Cancelar</button><button className="btn bp" onClick={enviar} disabled={saving||items.every(i=>i.cantidad===0)}>{saving?"Enviando…":"🧺 Confirmar envío"}</button></div>
     </div></div>}
 
-    {showRecogida&&<div className="ov" onClick={()=>setShowRecogida(null)}><div className="modal" onClick={e=>e.stopPropagation()}>
-      <h3>✅ Marcar como recogido</h3>
+    {showRecogida&&<div className="ov" onClick={()=>setShowRecogida(null)}><div className="modal" style={{maxHeight:"92vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
+      <h3>✅ Checklist de recogida</h3>
+      <div style={{fontSize:12,color:"#8A8580",marginBottom:14}}>Verifica que todo ha vuelto de la lavandería</div>
+      {checkItems.map((it,i)=><div key={i} style={{background:"#F5F3F0",borderRadius:10,padding:"10px 12px",marginBottom:8,borderLeft:`3px solid ${it.cantidad_recibida>=it.cantidad?"#A6BE59":"#D4A017"}`}}>
+        <div style={{fontWeight:600,fontSize:13,marginBottom:6}}>{it.nombre}</div>
+        <div style={{display:"flex",gap:12,alignItems:"center",flexWrap:"wrap"}}>
+          <span style={{fontSize:12,color:"#8A8580"}}>Enviadas: {it.cantidad}</span>
+          <div style={{display:"flex",alignItems:"center",gap:6}}>
+            <span style={{fontSize:12}}>Recibidas:</span>
+            <input type="number" min="0" max={it.cantidad} className="fi" value={it.cantidad_recibida} onChange={e=>setCheckItems(prev=>prev.map((x,j)=>j===i?{...x,cantidad_recibida:Math.min(it.cantidad,Math.max(0,parseFloat(e.target.value)||0))}:x))} style={{width:60,textAlign:"center",fontWeight:700,padding:"6px"}}/>
+            <span>{it.cantidad_recibida>=it.cantidad?"✅":"⚠️"}</span>
+          </div>
+        </div>
+        {it.cantidad_recibida<it.cantidad&&<input className="fi" style={{marginTop:8,fontSize:12}} placeholder="Nota sobre la diferencia..." value={it.nota||""} onChange={e=>setCheckItems(prev=>prev.map((x,j)=>j===i?{...x,nota:e.target.value}:x))}/>}
+      </div>)}
+      <hr className="div"/>
       <div className="fg"><label>Fecha recogida</label><input type="date" className="fi" value={recFecha} onChange={e=>setRecFecha(e.target.value)}/></div>
       <div className="fg"><label>Coste factura (€)</label><input type="number" inputMode="decimal" className="fi" value={recCoste} onChange={e=>setRecCoste(e.target.value)} placeholder="0"/></div>
-      <div className="fg"><label>Foto factura (opcional)</label>
-        <label className="pbtn">{recFoto?"📷 Cambiar":"📷 Foto factura"}<input type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={async e=>{const f=e.target.files[0];if(!f)return;try{const url=await uploadFotoSeguro(f);setRecFoto(url);}catch(_){const r=new FileReader();r.onload=ev=>setRecFoto(ev.target.result);r.readAsDataURL(f);}}}/></label>
+      <div className="fg"><label>Foto factura</label>
+        <label className="pbtn">{recFoto?"📷 Cambiar":"📷 Foto"}<input type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={async e=>{const f=e.target.files[0];if(!f)return;try{const url=await uploadFotoSeguro(f);setRecFoto(url);}catch(_){const r=new FileReader();r.onload=ev=>setRecFoto(ev.target.result);r.readAsDataURL(f);}}}/></label>
         {recFoto&&<img src={recFoto} alt="" className="pprev"/>}
       </div>
-      <div className="mft"><button className="btn bg" onClick={()=>setShowRecogida(null)}>Cancelar</button><button className="btn bp" onClick={recoger} disabled={saving}>{saving?"Guardando…":"✅ Confirmar"}</button></div>
+      <div className="mft"><button className="btn bg" onClick={()=>setShowRecogida(null)}>Cancelar</button><button className="btn bp" onClick={recoger} disabled={saving}>{saving?"Guardando…":"✅ Confirmar recogida"}</button></div>
     </div></div>}
   </>;
 }
 
 // ─── ALMACÉN ────────────────────────────────────────────────────────────────
+function verificarStock(art,ubi,cant){const s=ubi==="casa"?parseFloat(art.stock_casa||0):ubi==="almacen"?parseFloat(art.stock_almacen||0):parseFloat(art.stock_lavanderia||0);if(s<cant)return{ok:false,msg:`Stock insuficiente: hay ${s} ${art.unidad||"uds"} en ${ubi}, necesitas ${cant}`};return{ok:true};}
+
 const ALMACEN_CATS=[
   {id:"todos",lbl:"Todos"},
   {id:"limpieza",lbl:"🧴 Limpieza"},
@@ -4230,6 +4256,7 @@ function AlmacenPage({perfil,tok,rol}){
   const newVacio={nombre:"",categoria:"limpieza",unidad:"unidad",es_liquido:false,tiene_lavanderia:false,stock_minimo:"1",codigo_barras:"",stock_casa:"0",stock_almacen:"0",etiquetas:""};
   const [newForm,setNewForm]=useState(newVacio);
   const [movForm,setMovForm]=useState({tipo:"entrada",cantidad:"1",ubicacion:"casa",concepto:""});
+  const [stockErr,setStockErr]=useState("");
 
   const load_=async()=>{
     try{
@@ -4253,9 +4280,14 @@ function AlmacenPage({perfil,tok,rol}){
   };
 
   const ejecutarMov=async()=>{
-    if(!showMov||saving)return;setSaving(true);
+    if(!showMov||saving)return;setStockErr("");
     const art=showMov;const cant=parseFloat(movForm.cantidad)||0;
-    if(cant<=0){setSaving(false);return;}
+    if(cant<=0)return;
+    // Verify stock before movement
+    if(movForm.tipo==="salida"){const v=verificarStock(art,"casa",cant);if(!v.ok){setStockErr(v.msg);return;}}
+    if(movForm.tipo==="traslado_a_casa"){const v=verificarStock(art,"almacen",cant);if(!v.ok){setStockErr(v.msg);return;}}
+    if(movForm.tipo==="traslado_a_almacen"){const v=verificarStock(art,"casa",cant);if(!v.ok){setStockErr(v.msg);return;}}
+    setSaving(true);
     try{
       if(movForm.tipo==="entrada"){
         const field=movForm.ubicacion==="casa"?"stock_casa":"stock_almacen";
@@ -4437,7 +4469,8 @@ function AlmacenPage({perfil,tok,rol}){
         {showMov.es_liquido&&<div style={{fontSize:11,color:"#8A8580",marginTop:4}}>💡 Usa 0.25, 0.5, 0.75 para cantidades parciales de bote</div>}
       </div>
       <div className="fg"><label>Concepto (opcional)</label><input className="fi" value={movForm.concepto} onChange={e=>setMovForm(v=>({...v,concepto:e.target.value}))} placeholder="Ej: Compra semanal"/></div>
-      <div className="mft"><button className="btn bg" onClick={()=>setShowMov(null)}>Cancelar</button><button className="btn bp" onClick={ejecutarMov} disabled={saving}>{saving?"Guardando…":"✅ Confirmar"}</button></div>
+      {stockErr&&<div className="alert" style={{marginBottom:12}}>{stockErr}</div>}
+      <div className="mft"><button className="btn bg" onClick={()=>{setShowMov(null);setStockErr("");}}>Cancelar</button><button className="btn bp" onClick={ejecutarMov} disabled={saving}>{saving?"Guardando…":"✅ Confirmar"}</button></div>
     </div></div>}
 
     {/* Modal Recuento */}
