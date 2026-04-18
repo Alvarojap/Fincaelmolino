@@ -1768,7 +1768,7 @@ function DashA({reservas,jsem,jpunt,cwk,setPage,tok,perfil,rol}){
         <div className="chdr"><span className="ctit">📋 Tareas pendientes</span><span className="badge" style={{background:"rgba(236,104,62,.1)",color:"#EC683E"}}>{tareasPend.length}</span></div>
         {tareasPend.map(t=>{const hoyS=new Date().toISOString().split("T")[0];const u=!t.fecha_limite?"normal":t.fecha_limite<hoyS?"vencida":t.fecha_limite===hoyS?"hoy":"normal";const col=u==="vencida"?"#F35757":u==="hoy"?"#D4A017":"#A6BE59";
           return <div key={t.id} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 0",borderBottom:"1px solid rgba(0,0,0,.04)"}}>
-            <button className="btn bp sm" style={{flexShrink:0,padding:"4px 8px"}} onClick={async()=>{try{await sbPatch("tareas_comerciales",`id=eq.${t.id}`,{estado:"hecha",completada_por:perfil.nombre,completada_ts:new Date().toISOString()},tok);if(t.entidad_tipo&&t.entidad_id){await addHistorial(t.entidad_tipo,t.entidad_id,`Tarea completada: "${t.titulo}"`,perfil.nombre,tok);const cid=await getContactoDeEntidad(t.entidad_tipo,t.entidad_id,tok);if(cid)autoInteraccion(cid,["llamada","whatsapp","email"].includes(t.tipo)?t.tipo:"nota",`${({llamada:"📞",whatsapp:"💬",email:"📧",seguimiento:"📋",cobro:"💰",contrato:"📄"})[t.tipo]||"🔧"} Tarea completada: "${t.titulo}"`,"positivo",tok,perfil.nombre);}setTareasPend(prev=>prev.filter(x=>x.id!==t.id));}catch(_){}}}>✓</button>
+            <button className="btn bp sm" style={{flexShrink:0,padding:"4px 8px"}} onClick={async()=>{try{await sbPatch("tareas_comerciales",`id=eq.${t.id}`,{estado:"hecha",completada_por:perfil.nombre,completada_ts:new Date().toISOString()},tok);if(t.entidad_tipo&&t.entidad_id){await addHistorial(t.entidad_tipo,t.entidad_id,`Tarea completada: "${t.titulo}"`,perfil.nombre,tok).catch(()=>{});const cid=await getContactoDeEntidad(t.entidad_tipo,t.entidad_id,tok);if(cid){const TICONS={llamada:"📞",whatsapp:"💬",email:"📧",seguimiento:"📋",cobro:"💰",contrato:"📄"};const ti=["llamada","whatsapp","email"].includes(t.tipo)?t.tipo:"nota";await autoInteraccion(cid,ti,`${TICONS[t.tipo]||"🔧"} ${t.titulo}`,"positivo",tok,perfil.nombre);}}setTareasPend(prev=>prev.filter(x=>x.id!==t.id));}catch(_){}}}>✓</button>
             <div style={{flex:1,minWidth:0}}>
               <div style={{fontSize:13,fontWeight:600,color:"#1A1A1A",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{TAREA_TIPOS[t.tipo]||"📋"} {t.titulo}</div>
               <div style={{fontSize:11,color:"#8A8580"}}>{t.entidad_nombre}{t.fecha_limite?` · `:""}{t.fecha_limite&&<span style={{color:col,fontWeight:600}}>{u==="vencida"?"⚠️ ":""}📅 {new Date(t.fecha_limite+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"})}</span>}</div>
@@ -5616,8 +5616,11 @@ function TareasComerciales({entidad_tipo,entidad_id,entidad_nombre,tok,perfil,ro
     await sbPost("tareas_comerciales",body,tok);
     await addHistorial(entidad_tipo,entidad_id,`Tarea creada: "${form.titulo}"`,perfil?.nombre||"Admin",tok);
     setForm({tipo:"llamada",titulo:"",descripcion:"",fecha_limite:"",asignado_a:perfil?.id,asignado_nombre:perfil?.nombre});setShowForm(false);await cargar();}catch(e){console.error("Error crear tarea:",e);}setSaving(false);};
-  const marcarHecha=async(t)=>{try{await sbPatch("tareas_comerciales",`id=eq.${t.id}`,{estado:"hecha",completada_por:perfil.nombre,completada_ts:new Date().toISOString()},tok);await addHistorial(entidad_tipo,entidad_id,`Tarea completada: "${t.titulo}"`,perfil.nombre,tok);
-    const cid=await getContactoDeEntidad(entidad_tipo,entidad_id,tok);if(cid){const TICONS={llamada:"📞",whatsapp:"💬",email:"📧",seguimiento:"📋",cobro:"💰",contrato:"📄"};const ti=["llamada","whatsapp","email"].includes(t.tipo)?t.tipo:"nota";autoInteraccion(cid,ti,`${TICONS[t.tipo]||"🔧"} Tarea completada: "${t.titulo}"`,"positivo",tok,perfil.nombre);}
+  const marcarHecha=async(t)=>{try{
+    await sbPatch("tareas_comerciales",`id=eq.${t.id}`,{estado:"hecha",completada_por:perfil.nombre,completada_ts:new Date().toISOString()},tok);
+    await addHistorial(entidad_tipo,entidad_id,`Tarea completada: "${t.titulo}"`,perfil.nombre,tok).catch(()=>{});
+    const cid=await getContactoDeEntidad(entidad_tipo,entidad_id,tok);
+    if(cid){const TICONS={llamada:"📞",whatsapp:"💬",email:"📧",seguimiento:"📋",cobro:"💰",contrato:"📄"};const ti=["llamada","whatsapp","email"].includes(t.tipo)?t.tipo:"nota";await autoInteraccion(cid,ti,`${TICONS[t.tipo]||"🔧"} ${t.titulo}${t.descripcion?" — "+t.descripcion:""}`,"positivo",tok,perfil.nombre);}
     await cargar();}catch(_){}};
   const eliminar=async(id)=>{try{await sbDelete("tareas_comerciales",`id=eq.${id}`,tok);await cargar();}catch(_){}};
   const pend=tareas.filter(t=>t.estado==="pendiente");const hechas=tareas.filter(t=>t.estado==="hecha");
@@ -6192,9 +6195,11 @@ async function sincronizarContacto(contactoId,cambios,tok){
   }
 }
 async function autoInteraccion(contactoId,tipo,resumen,resultado,tok,creador){
-  if(!contactoId)return;
-  await sbPost("contacto_interacciones",{contacto_id:contactoId,tipo:tipo||"nota",direccion:"salida",fecha:new Date().toISOString(),resumen,resultado:resultado||"neutro",creado_por:creador||"Sistema"},tok).catch(()=>{});
-  await sbPatch("contactos",`id=eq.${contactoId}`,{updated_at:new Date().toISOString()},tok).catch(()=>{});
+  if(!contactoId||!tok)return;
+  try{
+    await sbPost("contacto_interacciones",{contacto_id:contactoId,tipo:tipo||"nota",direccion:"salida",fecha:new Date().toISOString(),resumen,resultado:resultado||"neutro",creado_por:creador||"Sistema"},tok);
+    await sbPatch("contactos",`id=eq.${contactoId}`,{updated_at:new Date().toISOString()},tok);
+  }catch(_){}
 }
 async function getContactoDeEntidad(entidad_tipo,entidad_id,tok){
   if(!entidad_tipo||!entidad_id)return null;
