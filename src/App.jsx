@@ -721,6 +721,7 @@ export default function App() {
     calendario:  <Calendario  {...P} rol={rol}/>,
     reservas:    <Reservas    {...P} perfil={perfil}/>,
     "nueva-res": <NuevaReserva {...P}/>,
+    contactos:   <Contactos   {...P}/>,
     visitas:     <Visitas     {...P}/>,
     airbnb:      <ReservasAirbnb {...P}/>,
     chat:        <Chat        {...P}/>,
@@ -929,11 +930,14 @@ function Sidebar({perfil,page,setPage,onLogout,inDrawer,onClose}){
         {(isA||isL||isJ)&&nItem("reservations","Almacén","almacen")}
         {isL&&nItem("calendar","Calendario","cal-limp")}
       </>}
+      {(isA||isC)&&<><p className="nav-sec">Comercial</p>
+        {nItem("users","Contactos","contactos")}
+        {nItem("visits","Visitas","visitas")}
+      </>}
       {(isA||isC)&&<><p className="nav-sec">Reservas</p>
         {nItem("calendar","Calendario","calendario")}
         {nItem("reservations","Reservas","reservas")}
         {isA&&nItem("new_res","Nueva reserva","nueva-res")}
-        {nItem("visits","Visitas","visitas")}
         {isA&&nItem("airbnb","Airbnb","airbnb")}
       </>}
       <p className="nav-sec">Comunicación</p>
@@ -1706,8 +1710,10 @@ async function autoCobrarAirbnb(tok){
 
 function DashA({reservas,jsem,jpunt,cwk,setPage,tok,perfil,rol}){
   const[tareasPend,setTareasPend]=useState([]);
+  const[contactosResumen,setContactosResumen]=useState(null);
   useEffect(()=>{autoCobrarAirbnb(tok);ejecutarMotorCoordinacion(tok);
-    sbGet("tareas_comerciales","?estado=eq.pendiente&order=fecha_limite.asc.nullslast&limit=10&select=*",tok).then(setTareasPend).catch(()=>{});},[]);
+    sbGet("tareas_comerciales","?estado=eq.pendiente&order=fecha_limite.asc.nullslast&limit=10&select=*",tok).then(setTareasPend).catch(()=>{});
+    sbGet("contactos","?select=estado",tok).then(cs=>{const r={lead:0,visitante:0,cliente:0,recurrente:0};cs.forEach(c=>{if(r[c.estado]!==undefined)r[c.estado]++;});setContactosResumen(r);}).catch(()=>{});},[]);
   const [meteo,setMeteo]=useState(null);
   const cargarMeteo=()=>fetchMeteo().then(d=>{if(d)setMeteo(d);});
   useEffect(()=>{localStorage.removeItem("fm_meteo_cache");cargarMeteo();},[]);
@@ -1769,6 +1775,16 @@ function DashA({reservas,jsem,jpunt,cwk,setPage,tok,perfil,rol}){
             </div>
           </div>;
         })}
+      </div>}
+
+      {contactosResumen&&<div className="card" style={{marginBottom:16}}>
+        <div className="chdr"><span className="ctit">👥 Contactos activos</span><button className="btn bg sm" onClick={()=>setPage("contactos")}>Ver todos</button></div>
+        <div style={{display:"flex",gap:16,flexWrap:"wrap",fontSize:13}}>
+          <span>🔵 Leads: <strong>{contactosResumen.lead}</strong></span>
+          <span>🟡 Visitantes: <strong>{contactosResumen.visitante}</strong></span>
+          <span>🟢 Clientes: <strong>{contactosResumen.cliente}</strong></span>
+          <span>⭐ Recurrentes: <strong>{contactosResumen.recurrente}</strong></span>
+        </div>
       </div>}
 
       <div className="g2">
@@ -5839,6 +5855,7 @@ function Reservas({tok,rol,perfil}){
               </>;
             })()}
           </>}
+          {isA&&sel.contacto_id&&<div onClick={()=>setPage("contactos")} style={{cursor:"pointer",color:"#EC683E",fontSize:13,fontWeight:600,padding:"10px 0",borderTop:"1px solid rgba(0,0,0,.04)"}}>👤 Ver ficha de cliente →</div>}
           <TareasComerciales entidad_tipo="reserva" entidad_id={sel.id} entidad_nombre={sel.nombre} tok={tok} perfil={perfil||{nombre:"Admin"}} rol={rol}/>
           <Historial entidad_tipo="reserva" entidad_id={sel.id} tok={tok} perfil={perfil||{nombre:"Admin"}}/>
           <Documentos entidad_tipo="reserva" entidad_id={sel.id} tok={tok} perfil={perfil||{nombre:"Admin"}}/>
@@ -6142,7 +6159,318 @@ const ESTADOS_VISITA = {
   reserva_cancelada:{lbl:"Reserva cancelada", col:"#e85555"},
 };
 
-function Visitas({perfil,tok,rol}){
+// ─── CONTACTOS ──────────────────────────────────────────────────────────────
+async function crearContactoDesdeAirbnb(airbnb,tok,perfil){
+  try{
+    const existente=await sbGet("contactos",`?nombre=eq.${encodeURIComponent(airbnb.huesped)}&tipo_evento=eq.airbnb&select=id`,tok).catch(()=>[]);
+    let cid;
+    if(existente.length>0){cid=existente[0].id;}
+    else{const[c]=await sbPost("contactos",{nombre:airbnb.huesped,telefono:airbnb.telefono||null,email:airbnb.email||null,origen:"airbnb",tipo_evento:"airbnb",estado:"cliente",notas:`Primera reserva: ${airbnb.fecha_entrada} → ${airbnb.fecha_salida}`,created_at:new Date().toISOString(),updated_at:new Date().toISOString(),asignado_a:perfil?.id,asignado_nombre:perfil?.nombre},tok).catch(()=>[{}]);cid=c?.id;}
+    if(cid&&airbnb.id)await sbPatch("reservas_airbnb",`id=eq.${airbnb.id}`,{contacto_id:cid},tok).catch(()=>{});
+    return cid;
+  }catch(_){return null;}
+}
+async function sincronizarContacto(contactoId,cambios,tok){
+  const u={};if(cambios.nombre)u.nombre=cambios.nombre;if(cambios.telefono)u.telefono=cambios.telefono;
+  if(Object.keys(u).length>0){
+    await sbPatch("visitas",`contacto_id=eq.${contactoId}`,u,tok).catch(()=>{});
+    if(cambios.nombre){
+      await sbPatch("reservas",`contacto_id=eq.${contactoId}`,{nombre:cambios.nombre},tok).catch(()=>{});
+      await sbPatch("reservas_airbnb",`contacto_id=eq.${contactoId}`,{huesped:cambios.nombre},tok).catch(()=>{});
+    }
+  }
+}
+const ICONOS_INTERACCION={llamada:"📞",whatsapp:"💬",email:"📧",visita_finca:"🏠",reunion:"🤝",nota:"📝"};
+const ESTADO_CONTACTO={lead:{lbl:"Lead",col:"#7FB2FF",ico:"🔵"},visitante:{lbl:"Visitante",col:"#D4A017",ico:"🟡"},cliente:{lbl:"Cliente",col:"#A6BE59",ico:"🟢"},recurrente:{lbl:"Recurrente",col:"#EC683E",ico:"⭐"},perdido:{lbl:"Perdido",col:"#6b7280",ico:"⚫"}};
+
+function Contactos({perfil,tok,rol,setPage}){
+  const isA=rol==="admin",isC=rol==="comercial";
+  const hoy=new Date().toISOString().split("T")[0];
+  const[contactos,setContactos]=useState([]);const[load,setLoad]=useState(true);const[saving,setSaving]=useState(false);
+  const[filtro,setFiltro]=useState("todos");const[busqueda,setBusqueda]=useState("");
+  const[sel,setSel]=useState(null);const[tabDet,setTabDet]=useState("resumen");
+  const[showForm,setShowForm]=useState(false);const[editando,setEditando]=useState(false);
+  const[interacciones,setInteracciones]=useState([]);const[visitasC,setVisitasC]=useState([]);const[reservasC,setReservasC]=useState([]);
+  const[showInter,setShowInter]=useState(false);
+  const[showVisita,setShowVisita]=useState(false);
+  const[showEstado,setShowEstado]=useState(false);
+
+  const formVacio={nombre:"",telefono:"",email:"",origen:"directo",tipo_evento:"boda",estado:"lead",fecha_evento_prevista:"",mes_evento_previsto:"",anio_evento_previsto:"",presupuesto_estimado:"",notas:"",asignado_a:perfil?.id,asignado_nombre:perfil?.nombre};
+  const[form,setForm]=useState(formVacio);
+  const formInterVacio={tipo:"llamada",direccion:"salida",fecha:hoy,resumen:"",resultado:"neutro"};
+  const[formInter,setFormInter]=useState(formInterVacio);
+  const formVisVacio={nombre:"",fecha:hoy,hora:"10:00",tipo_evento:"Boda",invitados:"",telefono:"",email:"",nota:"",fecha_evento_prevista:"",contacto_id:""};
+  const[formVis,setFormVis]=useState(formVisVacio);
+
+  const cargar=async()=>{
+    try{const c=await sbGet("contactos","?select=*&order=updated_at.desc",tok);setContactos(c);}catch(_){}setLoad(false);
+  };
+  useEffect(()=>{cargar();},[]);
+
+  const cargarDetalle=async(c)=>{
+    setSel(c);setTabDet("resumen");
+    const[inter,vis,res]=await Promise.all([
+      sbGet("contacto_interacciones",`?contacto_id=eq.${c.id}&select=*&order=fecha.desc`,tok).catch(()=>[]),
+      sbGet("visitas",`?contacto_id=eq.${c.id}&select=*&order=fecha.desc`,tok).catch(()=>[]),
+      sbGet("reservas",`?contacto_id=eq.${c.id}&select=*&order=fecha.desc`,tok).catch(()=>[]),
+    ]);
+    setInteracciones(inter);setVisitasC(vis);setReservasC(res);
+  };
+
+  const guardar=async()=>{
+    if(!form.nombre||saving)return;setSaving(true);
+    try{
+      const fep=form.fecha_evento_prevista||null;
+      const mep=fep?new Date(fep+"T12:00:00").getMonth()+1:(form.mes_evento_previsto?parseInt(form.mes_evento_previsto):null);
+      const aep=fep?new Date(fep+"T12:00:00").getFullYear():(form.anio_evento_previsto?parseInt(form.anio_evento_previsto):null);
+      const body={...form,fecha_evento_prevista:fep,mes_evento_previsto:mep,anio_evento_previsto:aep,presupuesto_estimado:parseFloat(form.presupuesto_estimado)||null,updated_at:new Date().toISOString()};
+      if(editando&&sel){
+        await sbPatch("contactos",`id=eq.${sel.id}`,body,tok);
+        await sincronizarContacto(sel.id,{nombre:form.nombre,telefono:form.telefono},tok);
+        await cargarDetalle({...sel,...body});
+      }else{
+        body.created_at=new Date().toISOString();
+        const[c]=await sbPost("contactos",body,tok);
+        if(c)await cargarDetalle(c);
+      }
+      setShowForm(false);setEditando(false);await cargar();
+    }catch(_){}setSaving(false);
+  };
+
+  const cambiarEstado=async(contacto,nuevoEstado)=>{
+    const update={estado:nuevoEstado,updated_at:new Date().toISOString()};
+    if(nuevoEstado==="perdido"){const motivo=window.prompt("¿Motivo por el que se perdió el contacto?");if(motivo)update.motivo_perdido=motivo;else if(motivo===null)return;}
+    await sbPatch("contactos",`id=eq.${contacto.id}`,update,tok);
+    await sbPost("contacto_interacciones",{contacto_id:contacto.id,tipo:"nota",fecha:new Date().toISOString(),resumen:`Estado cambiado a: ${nuevoEstado}${update.motivo_perdido?" — "+update.motivo_perdido:""}`,resultado:"neutro",creado_por:perfil.nombre},tok).catch(()=>{});
+    setShowEstado(false);await cargar();if(sel)await cargarDetalle({...contacto,...update});
+  };
+
+  const registrarInteraccion=async()=>{
+    if(!sel||!formInter.resumen||saving)return;setSaving(true);
+    try{
+      await sbPost("contacto_interacciones",{contacto_id:sel.id,tipo:formInter.tipo,direccion:formInter.direccion,fecha:formInter.fecha+"T"+new Date().toTimeString().slice(0,5)+":00",resumen:formInter.resumen,resultado:formInter.resultado,creado_por:perfil.nombre},tok);
+      await sbPatch("contactos",`id=eq.${sel.id}`,{updated_at:new Date().toISOString()},tok);
+      setShowInter(false);setFormInter(formInterVacio);await cargarDetalle(sel);await cargar();
+    }catch(_){}setSaving(false);
+  };
+
+  const programarVisita=async()=>{
+    if(!sel||!formVis.fecha||!formVis.hora||saving)return;setSaving(true);
+    try{
+      const fep=formVis.fecha_evento_prevista||null;
+      const mep=fep?new Date(fep+"T12:00:00").getMonth()+1:null;
+      const aep=fep?new Date(fep+"T12:00:00").getFullYear():null;
+      const[v]=await sbPost("visitas",{nombre:formVis.nombre,fecha:formVis.fecha,hora:formVis.hora,tipo_evento:formVis.tipo_evento,invitados:parseInt(formVis.invitados)||null,telefono:formVis.telefono,email:formVis.email,nota:formVis.nota,fecha_evento_prevista:fep,mes_evento_previsto:mep,anio_evento_previsto:aep,estado:"pendiente",creado_por:perfil.nombre,contacto_id:sel.id},tok);
+      if(sel.estado==="lead")await sbPatch("contactos",`id=eq.${sel.id}`,{estado:"visitante",updated_at:new Date().toISOString()},tok);
+      await sbPost("contacto_interacciones",{contacto_id:sel.id,tipo:"visita_finca",fecha:formVis.fecha+"T"+(formVis.hora||"10:00")+":00",resumen:`Visita programada para el ${formVis.fecha}`,resultado:"neutro",creado_por:perfil.nombre},tok).catch(()=>{});
+      setShowVisita(false);await cargarDetalle({...sel,estado:sel.estado==="lead"?"visitante":sel.estado});await cargar();
+    }catch(_){}setSaving(false);
+  };
+
+  const abrirEditar=()=>{setForm({nombre:sel.nombre,telefono:sel.telefono||"",email:sel.email||"",origen:sel.origen||"directo",tipo_evento:sel.tipo_evento||"boda",estado:sel.estado||"lead",fecha_evento_prevista:sel.fecha_evento_prevista||"",mes_evento_previsto:sel.mes_evento_previsto?""+sel.mes_evento_previsto:"",anio_evento_previsto:sel.anio_evento_previsto?""+sel.anio_evento_previsto:"",presupuesto_estimado:sel.presupuesto_estimado?""+sel.presupuesto_estimado:"",notas:sel.notas||"",asignado_a:sel.asignado_a||perfil?.id,asignado_nombre:sel.asignado_nombre||perfil?.nombre});setEditando(true);setShowForm(true);};
+
+  const abrirVisitaDesdeContacto=()=>{setFormVis({nombre:sel.nombre,fecha:hoy,hora:"10:00",tipo_evento:sel.tipo_evento==="boda"?"Boda":sel.tipo_evento==="comunion"?"Comunión":sel.tipo_evento==="empresa"?"Empresa":sel.tipo_evento||"Boda",invitados:"",telefono:sel.telefono||"",email:sel.email||"",nota:sel.notas||"",fecha_evento_prevista:sel.fecha_evento_prevista||"",contacto_id:sel.id});setShowVisita(true);};
+
+  const tiempoDesde=(fecha)=>{if(!fecha)return"—";const d=Math.floor((Date.now()-new Date(fecha).getTime())/86400000);return d===0?"hoy":d===1?"ayer":`hace ${d} días`;};
+
+  const filtrados=contactos.filter(c=>{
+    if(filtro!=="todos"&&c.estado!==filtro)return false;
+    if(busqueda){const q=busqueda.toLowerCase();return(c.nombre||"").toLowerCase().includes(q)||(c.telefono||"").includes(q)||(c.email||"").toLowerCase().includes(q);}
+    return true;
+  });
+
+  const conteo=estado=>contactos.filter(c=>c.estado===estado).length;
+
+  if(load)return <div className="loading"><div className="spin"/><span>Cargando…</span></div>;
+
+  // ─── DETALLE ──
+  if(sel&&!showForm&&!showInter&&!showVisita)return <>
+    <div className="ph"><h2 style={{cursor:"pointer"}} onClick={()=>setSel(null)}>← 👥 Contactos</h2></div>
+    <div className="pb">
+      <div className="card" style={{marginBottom:16}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8,marginBottom:14}}>
+          <div>
+            <h3 style={{margin:0,fontSize:20}}>{sel.nombre}</h3>
+            <div style={{display:"flex",gap:6,marginTop:6,flexWrap:"wrap",alignItems:"center"}}>
+              <span className="badge" style={{background:`${(ESTADO_CONTACTO[sel.estado]||ESTADO_CONTACTO.lead).col}18`,color:(ESTADO_CONTACTO[sel.estado]||ESTADO_CONTACTO.lead).col,border:`1px solid ${(ESTADO_CONTACTO[sel.estado]||ESTADO_CONTACTO.lead).col}30`,cursor:"pointer"}} onClick={()=>setShowEstado(true)}>{(ESTADO_CONTACTO[sel.estado]||ESTADO_CONTACTO.lead).ico} {(ESTADO_CONTACTO[sel.estado]||ESTADO_CONTACTO.lead).lbl} ▾</span>
+              {sel.tipo_evento&&<span className="badge" style={{background:"rgba(236,104,62,.1)",color:"#EC683E"}}>{sel.tipo_evento==="boda"?"💍":sel.tipo_evento==="comunion"?"⛪":sel.tipo_evento==="empresa"?"🏢":sel.tipo_evento==="airbnb"?"🏠":"🎉"} {sel.tipo_evento}</span>}
+              {(sel.fecha_evento_prevista||sel.mes_evento_previsto)&&<span className="badge" style={{background:"rgba(201,168,76,.1)",color:"#D4A017"}}>📅 {sel.fecha_evento_prevista?new Date(sel.fecha_evento_prevista+"T12:00:00").toLocaleDateString("es-ES",{month:"short",year:"numeric"}):`${sel.mes_evento_previsto}/${sel.anio_evento_previsto}`}</span>}
+            </div>
+          </div>
+          <button className="btn bg sm" onClick={()=>setSel(null)}>✕</button>
+        </div>
+        <div className="g2" style={{marginBottom:14}}>
+          {[{l:"TELÉFONO",v:sel.telefono},{l:"EMAIL",v:sel.email},{l:"ORIGEN",v:sel.origen},{l:"ASIGNADO",v:sel.asignado_nombre},{l:"PRESUPUESTO",v:sel.presupuesto_estimado?`${parseFloat(sel.presupuesto_estimado).toLocaleString("es-ES")}€`:null}].filter(x=>x.v).map(x=><div key={x.l} style={{background:"#F5F3F0",borderRadius:8,padding:"10px 12px"}}><div style={{fontSize:10,color:"#8A8580",marginBottom:3}}>{x.l}</div><div style={{fontSize:13,color:"#1A1A1A"}}>{x.v}</div></div>)}
+        </div>
+        {sel.motivo_perdido&&<div style={{background:"rgba(107,114,128,.08)",borderRadius:8,padding:"10px 12px",marginBottom:14,fontSize:12,color:"#6b7280"}}>⚫ Motivo perdido: {sel.motivo_perdido}</div>}
+        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+          <button className="btn bp sm" onClick={abrirVisitaDesdeContacto}>📅 Programar visita</button>
+          <button className="btn bg sm" onClick={()=>{setFormInter(formInterVacio);setShowInter(true);}}>📝 Registrar interacción</button>
+          <button className="btn bg sm" onClick={abrirEditar}>✏️ Editar</button>
+        </div>
+      </div>
+
+      {/* TABS */}
+      <div className="tabs" style={{marginBottom:14}}>
+        <button className={`tab${tabDet==="resumen"?" on":""}`} onClick={()=>setTabDet("resumen")}>Resumen</button>
+        <button className={`tab${tabDet==="interacciones"?" on":""}`} onClick={()=>setTabDet("interacciones")}>Interacciones ({interacciones.length})</button>
+        <button className={`tab${tabDet==="visitas"?" on":""}`} onClick={()=>setTabDet("visitas")}>Visitas ({visitasC.length})</button>
+        <button className={`tab${tabDet==="reservas"?" on":""}`} onClick={()=>setTabDet("reservas")}>Reservas ({reservasC.length})</button>
+      </div>
+
+      {tabDet==="resumen"&&<div className="card">
+        <div className="sg">
+          <SC lbl="Valor generado" val={`${reservasC.reduce((s,r)=>s+(parseFloat(r.precio)||0),0).toLocaleString("es-ES")}€`}/>
+          <SC lbl="Reservas" val={reservasC.length}/>
+          <SC lbl="Visitas" val={visitasC.length}/>
+          <SC lbl="Interacciones" val={interacciones.length}/>
+        </div>
+        {sel.notas&&<div style={{marginTop:14,padding:"10px 12px",background:"#F5F3F0",borderRadius:8,fontSize:13,color:"#1A1A1A"}}>{sel.notas}</div>}
+      </div>}
+
+      {tabDet==="interacciones"&&<div className="card">
+        <button className="btn bp sm" style={{marginBottom:12}} onClick={()=>{setFormInter(formInterVacio);setShowInter(true);}}>+ Registrar interacción</button>
+        {interacciones.length===0?<div className="empty"><span className="ico">📝</span><p>Sin interacciones registradas</p></div>
+        :interacciones.map(i=>{const rc=i.resultado==="positivo"?"#A6BE59":i.resultado==="negativo"?"#F35757":i.resultado==="sin_respuesta"?"#D4A017":"#8A8580";
+          return <div key={i.id} style={{padding:"10px 0",borderBottom:"1px solid rgba(0,0,0,.04)"}}>
+            <div style={{display:"flex",gap:8,alignItems:"center"}}>
+              <span style={{fontSize:16}}>{ICONOS_INTERACCION[i.tipo]||"📝"}</span>
+              <div style={{flex:1}}>
+                <div style={{fontSize:13,fontWeight:600,color:"#1A1A1A"}}>{i.resumen}</div>
+                <div style={{fontSize:11,color:"#8A8580",marginTop:3}}>{i.fecha?new Date(i.fecha).toLocaleDateString("es-ES",{day:"numeric",month:"short",year:"numeric"}):"—"} · {i.direccion==="entrada"?"⬅ Entrada":"➡ Salida"} · <span style={{color:rc}}>{i.resultado}</span>{i.creado_por?` · ${i.creado_por}`:""}</div>
+              </div>
+            </div>
+          </div>;})}
+      </div>}
+
+      {tabDet==="visitas"&&<div className="card">
+        {visitasC.length===0?<div className="empty"><span className="ico">👁</span><p>Sin visitas vinculadas</p></div>
+        :visitasC.map(v=><div key={v.id} style={{padding:"10px 0",borderBottom:"1px solid rgba(0,0,0,.04)",cursor:"pointer"}} onClick={()=>{setPage("visitas");}}>
+          <div style={{fontSize:13,fontWeight:600,color:"#1A1A1A"}}>{new Date(v.fecha+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"long",year:"numeric"})} · {v.hora?.slice(0,5)||"—"}</div>
+          <div style={{fontSize:12,color:"#8A8580",marginTop:3}}>{v.estado} · {v.tipo_evento||"—"}</div>
+        </div>)}
+      </div>}
+
+      {tabDet==="reservas"&&<div className="card">
+        {reservasC.length===0?<div className="empty"><span className="ico">📋</span><p>Sin reservas vinculadas</p></div>
+        :reservasC.map(r=><div key={r.id} style={{padding:"10px 0",borderBottom:"1px solid rgba(0,0,0,.04)",cursor:"pointer"}} onClick={()=>setPage("reservas")}>
+          <div style={{fontSize:13,fontWeight:600,color:"#1A1A1A"}}>{r.nombre} — {new Date(r.fecha+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"long",year:"numeric"})}</div>
+          <div style={{fontSize:12,color:"#8A8580",marginTop:3}}>{r.estado} · {(parseFloat(r.precio)||0).toLocaleString("es-ES")}€</div>
+        </div>)}
+      </div>}
+
+      {/* MODAL CAMBIAR ESTADO */}
+      {showEstado&&<div className="ov" onClick={()=>setShowEstado(false)}><div className="modal" style={{maxWidth:360}} onClick={e=>e.stopPropagation()}>
+        <h3>Cambiar estado</h3>
+        {Object.entries(ESTADO_CONTACTO).map(([k,v])=><button key={k} className="btn bg" style={{width:"100%",justifyContent:"flex-start",marginBottom:6,borderColor:sel.estado===k?v.col:undefined,color:sel.estado===k?v.col:undefined}} onClick={()=>cambiarEstado(sel,k)}>{v.ico} {v.lbl}{sel.estado===k?" ✓":""}</button>)}
+      </div></div>}
+    </div>
+  </>;
+
+  // ─── LISTA ──
+  return <>
+    <div className="ph"><h2>👥 Contactos</h2><p>{contactos.length} contactos</p></div>
+    <div className="pb">
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12,gap:8,flexWrap:"wrap"}}>
+        <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+          {[{id:"todos",lbl:"Todos"},{id:"lead",lbl:`🔵 Leads ${conteo("lead")}`},{id:"visitante",lbl:`🟡 Visitantes ${conteo("visitante")}`},{id:"cliente",lbl:`🟢 Clientes ${conteo("cliente")}`},{id:"recurrente",lbl:`⭐ Recurrentes ${conteo("recurrente")}`},{id:"perdido",lbl:`⚫ Perdidos ${conteo("perdido")}`}].map(f=><button key={f.id} className={`btn sm${filtro===f.id?" bp":" bg"}`} onClick={()=>setFiltro(f.id)}>{f.lbl}</button>)}
+        </div>
+        <button className="btn bp" onClick={()=>{setForm(formVacio);setEditando(false);setShowForm(true);}}>+ Nuevo contacto</button>
+      </div>
+      <input className="fi" value={busqueda} onChange={e=>setBusqueda(e.target.value)} placeholder="Buscar por nombre, teléfono o email…" style={{marginBottom:14}}/>
+
+      {filtrados.length===0?<div className="empty"><span className="ico">👥</span><p>No hay contactos con este filtro</p></div>
+      :filtrados.map(c=>{const ec=ESTADO_CONTACTO[c.estado]||ESTADO_CONTACTO.lead;const ultimaInter=c.updated_at?tiempoDesde(c.updated_at):"—";
+        return <div key={c.id} className="card" style={{marginBottom:10,borderLeft:`3px solid ${ec.col}`,cursor:"pointer"}} onClick={()=>cargarDetalle(c)}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8}}>
+            <div style={{minWidth:0}}>
+              <div style={{fontSize:15,fontWeight:600,color:"#1A1A1A"}}>{c.nombre}</div>
+              <div style={{fontSize:12,color:"#8A8580",marginTop:4}}>
+                {c.tipo_evento==="boda"?"💍":c.tipo_evento==="comunion"?"⛪":c.tipo_evento==="empresa"?"🏢":c.tipo_evento==="airbnb"?"🏠":"🎉"} {c.tipo_evento||"—"}
+                {(c.fecha_evento_prevista||c.mes_evento_previsto)&&<> · 📅 {c.fecha_evento_prevista?new Date(c.fecha_evento_prevista+"T12:00:00").toLocaleDateString("es-ES",{month:"short",year:"numeric"}):`${c.mes_evento_previsto}/${c.anio_evento_previsto}`}</>}
+                {c.telefono&&<> · 📞 {c.telefono}</>}
+              </div>
+              <div style={{display:"flex",gap:6,marginTop:6,flexWrap:"wrap"}}>
+                <span className="badge" style={{background:`${ec.col}18`,color:ec.col}}>{ec.ico} {ec.lbl}</span>
+                {c.origen&&<span className="badge" style={{background:"#F5F3F0",color:"#8A8580"}}>{c.origen}</span>}
+              </div>
+            </div>
+            <div style={{fontSize:11,color:"#BFBAB4",flexShrink:0,textAlign:"right"}}>Última act.<br/>{ultimaInter}</div>
+          </div>
+        </div>;})}
+    </div>
+
+    {/* MODAL NUEVO/EDITAR CONTACTO */}
+    {showForm&&<div className="ov" onClick={()=>{setShowForm(false);setEditando(false);}}><div className="modal" style={{maxHeight:"92vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
+      <h3>{editando?"✏️ Editar contacto":"👥 Nuevo contacto"}</h3>
+      <div className="fg"><label>Nombre *</label><input className="fi" value={form.nombre} onChange={e=>setForm(v=>({...v,nombre:e.target.value}))} placeholder="Nombre del contacto"/></div>
+      <div className="g2">
+        <div className="fg"><label>Teléfono</label><input className="fi" type="tel" value={form.telefono} onChange={e=>setForm(v=>({...v,telefono:e.target.value}))} placeholder="600 000 000"/></div>
+        <div className="fg"><label>Email</label><input className="fi" type="email" value={form.email} onChange={e=>setForm(v=>({...v,email:e.target.value}))} placeholder="correo@email.com"/></div>
+      </div>
+      <div className="g2">
+        <div className="fg"><label>Origen</label><select className="fi" value={form.origen} onChange={e=>setForm(v=>({...v,origen:e.target.value}))}>
+          {["directo","bodas.net","instagram","google","referido","airbnb","otro"].map(o=><option key={o} value={o}>{o}</option>)}
+        </select></div>
+        <div className="fg"><label>Tipo de evento</label><select className="fi" value={form.tipo_evento} onChange={e=>setForm(v=>({...v,tipo_evento:e.target.value}))}>
+          {["boda","comunion","empresa","airbnb","otro"].map(t=><option key={t} value={t}>{t}</option>)}
+        </select></div>
+      </div>
+      <div className="fg"><label>Fecha prevista del evento</label><input type="date" className="fi" value={form.fecha_evento_prevista} onChange={e=>setForm(v=>({...v,fecha_evento_prevista:e.target.value}))}/></div>
+      {!form.fecha_evento_prevista&&<div className="g2">
+        <div className="fg"><label>Mes previsto</label><select className="fi" value={form.mes_evento_previsto} onChange={e=>setForm(v=>({...v,mes_evento_previsto:e.target.value}))}>
+          <option value="">—</option>{[1,2,3,4,5,6,7,8,9,10,11,12].map(m=><option key={m} value={m}>{new Date(2000,m-1).toLocaleDateString("es-ES",{month:"long"})}</option>)}
+        </select></div>
+        <div className="fg"><label>Año previsto</label><select className="fi" value={form.anio_evento_previsto} onChange={e=>setForm(v=>({...v,anio_evento_previsto:e.target.value}))}>
+          <option value="">—</option>{[2025,2026,2027,2028,2029,2030].map(a=><option key={a} value={a}>{a}</option>)}
+        </select></div>
+      </div>}
+      <div className="fg"><label>Presupuesto estimado (€)</label><input type="number" inputMode="decimal" className="fi" value={form.presupuesto_estimado} onChange={e=>setForm(v=>({...v,presupuesto_estimado:e.target.value}))} placeholder="Ej: 8000"/></div>
+      <div className="fg"><label>Notas</label><textarea className="fi" rows={3} value={form.notas} onChange={e=>setForm(v=>({...v,notas:e.target.value}))} placeholder="Observaciones…"/></div>
+      <div className="mft"><button className="btn bg" onClick={()=>{setShowForm(false);setEditando(false);}}>Cancelar</button><button className="btn bp" onClick={guardar} disabled={saving}>{saving?"Guardando…":"✓ Guardar"}</button></div>
+    </div></div>}
+
+    {/* MODAL REGISTRAR INTERACCIÓN */}
+    {showInter&&sel&&<div className="ov" onClick={()=>setShowInter(false)}><div className="modal" style={{maxWidth:440}} onClick={e=>e.stopPropagation()}>
+      <h3>📝 Registrar interacción</h3>
+      <div style={{fontSize:13,color:"#8A8580",marginBottom:14}}>Con: <strong style={{color:"#1A1A1A"}}>{sel.nombre}</strong></div>
+      <div className="g2">
+        <div className="fg"><label>Tipo</label><select className="fi" value={formInter.tipo} onChange={e=>setFormInter(v=>({...v,tipo:e.target.value}))}>
+          {Object.entries(ICONOS_INTERACCION).map(([k,ico])=><option key={k} value={k}>{ico} {k}</option>)}
+        </select></div>
+        <div className="fg"><label>Dirección</label><select className="fi" value={formInter.direccion} onChange={e=>setFormInter(v=>({...v,direccion:e.target.value}))}>
+          <option value="salida">➡ Salida</option><option value="entrada">⬅ Entrada</option>
+        </select></div>
+      </div>
+      <div className="g2">
+        <div className="fg"><label>Fecha</label><input type="date" className="fi" value={formInter.fecha} onChange={e=>setFormInter(v=>({...v,fecha:e.target.value}))}/></div>
+        <div className="fg"><label>Resultado</label><select className="fi" value={formInter.resultado} onChange={e=>setFormInter(v=>({...v,resultado:e.target.value}))}>
+          <option value="positivo">✅ Positivo</option><option value="neutro">➖ Neutro</option><option value="negativo">❌ Negativo</option><option value="sin_respuesta">📵 Sin respuesta</option>
+        </select></div>
+      </div>
+      <div className="fg"><label>Resumen *</label><textarea className="fi" rows={3} value={formInter.resumen} onChange={e=>setFormInter(v=>({...v,resumen:e.target.value}))} placeholder="¿Qué se habló o acordó?"/></div>
+      <div className="mft"><button className="btn bg" onClick={()=>setShowInter(false)}>Cancelar</button><button className="btn bp" onClick={registrarInteraccion} disabled={saving||!formInter.resumen}>{saving?"Guardando…":"✓ Guardar"}</button></div>
+    </div></div>}
+
+    {/* MODAL PROGRAMAR VISITA */}
+    {showVisita&&sel&&<div className="ov" onClick={()=>setShowVisita(false)}><div className="modal" onClick={e=>e.stopPropagation()}>
+      <h3>📅 Programar visita</h3>
+      <div style={{fontSize:13,color:"#8A8580",marginBottom:14}}>Para: <strong style={{color:"#1A1A1A"}}>{sel.nombre}</strong></div>
+      <div className="g2">
+        <div className="fg"><label>Fecha *</label><input type="date" className="fi" value={formVis.fecha} onChange={e=>setFormVis(v=>({...v,fecha:e.target.value}))}/></div>
+        <div className="fg"><label>Hora *</label><input type="time" className="fi" value={formVis.hora} onChange={e=>setFormVis(v=>({...v,hora:e.target.value}))}/></div>
+      </div>
+      <div className="g2">
+        <div className="fg"><label>Tipo evento</label><input className="fi" value={formVis.tipo_evento} onChange={e=>setFormVis(v=>({...v,tipo_evento:e.target.value}))}/></div>
+        <div className="fg"><label>Invitados</label><input type="number" className="fi" value={formVis.invitados} onChange={e=>setFormVis(v=>({...v,invitados:e.target.value}))}/></div>
+      </div>
+      <div className="fg"><label>Nota</label><textarea className="fi" rows={2} value={formVis.nota} onChange={e=>setFormVis(v=>({...v,nota:e.target.value}))} placeholder="Notas…"/></div>
+      <div className="mft"><button className="btn bg" onClick={()=>setShowVisita(false)}>Cancelar</button><button className="btn bp" onClick={programarVisita} disabled={saving}>{saving?"Guardando…":"📅 Programar"}</button></div>
+    </div></div>}
+  </>;
+}
+
+function Visitas({perfil,tok,rol,setPage}){
   const isA=rol==="admin", isC=rol==="comercial";
   const puedeEditar=isA||isC;
   const{refresh}=useContext(BadgeCtx);
@@ -6252,8 +6580,9 @@ function Visitas({perfil,tok,rol}){
     if(!sel||saving||!formRes.fecha_evento)return;
     setSaving(true);
     try{
-      const [res]=await sbPost("reservas",{nombre:sel.nombre,fecha:formRes.fecha_evento,tipo:sel.tipo_evento||"Boda",precio:parseFloat(formRes.precio)||0,contacto:formRes.contacto||"",obs:formRes.obs||"",estado:formRes.estado||"visita",creado_por:perfil.id},tok);
+      const [res]=await sbPost("reservas",{nombre:sel.nombre,fecha:formRes.fecha_evento,tipo:sel.tipo_evento||"Boda",precio:parseFloat(formRes.precio)||0,contacto:formRes.contacto||"",obs:formRes.obs||"",estado:formRes.estado||"visita",creado_por:perfil.id,contacto_id:sel.contacto_id||null},tok);
       await sbPatch("visitas",`id=eq.${sel.id}`,{estado:"convertida",reserva_id:res.id},tok);
+      if(sel.contacto_id){await sbPatch("contactos",`id=eq.${sel.contacto_id}`,{estado:"cliente",updated_at:new Date().toISOString()},tok).catch(()=>{});}
       await addHistorial("visita",sel.id,`Visita convertida en reserva para el ${new Date(formRes.fecha_evento+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"long",year:"numeric"})}`,perfil.nombre,tok);
       await addHistorial("reserva",res.id,`Reserva creada a partir de visita de ${sel.nombre}`,perfil.nombre,tok);
       setSel(prev=>({...prev,estado:"convertida",reserva_id:res.id}));
@@ -6316,6 +6645,7 @@ function Visitas({perfil,tok,rol}){
                 :<span className="badge" style={{background:"rgba(245,158,11,.1)",color:"#D4A017",border:"1px solid rgba(245,158,11,.25)"}}>🔍 Captación</span>}
                 {v.tipo_evento&&<span className="badge" style={{background:"rgba(201,168,76,.1)",color:"#EC683E"}}>🎉 {v.tipo_evento}</span>}
                 {v.invitados&&<span className="badge" style={{background:"rgba(255,255,255,.06)",color:"#8A8580"}}>👥 {v.invitados} inv.</span>}
+                {v.contacto_id&&<span className="badge" style={{background:"rgba(236,104,62,.1)",color:"#EC683E",cursor:"pointer"}} onClick={e=>{e.stopPropagation();setPage("contactos");}}>👤 Ficha</span>}
               </div>
             </div>
             <span style={{color:"#8A8580",fontSize:22,flexShrink:0}}>›</span>
@@ -6555,12 +6885,13 @@ function ReservasAirbnb({perfil,tok,rol}){
     }
     if(conflictoEncontrado){setSaving(false);setShowForm(false);setBloqueadoA(conflictoEncontrado);setFechaBloqA(fechaConflicto);return;}
     try{
-      await sbPost("reservas_airbnb",{
+      const[abNew]=await sbPost("reservas_airbnb",{
         ...form,
         personas:parseInt(form.personas)||null,
         precio:parseFloat(form.precio)||null,
         creado_por:perfil.nombre,
       },tok);
+      if(abNew)await crearContactoDesdeAirbnb({...form,...abNew},tok,perfil).catch(()=>{});
       // Notificar si llegada próximos 7 días
       const en7=new Date();en7.setDate(en7.getDate()+7);
       if(form.fecha_entrada&&form.fecha_entrada<=en7.toISOString().split("T")[0])notificarRoles(["admin","limpieza","jardinero"],`🏠 Nueva reserva Airbnb`,`${form.huesped} llega el ${new Date(form.fecha_entrada+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"long"})}`,"airbnb-nueva",tok);
