@@ -1768,7 +1768,7 @@ function DashA({reservas,jsem,jpunt,cwk,setPage,tok,perfil,rol}){
         <div className="chdr"><span className="ctit">📋 Tareas pendientes</span><span className="badge" style={{background:"rgba(236,104,62,.1)",color:"#EC683E"}}>{tareasPend.length}</span></div>
         {tareasPend.map(t=>{const hoyS=new Date().toISOString().split("T")[0];const u=!t.fecha_limite?"normal":t.fecha_limite<hoyS?"vencida":t.fecha_limite===hoyS?"hoy":"normal";const col=u==="vencida"?"#F35757":u==="hoy"?"#D4A017":"#A6BE59";
           return <div key={t.id} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 0",borderBottom:"1px solid rgba(0,0,0,.04)"}}>
-            <button className="btn bp sm" style={{flexShrink:0,padding:"4px 8px"}} onClick={async()=>{try{await sbPatch("tareas_comerciales",`id=eq.${t.id}`,{estado:"hecha",completada_por:perfil.nombre,completada_ts:new Date().toISOString()},tok);if(t.entidad_tipo&&t.entidad_id)await addHistorial(t.entidad_tipo,t.entidad_id,`Tarea completada: "${t.titulo}"`,perfil.nombre,tok);setTareasPend(prev=>prev.filter(x=>x.id!==t.id));}catch(_){}}}>✓</button>
+            <button className="btn bp sm" style={{flexShrink:0,padding:"4px 8px"}} onClick={async()=>{try{await sbPatch("tareas_comerciales",`id=eq.${t.id}`,{estado:"hecha",completada_por:perfil.nombre,completada_ts:new Date().toISOString()},tok);if(t.entidad_tipo&&t.entidad_id){await addHistorial(t.entidad_tipo,t.entidad_id,`Tarea completada: "${t.titulo}"`,perfil.nombre,tok);const cid=await getContactoDeEntidad(t.entidad_tipo,t.entidad_id,tok);if(cid)autoInteraccion(cid,["llamada","whatsapp","email"].includes(t.tipo)?t.tipo:"nota",`${({llamada:"📞",whatsapp:"💬",email:"📧",seguimiento:"📋",cobro:"💰",contrato:"📄"})[t.tipo]||"🔧"} Tarea completada: "${t.titulo}"`,"positivo",tok,perfil.nombre);}setTareasPend(prev=>prev.filter(x=>x.id!==t.id));}catch(_){}}}>✓</button>
             <div style={{flex:1,minWidth:0}}>
               <div style={{fontSize:13,fontWeight:600,color:"#1A1A1A",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{TAREA_TIPOS[t.tipo]||"📋"} {t.titulo}</div>
               <div style={{fontSize:11,color:"#8A8580"}}>{t.entidad_nombre}{t.fecha_limite?` · `:""}{t.fecha_limite&&<span style={{color:col,fontWeight:600}}>{u==="vencida"?"⚠️ ":""}📅 {new Date(t.fecha_limite+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"})}</span>}</div>
@@ -5610,7 +5610,9 @@ function TareasComerciales({entidad_tipo,entidad_id,entidad_nombre,tok,perfil,ro
   const cargar=async()=>{let q=`?entidad_tipo=eq.${entidad_tipo}&entidad_id=eq.${entidad_id}&order=fecha_limite.asc.nullslast`;if(isC&&!isA)q+=`&or=(creado_por.eq.${perfil.nombre},asignado_a.eq.${perfil.id})`;const t=await sbGet("tareas_comerciales",q+="&select=*",tok).catch(()=>[]);setTareas(t);};
   useEffect(()=>{cargar();},[entidad_id]);
   const crear=async()=>{if(!form.titulo||saving)return;setSaving(true);try{await sbPost("tareas_comerciales",{...form,entidad_tipo,entidad_id:String(entidad_id),entidad_nombre,estado:"pendiente",creado_por:perfil.nombre},tok);await addHistorial(entidad_tipo,entidad_id,`Tarea creada: "${form.titulo}"`,perfil.nombre,tok);setForm({tipo:"llamada",titulo:"",descripcion:"",fecha_limite:"",asignado_a:perfil?.id,asignado_nombre:perfil?.nombre});setShowForm(false);await cargar();}catch(_){}setSaving(false);};
-  const marcarHecha=async(t)=>{try{await sbPatch("tareas_comerciales",`id=eq.${t.id}`,{estado:"hecha",completada_por:perfil.nombre,completada_ts:new Date().toISOString()},tok);await addHistorial(entidad_tipo,entidad_id,`Tarea completada: "${t.titulo}"`,perfil.nombre,tok);await cargar();}catch(_){}};
+  const marcarHecha=async(t)=>{try{await sbPatch("tareas_comerciales",`id=eq.${t.id}`,{estado:"hecha",completada_por:perfil.nombre,completada_ts:new Date().toISOString()},tok);await addHistorial(entidad_tipo,entidad_id,`Tarea completada: "${t.titulo}"`,perfil.nombre,tok);
+    const cid=await getContactoDeEntidad(entidad_tipo,entidad_id,tok);if(cid){const TICONS={llamada:"📞",whatsapp:"💬",email:"📧",seguimiento:"📋",cobro:"💰",contrato:"📄"};const ti=["llamada","whatsapp","email"].includes(t.tipo)?t.tipo:"nota";autoInteraccion(cid,ti,`${TICONS[t.tipo]||"🔧"} Tarea completada: "${t.titulo}"`,"positivo",tok,perfil.nombre);}
+    await cargar();}catch(_){}};
   const eliminar=async(id)=>{try{await sbDelete("tareas_comerciales",`id=eq.${id}`,tok);await cargar();}catch(_){}};
   const pend=tareas.filter(t=>t.estado==="pendiente");const hechas=tareas.filter(t=>t.estado==="hecha");
   const urgencia=(t)=>{if(!t.fecha_limite)return"normal";if(t.fecha_limite<hoy)return"vencida";if(t.fecha_limite===hoy)return"hoy";const d=Math.ceil((new Date(t.fecha_limite+"T12:00:00")-new Date())/(86400000));return d<=3?"proxima":"normal";};
@@ -5706,6 +5708,7 @@ function Reservas({tok,rol,perfil}){
       }
       setReservas(prev=>prev.map(r=>r.id===id?{...r,estado:e}:r));
       setSel(p=>p?.id===id?{...p,estado:e}:p);
+      if(r?.contacto_id){const resultado=e==="cancelada"?"negativo":"neutro";autoInteraccion(r.contacto_id,"nota",`${e==="cancelada"?"❌ Reserva cancelada":"Estado de reserva actualizado"}: ${est?.lbl||e} — ${r.nombre}`,resultado,tok,perfil?.nombre);}
     }catch(_){}
   };
 
@@ -5721,6 +5724,7 @@ function Reservas({tok,rol,perfil}){
       const hoyStr=new Date().toISOString().split("T")[0];
       await sbPatch("reservas",`id=eq.${sel.id}`,{seña_importe:imp,seña_cobrada:true,seña_fecha:hoyStr,estado_pago:"seña_cobrada"},tok);
       await addHistorial("reserva",sel.id,`Seña cobrada: ${imp.toLocaleString("es-ES")}€`,perfil?.nombre||"Admin",tok);
+      autoInteraccion(sel.contacto_id,"nota",`💰 Seña cobrada: ${imp.toLocaleString("es-ES")}€ — Reserva: ${sel.nombre}`,"positivo",tok,perfil?.nombre);
       const updated={...sel,seña_importe:imp,seña_cobrada:true,seña_fecha:hoyStr,estado_pago:"seña_cobrada"};
       setReservas(prev=>prev.map(r=>r.id===sel.id?{...r,...updated}:r));
       setSel(updated);
@@ -5737,6 +5741,7 @@ function Reservas({tok,rol,perfil}){
       await sbPatch("reservas",`id=eq.${sel.id}`,{saldo_cobrado:true,saldo_fecha:hoyStr,estado_pago:"pagado_completo"},tok);
       const precioTotal=parseFloat(sel.precio_total)||parseFloat(sel.precio)||0;
       await addHistorial("reserva",sel.id,`Pago total registrado. Total: ${precioTotal.toLocaleString("es-ES")}€`,perfil?.nombre||"Admin",tok);
+      autoInteraccion(sel.contacto_id,"nota",`✅ Pago completo recibido: ${precioTotal.toLocaleString("es-ES")}€ — Reserva: ${sel.nombre}`,"positivo",tok,perfil?.nombre);
       // Auto-insertar comisión en gastos
       const configRows=await sbGet("configuracion","?select=*",tok).catch(()=>[]);
       const cfg={};configRows.forEach(c=>cfg[c.clave]=c.valor);
@@ -6180,6 +6185,18 @@ async function sincronizarContacto(contactoId,cambios,tok){
     }
   }
 }
+async function autoInteraccion(contactoId,tipo,resumen,resultado,tok,creador){
+  if(!contactoId)return;
+  await sbPost("contacto_interacciones",{contacto_id:contactoId,tipo:tipo||"nota",direccion:"salida",fecha:new Date().toISOString(),resumen,resultado:resultado||"neutro",creado_por:creador||"Sistema"},tok).catch(()=>{});
+  await sbPatch("contactos",`id=eq.${contactoId}`,{updated_at:new Date().toISOString()},tok).catch(()=>{});
+}
+async function getContactoDeEntidad(entidad_tipo,entidad_id,tok){
+  if(!entidad_tipo||!entidad_id)return null;
+  const tbl=entidad_tipo==="visita"?"visitas":entidad_tipo==="reserva"?"reservas":entidad_tipo==="airbnb"?"reservas_airbnb":null;
+  if(!tbl)return null;
+  const r=await sbGet(tbl,`?id=eq.${entidad_id}&select=contacto_id`,tok).catch(()=>[]);
+  return r[0]?.contacto_id||null;
+}
 const ICONOS_INTERACCION={llamada:"📞",whatsapp:"💬",email:"📧",visita_finca:"🏠",reunion:"🤝",nota:"📝"};
 const ESTADO_CONTACTO={lead:{lbl:"Lead",col:"#7FB2FF",ico:"🔵"},visitante:{lbl:"Visitante",col:"#D4A017",ico:"🟡"},cliente:{lbl:"Cliente",col:"#A6BE59",ico:"🟢"},recurrente:{lbl:"Recurrente",col:"#EC683E",ico:"⭐"},perdido:{lbl:"Perdido",col:"#6b7280",ico:"⚫"}};
 
@@ -6190,7 +6207,7 @@ function Contactos({perfil,tok,rol,setPage}){
   const[filtro,setFiltro]=useState("todos");const[busqueda,setBusqueda]=useState("");
   const[sel,setSel]=useState(null);const[tabDet,setTabDet]=useState("resumen");
   const[showForm,setShowForm]=useState(false);const[editando,setEditando]=useState(false);
-  const[interacciones,setInteracciones]=useState([]);const[visitasC,setVisitasC]=useState([]);const[reservasC,setReservasC]=useState([]);
+  const[interacciones,setInteracciones]=useState([]);const[visitasC,setVisitasC]=useState([]);const[reservasC,setReservasC]=useState([]);const[airbnbsC,setAirbnbsC]=useState([]);const[tareasP,setTareasP]=useState([]);
   const[showInter,setShowInter]=useState(false);
   const[showVisita,setShowVisita]=useState(false);
   const[showEstado,setShowEstado]=useState(false);
@@ -6209,12 +6226,16 @@ function Contactos({perfil,tok,rol,setPage}){
 
   const cargarDetalle=async(c)=>{
     setSel(c);setTabDet("resumen");
-    const[inter,vis,res]=await Promise.all([
-      sbGet("contacto_interacciones",`?contacto_id=eq.${c.id}&select=*&order=fecha.desc`,tok).catch(()=>[]),
+    const[inter,vis,res,abs]=await Promise.all([
+      sbGet("contacto_interacciones",`?contacto_id=eq.${c.id}&select=*&order=fecha.desc&limit=50`,tok).catch(()=>[]),
       sbGet("visitas",`?contacto_id=eq.${c.id}&select=*&order=fecha.desc`,tok).catch(()=>[]),
       sbGet("reservas",`?contacto_id=eq.${c.id}&select=*&order=fecha.desc`,tok).catch(()=>[]),
+      sbGet("reservas_airbnb",`?contacto_id=eq.${c.id}&select=*&order=fecha_entrada.desc`,tok).catch(()=>[]),
     ]);
-    setInteracciones(inter);setVisitasC(vis);setReservasC(res);
+    setInteracciones(inter);setVisitasC(vis);setReservasC(res);setAirbnbsC(abs);
+    // Cargar tareas pendientes vinculadas a visitas/reservas de este contacto
+    const entIds=[...vis.map(v=>v.id),...res.map(r=>r.id)].filter(Boolean);
+    if(entIds.length>0){const tp=await sbGet("tareas_comerciales",`?entidad_id=in.(${entIds.join(",")})&estado=eq.pendiente&select=*`,tok).catch(()=>[]);setTareasP(tp);}else{setTareasP([]);}
   };
 
   const guardar=async()=>{
@@ -6315,29 +6336,39 @@ function Contactos({perfil,tok,rol,setPage}){
         <button className={`tab${tabDet==="resumen"?" on":""}`} onClick={()=>setTabDet("resumen")}>Resumen</button>
         <button className={`tab${tabDet==="interacciones"?" on":""}`} onClick={()=>setTabDet("interacciones")}>Interacciones ({interacciones.length})</button>
         <button className={`tab${tabDet==="visitas"?" on":""}`} onClick={()=>setTabDet("visitas")}>Visitas ({visitasC.length})</button>
-        <button className={`tab${tabDet==="reservas"?" on":""}`} onClick={()=>setTabDet("reservas")}>Reservas ({reservasC.length})</button>
+        <button className={`tab${tabDet==="reservas"?" on":""}`} onClick={()=>setTabDet("reservas")}>Reservas ({reservasC.length+airbnbsC.length})</button>
       </div>
 
-      {tabDet==="resumen"&&<div className="card">
-        <div className="sg">
-          <SC lbl="Valor generado" val={`${reservasC.reduce((s,r)=>s+(parseFloat(r.precio)||0),0).toLocaleString("es-ES")}€`}/>
-          <SC lbl="Reservas" val={reservasC.length}/>
-          <SC lbl="Visitas" val={visitasC.length}/>
-          <SC lbl="Interacciones" val={interacciones.length}/>
-        </div>
-        {sel.notas&&<div style={{marginTop:14,padding:"10px 12px",background:"#F5F3F0",borderRadius:8,fontSize:13,color:"#1A1A1A"}}>{sel.notas}</div>}
-      </div>}
+      {tabDet==="resumen"&&(()=>{const valorTotal=[...reservasC,...airbnbsC].reduce((s,r)=>s+getPrecioReserva(r),0);const completadas=interacciones.filter(i=>i.resultado==="positivo").length;const ultimaFecha=interacciones[0]?.fecha;
+        return <div className="card">
+          <div className="sg">
+            <SC lbl="Valor total generado" val={`${valorTotal.toLocaleString("es-ES")}€`}/>
+            <SC lbl="Reservas" val={reservasC.length+airbnbsC.length}/>
+            <SC lbl="Visitas realizadas" val={visitasC.filter(v=>v.estado==="realizada"||v.estado==="convertida").length}/>
+            <SC lbl="Interacciones" val={interacciones.length}/>
+          </div>
+          <div style={{display:"flex",gap:16,flexWrap:"wrap",fontSize:13,marginTop:14,padding:"10px 12px",background:"#F5F3F0",borderRadius:8}}>
+            <span>✅ Tareas completadas: <strong>{completadas}</strong></span>
+            <span>⏳ Tareas pendientes: <strong>{tareasP.length}</strong></span>
+            <span>📅 Última interacción: <strong>{ultimaFecha?tiempoDesde(ultimaFecha):"—"}</strong></span>
+          </div>
+          {sel.notas&&<div style={{marginTop:10,padding:"10px 12px",background:"#F5F3F0",borderRadius:8,fontSize:13,color:"#1A1A1A"}}>{sel.notas}</div>}
+        </div>;})()}
 
       {tabDet==="interacciones"&&<div className="card">
         <button className="btn bp sm" style={{marginBottom:12}} onClick={()=>{setFormInter(formInterVacio);setShowInter(true);}}>+ Registrar interacción</button>
         {interacciones.length===0?<div className="empty"><span className="ico">📝</span><p>Sin interacciones registradas</p></div>
-        :interacciones.map(i=>{const rc=i.resultado==="positivo"?"#A6BE59":i.resultado==="negativo"?"#F35757":i.resultado==="sin_respuesta"?"#D4A017":"#8A8580";
-          return <div key={i.id} style={{padding:"10px 0",borderBottom:"1px solid rgba(0,0,0,.04)"}}>
-            <div style={{display:"flex",gap:8,alignItems:"center"}}>
-              <span style={{fontSize:16}}>{ICONOS_INTERACCION[i.tipo]||"📝"}</span>
-              <div style={{flex:1}}>
-                <div style={{fontSize:13,fontWeight:600,color:"#1A1A1A"}}>{i.resumen}</div>
-                <div style={{fontSize:11,color:"#8A8580",marginTop:3}}>{i.fecha?new Date(i.fecha).toLocaleDateString("es-ES",{day:"numeric",month:"short",year:"numeric"}):"—"} · {i.direccion==="entrada"?"⬅ Entrada":"➡ Salida"} · <span style={{color:rc}}>{i.resultado}</span>{i.creado_por?` · ${i.creado_por}`:""}</div>
+        :interacciones.map(i=>{const rc=i.resultado==="positivo"?"#A6BE59":i.resultado==="negativo"?"#F35757":i.resultado==="sin_respuesta"?"#ECD227":"#8A8580";
+          return <div key={i.id} style={{display:"flex",gap:10,padding:"10px 0",borderBottom:"1px solid rgba(0,0,0,.04)"}}>
+            <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:2,width:32,flexShrink:0}}>
+              <span style={{fontSize:18}}>{ICONOS_INTERACCION[i.tipo]||"📝"}</span>
+              <div style={{width:2,flex:1,background:"rgba(0,0,0,.06)"}}/>
+            </div>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:11,color:"#BFBAB4",marginBottom:3}}>{i.fecha?tiempoDesde(i.fecha):"—"} — {i.creado_por||"Sistema"}</div>
+              <div style={{fontSize:13,color:"#1A1A1A",lineHeight:1.4}}>{i.resumen}</div>
+              <div style={{display:"flex",gap:6,marginTop:4}}>
+                <span className="badge" style={{background:`${rc}18`,color:rc,fontSize:10}}>{i.resultado==="positivo"?"✅ positivo":i.resultado==="negativo"?"❌ negativo":i.resultado==="sin_respuesta"?"📵 sin respuesta":"➖ neutro"}</span>
               </div>
             </div>
           </div>;})}
@@ -6352,11 +6383,21 @@ function Contactos({perfil,tok,rol,setPage}){
       </div>}
 
       {tabDet==="reservas"&&<div className="card">
-        {reservasC.length===0?<div className="empty"><span className="ico">📋</span><p>Sin reservas vinculadas</p></div>
-        :reservasC.map(r=><div key={r.id} style={{padding:"10px 0",borderBottom:"1px solid rgba(0,0,0,.04)",cursor:"pointer"}} onClick={()=>setPage("reservas")}>
-          <div style={{fontSize:13,fontWeight:600,color:"#1A1A1A"}}>{r.nombre} — {new Date(r.fecha+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"long",year:"numeric"})}</div>
-          <div style={{fontSize:12,color:"#8A8580",marginTop:3}}>{r.estado} · {(parseFloat(r.precio)||0).toLocaleString("es-ES")}€</div>
-        </div>)}
+        {reservasC.length===0&&airbnbsC.length===0?<div className="empty"><span className="ico">📋</span><p>Sin reservas vinculadas</p></div>:<>
+          {reservasC.map(r=><div key={`r-${r.id}`} style={{padding:"10px 0",borderBottom:"1px solid rgba(0,0,0,.04)",cursor:"pointer"}} onClick={()=>setPage("reservas")}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <div><div style={{fontSize:13,fontWeight:600,color:"#1A1A1A"}}>{r.nombre}</div><div style={{fontSize:12,color:"#8A8580",marginTop:3}}>📅 {new Date(r.fecha+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"long",year:"numeric"})} · {r.estado}</div></div>
+              <div style={{fontSize:14,fontWeight:700,color:"#EC683E"}}>{getPrecioReserva(r).toLocaleString("es-ES")}€</div>
+            </div>
+          </div>)}
+          {airbnbsC.map(a=><div key={`a-${a.id}`} style={{padding:"10px 0",borderBottom:"1px solid rgba(0,0,0,.04)",cursor:"pointer"}} onClick={()=>setPage("airbnb")}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <div><div style={{fontSize:13,fontWeight:600,color:"#1A1A1A"}}>🏠 {a.huesped}</div><div style={{fontSize:12,color:"#8A8580",marginTop:3}}>📅 {a.fecha_entrada} → {a.fecha_salida}</div></div>
+              <div style={{fontSize:14,fontWeight:700,color:"#10b981"}}>{getPrecioReserva(a).toLocaleString("es-ES")}€</div>
+            </div>
+          </div>)}
+          <div style={{marginTop:10,padding:"10px 12px",background:"#F5F3F0",borderRadius:8,fontSize:13,fontWeight:600,display:"flex",justifyContent:"space-between"}}><span>💰 Valor total</span><span style={{color:"#EC683E"}}>{[...reservasC,...airbnbsC].reduce((s,r)=>s+getPrecioReserva(r),0).toLocaleString("es-ES")}€</span></div>
+        </>}
       </div>}
 
       {/* MODAL CAMBIAR ESTADO */}
@@ -6545,6 +6586,7 @@ function Visitas({perfil,tok,rol,setPage}){
       await sbPatch("visitas",`id=eq.${sel.id}`,{estado:"realizada"},tok);
       await addHistorial("visita",sel.id,"Visita realizada en la finca",perfil.nombre,tok);
       if(sel.es_coordinacion&&sel.reserva_id)await addHistorial("reserva",sel.reserva_id,`Visita de coordinación realizada: ${sel.motivo_visita||sel.tipo_evento||"Coordinación"}`,perfil.nombre,tok);
+      autoInteraccion(sel.contacto_id,"visita_finca",`Visita realizada el ${new Date(sel.fecha+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"long"})}`,"positivo",tok,perfil.nombre);
       setSel(prev=>({...prev,estado:"realizada"}));await load_();
     }catch(_){}
   };
@@ -6555,6 +6597,7 @@ function Visitas({perfil,tok,rol,setPage}){
     try{
       await sbPatch("visitas",`id=eq.${sel.id}`,{estado:"no_presentado"},tok);
       await addHistorial("visita",sel.id,"El cliente no se presentó a la visita",perfil.nombre,tok);
+      autoInteraccion(sel.contacto_id,"visita_finca","Visita cancelada: el cliente no se presentó","negativo",tok,perfil.nombre);
       setShowNoPresentado(false);
       if(accion==="reprogramar"){
         setForm({nombre:sel.nombre,fecha:hoy,hora:sel.hora?.slice(0,5)||"10:00",tipo_evento:sel.tipo_evento||"Boda",invitados:sel.invitados||"",telefono:sel.telefono||"",email:sel.email||"",nota:sel.nota||""});
@@ -6582,7 +6625,10 @@ function Visitas({perfil,tok,rol,setPage}){
     try{
       const [res]=await sbPost("reservas",{nombre:sel.nombre,fecha:formRes.fecha_evento,tipo:sel.tipo_evento||"Boda",precio:parseFloat(formRes.precio)||0,contacto:formRes.contacto||"",obs:formRes.obs||"",estado:formRes.estado||"visita",creado_por:perfil.id,contacto_id:sel.contacto_id||null},tok);
       await sbPatch("visitas",`id=eq.${sel.id}`,{estado:"convertida",reserva_id:res.id},tok);
-      if(sel.contacto_id){await sbPatch("contactos",`id=eq.${sel.contacto_id}`,{estado:"cliente",updated_at:new Date().toISOString()},tok).catch(()=>{});}
+      if(sel.contacto_id){
+        await sbPatch("contactos",`id=eq.${sel.contacto_id}`,{estado:"cliente",updated_at:new Date().toISOString()},tok).catch(()=>{});
+        autoInteraccion(sel.contacto_id,"nota",`✅ Visita convertida en reserva: ${sel.nombre} — ${new Date(formRes.fecha_evento+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"long",year:"numeric"})} — ${parseFloat(formRes.precio)||0}€`,"positivo",tok,perfil.nombre);
+      }
       await addHistorial("visita",sel.id,`Visita convertida en reserva para el ${new Date(formRes.fecha_evento+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"long",year:"numeric"})}`,perfil.nombre,tok);
       await addHistorial("reserva",res.id,`Reserva creada a partir de visita de ${sel.nombre}`,perfil.nombre,tok);
       setSel(prev=>({...prev,estado:"convertida",reserva_id:res.id}));
@@ -6601,6 +6647,7 @@ function Visitas({perfil,tok,rol,setPage}){
         await addHistorial("reserva",sel.reserva_id,`Reserva cancelada: ${notaCancelacion}`,perfil.nombre,tok);
       }
       await addHistorial("visita",sel.id,`Reserva cancelada: ${notaCancelacion}`,perfil.nombre,tok);
+      autoInteraccion(sel.contacto_id,"nota",`❌ Reserva cancelada: ${sel.nombre} — ${notaCancelacion}`,"negativo",tok,perfil.nombre);
       setSel(prev=>({...prev,estado:"reserva_cancelada",nota_cancelacion:notaCancelacion}));
       setShowRevertir(false);setNotaCancelacion("");await load_();
     }catch(_){}
