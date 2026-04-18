@@ -5640,6 +5640,7 @@ function TareasComerciales({entidad_tipo,entidad_id,entidad_nombre,tok,perfil,ro
     await cargar();}catch(_){}};
   const eliminar=async(id)=>{try{await sbDelete("tareas_comerciales",`id=eq.${id}`,tok);await cargar();}catch(_){}};
   const pend=tareas.filter(t=>t.estado==="pendiente");const hechas=tareas.filter(t=>t.estado==="hecha");
+  console.log("Render TareasComerciales:",{totalTareas:tareas.length,pendientes:pend.length,hechas:hechas.length,estadosUnicos:[...new Set(tareas.map(t=>t.estado))]});
   const urgencia=(t)=>{if(!t.fecha_limite)return"normal";if(t.fecha_limite<hoy)return"vencida";if(t.fecha_limite===hoy)return"hoy";const d=Math.ceil((new Date(t.fecha_limite+"T12:00:00")-new Date())/(86400000));return d<=3?"proxima":"normal";};
   const colUrg={vencida:"#F35757",hoy:"#D4A017",proxima:"#D4A017",normal:"#A6BE59"};
   return <div style={{marginTop:16,borderTop:"1px solid rgba(0,0,0,.06)",paddingTop:14}}>
