@@ -5609,7 +5609,13 @@ function TareasComerciales({entidad_tipo,entidad_id,entidad_nombre,tok,perfil,ro
   const hoy=new Date().toISOString().split("T")[0];
   const cargar=async()=>{let q=`?entidad_tipo=eq.${entidad_tipo}&entidad_id=eq.${entidad_id}&order=fecha_limite.asc.nullslast`;if(isC&&!isA)q+=`&or=(creado_por.eq.${perfil.nombre},asignado_a.eq.${perfil.id})`;const t=await sbGet("tareas_comerciales",q+="&select=*",tok).catch(()=>[]);setTareas(t);};
   useEffect(()=>{cargar();},[entidad_id]);
-  const crear=async()=>{if(!form.titulo||saving)return;setSaving(true);try{await sbPost("tareas_comerciales",{...form,entidad_tipo,entidad_id:String(entidad_id),entidad_nombre,estado:"pendiente",creado_por:perfil.nombre},tok);await addHistorial(entidad_tipo,entidad_id,`Tarea creada: "${form.titulo}"`,perfil.nombre,tok);setForm({tipo:"llamada",titulo:"",descripcion:"",fecha_limite:"",asignado_a:perfil?.id,asignado_nombre:perfil?.nombre});setShowForm(false);await cargar();}catch(_){}setSaving(false);};
+  const crear=async()=>{if(!form.titulo||saving)return;setSaving(true);try{
+    const body={tipo:form.tipo||"otro",titulo:form.titulo,entidad_tipo,entidad_id:String(entidad_id),entidad_nombre:entidad_nombre||"",estado:"pendiente",creado_por:perfil?.nombre||"Admin",asignado_a:form.asignado_a||perfil?.id||null,asignado_nombre:form.asignado_nombre||perfil?.nombre||null};
+    if(form.descripcion)body.descripcion=form.descripcion;
+    if(form.fecha_limite)body.fecha_limite=form.fecha_limite;
+    await sbPost("tareas_comerciales",body,tok);
+    await addHistorial(entidad_tipo,entidad_id,`Tarea creada: "${form.titulo}"`,perfil?.nombre||"Admin",tok);
+    setForm({tipo:"llamada",titulo:"",descripcion:"",fecha_limite:"",asignado_a:perfil?.id,asignado_nombre:perfil?.nombre});setShowForm(false);await cargar();}catch(e){console.error("Error crear tarea:",e);}setSaving(false);};
   const marcarHecha=async(t)=>{try{await sbPatch("tareas_comerciales",`id=eq.${t.id}`,{estado:"hecha",completada_por:perfil.nombre,completada_ts:new Date().toISOString()},tok);await addHistorial(entidad_tipo,entidad_id,`Tarea completada: "${t.titulo}"`,perfil.nombre,tok);
     const cid=await getContactoDeEntidad(entidad_tipo,entidad_id,tok);if(cid){const TICONS={llamada:"📞",whatsapp:"💬",email:"📧",seguimiento:"📋",cobro:"💰",contrato:"📄"};const ti=["llamada","whatsapp","email"].includes(t.tipo)?t.tipo:"nota";autoInteraccion(cid,ti,`${TICONS[t.tipo]||"🔧"} Tarea completada: "${t.titulo}"`,"positivo",tok,perfil.nombre);}
     await cargar();}catch(_){}};
