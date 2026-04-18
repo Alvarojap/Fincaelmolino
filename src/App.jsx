@@ -5607,15 +5607,31 @@ function TareasComerciales({entidad_tipo,entidad_id,entidad_nombre,tok,perfil,ro
   const[tareas,setTareas]=useState([]);const[showForm,setShowForm]=useState(false);const[saving,setSaving]=useState(false);
   const[form,setForm]=useState({tipo:"llamada",titulo:"",descripcion:"",fecha_limite:"",asignado_a:perfil?.id,asignado_nombre:perfil?.nombre});
   const hoy=new Date().toISOString().split("T")[0];
-  const cargar=async()=>{let q=`?entidad_tipo=eq.${entidad_tipo}&entidad_id=eq.${entidad_id}&order=fecha_limite.asc.nullslast`;if(isC&&!isA)q+=`&or=(creado_por.eq.${perfil.nombre},asignado_a.eq.${perfil.id})`;const t=await sbGet("tareas_comerciales",q+="&select=*",tok).catch(()=>[]);setTareas(t);};
-  useEffect(()=>{cargar();},[entidad_id]);
-  const crear=async()=>{if(!form.titulo||saving)return;setSaving(true);try{
-    const body={tipo:form.tipo||"otro",titulo:form.titulo,entidad_tipo,entidad_id:String(entidad_id),entidad_nombre:entidad_nombre||"",estado:"pendiente",creado_por:perfil?.nombre||"Admin",asignado_a:form.asignado_a||perfil?.id||null,asignado_nombre:form.asignado_nombre||perfil?.nombre||null};
-    if(form.descripcion)body.descripcion=form.descripcion;
-    if(form.fecha_limite)body.fecha_limite=form.fecha_limite;
-    await sbPost("tareas_comerciales",body,tok);
-    await addHistorial(entidad_tipo,entidad_id,`Tarea creada: "${form.titulo}"`,perfil?.nombre||"Admin",tok);
-    setForm({tipo:"llamada",titulo:"",descripcion:"",fecha_limite:"",asignado_a:perfil?.id,asignado_nombre:perfil?.nombre});setShowForm(false);await cargar();}catch(e){console.error("Error crear tarea:",e);}setSaving(false);};
+  const cargar=async()=>{
+    const tokenQ=perfil?.es_operario?SB_KEY:tok;
+    const q=`?entidad_tipo=eq.${entidad_tipo}&entidad_id=eq.${entidad_id}&order=created_at.desc&select=*`;
+    console.log("TareasComerciales cargar query:",q);
+    const t=await sbGet("tareas_comerciales",q,tokenQ).catch(e=>{console.error("Error cargando tareas:",e);return[];});
+    console.log("Tareas encontradas:",t.length,t);
+    setTareas(t);
+  };
+  useEffect(()=>{console.log("TareasComerciales montado:",{entidad_tipo,entidad_id,tok:tok?"ok":"MISSING",perfil:perfil?.nombre});cargar();},[entidad_id]);
+  const crear=async()=>{
+    console.log("Intentando crear tarea:",{titulo:form.titulo,tipo:form.tipo,entidad_tipo,entidad_id:String(entidad_id),saving});
+    if(!form.titulo){console.log("BLOQUEADO: sin título");return;}
+    if(saving){console.log("BLOQUEADO: saving");return;}
+    setSaving(true);
+    const tokenQ=perfil?.es_operario?SB_KEY:tok;
+    try{
+      const body={tipo:form.tipo||"otro",titulo:form.titulo,descripcion:form.descripcion||"",entidad_tipo,entidad_id:String(entidad_id),entidad_nombre:entidad_nombre||"",estado:"pendiente",fecha_limite:form.fecha_limite||null,asignado_a:form.asignado_a||perfil?.id||"",asignado_nombre:form.asignado_nombre||perfil?.nombre||"",creado_por:perfil?.nombre||"Admin"};
+      console.log("POST body:",JSON.stringify(body));
+      const result=await sbPost("tareas_comerciales",body,tokenQ);
+      console.log("Resultado crear tarea:",JSON.stringify(result));
+      await addHistorial(entidad_tipo,entidad_id,`Tarea creada: "${form.titulo}"`,perfil?.nombre||"Admin",tokenQ).catch(()=>{});
+      setForm({tipo:"llamada",titulo:"",descripcion:"",fecha_limite:"",asignado_a:perfil?.id,asignado_nombre:perfil?.nombre});setShowForm(false);await cargar();
+    }catch(e){console.error("Error crear tarea:",e.message,e);}
+    setSaving(false);
+  };
   const marcarHecha=async(t)=>{try{
     await sbPatch("tareas_comerciales",`id=eq.${t.id}`,{estado:"hecha",completada_por:perfil.nombre,completada_ts:new Date().toISOString()},tok);
     await addHistorial(entidad_tipo,entidad_id,`Tarea completada: "${t.titulo}"`,perfil.nombre,tok).catch(()=>{});
