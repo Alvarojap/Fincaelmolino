@@ -6759,7 +6759,7 @@ function Visitas({perfil,tok,rol,setPage}){
 
     {/* MODAL DETALLE VISITA */}
     {sel&&!showConvertir&&!showNoPresentado&&!showRevertir&&<div className="ov" onClick={()=>setSel(null)}>
-      <div className="modal" style={{maxWidth:560}} onClick={e=>e.stopPropagation()}>
+      <div className="modal" style={{maxWidth:560,maxHeight:"92vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:16,gap:8}}>
           <div style={{minWidth:0}}>
             <h3 style={{marginBottom:6}}>{sel.nombre}</h3>
@@ -6815,6 +6815,7 @@ function Visitas({perfil,tok,rol,setPage}){
 
         {sel.creado_por&&<div style={{marginTop:12,fontSize:11,color:"#BFBAB4",textAlign:"right"}}>Creada por {sel.creado_por}</div>}
 
+        {console.log("Renderizando TareasComerciales visita:",{id:sel.id,nombre:sel.nombre,tok:tok?"ok":"MISSING"})}
         <TareasComerciales entidad_tipo="visita" entidad_id={sel.id} entidad_nombre={sel.nombre} tok={tok} perfil={perfil} rol={rol}/>
         <Historial entidad_tipo="visita" entidad_id={sel.id} tok={tok} perfil={perfil}/>
         <Documentos entidad_tipo="visita" entidad_id={sel.id} tok={tok} perfil={perfil}/>
