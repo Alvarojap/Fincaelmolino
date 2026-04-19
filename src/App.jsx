@@ -387,6 +387,11 @@ function Wordmark({size=17,color="#1A1A1A"}){
   </div>;
 }
 
+const FmIcon=({name,size=20,stroke="currentColor",sw=2})=>{
+  const P={eye:<><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></>,chevL:<><path d="m15 6-6 6 6 6"/></>,chevR:<><path d="m9 6 6 6-6 6"/></>,chevD:<><path d="m6 9 6 6 6-6"/></>,plus:<><path d="M12 5v14M5 12h14"/></>,check:<><path d="m5 12 5 5L20 7"/></>,x:<><path d="M6 6l12 12M18 6 6 18"/></>,search:<><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></>,filter:<><path d="M3 5h18l-7 9v5l-4 2v-7L3 5Z"/></>,bell:<><path d="M18 16v-5a6 6 0 1 0-12 0v5l-2 2h16l-2-2Z"/><path d="M10 20a2 2 0 0 0 4 0"/></>,home:<><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v10h14V10"/></>,calendar:<><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></>,users:<><circle cx="9" cy="8" r="3.5"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17" cy="9" r="2.5"/><path d="M15 20c.1-2.2 1.5-4 4-4 1.3 0 2.4.5 3 1.5"/></>,box:<><path d="M3 7.5 12 3l9 4.5v9L12 21l-9-4.5v-9Z"/><path d="M3 7.5 12 12l9-4.5M12 12v9"/></>,chart:<><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></>,settings:<><circle cx="12" cy="12" r="3"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></>,edit:<><path d="M4 20h4L20 8l-4-4L4 16v4Z"/></>,arrow:<><path d="M5 12h14M13 6l6 6-6 6"/></>,warn:<><path d="M12 3 2 21h20L12 3Z"/><path d="M12 10v5M12 18h.01"/></>,phone:<><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2Z"/></>,mail:<><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></>,more:<><circle cx="5" cy="12" r="1.6" fill={stroke} stroke="none"/><circle cx="12" cy="12" r="1.6" fill={stroke} stroke="none"/><circle cx="19" cy="12" r="1.6" fill={stroke} stroke="none"/></>,clock:<><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></>,euro:<><path d="M17 6a7 7 0 1 0 0 12"/><path d="M4 10h9M4 14h9"/></>,leaf:<><path d="M20 4c-10 0-16 4-16 12a4 4 0 0 0 4 4c8 0 12-6 12-16Z"/><path d="M4 20 14 10"/></>,camera:<><path d="M4 8h3l2-2h6l2 2h3a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2Z"/><circle cx="12" cy="13" r="4"/></>,menu:<><path d="M4 6h16M4 12h16M4 18h16"/></>};
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round">{P[name]||null}</svg>;
+};
+
 // ─── ICON COMPONENT ──────────────────────────────────────────────────────────
 const ICON_PATHS={
   dashboard:`<path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>`,
@@ -830,9 +835,14 @@ function LoginScreen({onLogin,onLoginOperario,desactivado}){
   };
   const delDigit=()=>{setPin(p=>p.slice(0,-1));setPinErr(false);};
 
-  return <div className="lw"><div className="lbg"/>
-    {modo==="admin"&&<div className="lc">
-      <div className="llo">
+  const modoTab=modo==="admin"?"email":"pin";
+  const setModoTab=(m)=>{if(m==="email")setModo("admin");else cargarOperarios();};
+
+  return <div style={{height:"100vh",height:"100dvh",display:"flex",flexDirection:"column",background:T.bg,fontFamily:T.sans}}>
+    <div style={{flex:1,padding:"80px 28px 20px",display:"flex",flexDirection:"column",maxWidth:400,margin:"0 auto",width:"100%"}}>
+
+      {/* Logo */}
+      <div style={{textAlign:"center",marginBottom:36}}>
         <div style={{display:"inline-flex",flexDirection:"column",alignItems:"center",gap:12}}>
           <LogoMark size={44}/>
           <div>
@@ -841,63 +851,76 @@ function LoginScreen({onLogin,onLoginOperario,desactivado}){
           </div>
         </div>
       </div>
-      {desactivado&&<div className="alert">Tu acceso ha sido desactivado. Contacta con el administrador.</div>}
-      {err&&<div className="alert">{err}</div>}
-      <div className="fg"><label>Correo electrónico</label>
-        <input className="fi" type="email" inputMode="email" autoComplete="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="tu@email.com"/>
-      </div>
-      <div className="fg"><label>Contraseña</label>
-        <input className="fi" type="password" autoComplete="current-password" value={pass} onChange={e=>setPass(e.target.value)} onKeyDown={e=>e.key==="Enter"&&go()} placeholder="••••••••"/>
-      </div>
-      <button className="btn bp" style={{width:"100%",justifyContent:"center",marginTop:4}} onClick={go} disabled={load}>
-        {load?<><div className="spin" style={{width:16,height:16,borderWidth:2}}/> Entrando…</>:"Entrar →"}
-      </button>
-      <div style={{display:"flex",alignItems:"center",gap:12,margin:"24px 0 16px"}}>
-        <div style={{flex:1,height:1,background:"rgba(0,0,0,.08)"}}/><span style={{fontSize:11,color:"#BFBAB4",fontWeight:600}}>o accede como operario</span><div style={{flex:1,height:1,background:"rgba(0,0,0,.08)"}}/>
-      </div>
-      <button className="btn bg" style={{width:"100%",justifyContent:"center",fontSize:14,padding:"12px"}} onClick={cargarOperarios}>
-        <Icon name="users" size={18} color="#8A8580"/> Soy del equipo
-      </button>
-    </div>}
 
-    {modo==="seleccion"&&<div className="lc" style={{maxWidth:420}}>
-      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:24}}>
-        <button className="btn bg sm" onClick={()=>setModo("admin")}><Icon name="back" size={16}/></button>
-        <div style={{fontSize:18,fontWeight:800,color:"#1A1A1A"}}>Selecciona tu perfil</div>
-      </div>
-      {opLoad?<div className="loading"><div className="spin"/></div>
-      :operarios.length===0?<div style={{textAlign:"center",color:"#8A8580",padding:"20px 0"}}>No hay operarios registrados</div>
-      :<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(110px,1fr))",gap:12}}>
-        {operarios.map(op=>(
-          <button key={op.id} onClick={()=>seleccionarOp(op)} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:8,padding:"18px 12px",background:"#F5F3F0",borderRadius:16,border:"none",cursor:"pointer",transition:"all .15s ease",fontFamily:"'Inter Tight',sans-serif"}}>
-            <div style={{width:52,height:52,borderRadius:"50%",background:"linear-gradient(135deg,#EC683E,#AFA3FF)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,fontWeight:700,color:"#fff"}}>{op.avatar||op.nombre.slice(0,2).toUpperCase()}</div>
-            <div style={{fontSize:13,fontWeight:600,color:"#1A1A1A",textAlign:"center"}}>{op.nombre}</div>
-            <span className="badge" style={{background:op.rol==="jardinero"?"rgba(166,190,89,.15)":"rgba(175,163,255,.15)",color:op.rol==="jardinero"?"#6B8A20":"#7B6FCC",fontSize:10}}>{op.rol==="jardinero"?"Jardinero":"Limpieza"}</span>
-          </button>
+      {/* Tab Admin / Personal */}
+      {modo!=="pin"&&<div style={{display:"flex",background:T.surface,borderRadius:999,padding:4,border:`1px solid ${T.line}`,marginBottom:22}}>
+        {[["email","Admin"],["pin","Personal"]].map(([k,l])=>(
+          <button key={k} onClick={()=>setModoTab(k)} style={{flex:1,padding:"10px 0",borderRadius:999,border:0,background:modoTab===k?T.ink:"transparent",color:modoTab===k?T.surface:T.ink3,fontFamily:T.sans,fontWeight:600,fontSize:13,cursor:"pointer",letterSpacing:-.1,transition:"all .15s"}}>{l}</button>
         ))}
       </div>}
-    </div>}
 
-    {modo==="pin"&&selOp&&<div className="lc" style={{maxWidth:340,textAlign:"center"}}>
-      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:24}}>
-        <button className="btn bg sm" onClick={()=>setModo("seleccion")}><Icon name="back" size={16}/></button>
-        <div style={{fontSize:16,fontWeight:700,color:"#1A1A1A"}}>{selOp.nombre}</div>
-      </div>
-      <div style={{width:60,height:60,borderRadius:"50%",background:"linear-gradient(135deg,#EC683E,#AFA3FF)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,fontWeight:700,color:"#fff",margin:"0 auto 16px"}}>{selOp.avatar||selOp.nombre.slice(0,2).toUpperCase()}</div>
-      <div style={{fontSize:14,color:"#8A8580",marginBottom:20}}>Introduce tu PIN</div>
-      <div style={{display:"flex",justifyContent:"center",gap:14,marginBottom:28,animation:pinErr?"shake .3s ease":"none"}}>
-        {[0,1,2,3].map(i=><div key={i} style={{width:18,height:18,borderRadius:"50%",background:pin.length>i?"#1A1A1A":"transparent",border:`2.5px solid ${pinErr?"#F35757":pin.length>i?"#1A1A1A":"#BFBAB4"}`,transition:"all .15s ease"}}/>)}
-      </div>
-      <style>{`@keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-8px)}40%,80%{transform:translateX(8px)}}`}</style>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,maxWidth:240,margin:"0 auto"}}>
-        {[1,2,3,4,5,6,7,8,9,null,0,"del"].map((d,i)=>(
-          d===null?<div key={i}/>:
-          <button key={i} onClick={()=>d==="del"?delDigit():addDigit(String(d))} style={{width:64,height:64,borderRadius:16,border:"none",background:d==="del"?"transparent":"#F5F3F0",cursor:"pointer",fontSize:d==="del"?16:24,fontWeight:700,color:"#1A1A1A",fontFamily:"'Inter Tight',sans-serif",display:"flex",alignItems:"center",justifyContent:"center",transition:"all .1s ease",margin:"0 auto"}}>
-            {d==="del"?<Icon name="back" size={20} color="#8A8580"/>:d}
-          </button>
-        ))}
-      </div>
-    </div>}
+      {/* Modo Admin — email + password */}
+      {modo==="admin"&&<div>
+        {desactivado&&<div style={{color:T.danger,fontSize:13,marginBottom:12,textAlign:"center",padding:"10px 14px",background:"rgba(217,68,58,.06)",borderRadius:T.r.sm}}>Tu acceso ha sido desactivado.</div>}
+        <label style={{display:"block",fontSize:11,fontWeight:600,color:T.ink3,textTransform:"uppercase",letterSpacing:1,marginBottom:6}}>Email</label>
+        <div style={{marginBottom:14}}>
+          <input value={email} onChange={e=>setEmail(e.target.value)} type="email" inputMode="email" autoComplete="email" placeholder="nombre@fincamolino.es" style={{width:"100%",boxSizing:"border-box",padding:"14px 16px",borderRadius:T.r.md,border:`1px solid ${T.line}`,background:T.surface,fontFamily:T.sans,fontSize:14,color:T.ink,outline:"none",transition:"border-color .15s"}} onFocus={e=>e.target.style.borderColor=T.terracotta} onBlur={e=>e.target.style.borderColor=T.line}/>
+        </div>
+        <label style={{display:"block",fontSize:11,fontWeight:600,color:T.ink3,textTransform:"uppercase",letterSpacing:1,marginBottom:6}}>Contraseña</label>
+        <div style={{marginBottom:20,position:"relative"}}>
+          <input type="password" value={pass} onChange={e=>setPass(e.target.value)} onKeyDown={e=>e.key==="Enter"&&go()} autoComplete="current-password" placeholder="••••••••" style={{width:"100%",boxSizing:"border-box",padding:"14px 16px",paddingRight:44,borderRadius:T.r.md,border:`1px solid ${T.line}`,background:T.surface,fontFamily:T.sans,fontSize:14,color:T.ink,outline:"none",transition:"border-color .15s"}} onFocus={e=>e.target.style.borderColor=T.terracotta} onBlur={e=>e.target.style.borderColor=T.line}/>
+          <span style={{position:"absolute",right:14,top:"50%",transform:"translateY(-50%)",opacity:.4}}><FmIcon name="eye" size={18} stroke={T.ink3}/></span>
+        </div>
+        {err&&<div style={{color:T.danger,fontSize:13,marginBottom:12,textAlign:"center"}}>{err}</div>}
+        <button onClick={go} disabled={load} style={{width:"100%",padding:"16px 0",borderRadius:999,border:0,background:load?T.ink3:T.ink,color:"white",fontFamily:T.sans,fontWeight:700,fontSize:15,letterSpacing:-.2,cursor:load?"default":"pointer",transition:"all .15s"}}>
+          {load?<><div className="spin" style={{width:16,height:16,borderWidth:2}}/> Entrando…</>:"Entrar"}
+        </button>
+      </div>}
+
+      {/* Modo selección operario */}
+      {modo==="seleccion"&&<div>
+        <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:20}}>
+          <button onClick={()=>setModo("admin")} style={{background:"transparent",border:`1px solid ${T.line}`,borderRadius:999,width:36,height:36,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}><FmIcon name="chevL" size={16} stroke={T.ink}/></button>
+          <div style={{fontSize:13,color:T.ink2}}>Selecciona tu perfil</div>
+        </div>
+        {opLoad?<div className="loading"><div className="spin"/></div>
+        :operarios.length===0?<div style={{textAlign:"center",color:T.ink3,padding:"20px 0"}}>No hay operarios registrados</div>
+        :<div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10}}>
+          {operarios.map(op=>{const col=op.rol==="jardinero"?T.olive:T.lavender;return(
+            <button key={op.id} onClick={()=>seleccionarOp(op)} style={{background:T.surface,border:`1px solid ${T.line}`,borderRadius:T.r.md,padding:"12px 4px",display:"flex",flexDirection:"column",alignItems:"center",gap:6,cursor:"pointer",transition:"all .15s",fontFamily:T.sans}}>
+              <div style={{width:44,height:44,borderRadius:999,background:col,color:T.ink,fontWeight:700,fontSize:17,display:"flex",alignItems:"center",justifyContent:"center"}}>{op.avatar||op.nombre?.slice(0,2).toUpperCase()}</div>
+              <div><div style={{fontSize:12,fontWeight:600,color:T.ink}}>{op.nombre}</div><div style={{fontSize:9,color:T.ink3}}>{op.rol}</div></div>
+            </button>
+          );})}
+        </div>}
+      </div>}
+
+      {/* Modo PIN */}
+      {modo==="pin"&&selOp&&<div style={{textAlign:"center"}}>
+        <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:20}}>
+          <button onClick={()=>setModo("seleccion")} style={{background:"transparent",border:`1px solid ${T.line}`,borderRadius:999,width:36,height:36,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}><FmIcon name="chevL" size={16} stroke={T.ink}/></button>
+          <div style={{fontSize:14,fontWeight:700,color:T.ink}}>{selOp.nombre}</div>
+        </div>
+        <div style={{width:60,height:60,borderRadius:999,background:selOp.rol==="jardinero"?T.olive:T.lavender,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,fontWeight:700,color:T.ink,margin:"0 auto 16px"}}>{selOp.avatar||selOp.nombre?.slice(0,2).toUpperCase()}</div>
+        <div style={{fontSize:11,fontWeight:600,color:T.ink3,textTransform:"uppercase",letterSpacing:1,marginBottom:10}}>PIN de 4 dígitos</div>
+        <div style={{display:"flex",justifyContent:"center",gap:10,marginBottom:20,animation:pinErr?"shake .3s ease":"none"}}>
+          {[0,1,2,3].map(i=><div key={i} style={{width:48,height:56,borderRadius:T.r.md,background:T.surface,border:`1px solid ${pinErr?T.danger:T.line}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:24,color:T.ink,transition:"all .15s"}}>{pin.length>i?"•":""}</div>)}
+        </div>
+        <style>{`@keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-8px)}40%,80%{transform:translateX(8px)}}`}</style>
+        {pinErr&&<div style={{color:T.danger,fontSize:13,marginBottom:12}}>PIN incorrecto</div>}
+        <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,maxWidth:240,margin:"0 auto"}}>
+          {[1,2,3,4,5,6,7,8,9,null,0,"del"].map((d,i)=>(
+            d===null?<div key={i}/>:
+            <button key={i} onClick={()=>d==="del"?delDigit():addDigit(String(d))} style={{width:64,height:64,borderRadius:T.r.md,border:"none",background:d==="del"?"transparent":T.surface,cursor:"pointer",fontSize:d==="del"?16:24,fontWeight:700,color:T.ink,fontFamily:T.sans,display:"flex",alignItems:"center",justifyContent:"center",transition:"all .1s",margin:"0 auto",boxShadow:d==="del"?"none":T.shadowSm}}>
+              {d==="del"?<FmIcon name="chevL" size={20} stroke={T.ink3}/>:d}
+            </button>
+          ))}
+        </div>
+      </div>}
+    </div>
+    <div style={{padding:"0 28px 32px",textAlign:"center",fontSize:11,color:T.ink4,letterSpacing:.3}}>
+      v2.4 · Sistema de gestión Finca El Molino
+    </div>
   </div>;
 }
 
