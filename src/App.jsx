@@ -6580,6 +6580,8 @@ function Visitas({perfil,tok,rol,setPage}){
   const [showRevertir,setShowRevertir]=useState(false);
   const [notaCancelacion,setNotaCancelacion]=useState("");
   const [saving,setSaving]=useState(false);
+  const [showVincular,setShowVincular]=useState(false);const [contactosList,setContactosList]=useState([]);const [showCrearContacto,setShowCrearContacto]=useState(false);
+  const [formContacto,setFormContacto]=useState({nombre:"",telefono:"",email:"",origen:"directo",tipo_evento:"boda",notas:""});
 
   const formVacio={nombre:"",fecha:hoy,hora:"10:00",tipo_evento:"Boda",invitados:"",telefono:"",email:"",nota:"",fecha_evento_prevista:""};
   const [form,setForm]=useState(formVacio);
@@ -6662,6 +6664,34 @@ function Visitas({perfil,tok,rol,setPage}){
     await sbPatch("visitas",`id=eq.${v.id}`,{nota},tok);
     setSel(prev=>prev?{...prev,nota}:prev);
     await load_();
+  };
+
+  const abrirVincular=async()=>{
+    const cs=await sbGet("contactos","?select=id,nombre,tipo_evento,estado&order=nombre.asc",tok).catch(()=>[]);
+    setContactosList(cs);setShowVincular(true);
+  };
+  const vincularContacto=async(contactoId)=>{
+    if(!sel||!contactoId)return;
+    await sbPatch("visitas",`id=eq.${sel.id}`,{contacto_id:contactoId},tok);
+    await sbPatch("contactos",`id=eq.${contactoId}`,{estado:"visitante",updated_at:new Date().toISOString()},tok).catch(()=>{});
+    await sbPost("contacto_interacciones",{contacto_id:contactoId,tipo:"visita_finca",direccion:"salida",fecha:new Date().toISOString(),resumen:`Visita vinculada: ${sel.nombre} — ${new Date(sel.fecha+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"long"})}`,resultado:"neutro",creado_por:perfil.nombre},tok).catch(()=>{});
+    setSel(prev=>({...prev,contacto_id:contactoId}));setShowVincular(false);await load_();
+  };
+  const abrirCrearContacto=()=>{
+    setFormContacto({nombre:sel?.nombre||"",telefono:sel?.telefono||"",email:sel?.email||"",origen:"directo",tipo_evento:sel?.tipo_evento==="Boda"?"boda":sel?.tipo_evento==="Comunión"?"comunion":sel?.tipo_evento==="Empresa"?"empresa":"boda",notas:sel?.nota||""});
+    setShowCrearContacto(true);
+  };
+  const crearYvincular=async()=>{
+    if(!formContacto.nombre||!sel||saving)return;setSaving(true);
+    try{
+      const[c]=await sbPost("contactos",{nombre:formContacto.nombre,telefono:formContacto.telefono||null,email:formContacto.email||null,origen:formContacto.origen,tipo_evento:formContacto.tipo_evento,estado:"visitante",notas:formContacto.notas||null,asignado_a:perfil?.id,asignado_nombre:perfil?.nombre,created_at:new Date().toISOString(),updated_at:new Date().toISOString()},tok);
+      if(c?.id){
+        await sbPatch("visitas",`id=eq.${sel.id}`,{contacto_id:c.id},tok);
+        await sbPost("contacto_interacciones",{contacto_id:c.id,tipo:"visita_finca",direccion:"salida",fecha:new Date().toISOString(),resumen:`Contacto creado y visita vinculada: ${sel.nombre} — ${new Date(sel.fecha+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"long"})}`,resultado:"positivo",creado_por:perfil.nombre},tok).catch(()=>{});
+        setSel(prev=>({...prev,contacto_id:c.id}));
+      }
+      setShowCrearContacto(false);await load_();
+    }catch(_){}setSaving(false);
   };
 
   const abrirConvertir=()=>{
@@ -6838,7 +6868,15 @@ function Visitas({perfil,tok,rol,setPage}){
 
         {sel.creado_por&&<div style={{marginTop:12,fontSize:11,color:"#BFBAB4",textAlign:"right"}}>Creada por {sel.creado_por}</div>}
 
-        {console.log("Renderizando TareasComerciales visita:",{id:sel.id,nombre:sel.nombre,tok:tok?"ok":"MISSING"})}
+        {isA&&!sel.contacto_id&&<div style={{marginTop:16,padding:"12px 14px",background:"rgba(212,160,23,.06)",border:"1px solid rgba(212,160,23,.2)",borderRadius:10}}>
+          <div style={{fontSize:13,fontWeight:600,color:"#D4A017",marginBottom:6}}>⚠️ Sin contacto vinculado</div>
+          <div style={{fontSize:12,color:"#8A8580",marginBottom:10}}>Esta visita no está vinculada a ningún contacto</div>
+          <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+            <button className="btn bg sm" onClick={abrirVincular}>👤 Vincular a contacto existente</button>
+            <button className="btn bp sm" onClick={abrirCrearContacto}>➕ Crear nuevo contacto</button>
+          </div>
+        </div>}
+        {sel.contacto_id&&<div style={{marginTop:12,cursor:"pointer",color:"#EC683E",fontSize:13,fontWeight:600}} onClick={()=>setPage("contactos")}>👤 Ver ficha del cliente →</div>}
         <TareasComerciales entidad_tipo="visita" entidad_id={sel.id} entidad_nombre={sel.nombre} tok={tok} perfil={perfil} rol={rol}/>
         <Historial entidad_tipo="visita" entidad_id={sel.id} tok={tok} perfil={perfil}/>
         <Documentos entidad_tipo="visita" entidad_id={sel.id} tok={tok} perfil={perfil}/>
@@ -6912,6 +6950,38 @@ function Visitas({perfil,tok,rol,setPage}){
 
     {/* MODAL FECHA OCUPADA */}
     {bloqueado&&<ModalOcupado fecha={form.fecha} conflictos={bloqueado} tipoAccion="visita" perfil={perfil} tok={tok} onCerrar={()=>setBloqueado(null)} onForzar={()=>setBloqueado(null)}/>}
+
+    {/* MODAL VINCULAR CONTACTO */}
+    {showVincular&&sel&&<div className="ov" onClick={()=>setShowVincular(false)}><div className="modal" style={{maxHeight:"80vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
+      <h3>👤 Vincular a contacto existente</h3>
+      <div style={{fontSize:13,color:"#8A8580",marginBottom:14}}>Selecciona el contacto para vincular a la visita de <strong style={{color:"#1A1A1A"}}>{sel.nombre}</strong></div>
+      {contactosList.length===0?<div className="empty"><span className="ico">👥</span><p>No hay contactos disponibles</p></div>
+      :contactosList.map(c=>{const ec=ESTADO_CONTACTO[c.estado]||ESTADO_CONTACTO.lead;return <div key={c.id} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",background:"#F5F3F0",borderRadius:8,marginBottom:6,cursor:"pointer",borderLeft:`3px solid ${ec.col}`}} onClick={()=>vincularContacto(c.id)}>
+        <div style={{flex:1}}><div style={{fontSize:14,fontWeight:600,color:"#1A1A1A"}}>{c.nombre}</div><div style={{fontSize:11,color:"#8A8580"}}>{ec.ico} {ec.lbl} · {c.tipo_evento||"—"}</div></div>
+        <span style={{color:"#EC683E",fontSize:13}}>Vincular →</span>
+      </div>;})}
+      <div className="mft"><button className="btn bg" onClick={()=>setShowVincular(false)}>Cancelar</button></div>
+    </div></div>}
+
+    {/* MODAL CREAR CONTACTO DESDE VISITA */}
+    {showCrearContacto&&sel&&<div className="ov" onClick={()=>setShowCrearContacto(false)}><div className="modal" style={{maxHeight:"90vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
+      <h3>➕ Crear contacto desde visita</h3>
+      <div className="fg"><label>Nombre *</label><input className="fi" value={formContacto.nombre} onChange={e=>setFormContacto(v=>({...v,nombre:e.target.value}))} placeholder="Nombre"/></div>
+      <div className="g2">
+        <div className="fg"><label>Teléfono</label><input className="fi" type="tel" value={formContacto.telefono} onChange={e=>setFormContacto(v=>({...v,telefono:e.target.value}))}/></div>
+        <div className="fg"><label>Email</label><input className="fi" type="email" value={formContacto.email} onChange={e=>setFormContacto(v=>({...v,email:e.target.value}))}/></div>
+      </div>
+      <div className="g2">
+        <div className="fg"><label>Origen</label><select className="fi" value={formContacto.origen} onChange={e=>setFormContacto(v=>({...v,origen:e.target.value}))}>
+          {["directo","bodas.net","instagram","google","referido","otro"].map(o=><option key={o} value={o}>{o}</option>)}
+        </select></div>
+        <div className="fg"><label>Tipo evento</label><select className="fi" value={formContacto.tipo_evento} onChange={e=>setFormContacto(v=>({...v,tipo_evento:e.target.value}))}>
+          {["boda","comunion","empresa","otro"].map(t=><option key={t} value={t}>{t}</option>)}
+        </select></div>
+      </div>
+      <div className="fg"><label>Notas</label><textarea className="fi" rows={2} value={formContacto.notas} onChange={e=>setFormContacto(v=>({...v,notas:e.target.value}))}/></div>
+      <div className="mft"><button className="btn bg" onClick={()=>setShowCrearContacto(false)}>Cancelar</button><button className="btn bp" onClick={crearYvincular} disabled={saving||!formContacto.nombre}>{saving?"Creando…":"✓ Crear y vincular"}</button></div>
+    </div></div>}
   </>;
 }
 
