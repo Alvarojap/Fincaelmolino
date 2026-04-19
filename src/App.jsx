@@ -5610,26 +5610,20 @@ function TareasComerciales({entidad_tipo,entidad_id,entidad_nombre,tok,perfil,ro
   const cargar=async()=>{
     const tokenQ=perfil?.es_operario?SB_KEY:tok;
     const q=`?entidad_tipo=eq.${entidad_tipo}&entidad_id=eq.${entidad_id}&order=created_at.desc&select=*`;
-    console.log("TareasComerciales cargar query:",q);
-    const t=await sbGet("tareas_comerciales",q,tokenQ).catch(e=>{console.error("Error cargando tareas:",e);return[];});
-    console.log("Tareas encontradas:",t.length,t);
+    const t=await sbGet("tareas_comerciales",q,tokenQ).catch(()=>[]);
     setTareas(t);
   };
-  useEffect(()=>{console.log("TareasComerciales montado:",{entidad_tipo,entidad_id,tok:tok?"ok":"MISSING",perfil:perfil?.nombre});cargar();},[entidad_id]);
+  useEffect(()=>{cargar();},[entidad_id]);
   const crear=async()=>{
-    console.log("Intentando crear tarea:",{titulo:form.titulo,tipo:form.tipo,entidad_tipo,entidad_id:String(entidad_id),saving});
-    if(!form.titulo){console.log("BLOQUEADO: sin título");return;}
-    if(saving){console.log("BLOQUEADO: saving");return;}
+    if(!form.titulo||saving)return;
     setSaving(true);
     const tokenQ=perfil?.es_operario?SB_KEY:tok;
     try{
       const body={tipo:form.tipo||"otro",titulo:form.titulo,descripcion:form.descripcion||"",entidad_tipo,entidad_id:String(entidad_id),entidad_nombre:entidad_nombre||"",estado:"pendiente",fecha_limite:form.fecha_limite||null,asignado_a:form.asignado_a||perfil?.id||"",asignado_nombre:form.asignado_nombre||perfil?.nombre||"",creado_por:perfil?.nombre||"Admin"};
-      console.log("POST body:",JSON.stringify(body));
-      const result=await sbPost("tareas_comerciales",body,tokenQ);
-      console.log("Resultado crear tarea:",JSON.stringify(result));
+      await sbPost("tareas_comerciales",body,tokenQ);
       await addHistorial(entidad_tipo,entidad_id,`Tarea creada: "${form.titulo}"`,perfil?.nombre||"Admin",tokenQ).catch(()=>{});
       setForm({tipo:"llamada",titulo:"",descripcion:"",fecha_limite:"",asignado_a:perfil?.id,asignado_nombre:perfil?.nombre});setShowForm(false);await cargar();
-    }catch(e){console.error("Error crear tarea:",e.message,e);}
+    }catch(_){}
     setSaving(false);
   };
   const marcarHecha=async(t)=>{
@@ -5643,17 +5637,14 @@ function TareasComerciales({entidad_tipo,entidad_id,entidad_nombre,tok,perfil,ro
         if(entidad_tipo==="visita")rows=await sbGet("visitas",`?id=eq.${entidad_id}&select=contacto_id`,tokenQ);
         else if(entidad_tipo==="reserva")rows=await sbGet("reservas",`?id=eq.${entidad_id}&select=contacto_id`,tokenQ);
         else if(entidad_tipo==="airbnb")rows=await sbGet("reservas_airbnb",`?id=eq.${entidad_id}&select=contacto_id`,tokenQ);
-        console.log("Rows entidad:",JSON.stringify(rows));
         contactoId=rows?.[0]?.contacto_id||null;
-      }catch(e){console.error("Error buscando contacto:",e.message);}
-      console.log("contactoId encontrado:",contactoId,"para entidad:",entidad_tipo,entidad_id);
+      }catch(_){}
       if(contactoId){
         const TICONS={llamada:"📞",whatsapp:"💬",email:"📧",seguimiento:"📋",cobro:"💰",contrato:"📄"};
         const ti=["llamada","whatsapp","email"].includes(t.tipo)?t.tipo:"nota";
         const resumen=`${TICONS[t.tipo]||"🔧"} ${t.titulo}${t.descripcion?" — "+t.descripcion:""}`;
-        await sbPost("contacto_interacciones",{contacto_id:contactoId,tipo:ti,direccion:"salida",fecha:new Date().toISOString(),resumen,resultado:"positivo",creado_por:perfil?.nombre||"Admin"},tokenQ).catch(e=>console.error("Error creando interacción:",e.message));
+        await sbPost("contacto_interacciones",{contacto_id:contactoId,tipo:ti,direccion:"salida",fecha:new Date().toISOString(),resumen,resultado:"positivo",creado_por:perfil?.nombre||"Admin"},tokenQ).catch(()=>{});
         await sbPatch("contactos",`id=eq.${contactoId}`,{updated_at:new Date().toISOString()},tokenQ).catch(()=>{});
-        console.log("Interacción registrada en contacto:",contactoId);
       }
       await addHistorial(entidad_tipo,entidad_id,`Tarea completada: "${t.titulo}"`,perfil?.nombre||"Admin",tokenQ).catch(()=>{});
       await cargar();
@@ -5662,7 +5653,6 @@ function TareasComerciales({entidad_tipo,entidad_id,entidad_nombre,tok,perfil,ro
   const eliminar=async(id)=>{try{await sbDelete("tareas_comerciales",`id=eq.${id}`,tok);await cargar();}catch(_){}};
   const pend=tareas.filter(t=>!t.estado||t.estado==="pendiente"||t.estado==="Pendiente");
   const hechas=tareas.filter(t=>t.estado==="hecha"||t.estado==="Hecha"||t.estado==="completada");
-  console.log("Render TareasComerciales:",{totalTareas:tareas.length,pendientes:pend.length,hechas:hechas.length,estadosUnicos:[...new Set(tareas.map(t=>t.estado))]});
   const urgencia=(t)=>{if(!t.fecha_limite)return"normal";if(t.fecha_limite<hoy)return"vencida";if(t.fecha_limite===hoy)return"hoy";const d=Math.ceil((new Date(t.fecha_limite+"T12:00:00")-new Date())/(86400000));return d<=3?"proxima":"normal";};
   const colUrg={vencida:"#F35757",hoy:"#D4A017",proxima:"#D4A017",normal:"#A6BE59"};
   return <div style={{marginTop:16,borderTop:"1px solid rgba(0,0,0,.06)",paddingTop:14}}>
