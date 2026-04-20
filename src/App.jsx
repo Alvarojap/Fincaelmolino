@@ -1917,7 +1917,7 @@ function RvEventDetail({reserva,tok,perfil,rol,isA,onClose,onChanged}){
           <div style={{fontFamily:T.sans,fontSize:26,fontWeight:700,letterSpacing:-1,lineHeight:1.05,marginTop:4}}>{localR.nombre}</div>
           <div style={{display:"flex",gap:12,marginTop:12,fontSize:12,color:"rgba(255,255,255,.75)",fontWeight:500}}>
             {localR.invitados&&<span style={{display:"inline-flex",alignItems:"center",gap:5}}><FmIcon name="users" size={13} stroke="rgba(255,255,255,.75)"/>{localR.invitados} pax</span>}
-            <span style={{display:"inline-flex",alignItems:"center",gap:5}}>{localR.incluye_casa?<><FmIcon name="key" size={13} stroke="rgba(255,255,255,.75)"/>Finca + Casa</>:<><FmIcon name="sparkle" size={13} stroke="rgba(255,255,255,.75)"/>Solo Finca</>}</span>
+            <span style={{display:"inline-flex",alignItems:"center",gap:5}}>{localR.incluye_casa?<><FmIcon name="home" size={13} stroke="rgba(255,255,255,.75)"/>Finca + Casa</>:<><FmIcon name="sun" size={13} stroke="rgba(255,255,255,.75)"/>Solo Finca</>}</span>
           </div>
           <div style={{marginTop:14}}><RvStatusPill r={localR} size="md"/></div>
         </div>
@@ -1978,7 +1978,7 @@ function RvEventDetail({reserva,tok,perfil,rol,isA,onClose,onChanged}){
           <div style={{display:"flex",alignItems:"center",gap:12}}>
             <div style={{width:44,height:44,borderRadius:999,background:T.terracotta+"40",color:T.ink,fontFamily:T.sans,fontWeight:700,fontSize:15,display:"flex",alignItems:"center",justifyContent:"center"}}>{initials}</div>
             <div style={{flex:1}}><div style={{fontSize:14,fontWeight:700,color:T.ink}}>{contacto?.nombre||localR.contacto}</div><div style={{fontSize:11,color:T.ink3}}>{contacto?.telefono||"—"}</div></div>
-            {(contacto?.telefono)&&<button onClick={()=>window.open("https://wa.me/"+(contacto.telefono||"").replace(/\D/g,""))} style={{width:38,height:38,borderRadius:999,background:T.olive,border:0,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}><FmIcon name="whatsapp" size={17} stroke={T.ink}/></button>}
+            {(contacto?.telefono)&&<button onClick={()=>window.open("https://wa.me/"+(contacto.telefono||"").replace(/\D/g,""))} style={{width:38,height:38,borderRadius:999,background:T.olive,border:0,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}><FmIcon name="phone" size={17} stroke={T.ink}/></button>}
           </div>
         </div></>}
 
@@ -6021,7 +6021,7 @@ function CalBase({tok,rol="admin"}){
       <div style={{fontSize:10.5,color:T.ink3,letterSpacing:.6,fontWeight:700,textTransform:"uppercase",marginBottom:10}}>Airbnb este mes</div>
       <div style={{display:"flex",flexDirection:"column",gap:8}}>
         {airbnbMes.slice(0,4).map(a=><div key={a.id} style={{background:T.surface,border:`1px solid ${T.line}`,borderRadius:14,padding:12,display:"flex",alignItems:"center",gap:12}}>
-          <div style={{width:36,height:36,borderRadius:10,background:T.softBlue+"30",display:"flex",alignItems:"center",justifyContent:"center"}}><FmIcon name="key" size={16} stroke={T.softBlue}/></div>
+          <div style={{width:36,height:36,borderRadius:10,background:T.softBlue+"30",display:"flex",alignItems:"center",justifyContent:"center"}}><FmIcon name="home" size={16} stroke={T.softBlue}/></div>
           <div style={{flex:1,minWidth:0}}>
             <div style={{fontSize:13,fontWeight:700,color:T.ink}}>{(isA||isL)?a.huesped:"Alojamiento turístico"}</div>
             <div style={{fontSize:11,color:T.ink3}}>{fmtRango(a)}{a.personas?` · ${a.personas} personas`:""}</div>
