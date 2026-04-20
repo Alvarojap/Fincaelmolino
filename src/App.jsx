@@ -1773,11 +1773,41 @@ function ContactosBlockDesktop({contactos,setPage}){const colors=[T.lavender,T.o
     {contactos.length===0&&<div style={{padding:"16px",color:T.ink3,fontSize:13,textAlign:"center"}}>Sin contactos</div>}</div></div>;}
 
 // ─── OPS HELPERS (Limpieza + Jardinería) ──────────────────────────────────────
-const OPS_SM={pendiente_fecha:{label:"Sin fecha",color:T.gold,bg:T.gold+"22",ink:"#8A6B0F"},fecha_ok:{label:"Fecha OK",color:T.softBlue,bg:T.softBlue+"22",ink:"#2A5BA0"},en_curso:{label:"En curso",color:T.olive,bg:T.olive+"22",ink:"#4A7A2E"},finalizado:{label:"Finalizado",color:T.ink4,bg:T.bg,ink:T.ink3},conflicto:{label:"Conflicto",color:T.danger,bg:T.danger+"18",ink:"#9A2A22"},pendiente:{label:"Sin fecha",color:T.gold,bg:T.gold+"22",ink:"#8A6B0F"},programado:{label:"Fecha OK",color:T.softBlue,bg:T.softBlue+"22",ink:"#2A5BA0"},completado:{label:"Finalizado",color:T.ink4,bg:T.bg,ink:T.ink3},activo:{label:"Activo",color:T.olive,bg:T.olive+"22",ink:"#4A7A2E"}};
-function getOpsMeta(estado){return OPS_SM[estado]||OPS_SM.pendiente;}
-function OpsAvatar({name,size=28,color:c}){const colors=[T.lavender,T.olive,T.softBlue,T.gold,T.terracotta];const cl=c||colors[((name||"X").charCodeAt(0))%colors.length];return<div style={{width:size,height:size,borderRadius:999,background:cl,display:"flex",alignItems:"center",justifyContent:"center",fontSize:size*.4,fontWeight:700,color:T.ink,fontFamily:T.sans,flexShrink:0}}>{(name||"?")[0].toUpperCase()}</div>;}
+const OPS_STATE_META={pendiente:{label:"Sin fecha",color:"#ECD227",bg:"#ECD22722",ink:"#8A6B0F"},pendiente_fecha:{label:"Sin fecha",color:"#ECD227",bg:"#ECD22722",ink:"#8A6B0F"},programado:{label:"Fecha OK",color:"#7FB2FF",bg:"#7FB2FF22",ink:"#2A5BA0"},en_curso:{label:"En curso",color:"#A6BE59",bg:"#A6BE5922",ink:"#4A7A2E"},completado:{label:"Finalizado",color:"#BFB9AE",bg:"#F5F3F0",ink:"#7A766F"},finalizado:{label:"Finalizado",color:"#BFB9AE",bg:"#F5F3F0",ink:"#7A766F"},conflicto:{label:"Conflicto",color:"#D9443A",bg:"#D9443A18",ink:"#9A2A22"},activo:{label:"Activo",color:"#A6BE59",bg:"#A6BE5922",ink:"#4A7A2E"}};
+function getOpsMeta(e){return OPS_STATE_META[e]||OPS_STATE_META.pendiente;}
+function OpsAvatar({name="?",size=28,color:c}){const cols=["#AFA3FF","#A6BE59","#7FB2FF","#ECD227","#EC683E"];const cl=c||cols[(name||"X").charCodeAt(0)%cols.length];return<div style={{width:size,height:size,borderRadius:999,background:cl,display:"flex",alignItems:"center",justifyContent:"center",fontSize:size*.4,fontWeight:700,color:"#1A1A1A",fontFamily:T.sans,flexShrink:0}}>{(name||"?")[0].toUpperCase()}</div>;}
 function OpsMiniKpi({value,label,color}){return<div style={{background:T.surface,borderRadius:16,padding:"10px 12px",border:`1px solid ${T.line}`}}><div style={{width:22,height:3,background:color,borderRadius:2,marginBottom:6}}/><div style={{fontSize:20,fontWeight:700,color:T.ink,letterSpacing:-.6,lineHeight:1}}>{value}</div><div style={{fontSize:10,color:T.ink3,fontWeight:500,textTransform:"uppercase",letterSpacing:.4,marginTop:4}}>{label}</div></div>;}
 function OpsStatePill({estado}){const m=getOpsMeta(estado);return<span style={{display:"inline-flex",alignItems:"center",gap:4,height:20,padding:"0 8px",borderRadius:999,background:m.bg,color:m.ink,fontSize:10,fontWeight:700}}><span style={{width:5,height:5,borderRadius:999,background:m.color}}/>{m.label}</span>;}
+function OpsStatMini({label,value,accent}){return<div style={{background:accent?"#EC683E14":T.bg,padding:"8px 10px",borderRadius:8}}><div style={{fontSize:9,color:T.ink3,textTransform:"uppercase",letterSpacing:.4,fontWeight:600}}>{label}</div><div style={{fontSize:14,fontWeight:700,color:accent?"#EC683E":T.ink,marginTop:2}}>{value}</div></div>;}
+function OpsServiceCard({s,kind,onClick}){const estado=s.estado||s.state||"pendiente";const meta=getOpsMeta(estado);const zD=s.zonas_completadas||s.zonesDone||0;const zT=s.total_zonas||s.zones||14;const tD=s.tareas_completadas||s.tasksDone||0;const tT=s.total_tareas||s.tasks||1;const progress=kind==="cleaning"?zD/zT:tD/tT;const progressLbl=kind==="cleaning"?`${zD}/${zT} zonas`:`${tD}/${tT} tareas`;const worker=kind==="cleaning"?(s.limpiadora_nombre||s.cleaner||"—"):(s.jardinero_nombre||s.gardener||"—");const titulo=s.titulo||s.title||s.nombre||"Servicio";const fecha=s.fecha||s.date||"Sin fecha";const coste=s.coste_calculado||s.cost||0;const esAuto=s.origen_automatico||s.origin==="auto";const esRec=s.origin==="recurring";const vinculo=s.reserva_nombre||s.linkedTo;const fE=v=>(Math.round(parseFloat(v)||0)).toLocaleString("es-ES")+"€";
+  return<div onClick={onClick} style={{background:T.surface,border:`1px solid ${T.line}`,borderRadius:16,padding:14,cursor:"pointer",display:"flex",gap:10,marginBottom:8}}>
+    <div style={{width:4,borderRadius:999,background:meta.color,flexShrink:0,alignSelf:"stretch"}}/>
+    <div style={{flex:1,minWidth:0}}>
+      <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:10}}>
+        <div style={{minWidth:0}}>
+          <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:3,flexWrap:"wrap"}}>
+            <OpsStatePill estado={estado}/>
+            {esAuto&&<span style={{display:"inline-flex",height:20,padding:"0 7px",borderRadius:999,background:T.ink3+"22",color:T.ink3,fontSize:10,fontWeight:700}}>Auto</span>}
+            {esRec&&<span style={{display:"inline-flex",height:20,padding:"0 7px",borderRadius:999,background:"#7FB2FF22",color:"#2A5BA0",fontSize:10,fontWeight:700}}>Semanal</span>}
+            {!esAuto&&!esRec&&<span style={{display:"inline-flex",height:20,padding:"0 7px",borderRadius:999,background:"#AFA3FF22",color:"#4A3A8A",fontSize:10,fontWeight:700}}>Manual</span>}
+          </div>
+          <div style={{fontSize:14,fontWeight:700,color:T.ink,letterSpacing:-.2}}>{titulo}</div>
+          {vinculo&&<div style={{fontSize:11,color:T.ink3,marginTop:2,display:"flex",alignItems:"center",gap:4}}><FmIcon name="calendar" size={10} stroke={T.ink3}/>{vinculo}</div>}
+        </div>
+        <div style={{textAlign:"right",flexShrink:0}}>
+          <div style={{fontSize:14,fontWeight:700,color:T.ink}}>{coste>0?fE(coste):"—"}</div>
+          {(s.modalidad_pago==="horas"||s.mode==="horas")&&coste>0&&<div style={{fontSize:10,color:T.ink3,marginTop:2}}>{s.horas_trabajadas||s.hoursLogged||0}h×{s.tarifa_hora||s.rate||0}€</div>}
+        </div>
+      </div>
+      <div style={{display:"flex",alignItems:"center",gap:8,marginTop:10}}>
+        <OpsAvatar name={worker} size={22}/><div style={{fontSize:11,color:T.ink2,fontWeight:600}}>{worker}</div><div style={{width:1,height:12,background:T.line}}/><div style={{fontSize:11,color:T.ink3}}>{typeof fecha==="string"&&fecha.includes("-")?new Date(fecha+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"}):fecha}</div>
+      </div>
+      {progress>0&&estado!=="completado"&&estado!=="finalizado"&&<div style={{marginTop:10}}>
+        <div style={{display:"flex",justifyContent:"space-between",fontSize:10,color:T.ink3,marginBottom:4}}><span>{progressLbl}</span><span>{Math.round(progress*100)}%</span></div>
+        <div style={{height:4,background:T.bg,borderRadius:999,overflow:"hidden"}}><div style={{width:(progress*100)+"%",height:"100%",background:meta.color}}/></div>
+      </div>}
+    </div>
+  </div>;}
 
 // ─── RESERVAS HELPERS ─────────────────────────────────────────────────────────
 function RvKpiBlock({bg,title,sub}){return<div style={{background:bg,borderRadius:16,padding:"12px 12px 14px",color:T.ink}}><div style={{fontSize:22,fontWeight:700,letterSpacing:-.6,lineHeight:1}}>{title}</div><div style={{fontSize:10.5,fontWeight:600,marginTop:4,opacity:.8}}>{sub}</div></div>;}
