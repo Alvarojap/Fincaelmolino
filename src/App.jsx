@@ -5981,6 +5981,26 @@ function Reservas({tok,rol,perfil,navTarget,setNavTarget,setPage}){
   const [señaImporte,setSeñaImporte]=useState("");
   const [showPagoTotal,setShowPagoTotal]=useState(false);
   const [cobroSaving,setCobroSaving]=useState(false);
+  const [showTipoRes,setShowTipoRes]=useState(false);
+  const [showFormAb,setShowFormAb]=useState(false);const [savingAb,setSavingAb]=useState(false);
+  const hoyR=new Date().toISOString().split("T")[0];
+  const abFormVacio={huesped:"",fecha_entrada:hoyR,fecha_salida:hoyR,personas:"",precio:"",notas:""};
+  const [formAb,setFormAb]=useState(abFormVacio);
+  const crearAirbnb=async()=>{
+    if(!formAb.huesped||!formAb.fecha_entrada||!formAb.fecha_salida||savingAb)return;
+    if(formAb.fecha_salida<formAb.fecha_entrada){alert("La fecha de salida no puede ser anterior a la de entrada");return;}
+    setSavingAb(true);
+    try{
+      const[abNew]=await sbPost("reservas_airbnb",{...formAb,personas:parseInt(formAb.personas)||null,precio:parseFloat(formAb.precio)||null,creado_por:perfil.nombre},tok);
+      if(abNew)await crearContactoDesdeAirbnb({...formAb,...abNew},tok,perfil).catch(()=>{});
+      const en7=new Date();en7.setDate(en7.getDate()+7);
+      if(formAb.fecha_entrada&&formAb.fecha_entrada<=en7.toISOString().split("T")[0])notificarRoles(["admin","limpieza","jardinero"],"🏠 Nueva reserva Airbnb",`${formAb.huesped} llega el ${new Date(formAb.fecha_entrada+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"long"})}`,"airbnb-nueva",tok);
+      const diasH=Math.ceil((new Date(formAb.fecha_entrada+"T12:00:00")-new Date())/(864e5));
+      if(diasH<=3)await ejecutarCoordInmediata(null,formAb.fecha_entrada,"airbnb",true,tok);
+      await verificarConflictosNuevaReserva(formAb.fecha_entrada,tok);
+      setShowFormAb(false);setFormAb(abFormVacio);await load_();
+    }catch(_){}setSavingAb(false);
+  };
   const fmtE=v=>(Math.round(parseFloat(v)||0)).toLocaleString("es-ES")+"€";
 
   const load_=async()=>{
@@ -6083,7 +6103,7 @@ function Reservas({tok,rol,perfil,navTarget,setNavTarget,setPage}){
       <div><div style={{fontSize:12,color:T.ink3,fontWeight:500,marginBottom:2}}>Eventos · {new Date().getFullYear()}</div><div style={{fontSize:30,fontWeight:700,color:T.ink,letterSpacing:-1,lineHeight:1.02}}>Reservas</div></div>
       <div style={{display:"flex",gap:6}}>
         <button onClick={()=>setPage?.("calendario")} style={{width:40,height:40,borderRadius:999,background:T.surface,border:`1px solid ${T.line}`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}><FmIcon name="calendar" size={17} stroke={T.ink2}/></button>
-        {isA&&<button onClick={()=>setPage?.("nueva-res")} style={{width:40,height:40,borderRadius:999,background:T.terracotta,border:0,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",boxShadow:"0 6px 14px rgba(236,104,62,.3)"}}><FmIcon name="plus" size={18} stroke="white"/></button>}
+        {isA&&<button onClick={()=>setShowTipoRes(true)} style={{width:40,height:40,borderRadius:999,background:T.terracotta,border:0,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",boxShadow:"0 6px 14px rgba(236,104,62,.3)"}}><FmIcon name="plus" size={18} stroke="white"/></button>}
       </div>
     </div>
     {/* Summary */}
@@ -6281,6 +6301,39 @@ function Reservas({tok,rol,perfil,navTarget,setNavTarget,setPage}){
         </div>
         <div className="mft"><button className="btn bg" style={{width:"100%",justifyContent:"center"}} onClick={()=>{setShowRent(false);setRentData(null);}}>Cerrar</button></div>
       </>:<div style={{color:"#8A8580",fontSize:13,textAlign:"center",padding:20}}>No se pudieron cargar los datos</div>}
+    </div></div>}
+
+    {/* MODAL TIPO RESERVA */}
+    {showTipoRes&&<div className="ov" onClick={()=>setShowTipoRes(false)}><div className="modal" style={{maxWidth:400}} onClick={e=>e.stopPropagation()}>
+      <div style={{fontSize:16,fontWeight:700,color:T.ink,marginBottom:6}}>Nueva reserva</div>
+      <div style={{fontSize:13,color:T.ink3,marginBottom:20}}>¿Qué tipo de reserva quieres crear?</div>
+      <div style={{display:"flex",flexDirection:"column",gap:10}}>
+        <button onClick={()=>{setShowTipoRes(false);setPage?.("nueva-res");}} style={{width:"100%",padding:16,borderRadius:16,background:T.ink,color:"white",border:0,fontFamily:T.sans,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:12}}>
+          <div style={{width:40,height:40,borderRadius:10,background:"rgba(255,255,255,.15)",display:"flex",alignItems:"center",justifyContent:"center"}}><FmIcon name="calendar" size={20} stroke="white"/></div>
+          <div style={{textAlign:"left"}}><div style={{fontSize:15,fontWeight:700}}>Evento</div><div style={{fontSize:11,opacity:.7,marginTop:1}}>Bodas, comuniones, cumpleaños...</div></div>
+        </button>
+        <button onClick={()=>{setShowTipoRes(false);setFormAb(abFormVacio);setShowFormAb(true);}} style={{width:"100%",padding:16,borderRadius:16,background:"#D9443A",color:"white",border:0,fontFamily:T.sans,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:12}}>
+          <div style={{width:40,height:40,borderRadius:10,background:"rgba(255,255,255,.15)",display:"flex",alignItems:"center",justifyContent:"center"}}><FmIcon name="home" size={20} stroke="white"/></div>
+          <div style={{textAlign:"left"}}><div style={{fontSize:15,fontWeight:700}}>Airbnb</div><div style={{fontSize:11,opacity:.7,marginTop:1}}>Alojamiento de huéspedes</div></div>
+        </button>
+      </div>
+      <button onClick={()=>setShowTipoRes(false)} style={{width:"100%",marginTop:12,padding:14,borderRadius:16,background:T.bg,border:0,color:T.ink3,fontFamily:T.sans,fontWeight:600,fontSize:13,cursor:"pointer"}}>Cancelar</button>
+    </div></div>}
+
+    {/* MODAL NUEVA AIRBNB */}
+    {showFormAb&&<div className="ov" onClick={()=>setShowFormAb(false)}><div className="modal" onClick={e=>e.stopPropagation()}>
+      <h3>🏠 Nueva reserva Airbnb</h3>
+      <div className="fg"><label>Nombre del huésped *</label><input className="fi" value={formAb.huesped} onChange={e=>setFormAb(v=>({...v,huesped:e.target.value}))} placeholder="Nombre completo"/></div>
+      <div className="g2">
+        <div className="fg"><label>Fecha entrada *</label><input type="date" className="fi" value={formAb.fecha_entrada} onChange={e=>setFormAb(v=>({...v,fecha_entrada:e.target.value}))}/></div>
+        <div className="fg"><label>Fecha salida *</label><input type="date" className="fi" value={formAb.fecha_salida} onChange={e=>setFormAb(v=>({...v,fecha_salida:e.target.value}))}/></div>
+      </div>
+      <div className="g2">
+        <div className="fg"><label>Personas</label><input type="number" inputMode="numeric" className="fi" value={formAb.personas} onChange={e=>setFormAb(v=>({...v,personas:e.target.value}))} placeholder="2"/></div>
+        <div className="fg"><label>Precio (€)</label><input type="number" inputMode="decimal" className="fi" value={formAb.precio} onChange={e=>setFormAb(v=>({...v,precio:e.target.value}))} placeholder="150"/></div>
+      </div>
+      <div className="fg"><label>Notas</label><textarea className="fi" rows={2} value={formAb.notas} onChange={e=>setFormAb(v=>({...v,notas:e.target.value}))} placeholder="Observaciones…"/></div>
+      <div className="mft"><button className="btn bg" onClick={()=>setShowFormAb(false)}>Cancelar</button><button className="btn bp" onClick={crearAirbnb} disabled={savingAb||!formAb.huesped}>{savingAb?"Creando…":"🏠 Crear reserva"}</button></div>
     </div></div>}
   </>;
 }
