@@ -986,7 +986,6 @@ function Sidebar({perfil,page,setPage,onLogout,inDrawer,onClose}){
         {nItem("calendar","Calendario","calendario")}
         {nItem("reservations","Reservas","reservas")}
         {isA&&nItem("new_res","Nueva reserva","nueva-res")}
-        {isA&&nItem("airbnb","Airbnb","airbnb")}
       </>}
       <p className="nav-sec">Comunicación</p>
       {nItem("chat",isA?"Chat con equipo":"Chat con admin","chat")}
@@ -5964,7 +5963,7 @@ function TareasComerciales({entidad_tipo,entidad_id,entidad_nombre,tok,perfil,ro
 }
 
 // ─── RESERVAS ────────────────────────────────────────────────────────────────
-function Reservas({tok,rol,perfil,navTarget,setNavTarget}){
+function Reservas({tok,rol,perfil,navTarget,setNavTarget,setPage}){
   const isA=rol==="admin";
   const{refresh}=useContext(BadgeCtx);
   useEffect(()=>{marcarVistoTipo("reserva",String(perfil?.id),tok);setTimeout(refresh,500);},[]);
@@ -5973,26 +5972,30 @@ function Reservas({tok,rol,perfil,navTarget,setNavTarget}){
   const [filtro,setFiltro]=useState("activas");
   const [sel,setSel]=useState(null);
   const [load,setLoad]=useState(true);
-  useEffect(()=>{if(navTarget&&navTarget.id){setSel(navTarget);setNavTarget?.(null);}},[navTarget]);
+  const [tabR,setTabR]=useState("activas");
+  const [airbnbs,setAirbnbs]=useState([]);const [selAb,setSelAb]=useState(null);
+  const [contactoVinc,setContactoVinc]=useState(null);
+  useEffect(()=>{if(navTarget&&navTarget.id){if(navTarget.fecha_entrada){setSelAb(navTarget);setTabR("airbnb");}else setSel(navTarget);setNavTarget?.(null);}},[navTarget]);
   const [showSeña,setShowSeña]=useState(false);
   const [showRent,setShowRent]=useState(false);const [rentData,setRentData]=useState(null);const [loadRent,setLoadRent]=useState(false);
   const [señaImporte,setSeñaImporte]=useState("");
   const [showPagoTotal,setShowPagoTotal]=useState(false);
   const [cobroSaving,setCobroSaving]=useState(false);
+  const fmtE=v=>(Math.round(parseFloat(v)||0)).toLocaleString("es-ES")+"€";
 
   const load_=async()=>{
-    const r=await sbGet("reservas","?select=*&order=fecha.asc",tok);
-    // Auto-finalizar reservas pasadas que siguen activas
+    const[r,ab]=await Promise.all([
+      sbGet("reservas","?select=*&order=fecha.asc",tok),
+      sbGet("reservas_airbnb","?select=*&order=fecha_entrada.desc",tok).catch(()=>[]),
+    ]);
     const hoy=new Date().toISOString().split("T")[0];
     const ACTIVOS_=["visita","pendiente_contrato","contrato_firmado","reserva_pagada","precio_total"];
     const pasadas=r.filter(x=>x.fecha<hoy&&ACTIVOS_.includes(x.estado));
-    for(const p of pasadas){
-      await sbPatch("reservas",`id=eq.${p.id}`,{estado:"finalizada"},tok).catch(()=>{});
-      p.estado="finalizada";
-    }
-    setReservas(r);setLoad(false);
+    for(const p of pasadas){await sbPatch("reservas",`id=eq.${p.id}`,{estado:"finalizada"},tok).catch(()=>{});p.estado="finalizada";}
+    setReservas(r);setAirbnbs(ab);setLoad(false);
   };
   useEffect(()=>{load_();},[]);
+  const abrirReserva=async(r)=>{setSel(r);if(r.contacto_id){const[c]=await sbGet("contactos",`?id=eq.${r.contacto_id}&select=*`,tok).catch(()=>[]);setContactoVinc(c||null);}else setContactoVinc(null);};
 
   const cambiarE=async(id,e)=>{
     try{
@@ -6072,43 +6075,77 @@ function Reservas({tok,rol,perfil,navTarget,setNavTarget}){
   const activas=reservas.filter(r=>ACTIVOS.includes(r.estado));
   const finalizadas=reservas.filter(r=>r.estado==="finalizada");
   const canceladas=reservas.filter(r=>r.estado==="cancelada");
-  const lista=filtro==="activas"?activas:filtro==="finalizadas"?finalizadas:filtro==="canceladas"?canceladas:reservas;
-
-  const renderRCard=(r)=>{
-    const est=ESTADOS.find(e=>e.id===r.estado);
-    return <div key={r.id} className="rc" style={{borderLeftColor:est?.col}} onClick={()=>setSel(r)}>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10}}>
-        <div style={{minWidth:0}}>
-          <div style={{fontSize:14,fontWeight:600,color:"#1A1A1A",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.nombre}</div>
-          <div style={{fontSize:11,color:"#8A8580",marginTop:3}}>📅 {new Date(r.fecha).toLocaleDateString("es-ES",{weekday:"long",day:"numeric",month:"long",year:"numeric"})}</div>
-          {r.tipo&&<div style={{fontSize:11,color:"#8A8580"}}>🎉 {r.tipo}</div>}
-        </div>
-        <div style={{textAlign:"right",flexShrink:0}}>
-          <div style={{fontSize:16,fontWeight:700,color:"#EC683E"}}>{parseFloat(r.precio||0).toLocaleString("es-ES")}€</div>
-          {est&&<span className="badge" style={{background:`${est.col}18`,color:est.col,border:`1px solid ${est.col}30`,display:"inline-block",marginTop:3}}>{est.lbl}</span>}
-        </div>
-      </div>
-    </div>;
-  };
+  const lista=tabR==="activas"?activas:tabR==="finalizadas"?finalizadas:tabR==="canceladas"?canceladas:reservas;
 
   return <>
-    <div className="ph">
-      <h2>Reservas</h2>
-      <p>{activas.length} activas · {finalizadas.length} finalizadas · {canceladas.length} canceladas</p>
-    </div>
-    <div className="pb">
-      <div className="tabs">
-        <button className={`tab${filtro==="activas"?" on":""}`} onClick={()=>{setFiltro("activas");setSel(null);}}>🟢 Activas ({activas.length})</button>
-        <button className={`tab${filtro==="finalizadas"?" on":""}`} onClick={()=>{setFiltro("finalizadas");setSel(null);}}>✅ Finalizadas ({finalizadas.length})</button>
-        <button className={`tab${filtro==="canceladas"?" on":""}`} onClick={()=>{setFiltro("canceladas");setSel(null);}}>❌ Canceladas ({canceladas.length})</button>
-        <button className={`tab${filtro==="todas"?" on":""}`} onClick={()=>{setFiltro("todas");setSel(null);}}>📋 Todas ({reservas.length})</button>
+    {/* Header */}
+    <div style={{padding:"54px 20px 16px",display:"flex",alignItems:"flex-end",justifyContent:"space-between",gap:10}}>
+      <div><div style={{fontSize:12,color:T.ink3,fontWeight:500,marginBottom:2}}>Eventos · {new Date().getFullYear()}</div><div style={{fontSize:30,fontWeight:700,color:T.ink,letterSpacing:-1,lineHeight:1.02}}>Reservas</div></div>
+      <div style={{display:"flex",gap:6}}>
+        <button onClick={()=>setPage?.("calendario")} style={{width:40,height:40,borderRadius:999,background:T.surface,border:`1px solid ${T.line}`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}><FmIcon name="calendar" size={17} stroke={T.ink2}/></button>
+        {isA&&<button onClick={()=>setPage?.("nueva-res")} style={{width:40,height:40,borderRadius:999,background:T.terracotta,border:0,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",boxShadow:"0 6px 14px rgba(236,104,62,.3)"}}><FmIcon name="plus" size={18} stroke="white"/></button>}
       </div>
-      <div className="g2" style={{alignItems:"flex-start"}}>
-        <div>
-          {lista.length===0
-            ?<div className="empty"><span className="ico">📋</span><p>Sin reservas en esta categoría</p></div>
-            :lista.map(r=>renderRCard(r))}
-        </div>
+    </div>
+    {/* Summary */}
+    <div style={{padding:"0 20px 14px",display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
+      {[{l:"Total año",v:reservas.filter(r=>r.estado!=="cancelada").length+airbnbs.length,c:T.ink},{l:"Confirmadas",v:activas.length,c:T.olive},{l:"Facturación",v:fmtE([...reservas,...airbnbs].reduce((s,r)=>s+getPrecioReserva(r),0)),c:T.terracotta}].map((s,i)=><div key={i} style={{background:T.surface,borderRadius:16,padding:10,border:`1px solid ${T.line}`}}><div style={{fontSize:9,color:T.ink3,letterSpacing:.5,textTransform:"uppercase",fontWeight:500}}>{s.l}</div><div style={{fontSize:s.l==="Facturación"?16:20,color:s.c,fontWeight:700,lineHeight:1.1,marginTop:2}}>{s.v}</div></div>)}
+    </div>
+    {/* Tabs */}
+    <div style={{padding:"0 20px 12px",display:"flex",gap:6}}>
+      {[{k:"activas",l:"Eventos",n:activas.length},{k:"airbnb",l:"Airbnb",n:airbnbs.length},{k:"finalizadas",l:"Final.",n:finalizadas.length},{k:"canceladas",l:"Cancel.",n:canceladas.length}].map(t=>{const on=tabR===t.k;return<button key={t.k} onClick={()=>{setTabR(t.k);setSel(null);setSelAb(null);}} style={{flex:1,height:34,borderRadius:12,border:`1px solid ${on?T.ink:T.line}`,background:on?T.ink:T.surface,color:on?"white":T.ink2,fontFamily:T.sans,fontSize:11,fontWeight:600,cursor:"pointer"}}>{t.l} <span style={{opacity:.6}}>({t.n})</span></button>;})}
+    </div>
+    <div className="pb" style={{paddingTop:0}}>
+      {/* Eventos list */}
+      {tabR!=="airbnb"&&<div style={{display:"flex",flexDirection:"column",gap:10}}>
+        {lista.length===0?<div style={{textAlign:"center",padding:"40px 20px",color:T.ink3,fontSize:13}}>Sin reservas en esta categoría</div>
+        :lista.map(r=>{const epago=r.estado_pago==="pagado_completo"?{l:"Pagada",c:T.olive}:r.seña_cobrada?{l:"Seña OK",c:T.olive}:{l:"Saldo pdte",c:T.gold};
+          return<div key={r.id} onClick={()=>abrirReserva(r)} style={{background:T.surface,borderRadius:20,padding:14,border:`1px solid ${T.line}`,cursor:"pointer"}}>
+            <div style={{display:"flex",alignItems:"flex-start",gap:12}}>
+              <div style={{width:4,borderRadius:2,background:tabR==="canceladas"?T.ink3:tabR==="finalizadas"?T.olive:T.terracotta,alignSelf:"stretch",flexShrink:0}}/>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",gap:8}}>
+                  <span style={{fontSize:10,color:T.ink3,letterSpacing:.5,fontWeight:500}}>#{r.id?.slice(-6)}</span>
+                  <span style={{display:"inline-flex",alignItems:"center",gap:4,height:22,padding:"0 9px",borderRadius:999,background:epago.c+"22",color:epago.c,fontSize:11,fontWeight:600,whiteSpace:"nowrap"}}><span style={{width:5,height:5,borderRadius:999,background:epago.c}}/>{epago.l}</span>
+                </div>
+                <div style={{fontSize:17,color:T.ink,letterSpacing:-.3,marginTop:2,fontWeight:700,lineHeight:1.2}}>{r.nombre}</div>
+                <div style={{display:"flex",alignItems:"center",gap:8,marginTop:6,fontSize:11,color:T.ink3}}>
+                  <FmIcon name="calendar" size={12} stroke={T.ink3}/><span style={{color:T.ink2,fontWeight:500}}>{new Date(r.fecha+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"long"})}</span>
+                  {r.incluye_casa&&<><span style={{color:T.ink4}}>·</span><span>Finca + casa</span></>}
+                </div>
+                <div style={{height:1,background:T.line,margin:"10px 0"}}/>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline"}}>
+                  <div style={{fontSize:10,color:T.ink3}}><span>Finca {fmtE(r.precio_finca||r.precio||0)}</span>{parseFloat(r.precio_casa||0)>0&&<span style={{color:T.ink4}}> · Casa {fmtE(r.precio_casa)}</span>}</div>
+                  <span style={{fontSize:18,fontWeight:700,color:T.ink,letterSpacing:-.4}}>{fmtE(getPrecioReserva(r))}</span>
+                </div>
+              </div>
+            </div>
+          </div>;})}
+      </div>}
+      {/* Airbnb list */}
+      {tabR==="airbnb"&&<div style={{display:"flex",flexDirection:"column",gap:10}}>
+        {airbnbs.length===0?<div style={{textAlign:"center",padding:"40px 20px",color:T.ink3,fontSize:13}}>Sin reservas Airbnb</div>
+        :airbnbs.map(a=>{const dias=Math.ceil((new Date(a.fecha_salida+"T12:00:00")-new Date(a.fecha_entrada+"T12:00:00"))/(864e5));
+          return<div key={a.id} onClick={()=>setSelAb(a)} style={{background:T.surface,borderRadius:20,padding:14,border:`1px solid ${T.line}`,cursor:"pointer"}}>
+            <div style={{display:"flex",alignItems:"flex-start",gap:12}}>
+              <div style={{width:4,borderRadius:2,background:"#D9443A",alignSelf:"stretch",flexShrink:0}}/>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",gap:8}}>
+                  <span style={{fontSize:10,color:T.ink3,letterSpacing:.5,fontWeight:500}}>Airbnb</span>
+                  <span style={{display:"inline-flex",alignItems:"center",gap:4,height:22,padding:"0 9px",borderRadius:999,background:a.cobrado?T.olive+"22":T.gold+"22",color:a.cobrado?"#5A8A3E":"#9B8324",fontSize:11,fontWeight:600}}><span style={{width:5,height:5,borderRadius:999,background:a.cobrado?T.olive:T.gold}}/>{a.cobrado?"Cobrado":"Pendiente"}</span>
+                </div>
+                <div style={{fontSize:17,color:T.ink,letterSpacing:-.3,marginTop:2,fontWeight:700}}>{a.huesped}</div>
+                <div style={{display:"flex",alignItems:"center",gap:8,marginTop:6,fontSize:11,color:T.ink3}}>
+                  <FmIcon name="calendar" size={12} stroke={T.ink3}/><span style={{color:T.ink2,fontWeight:500}}>{new Date(a.fecha_entrada+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"})} → {new Date(a.fecha_salida+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"})}</span><span style={{color:T.ink4}}>·</span><span>{dias} noche{dias!==1?"s":""}</span>
+                </div>
+                <div style={{height:1,background:T.line,margin:"10px 0"}}/>
+                <div style={{display:"flex",justifyContent:"flex-end"}}><span style={{fontSize:18,fontWeight:700,color:T.ink,letterSpacing:-.4}}>{fmtE(getPrecioReserva(a))}</span></div>
+              </div>
+            </div>
+          </div>;})}
+      </div>}
+      {/* Detail panel — keep existing */}
+      <div className="g2" style={{alignItems:"flex-start",display:sel&&tabR!=="airbnb"?"grid":"none"}}>
+        <div style={{display:"none"}}></div>
         {sel&&<div className="card detail-panel" style={{position:"sticky",top:20}}>
           <div style={{display:"flex",justifyContent:"space-between",marginBottom:16,gap:8}}>
             <div style={{minWidth:0}}><div style={{fontSize:18,fontWeight:700,color:"#1A1A1A",fontFamily:"'Inter Tight',sans-serif"}}>{sel.nombre}</div><SBadge e={sel.estado}/></div>
