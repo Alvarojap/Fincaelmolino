@@ -3366,21 +3366,21 @@ function JardinAdmin({perfil,tok}){
       </>}
       {tab==="servicios"&&<>
         <div style={{marginBottom:14}}>
-          <button className="btn bp" style={{width:"100%",justifyContent:"center",padding:"12px",fontSize:15}} onClick={()=>{setSrvForm(srvVacio);setSrvTareas([]);setShowSrv(true);}}>+ Crear servicio a medida</button>
+          <button onClick={()=>{setSrvForm(srvVacio);setSrvTareas([]);setShowSrv(true);}} style={{width:"100%",padding:"12px 0",borderRadius:999,border:0,background:T.ink,color:"white",fontFamily:T.sans,fontSize:13,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}><FmIcon name="plus" size={14} stroke="white"/>Crear servicio a medida</button>
         </div>
-        {srvsActivos.length===0&&srvsHist.length===0&&<div className="empty"><span className="ico">🌿</span><p>Sin servicios creados</p></div>}
+        {srvsActivos.length===0&&srvsHist.length===0&&<div style={{textAlign:"center",padding:"40px 0",color:T.ink3,fontSize:13}}>Sin servicios creados</div>}
         {srvsActivos.map(s=>{const tareas=s.jardin_servicio_tareas||[];const hechas=tareas.filter(t=>t.done).length;
           const fi=new Date(s.fecha_inicio+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"});
           const ff=new Date(s.fecha_fin+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"});
-          const abierto=selSrv===s.id;
-          return <div key={s.id} className="card" style={{marginBottom:14}}>
-            <div className="chdr" onClick={()=>setSelSrv(abierto?null:s.id)} style={{cursor:"pointer"}}>
-              <span className="ctit">{abierto?"▼":"▶"} 🌿 {s.nombre}</span>
-              <span className="badge" style={{background:"rgba(16,185,129,.1)",color:"#A6BE59"}}>{hechas}/{tareas.length}</span>
-            </div>
-            <div style={{padding:"4px 0 0",fontSize:12,color:"#8A8580",display:"flex",gap:12,flexWrap:"wrap"}}>
-              <span>📅 {fi} – {ff}</span>
-              <span>👤 {s.jardinero_nombre}</span>
+          const abierto=selSrv===s.id;const m=getOpsMeta(s.estado||"activo");
+          return <div key={s.id} style={{background:T.surface,border:`1px solid ${abierto?T.ink:T.line}`,borderRadius:16,padding:14,marginBottom:10,boxShadow:abierto?"0 4px 12px rgba(40,30,20,.06)":"none"}}>
+            <div onClick={()=>setSelSrv(abierto?null:s.id)} style={{cursor:"pointer",display:"flex",gap:10}}>
+              <div style={{width:4,borderRadius:999,background:m.color,flexShrink:0,alignSelf:"stretch"}}/>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}><OpsStatePill estado={s.estado||"activo"}/><span style={{fontSize:11,color:T.ink3,fontWeight:600}}>{hechas}/{tareas.length} tareas</span></div>
+                <div style={{fontSize:14,fontWeight:700,color:T.ink,letterSpacing:-.2}}>{s.nombre}</div>
+                <div style={{display:"flex",alignItems:"center",gap:8,marginTop:4,fontSize:11,color:T.ink3}}><FmIcon name="calendar" size={11} stroke={T.ink3}/>{fi} – {ff}<span style={{color:T.ink4}}>·</span><OpsAvatar name={s.jardinero_nombre||"?"} size={16}/>{s.jardinero_nombre}</div>
+              </div>
             </div>
             {abierto&&<>
               <div style={{marginTop:10}}>
@@ -3407,16 +3407,17 @@ function JardinAdmin({perfil,tok}){
           </div>;
         })}
         {srvsHist.length>0&&<>
-          <div style={{fontSize:11,color:"#8A8580",textTransform:"uppercase",letterSpacing:1.5,marginTop:20,marginBottom:10}}>📁 Historial</div>
+          <div style={{fontSize:11,color:T.ink3,textTransform:"uppercase",letterSpacing:1,fontWeight:700,marginTop:20,marginBottom:10}}>Historial</div>
           {srvsHist.map(s=>{const tareas=s.jardin_servicio_tareas||[];const hechas=tareas.filter(t=>t.done).length;
             const fi=new Date(s.fecha_inicio+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"});
             const ff=new Date(s.fecha_fin+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"});
-            return <div key={s.id} className="card" style={{marginBottom:10,opacity:.6}}>
-              <div className="chdr">
-                <span className="ctit">{s.estado==="completado"?"✅":"❌"} {s.nombre}</span>
-                <span className="badge" style={{background:s.estado==="completado"?"rgba(16,185,129,.1)":"rgba(232,85,85,.1)",color:s.estado==="completado"?"#10b981":"#e85555"}}>{s.estado==="completado"?"Completado":"Cancelado"}</span>
+            return <div key={s.id} style={{background:T.surface,border:`1px solid ${T.line}`,borderRadius:16,padding:12,marginBottom:8,opacity:.7,display:"flex",gap:10}}>
+              <div style={{width:4,borderRadius:999,background:s.estado==="completado"?T.olive:T.danger,flexShrink:0,alignSelf:"stretch"}}/>
+              <div style={{flex:1}}>
+                <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}><OpsStatePill estado={s.estado||"completado"}/></div>
+                <div style={{fontSize:13,fontWeight:700,color:T.ink}}>{s.nombre}</div>
+                <div style={{fontSize:11,color:T.ink3,marginTop:3}}>{fi} – {ff} · {s.jardinero_nombre} · {hechas}/{tareas.length}</div>
               </div>
-              <div style={{fontSize:12,color:"#8A8580"}}>📅 {fi} – {ff} · 👤 {s.jardinero_nombre} · {hechas}/{tareas.length} tareas</div>
             </div>;
           })}
         </>}
