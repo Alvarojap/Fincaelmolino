@@ -1689,17 +1689,22 @@ function AtencionAhora({tok,setPage}){
 
     {/* COORDINACIÓN PENDIENTE */}
     {coordItems.length>0&&<>
-      <div style={{fontSize:11,color:"#AFA3FF",fontWeight:600,textTransform:"uppercase",letterSpacing:1,marginBottom:8,marginTop:secMt()}}>🔄 Coordinación pendiente ({coordItems.length})</div>
+      <div style={{fontSize:11,color:T.lavender,fontWeight:700,textTransform:"uppercase",letterSpacing:1,marginBottom:8,marginTop:secMt()}}>Coordinación pendiente ({coordItems.length})</div>
       {coordItems.map(c=>{
         const esL=c.tipo?.includes("limpieza");const est=c.estado;
-        const col=est==="pendiente_aprobacion_admin"?"#D4A017":est==="servicio_creado_pendiente_fecha"?"#EC683E":"#AFA3FF";
-        const ico=est==="pendiente_aprobacion_admin"?"🔑":est==="servicio_creado_pendiente_fecha"?"⏳":"📋";
-        return <div key={c.id} style={{padding:"10px 12px",background:`${col}10`,borderRadius:10,marginBottom:5,borderLeft:`3px solid ${col}`,fontSize:12,color:"#1A1A1A"}}>
-          <div>{ico} {esL?"Limpieza":"Jardín"} {c.tipo_reserva==="airbnb"?"Airbnb":"evento"} — {est==="pendiente_aprobacion_admin"?`${c.respondido_por||"Operario"} solicita día checkin`:"Pendiente confirmación"}</div>
-          {c.fecha_checkout&&<div style={{color:"#8A8580",marginTop:3}}>{new Date(c.fecha_checkout+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"})}</div>}
-          {est==="pendiente_aprobacion_admin"&&<div style={{display:"flex",gap:6,marginTop:8}}>
-            <button className="btn bp sm" onClick={async()=>{try{await sbPatch("coordinacion_servicios",`id=eq.${c.id}`,{estado:"confirmado"},tok);if(c.respondido_por){const ops=await sbGet("operarios",`?nombre=eq.${encodeURIComponent(c.respondido_por)}&select=id`,tok).catch(()=>[]);for(const op of ops)await sbPost("notificaciones",{para:op.id,txt:`✅ Aprobado: puedes hacer ${esL?"la limpieza":"el jardín"} el ${c.fecha_programada}`},tok).catch(()=>{});}setCoordItems(prev=>prev.filter(x=>x.id!==c.id));}catch(_){}}}>✅ Aprobar</button>
-            <button className="btn br sm" onClick={async()=>{try{await sbPatch("coordinacion_servicios",`id=eq.${c.id}`,{estado:"servicio_creado_pendiente_fecha"},tok);if(c.respondido_por){const ops=await sbGet("operarios",`?nombre=eq.${encodeURIComponent(c.respondido_por)}&select=id`,tok).catch(()=>[]);for(const op of ops)await sbPost("notificaciones",{para:op.id,txt:`❌ No aprobado día checkin. Elige otra fecha.`},tok).catch(()=>{});}setCoordItems(prev=>prev.map(x=>x.id===c.id?{...x,estado:"servicio_creado_pendiente_fecha"}:x));}catch(_){}}}>❌ Rechazar</button>
+        const sevColor=est==="pendiente_aprobacion_admin"?T.gold:est==="servicio_creado_pendiente_fecha"?T.terracotta:T.softBlue;
+        const kindColor=esL?T.lavender:T.olive;const kindIcon=esL?"broom":"sprout";
+        return <div key={c.id} style={{background:T.surface,borderRadius:16,padding:14,marginBottom:8,border:`1px solid ${T.line}`,borderLeft:`4px solid ${sevColor}`}}>
+          <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8}}>
+            <div style={{width:22,height:22,borderRadius:999,background:kindColor,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><FmIcon name={kindIcon} size={12} stroke={T.ink}/></div>
+            <div style={{fontSize:11,fontWeight:700,color:T.ink3,textTransform:"uppercase",letterSpacing:.3}}>{esL?"Limpieza":"Jardín"} · {c.respondido_por||"Operario"}</div>
+            <div style={{flex:1}}/><div style={{fontSize:10,fontWeight:700,color:sevColor,textTransform:"uppercase"}}>{est==="pendiente_aprobacion_admin"?"Solicitud":"Pendiente"}</div>
+          </div>
+          <div style={{fontSize:14,fontWeight:700,color:T.ink,letterSpacing:-.2,marginBottom:4}}>{est==="pendiente_aprobacion_admin"?`Solicita limpiar día del checkin`:"Pendiente de confirmación de fecha"}</div>
+          {c.fecha_checkout&&<div style={{fontSize:11,color:T.ink3,marginBottom:6}}>{c.tipo_reserva==="airbnb"?"Airbnb":"Evento"} · {new Date(c.fecha_checkout+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"})}</div>}
+          {est==="pendiente_aprobacion_admin"&&<div style={{display:"flex",gap:6,marginTop:4}}>
+            <button onClick={async()=>{try{await sbPatch("coordinacion_servicios",`id=eq.${c.id}`,{estado:"confirmado"},tok);if(c.respondido_por){const ops=await sbGet("operarios",`?nombre=eq.${encodeURIComponent(c.respondido_por)}&select=id`,tok).catch(()=>[]);for(const op of ops)await sbPost("notificaciones",{para:op.id,txt:`✅ Aprobado: puedes hacer ${esL?"la limpieza":"el jardín"} el ${c.fecha_programada}`},tok).catch(()=>{});}setCoordItems(prev=>prev.filter(x=>x.id!==c.id));}catch(_){}}} style={{padding:"8px 12px",borderRadius:8,background:T.ink,color:"white",border:0,fontFamily:T.sans,fontSize:11,fontWeight:700,cursor:"pointer"}}>✓ Aprobar</button>
+            <button onClick={async()=>{try{await sbPatch("coordinacion_servicios",`id=eq.${c.id}`,{estado:"servicio_creado_pendiente_fecha"},tok);if(c.respondido_por){const ops=await sbGet("operarios",`?nombre=eq.${encodeURIComponent(c.respondido_por)}&select=id`,tok).catch(()=>[]);for(const op of ops)await sbPost("notificaciones",{para:op.id,txt:`❌ No aprobado día checkin. Elige otra fecha.`},tok).catch(()=>{});}setCoordItems(prev=>prev.map(x=>x.id===c.id?{...x,estado:"servicio_creado_pendiente_fecha"}:x));}catch(_){}}} style={{padding:"8px 12px",borderRadius:8,background:T.surface,color:T.ink,border:`1px solid ${T.line}`,fontFamily:T.sans,fontSize:11,fontWeight:700,cursor:"pointer"}}>✗ Rechazar</button>
           </div>}
         </div>;
       })}
@@ -3985,13 +3990,17 @@ function Limpieza({perfil,tok,rol}){
               </div>
               {row&&<span className="ibtn" onClick={()=>openN2(row)}>{row.nota||row.foto_url?"✏️":"➕"}</span>}
             </div>;};
-            return <div key={zona.id} style={{marginBottom:8,borderRadius:14,overflow:"hidden",border:`1.5px solid ${zonaCerrada?"rgba(166,190,89,.3)":abierta?"rgba(236,104,62,.2)":"rgba(0,0,0,.06)"}`,background:zonaCerrada?"rgba(166,190,89,.04)":"#fff"}}>
-              <div onClick={()=>setZonasAbiertas(prev=>({...prev,[zona.id]:!prev[zona.id]}))} style={{display:"flex",alignItems:"center",gap:10,padding:"12px 14px",cursor:"pointer",background:zonaCerrada?"rgba(166,190,89,.06)":"transparent"}}>
-                <span style={{fontSize:20}}>{zona.emoji}</span>
-                <div style={{flex:1,minWidth:0}}><div style={{fontSize:14,fontWeight:600,color:"#1A1A1A"}}>{zona.nombre}</div></div>
-                <span className="badge" style={{background:`${estadoColor}18`,color:estadoColor,border:`1px solid ${estadoColor}30`}}>{zonaDone}/{zonaTotal}</span>
-                {zonaCerrada&&<span style={{fontSize:16}}>✅</span>}
-                <span style={{color:"#BFBAB4",fontSize:18,transition:"transform .2s",transform:abierta?"rotate(90deg)":"none"}}>›</span>
+            return <div key={zona.id} style={{marginBottom:8,borderRadius:16,overflow:"hidden",border:`1px solid ${zonaCerrada?T.olive+"44":abierta?T.terracotta+"33":T.line}`,background:zonaCerrada?T.olive+"08":T.surface}}>
+              <div onClick={()=>setZonasAbiertas(prev=>({...prev,[zona.id]:!prev[zona.id]}))} style={{display:"flex",alignItems:"center",gap:10,padding:"12px 14px",cursor:"pointer"}}>
+                <div style={{width:32,height:32,borderRadius:10,background:zonaCerrada?T.olive:estadoColor+"22",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                  {zonaCerrada?<FmIcon name="check" size={16} stroke="white" sw={2.5}/>:<span style={{fontSize:16}}>{zona.emoji}</span>}
+                </div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:14,fontWeight:700,color:T.ink,letterSpacing:-.2}}>{zona.nombre}</div>
+                  <div style={{fontSize:11,color:T.ink3,marginTop:1}}>{zonaDone}/{zonaTotal} tareas</div>
+                </div>
+                {!zonaCerrada&&zonaDone>0&&<div style={{width:40,height:4,borderRadius:999,background:T.bg,overflow:"hidden"}}><div style={{width:(zonaDone/zonaTotal*100)+"%",height:"100%",background:estadoColor}}/></div>}
+                <FmIcon name={abierta?"chevD":"chevR"} size={14} stroke={T.ink3}/>
               </div>
               {abierta&&<div style={{padding:"0 14px 14px"}}>
                 {zona.subzonas?zona.subzonas.map(sz=>{
