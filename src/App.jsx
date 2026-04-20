@@ -3692,7 +3692,7 @@ const LIMP_CF = [
   {id:"cf12",txt:"Alarma lista para activar"},
 ];
 
-function Limpieza({perfil,tok,rol}){
+function Limpieza({perfil,tok,rol,setPage}){
   const isA=rol==="admin";
   const isL=rol==="limpieza";
   const [servicios,setServicios]=useState([]);
@@ -3979,6 +3979,9 @@ function Limpieza({perfil,tok,rol}){
 
   // tabLimp MUST be before any conditional returns (React hooks rule)
   const [tabLimp,setTabLimp]=useState("todos");
+  const [isDesktop,setIsDesktop]=useState(typeof window!=="undefined"&&window.innerWidth>=768);
+  useEffect(()=>{const fn=()=>setIsDesktop(window.innerWidth>=768);window.addEventListener("resize",fn);return()=>window.removeEventListener("resize",fn);},[]);
+  const {noVistos}=useContext(BadgeCtx);
 
   if(load)return <div className="loading"><div className="spin"/><span>Cargando…</span></div>;
   if(!isA&&servicios.length===0)return <><div style={{padding:"28px 32px 16px"}}><div style={{fontSize:28,fontWeight:700,color:T.ink}}>Mi servicio</div></div><div className="pb"><div className="empty"><span className="ico">🧹</span><p>Sin servicios asignados todavía</p></div></div></>;
@@ -3996,7 +3999,326 @@ function Limpieza({perfil,tok,rol}){
 
   const srvFilt=tabLimp==="todos"?servicios:tabLimp==="pendientes"?servicios.filter(s=>["pendiente","pendiente_fecha"].includes(s.estado||"")||(!s.estado&&!s.verificado)):tabLimp==="activos"?servicios.filter(s=>["en_curso","programado","activo"].includes(s.estado||"")):servicios.filter(s=>["completado","finalizado"].includes(s.estado||"")||s.verificado);
   const costeLimp=(servicios.reduce((t,s)=>t+(parseFloat(s.coste_calculado)||0),0)).toLocaleString("es-ES")+"€";
+  const fmtE=v=>(Math.round(parseFloat(v)||0)).toLocaleString("es-ES")+"€";
+  const zComputedGlobal=useZonas?LIMP_ZONAS.filter(z=>!!tMap[z.id+"_cerrada"]?.done).length:0;
+  const pctGlobal=tot?Math.round(comp/tot*100):0;
 
+  /* ═══════ DESKTOP LAYOUT ═══════ */
+  if(isDesktop&&isA)return(
+    <div style={{display:"flex",height:"100vh",background:T.bg,fontFamily:T.sans,overflow:"hidden",position:"fixed",inset:0,zIndex:1}}>
+
+      {/* Sidebar negro */}
+      <AppSidebarDesktop page="limpieza" setPage={setPage} perfil={perfil} noVistos={noVistos}/>
+
+      {/* Columna lista — 380px */}
+      <div style={{width:380,borderRight:"1px solid "+T.line,background:T.surface,display:"flex",flexDirection:"column",height:"100vh",flexShrink:0}}>
+        {/* Cabecera lista */}
+        <div style={{padding:"22px 20px 14px",borderBottom:"1px solid "+T.line,flexShrink:0}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+            <div>
+              <div style={{fontSize:10,color:T.ink3,fontWeight:700,letterSpacing:1,textTransform:"uppercase"}}>Operaciones</div>
+              <div style={{fontSize:26,fontWeight:700,color:T.ink,letterSpacing:-.8,lineHeight:1.1,marginTop:2}}>Limpieza</div>
+            </div>
+            <button onClick={()=>setShowNew(true)} style={{height:36,padding:"0 14px",borderRadius:999,background:T.ink,color:"white",border:0,fontFamily:T.sans,fontSize:12,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:6}}>
+              <FmIcon name="plus" size={13} stroke="white"/>Nuevo
+            </button>
+          </div>
+          {/* KPIs 3 cols */}
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,marginBottom:12}}>
+            <OpsMiniKpi value={servicios.length} label="Total" color={T.ink}/>
+            <OpsMiniKpi value={servicios.filter(s=>!["completado","finalizado"].includes(s.estado||"")&&!s.verificado).length} label="Abiertos" color={T.olive}/>
+            <OpsMiniKpi value={costeLimp} label="Coste" color={T.terracotta}/>
+          </div>
+          {/* Tabs */}
+          <div style={{display:"flex",gap:2,background:T.bg,borderRadius:999,padding:3}}>
+            {[
+              {k:"todos",l:"Todos",c:servicios.length},
+              {k:"pendientes",l:"Pend.",c:servicios.filter(s=>["pendiente","pendiente_fecha"].includes(s.estado||"")||(!s.estado&&!s.verificado)).length},
+              {k:"activos",l:"Activos",c:servicios.filter(s=>["en_curso","programado","activo"].includes(s.estado||"")).length},
+              {k:"hechos",l:"Hechos",c:servicios.filter(s=>["completado","finalizado"].includes(s.estado||"")||s.verificado).length},
+            ].map(t=>(
+              <button key={t.k} onClick={()=>setTabLimp(t.k)} style={{flex:1,padding:"7px 4px",borderRadius:999,border:0,cursor:"pointer",background:tabLimp===t.k?T.ink:"transparent",color:tabLimp===t.k?"#fff":T.ink2,fontWeight:700,fontSize:10.5,fontFamily:T.sans,whiteSpace:"nowrap"}}>
+                {t.l} <span style={{opacity:.6,fontSize:9}}>{t.c}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+        {/* Lista scrollable */}
+        <div style={{flex:1,overflow:"auto",padding:"8px 10px"}}>
+          {srvFilt.map(s=>{
+            const m=getOpsMeta(s.estado||(s.verificado?"completado":"pendiente"));
+            const on=actId===s.id;
+            return(
+              <div key={s.id} onClick={()=>setActId(s.id)} style={{borderRadius:14,padding:"12px 13px",marginBottom:5,cursor:"pointer",background:on?T.ink:"transparent",border:"1px solid "+(on?T.ink2:T.line),transition:"all 0.1s"}}>
+                <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+                  <span style={{display:"inline-flex",alignItems:"center",gap:4,height:18,padding:"0 7px",borderRadius:999,background:on?"rgba(255,255,255,0.15)":m.bg,color:on?"white":m.ink,fontSize:9.5,fontWeight:700}}>
+                    <span style={{width:4,height:4,borderRadius:999,background:on?"white":m.color}}/>{m.label}
+                  </span>
+                  <span style={{fontSize:12,fontWeight:700,color:on?"white":T.ink}}>
+                    {parseFloat(s.coste_calculado||0)>0?fmtE(s.coste_calculado):"—"}
+                  </span>
+                </div>
+                <div style={{fontSize:13.5,fontWeight:700,color:on?"white":T.ink,letterSpacing:-.25,marginBottom:5,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                  {s.nombre}
+                </div>
+                <div style={{display:"flex",alignItems:"center",gap:8}}>
+                  <OpsAvatar name={s.limpiadora_nombre||"?"} size={18}/>
+                  <span style={{fontSize:11,color:on?"rgba(255,255,255,0.65)":T.ink3,fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                    {s.limpiadora_nombre||"Sin asignar"} · {s.fecha?new Date(s.fecha).toLocaleDateString("es-ES",{day:"numeric",month:"short"}):"Sin fecha"}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+          {srvFilt.length===0&&<div style={{textAlign:"center",padding:"30px 0",color:T.ink3,fontSize:13}}>Sin servicios</div>}
+        </div>
+      </div>
+
+      {/* Panel detalle */}
+      <div style={{flex:1,overflow:"auto",background:T.bg,minWidth:0}}>
+        {!srv?(
+          <div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100%",flexDirection:"column",gap:14,color:T.ink3}}>
+            <FmIcon name="cleaning" size={44} stroke={T.line}/>
+            <div style={{fontSize:15,fontWeight:500,color:T.ink3}}>Selecciona un servicio</div>
+            <div style={{fontSize:12,color:T.ink3,opacity:.6}}>Verás aquí todos los detalles y el progreso</div>
+          </div>
+        ):(
+          <div style={{padding:28,maxWidth:820}}>
+
+            {/* Header detalle */}
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:22,gap:16}}>
+              <div style={{flex:1}}>
+                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8,flexWrap:"wrap"}}>
+                  {(()=>{const m=getOpsMeta(srv.estado||(srv.verificado?"completado":"en_curso"));return(
+                    <span style={{display:"inline-flex",alignItems:"center",gap:4,height:22,padding:"0 9px",borderRadius:999,background:m.bg,color:m.ink,fontSize:10.5,fontWeight:700}}>
+                      <span style={{width:5,height:5,borderRadius:999,background:m.color}}/>{m.label}
+                    </span>
+                  );})()}
+                  {srv.limpiadora_nombre&&<span style={{display:"inline-flex",alignItems:"center",gap:4,height:22,padding:"0 9px",borderRadius:999,background:T.lavender+"22",color:"#4A3A8A",fontSize:10.5,fontWeight:700}}>
+                    <OpsAvatar name={srv.limpiadora_nombre} size={14}/>{srv.limpiadora_nombre}
+                  </span>}
+                  <span style={{fontSize:11,color:T.ink3,fontFamily:"monospace"}}>{String(srv.id).slice(-8)}</span>
+                </div>
+                <div style={{fontSize:32,fontWeight:700,color:T.ink,letterSpacing:-1,lineHeight:1.05}}>{srv.nombre}</div>
+                {srv.reserva_nombre&&(
+                  <div style={{fontSize:13,color:T.ink3,marginTop:6,display:"flex",alignItems:"center",gap:6}}>
+                    <FmIcon name="calendar" size={14} stroke={T.terracotta}/>
+                    Vinculado a <b style={{color:T.ink}}>{srv.reserva_nombre}</b>
+                  </div>
+                )}
+              </div>
+              <div style={{display:"flex",gap:8,flexShrink:0}}>
+                <button onClick={()=>setShowEx(true)} style={{padding:"9px 14px",borderRadius:11,border:"1px solid "+T.line,background:T.surface,fontWeight:700,fontSize:12,cursor:"pointer",fontFamily:T.sans,color:T.ink,display:"flex",gap:6,alignItems:"center"}}>
+                  <FmIcon name="plus" size={13} stroke={T.ink2}/>Extra
+                </button>
+                <button onClick={async()=>{if(!window.confirm(`¿Eliminar "${srv.nombre}"?`))return;await sbDelete("servicio_tareas",`servicio_id=eq.${srv.id}`,tok);await sbDelete("servicios",`id=eq.${srv.id}`,tok);setActId(null);setTareas([]);await loadSrvs();}} style={{padding:"9px 14px",borderRadius:11,border:"1px solid #FECACA",background:"#FEF2F2",fontWeight:700,fontSize:12,cursor:"pointer",fontFamily:T.sans,color:"#D9443A",display:"flex",gap:6,alignItems:"center"}}>
+                  <FmIcon name="x" size={13} stroke="#D9443A"/>Eliminar
+                </button>
+              </div>
+            </div>
+
+            {/* Grid: asignación + coste */}
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:16}}>
+              {/* Asignación */}
+              <div style={{background:T.surface,borderRadius:18,padding:20,border:"1px solid "+T.line}}>
+                <div style={{fontSize:11,color:T.ink3,letterSpacing:.8,textTransform:"uppercase",fontWeight:700,marginBottom:14}}>Asignación</div>
+                <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:14}}>
+                  <OpsAvatar name={srv.limpiadora_nombre||"?"} size={48}/>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:16,fontWeight:700,color:T.ink}}>{srv.limpiadora_nombre||"Sin asignar"}</div>
+                    <div style={{fontSize:12,color:T.ink3,marginTop:2}}>Limpiadora · {srv.modalidad_pago||"horas"} · {srv.tarifa_hora||0}€/h</div>
+                  </div>
+                </div>
+                <div style={{height:1,background:T.line,margin:"0 0 14px"}}/>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+                  <div>
+                    <div style={{fontSize:10,color:T.ink3,textTransform:"uppercase",letterSpacing:.5,fontWeight:600}}>Fecha</div>
+                    <div style={{fontSize:14,fontWeight:700,color:T.ink,marginTop:3}}>{srv.fecha?new Date(srv.fecha).toLocaleDateString("es-ES",{weekday:"short",day:"numeric",month:"long"}):"Sin confirmar"}</div>
+                  </div>
+                  <div>
+                    <div style={{fontSize:10,color:T.ink3,textTransform:"uppercase",letterSpacing:.5,fontWeight:600}}>Hora inicio</div>
+                    <div style={{fontSize:14,fontWeight:700,color:T.ink,marginTop:3}}>{srv.hora_inicio||"—"}</div>
+                  </div>
+                </div>
+              </div>
+              {/* Coste terracotta */}
+              <div style={{background:T.terracotta,borderRadius:18,padding:20,color:T.ink}}>
+                <div style={{fontSize:11,color:"rgba(30,20,10,0.7)",letterSpacing:.8,textTransform:"uppercase",fontWeight:700,marginBottom:8}}>Coste calculado</div>
+                <div style={{fontSize:48,fontWeight:700,letterSpacing:-1.8,lineHeight:1}}>
+                  {parseFloat(srv.coste_calculado||0)>0?fmtE(srv.coste_calculado):"—"}
+                </div>
+                <div style={{fontSize:12,color:"rgba(30,20,10,0.75)",marginTop:10,lineHeight:1.5}}>
+                  {srv.modalidad_pago==="horas"
+                    ?<><div><b>{srv.horas_trabajadas||0}h</b> × {srv.tarifa_hora||0}€/h</div><div style={{opacity:.7}}>calculado del cronómetro</div></>
+                    :<div>Precio fijo pactado</div>
+                  }
+                </div>
+              </div>
+            </div>
+
+            {/* Progreso zonas */}
+            <div style={{background:T.surface,borderRadius:18,padding:20,border:"1px solid "+T.line,marginBottom:16}}>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
+                <div>
+                  <div style={{fontSize:11,color:T.ink3,letterSpacing:.8,textTransform:"uppercase",fontWeight:700}}>Progreso por zona</div>
+                  <div style={{fontSize:20,fontWeight:700,color:T.ink,letterSpacing:-.5,marginTop:4}}>
+                    {useZonas?`${zComputedGlobal}/${LIMP_ZONAS.length} zonas · `:""}{comp}/{tot} tareas
+                  </div>
+                </div>
+                <div style={{fontSize:14,fontWeight:700,color:pctGlobal===100?T.olive:T.ink}}>{pctGlobal}%</div>
+              </div>
+              {useZonas&&<div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:8}}>
+                {LIMP_ZONAS.map((z,i)=>{
+                  const done=!!tMap[z.id+"_cerrada"]?.done;
+                  const zt2=getZonaTareas(z);
+                  const partial=zt2.some(t2=>tMap[t2.id]?.done)&&!done;
+                  return(
+                    <div key={i} style={{padding:10,borderRadius:10,background:done?T.olive:partial?T.gold+"44":T.bg,border:"1px solid "+(done?T.olive:partial?T.gold:T.line),color:done?"white":T.ink,minHeight:64,display:"flex",flexDirection:"column",justifyContent:"space-between"}}>
+                      <div style={{fontSize:9,fontWeight:700,opacity:.7,letterSpacing:.5}}>{String(i+1).padStart(2,"0")}</div>
+                      <div style={{fontSize:10,fontWeight:600,marginTop:4,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{z.nombre}</div>
+                      {done&&<FmIcon name="check" size={12} stroke="white" sw={3}/>}
+                      {partial&&<div style={{fontSize:9,fontWeight:700,color:"#8A6B0F"}}>EN CURSO</div>}
+                    </div>
+                  );
+                })}
+              </div>}
+              {!useZonas&&<div style={{height:5,background:T.bg,borderRadius:999,overflow:"hidden"}}>
+                <div style={{width:pctGlobal+"%",height:"100%",background:pctGlobal===100?T.olive:pctGlobal>40?T.terracotta:"#F35757"}}/>
+              </div>}
+            </div>
+
+            {/* Banner verificado */}
+            {yaVerif&&<div style={{marginBottom:16}}><div style={{background:srv.verificado_ok?T.olive+"14":T.gold+"14",border:`1px solid ${srv.verificado_ok?T.olive+"44":T.gold+"44"}`,borderRadius:16,padding:"12px 16px",display:"flex",alignItems:"center",gap:10}}>
+              <div style={{width:28,height:28,borderRadius:999,background:srv.verificado_ok?T.olive:T.gold,display:"flex",alignItems:"center",justifyContent:"center"}}><FmIcon name={srv.verificado_ok?"check":"warn"} size={14} stroke="white" sw={2.5}/></div>
+              <div><div style={{fontSize:13,fontWeight:700,color:srv.verificado_ok?"#4A7A2E":"#8A6B0F"}}>{srv.verificado_ok?"Servicio verificado":"Cerrado con incidencias"}</div>{srv.verificado_nota&&<div style={{fontSize:11,color:T.ink3,marginTop:2}}>{srv.verificado_nota}</div>}</div>
+            </div></div>}
+
+            {/* Checklist zonas — dentro de card */}
+            <div style={{background:T.surface,borderRadius:18,padding:20,border:"1px solid "+T.line,marginBottom:16}}>
+              <div style={{fontSize:11,color:T.ink3,letterSpacing:.8,textTransform:"uppercase",fontWeight:700,marginBottom:14}}>Zonas y tareas</div>
+
+              {/* TAREAS — zonas o lista plana */}
+              {!useZonas?fijas.map(t=>(
+                <div key={t.id} className={`cli${t.done?" done":""}`} style={{marginBottom:4}}>
+                  <span style={{fontSize:17,flexShrink:0}}>{t.done?"✅":"⬜"}</span>
+                  <div style={{flex:1,minWidth:0}}>
+                    <span className="tz">{t.zona||"General"}</span>
+                    <div className={`tl${t.done?" done":""}`}>{LIMP_T.find(x=>x.id===t.tarea_id)?.txt||t.txt||t.tarea_id}</div>
+                    {t.done&&<div className="tm">✓ {t.completado_por}</div>}
+                    {t.nota&&<div className="nbox">📝 {t.nota}</div>}
+                    {t.foto_url&&<img src={t.foto_url} alt="" className="pthumb"/>}
+                  </div>
+                  <span className="ibtn" onClick={()=>openN2(t)}>{t.nota||t.foto_url?"✏️":"➕"}</span>
+                </div>
+              )):LIMP_ZONAS.map(zona=>{
+                const zt=getZonaTareas(zona);
+                const zonaDone=zt.filter(t=>tMap[t.id]?.done).length;
+                const zonaTotal=zt.length;
+                const zonaCompleta=zonaTotal>0&&zonaDone===zonaTotal;
+                const cerradaRow=tMap[zona.id+"_cerrada"];
+                const zonaCerrada=!!cerradaRow?.done;
+                const abierta=!!zonasAbiertas[zona.id];
+                const estadoColor=zonaCerrada?"#A6BE59":zonaDone===0?"#BFBAB4":zonaCompleta?"#A6BE59":"#D4A017";
+                const renderTarea=(td)=>{const row=tMap[td.id];return <div key={td.id} className={`cli${row?.done?" done":""}`} style={{marginBottom:4}}>
+                  <span style={{fontSize:17,flexShrink:0}}>{row?.done?"✅":"⬜"}</span>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div className={`tl${row?.done?" done":""}`}>{td.txt}</div>
+                    {row?.done&&<div className="tm">✓ {row.completado_por}</div>}
+                    {row?.nota&&<div className="nbox">📝 {row.nota}</div>}
+                    {row?.foto_url&&<img src={row.foto_url} alt="" className="pthumb"/>}
+                  </div>
+                  {row&&<span className="ibtn" onClick={()=>openN2(row)}>{row.nota||row.foto_url?"✏️":"➕"}</span>}
+                </div>;};
+                return <div key={zona.id} style={{marginBottom:8,borderRadius:16,overflow:"hidden",border:`1px solid ${zonaCerrada?T.olive+"44":abierta?T.terracotta+"33":T.line}`,background:zonaCerrada?T.olive+"08":"transparent"}}>
+                  <div onClick={()=>setZonasAbiertas(prev=>({...prev,[zona.id]:!prev[zona.id]}))} style={{display:"flex",alignItems:"center",gap:10,padding:"12px 14px",cursor:"pointer"}}>
+                    <div style={{width:32,height:32,borderRadius:10,background:zonaCerrada?T.olive:estadoColor+"22",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                      {zonaCerrada?<FmIcon name="check" size={16} stroke="white" sw={2.5}/>:<span style={{fontSize:16}}>{zona.emoji}</span>}
+                    </div>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:14,fontWeight:700,color:T.ink,letterSpacing:-.2}}>{zona.nombre}</div>
+                      <div style={{fontSize:11,color:T.ink3,marginTop:1}}>{zonaDone}/{zonaTotal} tareas</div>
+                    </div>
+                    {!zonaCerrada&&zonaDone>0&&<div style={{width:40,height:4,borderRadius:999,background:T.bg,overflow:"hidden"}}><div style={{width:(zonaDone/zonaTotal*100)+"%",height:"100%",background:estadoColor}}/></div>}
+                    <FmIcon name={abierta?"chevD":"chevR"} size={14} stroke={T.ink3}/>
+                  </div>
+                  {abierta&&<div style={{padding:"0 14px 14px"}}>
+                    {zona.subzonas?zona.subzonas.map(sz=>{
+                      const szDone=sz.tareas.filter(t=>tMap[t.id]?.done).length;
+                      return <div key={sz.id} style={{marginBottom:10}}>
+                        <div style={{fontSize:12,fontWeight:700,color:"#8A8580",textTransform:"uppercase",letterSpacing:.5,marginBottom:6,paddingTop:8,borderTop:"1px solid rgba(0,0,0,.04)"}}>{sz.nombre} ({szDone}/{sz.tareas.length})</div>
+                        {sz.tareas.map(td=>renderTarea(td))}
+                      </div>;
+                    }):zt.map(td=>renderTarea(td))}
+                    {cerradaRow?.foto_url&&<img src={cerradaRow.foto_url} alt="" className="pthumb" style={{marginTop:8}}/>}
+                  </div>}
+                </div>;
+              })}
+
+              {/* EXTRAS */}
+              {extras.length>0&&<>
+                <div style={{height:1,background:T.line,margin:"14px 0"}}/>
+                <div style={{fontSize:11,color:T.terracotta,fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginBottom:9}}>Extras</div>
+                {extras.map(t=>(
+                  <div key={t.id} className={`cli${t.done?" done":""}`}>
+                    <span style={{fontSize:17,flexShrink:0}}>{t.done?"✅":"⬜"}</span>
+                    <div style={{flex:1,minWidth:0}}>
+                      <span className="tz">{t.zona||"General"}</span>
+                      <div className={`tl${t.done?" done":""}`}>{t.txt}</div>
+                      {t.done&&<div className="tm">✓ {t.completado_por}</div>}
+                      {t.nota&&<div className="nbox">📝 {t.nota}</div>}
+                    </div>
+                    <span className="ibtn" onClick={()=>openN2(t)}>{t.nota||t.foto_url?"✏️":"➕"}</span>
+                  </div>
+                ))}
+              </>}
+            </div>
+
+          </div>
+        )}
+      </div>
+
+      {/* Modales compartidos */}
+      {showNew&&<div className="ov" onClick={()=>setShowNew(false)}>
+        <div className="modal" style={{maxHeight:"90vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
+          <h3>🧹 Nuevo servicio</h3>
+          <div className="fg"><label>Nombre *</label><input className="fi" value={newS.nombre} onChange={e=>setNewS(v=>({...v,nombre:e.target.value}))} placeholder="Ej: Limpieza post-boda García"/></div>
+          <div className="fg"><label>Fecha</label><input type="date" className="fi" value={newS.fecha} onChange={e=>setNewS(v=>({...v,fecha:e.target.value}))}/></div>
+          {limpiadoras.length>0&&<>
+            <div className="fg"><label>Limpiadora</label>
+              <select className="fi" value={newS.limpiadora_id} onChange={e=>selLimpiadora(e.target.value)}>
+                <option value="">Sin asignar</option>
+                {limpiadoras.filter(l=>l.activa).map(l=><option key={l.id} value={l.id}>{l.nombre}</option>)}
+              </select>
+            </div>
+            {newS.limpiadora_id&&<>
+              <div className="fg"><label>Modalidad de pago</label>
+                <select className="fi" value={newS.modalidad_pago} onChange={e=>setNewS(v=>({...v,modalidad_pago:e.target.value}))}>
+                  <option value="por_horas">Por horas</option>
+                  <option value="precio_fijo_servicio">Precio fijo</option>
+                  <option value="permuta">Permuta</option>
+                </select>
+              </div>
+              {newS.modalidad_pago==="por_horas"&&<div className="fg"><label>Tarifa €/hora</label><input type="number" inputMode="decimal" className="fi" value={newS.tarifa_hora} onChange={e=>setNewS(v=>({...v,tarifa_hora:e.target.value}))} placeholder="Ej: 12"/></div>}
+              {newS.modalidad_pago==="precio_fijo_servicio"&&<div className="fg"><label>Importe acordado (€)</label><input type="number" inputMode="decimal" className="fi" value={newS.precio_fijo_acordado} onChange={e=>setNewS(v=>({...v,precio_fijo_acordado:e.target.value}))} placeholder="Ej: 80"/></div>}
+              {newS.modalidad_pago==="permuta"&&<div className="fg"><label>Descripción del acuerdo</label><input className="fi" value={newS.permuta_descripcion} onChange={e=>setNewS(v=>({...v,permuta_descripcion:e.target.value}))} placeholder="Ej: 1 noche en la casa"/></div>}
+            </>}
+          </>}
+          <div className="mft"><button className="btn bg" onClick={()=>setShowNew(false)}>Cancelar</button><button className="btn bp" onClick={crearSrv} disabled={saving}>Crear y notificar</button></div>
+        </div>
+      </div>}
+      {showEx&&<div className="ov" onClick={()=>setShowEx(false)}>
+        <div className="modal" onClick={e=>e.stopPropagation()}>
+          <h3>➕ Tarea extra</h3>
+          <div className="fg"><label>Descripción</label><input className="fi" value={newE.txt} onChange={e=>setNewE(v=>({...v,txt:e.target.value}))} placeholder="Ej: Limpiar terraza exterior"/></div>
+          <div className="fg"><label>Zona</label><input className="fi" value={newE.zona} onChange={e=>setNewE(v=>({...v,zona:e.target.value}))} placeholder="Ej: Exterior"/></div>
+          <div className="mft"><button className="btn bg" onClick={()=>setShowEx(false)}>Cancelar</button><button className="btn bp" onClick={addExtra} disabled={saving}>Añadir</button></div>
+        </div>
+      </div>}
+      {notaM&&<NotaModal nota={nota} setNota={setNota} foto={foto} setFoto={setFoto} onSave={saveNota} onClose={()=>setNotaM(null)} tok={tok}/>}
+    </div>
+  );
+
+  /* ═══════ MOBILE LAYOUT ═══════ */
   return <div style={{paddingBottom:100}}>
     {/* Header */}
     <div style={{padding:"54px 20px 16px",display:"flex",alignItems:"flex-end",justifyContent:"space-between"}}>
