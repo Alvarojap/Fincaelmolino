@@ -3820,42 +3820,38 @@ function Limpieza({perfil,tok,rol}){
   const todoHecho=tot>0&&comp===tot;
   const yaVerif=srv?.verificado;
 
+  const [tabLimp,setTabLimp]=useState("todos");
+  const srvFilt=tabLimp==="todos"?servicios:tabLimp==="pendientes"?servicios.filter(s=>["pendiente","pendiente_fecha"].includes(s.estado||"")||(!s.estado&&!s.verificado)):tabLimp==="activos"?servicios.filter(s=>["en_curso","programado","activo"].includes(s.estado||"")):servicios.filter(s=>["completado","finalizado"].includes(s.estado||"")||s.verificado);
+  const costeLimp=(servicios.reduce((t,s)=>t+(parseFloat(s.coste_calculado)||0),0)).toLocaleString("es-ES")+"€";
+
   return <>
-    <div style={{padding:"28px 32px 16px"}}><div style={{fontSize:12,color:T.ink3,fontWeight:500}}>Servicios</div><div style={{fontSize:28,fontWeight:700,color:T.ink,letterSpacing:-.8,lineHeight:1.02,marginTop:2}}>{isA?"Limpieza":"Mi servicio"}</div></div>
-    <div className="pb">
-      {isA&&<div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:16}}>
-        <OpsMiniKpi value={servicios.length} label="Total" color={T.ink}/>
-        <OpsMiniKpi value={servicios.filter(s=>!["finalizado","completado"].includes(s.estado)).length||servicios.filter(s=>!s.verificado).length} label="Abiertos" color={T.olive}/>
-        <OpsMiniKpi value={(servicios.reduce((t,s)=>t+(parseFloat(s.coste_calculado)||0),0)).toLocaleString("es-ES")+"€"} label="Coste total" color={T.terracotta}/>
-      </div>}
+    {/* Header */}
+    <div style={{padding:"54px 20px 16px",display:"flex",alignItems:"flex-end",justifyContent:"space-between"}}>
+      <div><div style={{fontSize:12,color:T.ink3,fontWeight:500}}>Servicios</div><div style={{fontSize:30,fontWeight:700,color:T.ink,letterSpacing:-1,lineHeight:1.02}}>{isA?"Limpieza":"Mi servicio"}</div></div>
+      {isA&&<button onClick={()=>setShowNew(true)} style={{width:38,height:38,borderRadius:999,background:T.ink,border:0,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}><FmIcon name="plus" size={18} stroke="white"/></button>}
+    </div>
+
+    {/* KPIs */}
+    {isA&&<div style={{padding:"0 20px 14px",display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
+      <OpsMiniKpi value={servicios.length} label="Total" color={T.ink}/>
+      <OpsMiniKpi value={servicios.filter(s=>!["finalizado","completado"].includes(s.estado||"")&&!s.verificado).length} label="Abiertos" color={T.olive}/>
+      <OpsMiniKpi value={costeLimp} label="Coste período" color={T.terracotta}/>
+    </div>}
+
+    {/* Tabs */}
+    {isA&&<div style={{padding:"0 20px 14px"}}><div style={{display:"flex",background:T.surface,borderRadius:999,padding:4,border:`1px solid ${T.line}`,gap:2}}>
+      {[{k:"todos",l:"Todos",c:servicios.length},{k:"pendientes",l:"Pendientes",c:servicios.filter(s=>["pendiente","pendiente_fecha"].includes(s.estado||"")||(!s.estado&&!s.verificado)).length},{k:"activos",l:"Activos",c:servicios.filter(s=>["en_curso","programado","activo"].includes(s.estado||"")).length},{k:"hechos",l:"Hechos",c:servicios.filter(s=>["completado","finalizado"].includes(s.estado||"")||s.verificado).length}].map(t=><button key={t.k} onClick={()=>setTabLimp(t.k)} style={{flex:1,padding:"9px 6px",borderRadius:999,border:0,background:tabLimp===t.k?T.ink:"transparent",color:tabLimp===t.k?"#fff":T.ink2,fontFamily:T.sans,fontSize:11,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4}}>{t.l}<span style={{fontSize:9,padding:"1px 5px",borderRadius:999,background:tabLimp===t.k?"rgba(255,255,255,.2)":T.bg,color:tabLimp===t.k?"#fff":T.ink3}}>{t.c}</span></button>)}
+    </div></div>}
+
+    {/* Lista con OpsServiceCard */}
+    <div style={{padding:"0 20px"}}>
+      {srvFilt.map(s=><OpsServiceCard key={s.id} s={{...s,titulo:s.nombre,fecha:s.fecha}} kind="cleaning" onClick={()=>setActId(s.id)}/>)}
+      {srvFilt.length===0&&<div style={{textAlign:"center",padding:"40px 0",color:T.ink3,fontSize:13}}>Sin servicios en esta categoría</div>}
+    </div>
+
+    <div className="pb" style={{paddingTop:16}}>
       <div className="g2" style={{alignItems:"flex-start"}}>
-        {/* LISTA SERVICIOS */}
-        <div>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-            <span style={{fontSize:13,fontWeight:700,color:T.ink}}>Servicios</span>
-            {isA&&<button onClick={()=>setShowNew(true)} style={{height:32,padding:"0 14px",borderRadius:999,background:T.ink,color:"#fff",border:0,fontFamily:T.sans,fontSize:12,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:4}}><FmIcon name="plus" size={13} stroke="#fff"/> Nuevo</button>}
-          </div>
-          {servicios.map(s=>{
-            const vOk=s.verificado&&s.verificado_ok;const vInc=s.verificado&&!s.verificado_ok;const isOn=actId===s.id;
-            const m=getOpsMeta(s.estado||(s.verificado?"completado":"en_curso"));
-            return <div key={s.id} style={{background:T.surface,border:`1px solid ${isOn?T.ink:T.line}`,borderRadius:16,padding:12,marginBottom:8,cursor:"pointer",display:"flex",gap:10,boxShadow:isOn?"0 4px 12px rgba(40,30,20,.06)":"none"}} onClick={()=>setActId(s.id)}>
-              <div style={{width:4,borderRadius:999,background:m.color,flexShrink:0,alignSelf:"stretch"}}/>
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}>
-                  <OpsStatePill estado={s.estado||(s.verificado?"completado":"en_curso")}/>
-                  {vOk&&<span style={{fontSize:10,color:T.olive,fontWeight:700}}>✓ Verificado</span>}
-                  {vInc&&<span style={{fontSize:10,color:T.gold,fontWeight:700}}>⚠ Incidencias</span>}
-                </div>
-                <div style={{fontSize:14,fontWeight:700,color:T.ink,letterSpacing:-.2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{s.nombre}</div>
-                <div style={{display:"flex",alignItems:"center",gap:8,marginTop:4,fontSize:11,color:T.ink3}}>
-                  <FmIcon name="calendar" size={11} stroke={T.ink3}/>{new Date(s.fecha).toLocaleDateString("es-ES",{day:"numeric",month:"short"})}
-                  {s.limpiadora_nombre&&<><span style={{color:T.ink4}}>·</span><OpsAvatar name={s.limpiadora_nombre} size={16}/><span>{s.limpiadora_nombre}</span></>}
-                </div>
-                {parseFloat(s.coste_calculado)>0&&<div style={{fontSize:12,fontWeight:700,color:T.ink,marginTop:4}}>{parseFloat(s.coste_calculado).toLocaleString("es-ES")}€</div>}
-              </div>
-            </div>;
-          })}
-        </div>
+        <div style={{display:"none"}}></div>
 
         {/* DETALLE SERVICIO */}
         {srv&&<div>
