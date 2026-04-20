@@ -5365,68 +5365,76 @@ function Gastos({tok}){
     return null;
   };
 
+  const fmtE=v=>(Math.round(parseFloat(v)||0)).toLocaleString("es-ES")+"€";
+  const catColors={Personal:T.lavender,personal:T.lavender,"Comisión gestor":T.terracotta,comision:T.terracotta,Suministros:T.softBlue,suministros:T.softBlue,Consumibles:T.olive,consumibles:T.olive,Mantenimiento:T.gold,mantenimiento:T.gold,Marketing:"#F2995E",marketing:"#F2995E",Otros:T.ink3,otros:T.ink3};
+  const catAgrup=[...new Set(gastos.map(g=>g.categoria).filter(Boolean))].map(k=>({key:k,label:k,total:gastos.filter(g=>g.categoria===k).reduce((s,g)=>s+(parseFloat(g.importe)||0),0)})).filter(c=>c.total>0).sort((a,b)=>b.total-a.total);
+
   return <>
-    <div className="ph"><h2>💸 Gastos</h2><p>Control de gastos de la finca</p></div>
-    <div className="pb">
-      {/* FILTROS PERÍODO */}
-      <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:12}}>
-        {periodos.map(p=>(
-          <button key={p.lbl} className={`btn sm${desde===p.d&&hasta===p.h?" bp":" bg"}`} onClick={()=>{setDesde(p.d);setHasta(p.h);}}>{p.lbl}</button>
-        ))}
-      </div>
-      <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap",alignItems:"center"}}>
-        <input type="date" className="fi" value={desde} onChange={e=>setDesde(e.target.value)} style={{flex:1,minWidth:130}}/>
-        <span style={{color:"#8A8580",fontSize:12}}>→</span>
-        <input type="date" className="fi" value={hasta} onChange={e=>setHasta(e.target.value)} style={{flex:1,minWidth:130}}/>
-      </div>
+    {/* Header */}
+    <div style={{padding:"54px 20px 16px",display:"flex",alignItems:"flex-end",justifyContent:"space-between"}}>
+      <div><div style={{fontSize:12,color:T.ink3,fontWeight:500}}>Control financiero</div><div style={{fontSize:30,fontWeight:700,color:T.ink,letterSpacing:-1,lineHeight:1.02}}>Gastos</div></div>
+      <button onClick={()=>{setForm(formVacio);setShowForm(true);}} style={{width:38,height:38,borderRadius:999,background:T.ink,border:0,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}><FmIcon name="plus" size={18} stroke="white"/></button>
+    </div>
 
-      {/* FILTRO CATEGORÍA */}
-      {cats.length>0&&<div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:14}}>
-        <button className={`btn sm${catFiltro==="todas"?" bp":" bg"}`} onClick={()=>setCatFiltro("todas")}>Todas</button>
-        {cats.map(c=><button key={c} className={`btn sm${catFiltro===c?" bp":" bg"}`} onClick={()=>setCatFiltro(c)}>{c}</button>)}
-      </div>}
-
-      {/* TOTAL + BOTÓN */}
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16,gap:12,flexWrap:"wrap"}}>
-        <div style={{background:"rgba(232,85,85,.08)",border:"1px solid rgba(232,85,85,.2)",borderRadius:10,padding:"12px 18px"}}>
-          <div style={{fontSize:10,color:"#F35757",textTransform:"uppercase",letterSpacing:.5}}>Total período</div>
-          <div style={{fontSize:22,fontWeight:700,color:"#F35757",fontFamily:"'Inter Tight',sans-serif"}}>{total.toLocaleString("es-ES",{minimumFractionDigits:0,maximumFractionDigits:2})}€</div>
-          <div style={{fontSize:11,color:"#8A8580"}}>{filtrados.length} gasto{filtrados.length!==1?"s":""}</div>
-        </div>
-        <button className="btn bp" onClick={()=>{setForm(formVacio);setShowForm(true);}}>➕ Añadir gasto</button>
+    {/* KPI total */}
+    <div style={{padding:"0 20px 14px"}}>
+      <div style={{background:"linear-gradient(135deg,#1A1A1A 0%,#2a2520 100%)",borderRadius:20,padding:18,color:"white"}}>
+        <div style={{fontSize:10,color:T.gold,letterSpacing:1,textTransform:"uppercase",fontWeight:700,marginBottom:4}}>Total período</div>
+        <div style={{fontSize:38,fontWeight:700,letterSpacing:-1.2,lineHeight:1}}>{fmtE(total)}</div>
+        <div style={{fontSize:12,color:"rgba(255,255,255,.55)",marginTop:6}}>{filtrados.length} gastos · {gastos.filter(g=>GASTO_AUTO.includes(g.origen)).length} automáticos</div>
       </div>
+    </div>
 
-      {/* LISTADO */}
+    {/* Filtro período */}
+    <div style={{padding:"0 20px 14px"}}><div style={{display:"flex",background:T.surface,borderRadius:999,padding:4,border:`1px solid ${T.line}`,gap:2}}>
+      {periodos.map(p=><button key={p.lbl} onClick={()=>{setDesde(p.d);setHasta(p.h);}} style={{flex:1,padding:"9px 6px",borderRadius:999,border:0,background:desde===p.d&&hasta===p.h?T.ink:"transparent",color:desde===p.d&&hasta===p.h?"#fff":T.ink2,fontFamily:T.sans,fontSize:12,fontWeight:700,cursor:"pointer"}}>{p.lbl}</button>)}
+    </div></div>
+
+    {/* Desglose categoría */}
+    {catAgrup.length>0&&<div style={{padding:"0 20px 14px"}}>
+      <div style={{fontSize:11,color:T.ink3,letterSpacing:1,textTransform:"uppercase",fontWeight:700,marginBottom:10}}>Por categoría</div>
+      <div style={{background:T.surface,borderRadius:16,border:`1px solid ${T.line}`,overflow:"hidden"}}>
+        {catAgrup.map((cat,i)=>{const color=catColors[cat.key]||T.ink3;const pct=total>0?Math.round(cat.total/total*100):0;
+          return<div key={cat.key} onClick={()=>setCatFiltro(catFiltro===cat.key?"todas":cat.key)} style={{display:"flex",alignItems:"center",gap:12,padding:"12px 14px",borderBottom:i<catAgrup.length-1?`1px solid ${T.line}`:"none",cursor:"pointer",background:catFiltro===cat.key?color+"0a":"transparent"}}>
+            <div style={{width:10,height:10,borderRadius:3,background:color,flexShrink:0}}/>
+            <div style={{flex:1}}><div style={{fontSize:13,fontWeight:600,color:T.ink,textTransform:"capitalize"}}>{cat.label}</div><div style={{height:4,background:T.bg,borderRadius:999,overflow:"hidden",marginTop:5}}><div style={{width:pct+"%",height:"100%",background:color}}/></div></div>
+            <div style={{textAlign:"right",flexShrink:0}}><div style={{fontSize:13,fontWeight:700,color:T.ink}}>{fmtE(cat.total)}</div><div style={{fontSize:10,color:T.ink3,marginTop:2}}>{pct}%</div></div>
+          </div>;})}
+      </div>
+    </div>}
+
+    {/* Filtros pills */}
+    <div style={{padding:"0 20px 10px",display:"flex",gap:6,overflowX:"auto"}}>
+      {["todas",...cats].map(f=>{const on=catFiltro===f;return<button key={f} onClick={()=>setCatFiltro(f)} style={{flexShrink:0,height:28,padding:"0 12px",borderRadius:999,border:`1px solid ${on?T.ink:T.line}`,background:on?T.ink:T.surface,color:on?"white":T.ink2,fontFamily:T.sans,fontSize:11,fontWeight:700,cursor:"pointer",textTransform:"capitalize"}}>{f==="todas"?"Todas":f}</button>;})}
+    </div>
+
+    {/* Lista */}
+    <div style={{padding:"0 20px"}}>
       {load?<div className="loading"><div className="spin"/><span>Cargando…</span></div>
-      :filtrados.length===0?<div className="empty"><span className="ico">💸</span><p>Sin gastos en este período</p></div>
-      :filtrados.map(g=>{
-        const esAuto=GASTO_AUTO.includes(g.origen);
-        const olbl=origenLbl(g.origen);
-        return <div key={g.id} className="card" style={{marginBottom:8,borderLeft:`3px solid ${g.categoria==="Comisión gestor"?"#6366f1":"#e85555"}`}}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10}}>
-            <div style={{flex:1,minWidth:0}}>
-              <div style={{fontSize:14,fontWeight:600,color:"#1A1A1A",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{g.concepto}</div>
-              <div style={{display:"flex",gap:6,marginTop:5,flexWrap:"wrap"}}>
-                <span className="badge" style={{background:"rgba(232,85,85,.1)",color:"#F35757"}}>{g.categoria||"Sin categoría"}</span>
-                {g.recurrente&&<span className="badge" style={{background:"rgba(201,168,76,.1)",color:"#EC683E"}}>🔁 {g.frecuencia||"mensual"}</span>}
-                {olbl&&<span className="badge" style={{background:"rgba(99,102,241,.1)",color:"#a5b4fc"}}>{olbl}</span>}
-              </div>
-              <div style={{fontSize:11,color:"#8A8580",marginTop:4}}>📅 {new Date(g.fecha+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"long",year:"numeric"})}</div>
-              {g.notas&&<div style={{fontSize:11,color:"#8A8580",marginTop:3}}>{g.notas}</div>}
+      :filtrados.length===0?<div style={{textAlign:"center",padding:"40px 0",color:T.ink3,fontSize:13}}>Sin gastos en este período</div>
+      :filtrados.map(g=>{const esAuto=GASTO_AUTO.includes(g.origen);const olbl=origenLbl(g.origen);const color=catColors[g.categoria]||T.ink3;
+        return<div key={g.id} style={{background:T.surface,borderRadius:16,padding:14,border:`1px solid ${T.line}`,marginBottom:8,display:"flex",gap:12,alignItems:"center"}}>
+          <div style={{width:4,borderRadius:999,background:color,alignSelf:"stretch",flexShrink:0}}/>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:3,flexWrap:"wrap"}}>
+              <span style={{display:"inline-flex",height:18,padding:"0 7px",borderRadius:999,background:color+"22",color:color,fontSize:9.5,fontWeight:700,textTransform:"capitalize"}}>{g.categoria||"—"}</span>
+              {olbl&&<span style={{display:"inline-flex",height:18,padding:"0 7px",borderRadius:999,background:T.ink3+"22",color:T.ink3,fontSize:9.5,fontWeight:700}}>{olbl}</span>}
+              {g.recurrente&&<span style={{display:"inline-flex",height:18,padding:"0 7px",borderRadius:999,background:T.softBlue+"22",color:"#2A5BA0",fontSize:9.5,fontWeight:700}}>Recurrente</span>}
             </div>
-            <div style={{textAlign:"right",flexShrink:0}}>
-              <div style={{fontSize:18,fontWeight:700,color:"#F35757",fontFamily:"'Inter Tight',sans-serif"}}>{parseFloat(g.importe||0).toLocaleString("es-ES")}€</div>
-              {!esAuto&&<button className="btn br sm" style={{marginTop:6}} onClick={()=>eliminar(g)}>🗑</button>}
-            </div>
+            <div style={{fontSize:14,fontWeight:700,color:T.ink,letterSpacing:-.2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{g.concepto}</div>
+            <div style={{fontSize:11,color:T.ink3,marginTop:3,display:"flex",alignItems:"center",gap:4}}><FmIcon name="calendar" size={10} stroke={T.ink3}/>{new Date(g.fecha+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"})}</div>
           </div>
-        </div>;
-      })}
+          <div style={{textAlign:"right",flexShrink:0}}>
+            <div style={{fontSize:16,fontWeight:700,color:T.ink,letterSpacing:-.3}}>{fmtE(g.importe)}</div>
+            {!esAuto&&<button onClick={()=>eliminar(g)} style={{marginTop:4,width:28,height:28,borderRadius:999,background:"#FEF2F2",border:"1px solid #FECACA",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}><FmIcon name="x" size={12} stroke="#D9443A"/></button>}
+          </div>
+        </div>;})}
     </div>
 
     {/* MODAL NUEVO GASTO */}
     {showForm&&<div className="ov" onClick={()=>setShowForm(false)}>
       <div className="modal" onClick={e=>e.stopPropagation()}>
-        <h3>💸 Añadir gasto</h3>
+        <h3 style={{fontSize:22,fontWeight:700,color:T.ink,letterSpacing:-.6}}>Nuevo gasto</h3>
         <div className="g2">
           <div className="fg"><label>Fecha *</label><input type="date" className="fi" value={form.fecha} onChange={e=>setForm(v=>({...v,fecha:e.target.value}))}/></div>
           <div className="fg"><label>Categoría</label><select className="fi" value={form.categoria} onChange={e=>setForm(v=>({...v,categoria:e.target.value}))}>{GASTO_CATS.map(c=><option key={c}>{c}</option>)}</select></div>
@@ -5434,20 +5442,14 @@ function Gastos({tok}){
         <div className="fg"><label>Concepto *</label><input className="fi" value={form.concepto} onChange={e=>setForm(v=>({...v,concepto:e.target.value}))} placeholder="Ej: Compra de cloro para piscina"/></div>
         <div className="fg"><label>Importe (€) *</label><input type="number" inputMode="decimal" className="fi" value={form.importe} onChange={e=>setForm(v=>({...v,importe:e.target.value}))} placeholder="0"/></div>
         <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
-          <div onClick={()=>setForm(v=>({...v,recurrente:!v.recurrente}))}
-            style={{width:22,height:22,borderRadius:6,flexShrink:0,border:`2px solid ${form.recurrente?"#c9a84c":"rgba(255,255,255,.15)"}`,background:form.recurrente?"#c9a84c":"transparent",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:12,color:"#fff",fontWeight:700}}>
-            {form.recurrente?"✓":""}
-          </div>
-          <span style={{fontSize:13,color:"#1A1A1A"}}>¿Es recurrente?</span>
-          {form.recurrente&&<select className="fi" value={form.frecuencia} onChange={e=>setForm(v=>({...v,frecuencia:e.target.value}))} style={{width:"auto",flex:"none",padding:"6px 30px 6px 10px"}}>
-            <option value="mensual">Mensual</option>
-            <option value="anual">Anual</option>
-          </select>}
+          <div onClick={()=>setForm(v=>({...v,recurrente:!v.recurrente}))} style={{width:22,height:22,borderRadius:6,flexShrink:0,border:`2px solid ${form.recurrente?T.olive:T.line}`,background:form.recurrente?T.olive:"transparent",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}>{form.recurrente&&<FmIcon name="check" size={12} stroke="white" sw={2.5}/>}</div>
+          <span style={{fontSize:13,color:T.ink}}>¿Es recurrente?</span>
+          {form.recurrente&&<select className="fi" value={form.frecuencia} onChange={e=>setForm(v=>({...v,frecuencia:e.target.value}))} style={{width:"auto",flex:"none",padding:"6px 30px 6px 10px"}}><option value="mensual">Mensual</option><option value="anual">Anual</option></select>}
         </div>
-        <div className="fg"><label>Notas (opcional)</label><textarea className="fi" rows={2} value={form.notas} onChange={e=>setForm(v=>({...v,notas:e.target.value}))} placeholder="Detalles adicionales…"/></div>
+        <div className="fg"><label>Notas (opcional)</label><textarea className="fi" rows={2} value={form.notas} onChange={e=>setForm(v=>({...v,notas:e.target.value}))} placeholder="Detalles…"/></div>
         <div className="mft">
           <button className="btn bg" onClick={()=>setShowForm(false)}>Cancelar</button>
-          <button className="btn bp" onClick={crear} disabled={saving||!form.concepto||!form.importe}>{saving?"Guardando…":"💸 Guardar gasto"}</button>
+          <button className="btn bp" onClick={crear} disabled={saving||!form.concepto||!form.importe}>{saving?"Guardando…":"Guardar gasto"}</button>
         </div>
       </div>
     </div>}
