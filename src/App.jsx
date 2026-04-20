@@ -6511,6 +6511,7 @@ async function getContactoDeEntidad(entidad_tipo,entidad_id,tok){
 const ICONOS_INTERACCION={llamada:"📞",whatsapp:"💬",email:"📧",visita_finca:"🏠",reunion:"🤝",nota:"📝"};
 const ESTADO_CONTACTO={lead:{lbl:"Lead",col:"#7FB2FF",ico:"🔵"},visitante:{lbl:"Visitante",col:"#D4A017",ico:"🟡"},cliente:{lbl:"Cliente",col:"#A6BE59",ico:"🟢"},recurrente:{lbl:"Recurrente",col:"#EC683E",ico:"⭐"},perdido:{lbl:"Perdido",col:"#6b7280",ico:"⚫"}};
 
+const CSC={lead:{c:T.ink3,bg:T.ink4+"33"},visitante:{c:"#9B8324",bg:T.gold+"33"},cliente:{c:"#5A8A3E",bg:T.olive+"33"},recurrente:{c:T.terracotta,bg:T.terracotta+"22"},perdido:{c:T.ink,bg:"#E4E0D5"}};
 function Contactos({perfil,tok,rol,setPage}){
   const isA=rol==="admin",isC=rol==="comercial";
   const hoy=new Date().toISOString().split("T")[0];
@@ -6611,145 +6612,158 @@ function Contactos({perfil,tok,rol,setPage}){
     return true;
   });
 
-  const conteo=estado=>contactos.filter(c=>c.estado===estado).length;
-
   if(load)return <div className="loading"><div className="spin"/><span>Cargando…</span></div>;
+  const fmtEur=v=>(Math.round(parseFloat(v)||0)).toLocaleString("es-ES")+"€";
 
   // ─── DETALLE ──
-  if(sel&&!showForm&&!showInter&&!showVisita)return <>
-    <div className="ph"><h2 style={{cursor:"pointer"}} onClick={()=>setSel(null)}>← 👥 Contactos</h2></div>
-    <div className="pb">
-      <div className="card" style={{marginBottom:16}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8,marginBottom:14}}>
-          <div>
-            <h3 style={{margin:0,fontSize:20}}>{sel.nombre}</h3>
-            <div style={{display:"flex",gap:6,marginTop:6,flexWrap:"wrap",alignItems:"center"}}>
-              <span className="badge" style={{background:`${(ESTADO_CONTACTO[sel.estado]||ESTADO_CONTACTO.lead).col}18`,color:(ESTADO_CONTACTO[sel.estado]||ESTADO_CONTACTO.lead).col,border:`1px solid ${(ESTADO_CONTACTO[sel.estado]||ESTADO_CONTACTO.lead).col}30`,cursor:"pointer"}} onClick={()=>setShowEstado(true)}>{(ESTADO_CONTACTO[sel.estado]||ESTADO_CONTACTO.lead).ico} {(ESTADO_CONTACTO[sel.estado]||ESTADO_CONTACTO.lead).lbl} ▾</span>
-              {sel.tipo_evento&&<span className="badge" style={{background:"rgba(236,104,62,.1)",color:"#EC683E"}}>{sel.tipo_evento==="boda"?"💍":sel.tipo_evento==="comunion"?"⛪":sel.tipo_evento==="empresa"?"🏢":sel.tipo_evento==="airbnb"?"🏠":"🎉"} {sel.tipo_evento}</span>}
-              {(sel.fecha_evento_prevista||sel.mes_evento_previsto)&&<span className="badge" style={{background:"rgba(201,168,76,.1)",color:"#D4A017"}}>📅 {sel.fecha_evento_prevista?new Date(sel.fecha_evento_prevista+"T12:00:00").toLocaleDateString("es-ES",{month:"short",year:"numeric"}):`${sel.mes_evento_previsto}/${sel.anio_evento_previsto}`}</span>}
-            </div>
-          </div>
-          <button className="btn bg sm" onClick={()=>setSel(null)}>✕</button>
-        </div>
-        <div className="g2" style={{marginBottom:14}}>
-          {[{l:"TELÉFONO",v:sel.telefono},{l:"EMAIL",v:sel.email},{l:"ORIGEN",v:sel.origen},{l:"ASIGNADO",v:sel.asignado_nombre},{l:"PRESUPUESTO",v:sel.presupuesto_estimado?`${parseFloat(sel.presupuesto_estimado).toLocaleString("es-ES")}€`:null}].filter(x=>x.v).map(x=><div key={x.l} style={{background:"#F5F3F0",borderRadius:8,padding:"10px 12px"}}><div style={{fontSize:10,color:"#8A8580",marginBottom:3}}>{x.l}</div><div style={{fontSize:13,color:"#1A1A1A"}}>{x.v}</div></div>)}
-        </div>
-        {sel.motivo_perdido&&<div style={{background:"rgba(107,114,128,.08)",borderRadius:8,padding:"10px 12px",marginBottom:14,fontSize:12,color:"#6b7280"}}>⚫ Motivo perdido: {sel.motivo_perdido}</div>}
-        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-          <button className="btn bp sm" onClick={abrirVisitaDesdeContacto}>📅 Programar visita</button>
-          <button className="btn bg sm" onClick={()=>{setFormInter(formInterVacio);setShowInter(true);}}>📝 Registrar interacción</button>
-          <button className="btn bg sm" onClick={abrirEditar}>✏️ Editar</button>
+  if(sel&&!showForm&&!showInter&&!showVisita)return <div style={{position:"relative",background:T.bg,minHeight:"100%",overflow:"auto",paddingBottom:24}}>
+    {/* Hero */}
+    <div style={{background:`linear-gradient(145deg, ${T.olive} 0%, #8DA44A 100%)`,paddingTop:54,paddingBottom:20,paddingLeft:20,paddingRight:20}}>
+      <div style={{display:"flex",justifyContent:"space-between",marginBottom:16}}>
+        <button onClick={()=>setSel(null)} style={{width:36,height:36,borderRadius:999,background:"rgba(255,255,255,.18)",border:0,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}><FmIcon name="chevL" size={16} stroke="white"/></button>
+        <div style={{display:"flex",gap:8}}>
+          <button onClick={abrirEditar} style={{width:36,height:36,borderRadius:999,background:"rgba(255,255,255,.18)",border:0,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}><FmIcon name="edit" size={15} stroke="white"/></button>
+          <button onClick={()=>setShowEstado(true)} style={{width:36,height:36,borderRadius:999,background:"rgba(255,255,255,.18)",border:0,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}><FmIcon name="more" size={15} stroke="white"/></button>
         </div>
       </div>
-
-      {/* TABS */}
-      <div className="tabs" style={{marginBottom:14}}>
-        <button className={`tab${tabDet==="resumen"?" on":""}`} onClick={()=>setTabDet("resumen")}>Resumen</button>
-        <button className={`tab${tabDet==="interacciones"?" on":""}`} onClick={()=>setTabDet("interacciones")}>Interacciones ({interacciones.length})</button>
-        <button className={`tab${tabDet==="visitas"?" on":""}`} onClick={()=>setTabDet("visitas")}>Visitas ({visitasC.length})</button>
-        <button className={`tab${tabDet==="reservas"?" on":""}`} onClick={()=>setTabDet("reservas")}>Reservas ({reservasC.length+airbnbsC.length})</button>
+      <div style={{display:"flex",alignItems:"center",gap:14}}>
+        <div style={{width:54,height:54,borderRadius:999,background:"rgba(255,255,255,.25)",color:"white",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,fontWeight:700}}>{sel.nombre?.split(" ").map(p=>p[0]).slice(0,2).join("").toUpperCase()||"??"}</div>
+        <div>
+          <div style={{fontSize:10,color:"rgba(255,255,255,.7)",letterSpacing:1,textTransform:"uppercase",fontWeight:500}}>{sel.estado?.charAt(0).toUpperCase()+sel.estado?.slice(1)||"Lead"}{sel.created_at?` · desde ${new Date(sel.created_at).toLocaleDateString("es-ES",{month:"short",year:"numeric"})}`:""}</div>
+          <div style={{fontSize:24,color:"white",letterSpacing:-.6,lineHeight:1.1,fontWeight:700,marginTop:2}}>{sel.nombre}</div>
+          {sel.tipo_evento&&sel.fecha_evento_prevista&&<div style={{fontSize:12,color:"rgba(255,255,255,.8)",marginTop:2}}>{sel.tipo_evento} · {new Date(sel.fecha_evento_prevista+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"long",year:"numeric"})}</div>}
+        </div>
       </div>
-
-      {tabDet==="resumen"&&(()=>{const valorTotal=[...reservasC,...airbnbsC].reduce((s,r)=>s+getPrecioReserva(r),0);const completadas=interacciones.filter(i=>i.resultado==="positivo").length;const ultimaFecha=interacciones[0]?.fecha;
-        return <div className="card">
-          <div className="sg">
-            <SC lbl="Valor total generado" val={`${valorTotal.toLocaleString("es-ES")}€`}/>
-            <SC lbl="Reservas" val={reservasC.length+airbnbsC.length}/>
-            <SC lbl="Visitas realizadas" val={visitasC.filter(v=>v.estado==="realizada"||v.estado==="convertida").length}/>
-            <SC lbl="Interacciones" val={interacciones.length}/>
-          </div>
-          <div style={{display:"flex",gap:16,flexWrap:"wrap",fontSize:13,marginTop:14,padding:"10px 12px",background:"#F5F3F0",borderRadius:8}}>
-            <span>✅ Tareas completadas: <strong>{completadas}</strong></span>
-            <span>⏳ Tareas pendientes: <strong>{tareasP.length}</strong></span>
-            <span>📅 Última interacción: <strong>{ultimaFecha?tiempoDesde(ultimaFecha):"—"}</strong></span>
-          </div>
-          {sel.notas&&<div style={{marginTop:10,padding:"10px 12px",background:"#F5F3F0",borderRadius:8,fontSize:13,color:"#1A1A1A"}}>{sel.notas}</div>}
-        </div>;})()}
-
-      {tabDet==="interacciones"&&<div className="card">
-        <button className="btn bp sm" style={{marginBottom:12}} onClick={()=>{setFormInter(formInterVacio);setShowInter(true);}}>+ Registrar interacción</button>
-        {interacciones.length===0?<div className="empty"><span className="ico">📝</span><p>Sin interacciones registradas</p></div>
-        :interacciones.map(i=>{const rc=i.resultado==="positivo"?"#A6BE59":i.resultado==="negativo"?"#F35757":i.resultado==="sin_respuesta"?"#ECD227":"#8A8580";
-          return <div key={i.id} style={{display:"flex",gap:10,padding:"10px 0",borderBottom:"1px solid rgba(0,0,0,.04)"}}>
-            <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:2,width:32,flexShrink:0}}>
-              <span style={{fontSize:18}}>{ICONOS_INTERACCION[i.tipo]||"📝"}</span>
-              <div style={{width:2,flex:1,background:"rgba(0,0,0,.06)"}}/>
-            </div>
-            <div style={{flex:1,minWidth:0}}>
-              <div style={{fontSize:11,color:"#BFBAB4",marginBottom:3}}>{i.fecha?tiempoDesde(i.fecha):"—"} — {i.creado_por||"Sistema"}</div>
-              <div style={{fontSize:13,color:"#1A1A1A",lineHeight:1.4}}>{i.resumen}</div>
-              <div style={{display:"flex",gap:6,marginTop:4}}>
-                <span className="badge" style={{background:`${rc}18`,color:rc,fontSize:10}}>{i.resultado==="positivo"?"✅ positivo":i.resultado==="negativo"?"❌ negativo":i.resultado==="sin_respuesta"?"📵 sin respuesta":"➖ neutro"}</span>
-              </div>
-            </div>
-          </div>;})}
-      </div>}
-
-      {tabDet==="visitas"&&<div className="card">
-        {visitasC.length===0?<div className="empty"><span className="ico">👁</span><p>Sin visitas vinculadas</p></div>
-        :visitasC.map(v=><div key={v.id} style={{padding:"10px 0",borderBottom:"1px solid rgba(0,0,0,.04)",cursor:"pointer"}} onClick={()=>{setPage("visitas");}}>
-          <div style={{fontSize:13,fontWeight:600,color:"#1A1A1A"}}>{new Date(v.fecha+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"long",year:"numeric"})} · {v.hora?.slice(0,5)||"—"}</div>
-          <div style={{fontSize:12,color:"#8A8580",marginTop:3}}>{v.estado} · {v.tipo_evento||"—"}</div>
-        </div>)}
-      </div>}
-
-      {tabDet==="reservas"&&<div className="card">
-        {reservasC.length===0&&airbnbsC.length===0?<div className="empty"><span className="ico">📋</span><p>Sin reservas vinculadas</p></div>:<>
-          {reservasC.map(r=><div key={`r-${r.id}`} style={{padding:"10px 0",borderBottom:"1px solid rgba(0,0,0,.04)",cursor:"pointer"}} onClick={()=>setPage("reservas")}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-              <div><div style={{fontSize:13,fontWeight:600,color:"#1A1A1A"}}>{r.nombre}</div><div style={{fontSize:12,color:"#8A8580",marginTop:3}}>📅 {new Date(r.fecha+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"long",year:"numeric"})} · {r.estado}</div></div>
-              <div style={{fontSize:14,fontWeight:700,color:"#EC683E"}}>{getPrecioReserva(r).toLocaleString("es-ES")}€</div>
-            </div>
-          </div>)}
-          {airbnbsC.map(a=><div key={`a-${a.id}`} style={{padding:"10px 0",borderBottom:"1px solid rgba(0,0,0,.04)",cursor:"pointer"}} onClick={()=>setPage("airbnb")}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-              <div><div style={{fontSize:13,fontWeight:600,color:"#1A1A1A"}}>🏠 {a.huesped}</div><div style={{fontSize:12,color:"#8A8580",marginTop:3}}>📅 {a.fecha_entrada} → {a.fecha_salida}</div></div>
-              <div style={{fontSize:14,fontWeight:700,color:"#10b981"}}>{getPrecioReserva(a).toLocaleString("es-ES")}€</div>
-            </div>
-          </div>)}
-          <div style={{marginTop:10,padding:"10px 12px",background:"#F5F3F0",borderRadius:8,fontSize:13,fontWeight:600,display:"flex",justifyContent:"space-between"}}><span>💰 Valor total</span><span style={{color:"#EC683E"}}>{[...reservasC,...airbnbsC].reduce((s,r)=>s+getPrecioReserva(r),0).toLocaleString("es-ES")}€</span></div>
-        </>}
-      </div>}
-
-      {/* MODAL CAMBIAR ESTADO */}
-      {showEstado&&<div className="ov" onClick={()=>setShowEstado(false)}><div className="modal" style={{maxWidth:360}} onClick={e=>e.stopPropagation()}>
-        <h3>Cambiar estado</h3>
-        {Object.entries(ESTADO_CONTACTO).map(([k,v])=><button key={k} className="btn bg" style={{width:"100%",justifyContent:"flex-start",marginBottom:6,borderColor:sel.estado===k?v.col:undefined,color:sel.estado===k?v.col:undefined}} onClick={()=>cambiarEstado(sel,k)}>{v.ico} {v.lbl}{sel.estado===k?" ✓":""}</button>)}
-      </div></div>}
+      <div style={{display:"flex",gap:8,marginTop:16}}>
+        {[{icon:"phone",label:"Llamar",action:()=>sel.telefono&&window.open("tel:"+sel.telefono)},{icon:"mail",label:"Email",action:()=>sel.email&&window.open("mailto:"+sel.email)}].map((b,i)=><button key={i} onClick={b.action} style={{flex:1,padding:"10px 0",borderRadius:16,background:"rgba(255,255,255,.18)",border:0,color:"white",display:"flex",flexDirection:"column",alignItems:"center",gap:4,cursor:"pointer",fontFamily:T.sans}}><FmIcon name={b.icon} size={16} stroke="white"/><span style={{fontSize:11,fontWeight:600}}>{b.label}</span></button>)}
+      </div>
     </div>
-  </>;
+    {/* Tabs */}
+    <div style={{display:"flex",background:T.surface,borderBottom:`1px solid ${T.line}`,position:"sticky",top:0,zIndex:5}}>
+      {["Resumen","Interacciones","Visitas","Reservas"].map(t=>{const on=tabDet===t.toLowerCase();return<button key={t} onClick={()=>setTabDet(t.toLowerCase())} style={{flex:1,padding:"13px 0",border:0,background:"transparent",fontFamily:T.sans,fontSize:12,fontWeight:on?600:500,color:on?T.ink:T.ink3,cursor:"pointer",position:"relative"}}>{t}{on&&<span style={{position:"absolute",bottom:0,left:"25%",right:"25%",height:2,background:T.terracotta,borderRadius:2}}/>}</button>;})}
+    </div>
+    {/* Tab content */}
+    <div style={{padding:16}}>
+      {tabDet==="resumen"&&<div style={{display:"flex",flexDirection:"column",gap:10}}>
+        <div style={{background:T.surface,borderRadius:16,padding:14,border:`1px solid ${T.line}`}}>
+          <div style={{fontSize:10,color:T.ink3,letterSpacing:1,textTransform:"uppercase",fontWeight:600,marginBottom:10}}>Datos</div>
+          <div style={{display:"flex",flexDirection:"column",gap:10}}>
+            {[{label:"Teléfono",value:sel.telefono,icon:"phone"},{label:"Email",value:sel.email,icon:"mail"},{label:"Origen",value:sel.origen,icon:"search"},{label:"Asignado a",value:sel.asignado_nombre,icon:"users"}].filter(f=>f.value).map((f,i)=><div key={i} style={{display:"flex",alignItems:"center",gap:10}}><div style={{width:30,height:30,borderRadius:8,background:T.bg,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><FmIcon name={f.icon} size={14} stroke={T.ink2}/></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:10,color:T.ink3,letterSpacing:.3,textTransform:"uppercase"}}>{f.label}</div><div style={{fontSize:13,color:T.ink,fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{f.value}</div></div></div>)}
+          </div>
+        </div>
+        {(sel.tipo_evento||sel.presupuesto_estimado)&&<div style={{background:T.surface,borderRadius:16,padding:14,border:`1px solid ${T.line}`}}>
+          <div style={{fontSize:10,color:T.ink3,letterSpacing:1,textTransform:"uppercase",fontWeight:600,marginBottom:10}}>Evento</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+            {sel.tipo_evento&&<div><div style={{fontSize:10,color:T.ink3,textTransform:"uppercase",fontWeight:500}}>Tipo</div><div style={{fontSize:18,color:T.ink,fontWeight:700,lineHeight:1.2,marginTop:2}}>{sel.tipo_evento}</div></div>}
+            {sel.fecha_evento_prevista&&<div><div style={{fontSize:10,color:T.ink3,textTransform:"uppercase",fontWeight:500}}>Fecha</div><div style={{fontSize:18,color:T.terracotta,fontWeight:700,lineHeight:1.2,marginTop:2}}>{new Date(sel.fecha_evento_prevista+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short",year:"numeric"})}</div></div>}
+            {sel.presupuesto_estimado&&<div><div style={{fontSize:10,color:T.ink3,textTransform:"uppercase",fontWeight:500}}>Presupuesto</div><div style={{fontSize:18,color:T.olive,fontWeight:700,lineHeight:1.2,marginTop:2}}>{fmtEur(sel.presupuesto_estimado)}</div></div>}
+          </div>
+        </div>}
+        {tareasP[0]&&<div style={{background:"#FEF8F3",borderRadius:16,padding:14,border:`1px solid ${T.terracotta}33`}}>
+          <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}><FmIcon name="warn" size={14} stroke={T.terracotta}/><span style={{fontSize:11,fontWeight:600,color:T.terracotta,letterSpacing:.2,textTransform:"uppercase"}}>Próxima acción</span></div>
+          <div style={{fontSize:13,color:T.ink,fontWeight:500}}>{tareasP[0].titulo}</div>
+          {tareasP[0].fecha_limite&&<div style={{fontSize:11,color:T.ink2,marginTop:4}}>Vence: {new Date(tareasP[0].fecha_limite+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"long"})}</div>}
+        </div>}
+        {sel.notas&&<div style={{background:T.surface,borderRadius:16,padding:14,border:`1px solid ${T.line}`,fontSize:13,color:T.ink}}>{sel.notas}</div>}
+      </div>}
+
+      {tabDet==="interacciones"&&<div>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+          <span style={{fontSize:11,color:T.ink3,letterSpacing:1,textTransform:"uppercase",fontWeight:600}}>Historial · {interacciones.length}</span>
+          <button onClick={()=>{setFormInter(formInterVacio);setShowInter(true);}} style={{background:T.ink,color:"white",border:0,padding:"6px 10px",borderRadius:999,fontSize:11,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",gap:4,fontFamily:T.sans}}><FmIcon name="plus" size={12} stroke="white"/> Registrar</button>
+        </div>
+        <div style={{position:"relative",paddingLeft:30}}>
+          <div style={{position:"absolute",left:15,top:14,bottom:14,width:1.5,background:T.line,borderRadius:1}}/>
+          {interacciones.map(it=>{const tipoCol={llamada:T.softBlue,whatsapp:T.olive,email:T.lavender,visita_finca:T.gold,reunion:T.terracotta,nota:T.ink3};const tipoIco={llamada:"phone",whatsapp:"phone",email:"mail",visita_finca:"home",reunion:"users",nota:"edit"};const color=tipoCol[it.tipo]||T.ink3;const icon=tipoIco[it.tipo]||"edit";const resCol={positivo:T.olive,negativo:T.danger,sin_respuesta:T.gold,neutro:T.ink3};
+            return<div key={it.id} style={{position:"relative",marginBottom:12}}>
+              <div style={{position:"absolute",left:-30,top:4,width:30,height:30,borderRadius:999,background:color+"22",color,display:"flex",alignItems:"center",justifyContent:"center",border:`3px solid ${T.bg}`}}><FmIcon name={icon} size={13} stroke={color} sw={2}/></div>
+              <div style={{background:T.surface,borderRadius:12,padding:11,border:`1px solid ${T.line}`}}>
+                <div style={{display:"flex",justifyContent:"space-between",gap:8,marginBottom:3}}><span style={{fontSize:12,fontWeight:600,color:T.ink,letterSpacing:-.1}}>{it.tipo?.charAt(0).toUpperCase()+it.tipo?.slice(1).replace("_"," ")}</span><span style={{fontSize:10,color:T.ink3,whiteSpace:"nowrap"}}>{it.fecha?new Date(it.fecha).toLocaleDateString("es-ES",{day:"numeric",month:"short"}):""}</span></div>
+                {it.resumen&&<div style={{fontSize:11,color:T.ink2,marginBottom:6}}>{it.resumen}</div>}
+                {it.resultado&&<span style={{display:"inline-flex",alignItems:"center",gap:4,height:20,padding:"0 8px",borderRadius:999,background:(resCol[it.resultado]||T.ink3)+"22",color:resCol[it.resultado]||T.ink3,fontSize:10,fontWeight:600}}>{it.resultado}</span>}
+              </div>
+            </div>;})}
+          {interacciones.length===0&&<div style={{color:T.ink3,fontSize:13,textAlign:"center",padding:"20px 0"}}>Sin interacciones</div>}
+        </div>
+      </div>}
+
+      {tabDet==="visitas"&&<div style={{display:"flex",flexDirection:"column",gap:10}}>
+        <button onClick={abrirVisitaDesdeContacto} style={{width:"100%",padding:"12px 0",borderRadius:999,border:`1px solid ${T.line}`,background:T.surface,color:T.ink,fontFamily:T.sans,fontSize:13,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}><FmIcon name="plus" size={14} stroke={T.ink}/> Programar visita</button>
+        {visitasC.map(v=><div key={v.id} style={{background:T.surface,borderRadius:16,padding:14,border:`1px solid ${T.line}`}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6}}>
+            <div><div style={{fontSize:10,color:T.ink3,letterSpacing:1,textTransform:"uppercase",fontWeight:600}}>{new Date(v.fecha+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"})} · {v.hora||"—"}</div><div style={{fontSize:17,color:T.ink,marginTop:2,fontWeight:700}}>{v.nombre||"Visita"}</div></div>
+            <span style={{display:"inline-flex",alignItems:"center",height:22,padding:"0 9px",borderRadius:999,background:v.estado==="realizada"?T.olive+"33":T.gold+"33",color:v.estado==="realizada"?"#5A8A3E":"#9B8324",fontSize:11,fontWeight:600}}>{v.estado?.charAt(0).toUpperCase()+v.estado?.slice(1)||"Pendiente"}</span>
+          </div>
+          {v.nota&&<div style={{fontSize:11,color:T.ink3,marginTop:6,padding:"8px 10px",background:T.bg,borderRadius:8}}>{v.nota}</div>}
+        </div>)}
+        {visitasC.length===0&&<div style={{color:T.ink3,fontSize:13,textAlign:"center",padding:"20px 0"}}>Sin visitas</div>}
+      </div>}
+
+      {tabDet==="reservas"&&<div style={{display:"flex",flexDirection:"column",gap:10}}>
+        {[...reservasC,...airbnbsC].map(r=><div key={r.id} style={{background:T.surface,borderRadius:16,padding:14,border:`1px solid ${T.line}`}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+            <div><div style={{fontSize:10,color:T.ink3,letterSpacing:1,textTransform:"uppercase",fontWeight:600}}>{r.fecha_entrada?"Airbnb":"Evento"} · {new Date((r.fecha||r.fecha_entrada)+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short",year:"numeric"})}</div><div style={{fontSize:17,color:T.ink,marginTop:2,fontWeight:700}}>{r.nombre||r.huesped}</div></div>
+            <span style={{display:"inline-flex",alignItems:"center",gap:4,height:22,padding:"0 9px",borderRadius:999,background:r.estado_pago==="pagado_completo"?T.olive+"33":T.gold+"33",color:r.estado_pago==="pagado_completo"?"#5A8A3E":"#9B8324",fontSize:11,fontWeight:600}}>{r.estado_pago==="pagado_completo"?"Pagado":r.seña_cobrada?"Seña OK":"Pendiente"}</span>
+          </div>
+          <div style={{height:1,background:T.line,margin:"12px -14px"}}/>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+            <div><div style={{fontSize:10,color:T.ink3,textTransform:"uppercase",fontWeight:500}}>Total</div><div style={{fontSize:18,color:T.ink,fontWeight:700,marginTop:2}}>{fmtEur(getPrecioReserva(r))}</div></div>
+            <div><div style={{fontSize:10,color:T.ink3,textTransform:"uppercase",fontWeight:500}}>Pendiente</div><div style={{fontSize:18,color:T.terracotta,fontWeight:700,marginTop:2}}>{fmtEur(Math.max(0,getPrecioReserva(r)-(parseFloat(r.seña_cobrada?r.seña_importe||0:0))))}</div></div>
+          </div>
+        </div>)}
+        {reservasC.length===0&&airbnbsC.length===0&&<div style={{color:T.ink3,fontSize:13,textAlign:"center",padding:"20px 0"}}>Sin reservas</div>}
+      </div>}
+
+      <div style={{marginTop:20}}><TareasComerciales entidad_tipo="visita" entidad_id={sel.id} entidad_nombre={sel.nombre} tok={tok} perfil={perfil} rol={rol}/></div>
+    </div>
+    {/* MODAL CAMBIAR ESTADO */}
+    {showEstado&&<div className="ov" onClick={()=>setShowEstado(false)}><div className="modal" style={{maxWidth:360}} onClick={e=>e.stopPropagation()}>
+      <h3>Cambiar estado</h3>
+      {Object.entries(ESTADO_CONTACTO).map(([k,v])=><button key={k} className="btn bg" style={{width:"100%",justifyContent:"flex-start",marginBottom:6,borderColor:sel.estado===k?v.col:undefined,color:sel.estado===k?v.col:undefined}} onClick={()=>cambiarEstado(sel,k)}>{v.ico} {v.lbl}{sel.estado===k?" ✓":""}</button>)}
+    </div></div>}
+  </div>;
 
   // ─── LISTA ──
-  return <>
-    <div className="ph"><h2>👥 Contactos</h2><p>{contactos.length} contactos</p></div>
-    <div className="pb">
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12,gap:8,flexWrap:"wrap"}}>
-        <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
-          {[{id:"todos",lbl:"Todos"},{id:"lead",lbl:`🔵 Leads ${conteo("lead")}`},{id:"visitante",lbl:`🟡 Visitantes ${conteo("visitante")}`},{id:"cliente",lbl:`🟢 Clientes ${conteo("cliente")}`},{id:"recurrente",lbl:`⭐ Recurrentes ${conteo("recurrente")}`},{id:"perdido",lbl:`⚫ Perdidos ${conteo("perdido")}`}].map(f=><button key={f.id} className={`btn sm${filtro===f.id?" bp":" bg"}`} onClick={()=>setFiltro(f.id)}>{f.lbl}</button>)}
-        </div>
-        <button className="btn bp" onClick={()=>{setForm(formVacio);setEditando(false);setShowForm(true);}}>+ Nuevo contacto</button>
+  const conteo=estado=>contactos.filter(c=>c.estado===estado).length;
+  return <div style={{background:T.bg,minHeight:"100%",paddingBottom:80}}>
+    {/* Header */}
+    <div style={{padding:"54px 20px 16px",display:"flex",alignItems:"flex-end",justifyContent:"space-between",gap:10}}>
+      <div style={{flex:1}}><div style={{fontSize:12,color:T.ink3,fontWeight:500,marginBottom:2}}>CRM · Clientes y leads</div><div style={{fontSize:30,fontWeight:700,color:T.ink,letterSpacing:-1,lineHeight:1.02}}>Contactos</div></div>
+      <button onClick={()=>{setForm(formVacio);setEditando(false);setShowForm(true);}} style={{width:40,height:40,borderRadius:999,background:T.terracotta,color:"white",border:0,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",boxShadow:"0 6px 14px rgba(236,104,62,.3)",flexShrink:0}}><FmIcon name="plus" size={18} stroke="white"/></button>
+    </div>
+    {/* Buscador */}
+    <div style={{padding:"0 20px 12px"}}>
+      <div style={{display:"flex",alignItems:"center",gap:10,background:T.surface,border:`1px solid ${T.line}`,borderRadius:16,padding:"11px 14px"}}>
+        <FmIcon name="search" size={16} stroke={T.ink3}/>
+        <input value={busqueda} onChange={e=>setBusqueda(e.target.value)} placeholder="Buscar por nombre, teléfono o email" style={{flex:1,border:0,outline:"none",background:"transparent",fontFamily:T.sans,fontSize:13,color:T.ink}}/>
+        {busqueda&&<button onClick={()=>setBusqueda("")} style={{background:"transparent",border:0,cursor:"pointer",display:"flex"}}><FmIcon name="x" size={14} stroke={T.ink3}/></button>}
       </div>
-      <input className="fi" value={busqueda} onChange={e=>setBusqueda(e.target.value)} placeholder="Buscar por nombre, teléfono o email…" style={{marginBottom:14}}/>
-
-      {filtrados.length===0?<div className="empty"><span className="ico">👥</span><p>No hay contactos con este filtro</p></div>
-      :filtrados.map(c=>{const ec=ESTADO_CONTACTO[c.estado]||ESTADO_CONTACTO.lead;const ultimaInter=c.updated_at?tiempoDesde(c.updated_at):"—";
-        return <div key={c.id} className="card" style={{marginBottom:10,borderLeft:`3px solid ${ec.col}`,cursor:"pointer"}} onClick={()=>cargarDetalle(c)}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8}}>
-            <div style={{minWidth:0}}>
-              <div style={{fontSize:15,fontWeight:600,color:"#1A1A1A"}}>{c.nombre}</div>
-              <div style={{fontSize:12,color:"#8A8580",marginTop:4}}>
-                {c.tipo_evento==="boda"?"💍":c.tipo_evento==="comunion"?"⛪":c.tipo_evento==="empresa"?"🏢":c.tipo_evento==="airbnb"?"🏠":"🎉"} {c.tipo_evento||"—"}
-                {(c.fecha_evento_prevista||c.mes_evento_previsto)&&<> · 📅 {c.fecha_evento_prevista?new Date(c.fecha_evento_prevista+"T12:00:00").toLocaleDateString("es-ES",{month:"short",year:"numeric"}):`${c.mes_evento_previsto}/${c.anio_evento_previsto}`}</>}
-                {c.telefono&&<> · 📞 {c.telefono}</>}
+    </div>
+    {/* Filtros */}
+    <div style={{padding:"0 20px 14px",display:"flex",gap:6,overflowX:"auto"}}>
+      {["todos","lead","visitante","cliente","recurrente","perdido"].map(f=>{const on=filtro===f;const cfg=CSC[f];const cnt=f==="todos"?contactos.length:conteo(f);
+        return<button key={f} onClick={()=>setFiltro(f)} style={{flexShrink:0,height:30,padding:"0 12px",borderRadius:999,border:`1px solid ${on?T.ink:T.line}`,background:on?T.ink:T.surface,color:on?"white":T.ink2,fontFamily:T.sans,fontSize:12,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:6,textTransform:"capitalize"}}>{cfg&&<span style={{width:6,height:6,borderRadius:999,background:on?"rgba(255,255,255,.5)":cfg.c}}/>}{f==="todos"?"Todos":f} <span style={{fontSize:10,color:on?"rgba(255,255,255,.5)":T.ink3}}>{cnt}</span></button>;})}
+    </div>
+    {/* Lista */}
+    <div style={{padding:"0 20px",display:"flex",flexDirection:"column",gap:8}}>
+      {filtrados.map(c=>{const s=CSC[c.estado]||CSC.lead;const ini=c.nombre?.split(" ").map(p=>p[0]).slice(0,2).join("").toUpperCase()||"??";
+        return<div key={c.id} onClick={()=>cargarDetalle(c)} style={{background:T.surface,borderRadius:16,padding:14,border:`1px solid ${T.line}`,cursor:"pointer"}}>
+          <div style={{display:"flex",alignItems:"center",gap:12}}>
+            <div style={{width:42,height:42,borderRadius:999,background:s.bg,color:s.c,display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,fontWeight:700,flexShrink:0}}>{ini}</div>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",gap:8}}>
+                <span style={{fontSize:14,fontWeight:600,color:T.ink,letterSpacing:-.2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.nombre}</span>
+                <span style={{display:"inline-flex",alignItems:"center",gap:4,height:22,padding:"0 9px",borderRadius:999,background:s.bg,color:s.c,fontSize:11,fontWeight:600,whiteSpace:"nowrap",flexShrink:0}}><span style={{width:5,height:5,borderRadius:999,background:s.c}}/>{c.estado?.charAt(0).toUpperCase()+c.estado?.slice(1)||"Lead"}</span>
               </div>
-              <div style={{display:"flex",gap:6,marginTop:6,flexWrap:"wrap"}}>
-                <span className="badge" style={{background:`${ec.col}18`,color:ec.col}}>{ec.ico} {ec.lbl}</span>
-                {c.origen&&<span className="badge" style={{background:"#F5F3F0",color:"#8A8580"}}>{c.origen}</span>}
+              <div style={{fontSize:11.5,color:T.ink3,marginTop:4,display:"flex",alignItems:"center",gap:6,overflow:"hidden"}}>
+                <span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.tipo_evento||"—"}</span>
+                {c.fecha_evento_prevista&&<><span style={{color:T.ink4}}>·</span><span style={{color:T.ink2,fontWeight:500,whiteSpace:"nowrap"}}>{new Date(c.fecha_evento_prevista+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"})}</span></>}
+                {c.origen&&<><span style={{color:T.ink4}}>·</span><span style={{whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{c.origen}</span></>}
               </div>
             </div>
-            <div style={{fontSize:11,color:"#BFBAB4",flexShrink:0,textAlign:"right"}}>Última act.<br/>{ultimaInter}</div>
           </div>
         </div>;})}
+      {filtrados.length===0&&<div style={{textAlign:"center",padding:"40px 20px",color:T.ink3,fontSize:13}}>{busqueda?`Sin resultados para "${busqueda}"`:"Sin contactos en esta categoría"}</div>}
     </div>
 
     {/* MODAL NUEVO/EDITAR CONTACTO */}
@@ -6819,7 +6833,7 @@ function Contactos({perfil,tok,rol,setPage}){
       <div className="fg"><label>Nota</label><textarea className="fi" rows={2} value={formVis.nota} onChange={e=>setFormVis(v=>({...v,nota:e.target.value}))} placeholder="Notas…"/></div>
       <div className="mft"><button className="btn bg" onClick={()=>setShowVisita(false)}>Cancelar</button><button className="btn bp" onClick={programarVisita} disabled={saving}>{saving?"Guardando…":"📅 Programar"}</button></div>
     </div></div>}
-  </>;
+  </div>;
 }
 
 function Visitas({perfil,tok,rol,setPage,navTarget,setNavTarget}){
