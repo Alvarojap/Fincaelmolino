@@ -2620,9 +2620,10 @@ function DashJ({perfil,jsem,jpunt,cwk,setPage,tok}){
   const totalAcum=parseFloat(srvActivo?.horas_totales||0);
 
   return <>
-    <div style={{padding:"28px 32px 16px"}}><div style={{fontSize:12,color:T.ink3,fontWeight:500}}>{new Date().toLocaleDateString("es-ES",{weekday:"long",day:"numeric",month:"long"})}</div><div style={{fontSize:28,fontWeight:700,color:T.ink,letterSpacing:-.8,lineHeight:1.02,marginTop:2}}>Hola, {perfil.nombre.split(" ")[0]} 🌿</div></div>
+    {/* Greeting */}
+    <div style={{padding:"54px 20px 16px"}}><div style={{fontSize:12,color:T.ink3,fontWeight:500}}>{new Date().toLocaleDateString("es-ES",{weekday:"long",day:"numeric",month:"long"}).replace(/^\w/,c=>c.toUpperCase())}</div><div style={{fontSize:28,fontWeight:700,color:T.ink,letterSpacing:-.8,lineHeight:1.02,marginTop:2}}>Hola, {perfil.nombre.split(" ")[0]} 🌿</div></div>
     <div className="pb">
-      {meteoJ&&<div style={{background:"rgba(127,178,255,.08)",borderRadius:14,padding:"10px 14px",marginBottom:14,fontSize:13,color:"#5A8AD4",fontWeight:500}}>{meteoJ.rain>10?`💧 Lluvia abundante prevista ${meteoJ.day} (${meteoJ.rain}mm) — el riego puede ser innecesario`:`🌧️ Lluvia prevista ${meteoJ.day} (${meteoJ.rain}mm) — considera posponer el riego`}</div>}
+      {meteoJ&&<div style={{background:T.softBlue+"14",borderRadius:16,padding:"10px 14px",marginBottom:14,fontSize:13,color:"#2A5BA0",fontWeight:500,display:"flex",alignItems:"center",gap:8}}><FmIcon name="cloud" size={16} stroke="#2A5BA0"/>{meteoJ.rain>10?`Lluvia abundante prevista ${meteoJ.day} (${meteoJ.rain}mm) — el riego puede ser innecesario`:`Lluvia prevista ${meteoJ.day} (${meteoJ.rain}mm) — considera posponer el riego`}</div>}
       {coordPJ.map(c=>{
         const tQ=perfil?.es_operario?SB_KEY:tok;
         const fechaFmt=c.fecha_checkin_siguiente?new Date(c.fecha_checkin_siguiente+"T12:00:00").toLocaleDateString("es-ES",{weekday:"long",day:"numeric",month:"long"}):"—";
@@ -2639,48 +2640,55 @@ function DashJ({perfil,jsem,jpunt,cwk,setPage,tok}){
           for(const a of adms)await sbPost("notificaciones",{para:a.id,txt:`🌿 ${perfil.nombre} realizará jardín el ${new Date(ds+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"long"})}`},tQ).catch(()=>{});
           setCoordPJ(prev=>prev.filter(x=>x.id!==c.id));await loadCoordYServicios();}catch(_){}setSavingCoord(false);
         };
-        // preguntando_si_lista → ask if ready
-        if(c.estado==="preguntando_si_lista") return <div key={c.id} className="card" style={{marginBottom:14,border:"2px solid #A6BE59",background:"rgba(166,190,89,.04)"}}>
-          <div style={{fontSize:14,fontWeight:800,color:"#A6BE59",marginBottom:8}}>🌿 ¿Está el jardín listo?</div>
-          <div style={{fontSize:13,color:"#1A1A1A",marginBottom:12}}>Reserva el {fechaFmt} — en {diasH} día{diasH!==1?"s":""}</div>
-          <div style={{display:"flex",gap:8}}>
-            <button className="btn bp" style={{flex:1,justifyContent:"center",background:"#A6BE59"}} disabled={savingCoord} onClick={async()=>{setSavingCoord(true);try{await sbPatch("coordinacion_servicios",`id=eq.${c.id}`,{estado:"listo_confirmado",respondido_por:perfil.nombre},tQ);const adms=await sbGet("usuarios","?rol=eq.admin&select=id",tQ).catch(()=>[]);for(const a of adms)await sbPost("notificaciones",{para:a.id,txt:`✅ ${perfil.nombre} confirma: jardín listo para el ${fechaFmt}`},tQ).catch(()=>{});setCoordPJ(prev=>prev.filter(x=>x.id!==c.id));}catch(_){}setSavingCoord(false);}}>{savingCoord?<div className="spin" style={{width:16,height:16,borderWidth:2}}/>:"✅ Sí, está listo"}</button>
-            <button className="btn br" style={{flex:1,justifyContent:"center"}} disabled={savingCoord} onClick={()=>{setCoordPJ(prev=>prev.map(x=>x.id===c.id?{...x,estado:"servicio_creado_pendiente_fecha"}:x));}}>❌ No, necesita servicio</button>
+        if(c.estado==="preguntando_si_lista") return <div key={c.id} style={{padding:"0 20px 10px"}}><div style={{background:T.olive,borderRadius:20,padding:16,color:T.ink}}>
+          <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8}}><div style={{width:8,height:8,borderRadius:999,background:T.ink}}/><span style={{fontSize:10,fontWeight:700,letterSpacing:1,textTransform:"uppercase"}}>Acción requerida</span></div>
+          <div style={{fontSize:18,fontWeight:700,letterSpacing:-.4,lineHeight:1.2}}>¿Está el jardín listo?</div>
+          <div style={{fontSize:12,color:"rgba(20,25,5,.75)",marginTop:4}}>Reserva el {fechaFmt} — en {diasH} día{diasH!==1?"s":""}</div>
+          <div style={{display:"flex",gap:8,marginTop:12}}>
+            <button disabled={savingCoord} onClick={async()=>{setSavingCoord(true);try{await sbPatch("coordinacion_servicios",`id=eq.${c.id}`,{estado:"listo_confirmado",respondido_por:perfil.nombre},tQ);const adms=await sbGet("usuarios","?rol=eq.admin&select=id",tQ).catch(()=>[]);for(const a of adms)await sbPost("notificaciones",{para:a.id,txt:`✅ ${perfil.nombre} confirma: jardín listo para el ${fechaFmt}`},tQ).catch(()=>{});setCoordPJ(prev=>prev.filter(x=>x.id!==c.id));}catch(_){}setSavingCoord(false);}} style={{flex:1,padding:"12px 0",borderRadius:14,background:T.ink,color:"white",border:0,fontFamily:T.sans,fontSize:13,fontWeight:700,cursor:"pointer"}}>{savingCoord?"…":"✓ Listo"}</button>
+            <button disabled={savingCoord} onClick={()=>{setCoordPJ(prev=>prev.map(x=>x.id===c.id?{...x,estado:"servicio_creado_pendiente_fecha"}:x));}} style={{flex:1,padding:"12px 0",borderRadius:14,background:"white",color:T.ink,border:0,fontFamily:T.sans,fontSize:13,fontWeight:700,cursor:"pointer"}}>✗ Falta preparar</button>
           </div>
-        </div>;
-        // servicio_creado_pendiente_fecha → pick day + create service
+        </div></div>;
         const dias=[];const ini=new Date(c.ventana_inicio||new Date().toISOString());const fin=new Date(c.ventana_fin||new Date(Date.now()+3*86400000).toISOString());const hoy2=new Date();let dd=ini>hoy2?ini:hoy2;while(dd<=fin&&dias.length<7){dias.push(new Date(dd));dd=new Date(dd.getTime()+86400000);}
-        return <div key={c.id} className="card" style={{marginBottom:14,border:"2px solid #A6BE59",background:"rgba(166,190,89,.04)"}}>
-          <div style={{fontSize:14,fontWeight:800,color:"#A6BE59",marginBottom:8}}>🌿 Elige día de jardín</div>
-          <div style={{fontSize:13,color:"#1A1A1A",marginBottom:4}}>Reserva el {fechaFmt}</div>
-          <div style={{fontSize:12,color:"#8A8580",marginBottom:10}}>📅 Ventana preferida</div>
-          <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-            {dias.map(d=><button key={d.toISOString()} className="btn bg" style={{padding:"10px 14px",fontSize:13,fontWeight:600}} disabled={savingCoord} onClick={()=>confirmarJ(d.toISOString().split("T")[0])}>{d.toLocaleDateString("es-ES",{weekday:"short",day:"numeric"})}</button>)}
+        return <div key={c.id} style={{padding:"0 20px 10px"}}><div style={{background:T.gold,borderRadius:20,padding:16,color:T.ink}}>
+          <div style={{fontSize:10,fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginBottom:6}}>Elige día</div>
+          <div style={{fontSize:16,fontWeight:700,letterSpacing:-.3,lineHeight:1.25}}>Jardín antes de reserva</div>
+          <div style={{fontSize:12,color:"rgba(30,25,5,.72)",marginTop:4}}>Reserva el {fechaFmt}</div>
+          <div style={{display:"grid",gridTemplateColumns:`repeat(${Math.min(dias.length,3)},1fr)`,gap:6,marginTop:12}}>
+            {dias.slice(0,3).map((d,i)=><button key={d.toISOString()} disabled={savingCoord} onClick={()=>confirmarJ(d.toISOString().split("T")[0])} style={{padding:"10px 0",borderRadius:14,background:i===0?T.ink:"rgba(255,255,255,.6)",color:i===0?"white":T.ink,border:0,cursor:"pointer",fontFamily:T.sans}}>
+              <div style={{fontSize:10,fontWeight:600,opacity:.7}}>{d.toLocaleDateString("es-ES",{weekday:"short"})}</div>
+              <div style={{fontSize:20,fontWeight:700,letterSpacing:-.5,marginTop:2}}>{d.getDate()}</div>
+              {i===0&&<div style={{fontSize:9,marginTop:2,opacity:.8}}>recomendado</div>}
+            </button>)}
           </div>
-        </div>;
+        </div></div>;
       })}
+
       {/* SERVICIO ACTIVO */}
-      {srvActivo&&<div className="card" style={{marginBottom:16,border:"1px solid rgba(16,185,129,.3)",background:"rgba(16,185,129,.04)"}}>
-        <div className="chdr"><span className="ctit">🌿 Servicio activo</span></div>
-        <div style={{fontSize:16,fontWeight:600,color:"#1A1A1A",marginBottom:4}}>{srvActivo.nombre}</div>
-        {(srvActivo.fecha_inicio||srvActivo.fecha_fin)&&<div style={{fontSize:11,color:"#8A8580",marginBottom:4}}>📅 {srvActivo.fecha_inicio?new Date(srvActivo.fecha_inicio+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"}):""}{srvActivo.fecha_fin?` → ${new Date(srvActivo.fecha_fin+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"})}`:""}</div>}
-        <div style={{fontSize:12,color:"#8A8580",marginBottom:6}}>Tareas: {srvTareas.filter(t=>t.done).length} de {srvTareas.length} completadas{srvExtras.length>0?` + ${srvExtras.length} extra`:""}</div>
-        <div className="prog" style={{marginBottom:14,height:8}}><div className="pfill" style={{width:`${srvTareas.length?(srvTareas.filter(t=>t.done).length/srvTareas.length)*100:0}%`}}/></div>
+      {srvActivo&&<div style={{background:T.surface,border:`1px solid ${T.line}`,borderRadius:20,padding:16,marginBottom:16}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}><span style={{fontSize:13,fontWeight:700,color:T.ink}}>🌿 Servicio activo</span><OpsStatePill estado="en_curso"/></div>
+        <div style={{fontSize:16,fontWeight:700,color:T.ink,letterSpacing:-.3,marginBottom:4}}>{srvActivo.nombre}</div>
+        {(srvActivo.fecha_inicio||srvActivo.fecha_fin)&&<div style={{fontSize:11,color:T.ink3,marginBottom:4,display:"flex",alignItems:"center",gap:4}}><FmIcon name="calendar" size={11} stroke={T.ink3}/>{srvActivo.fecha_inicio?new Date(srvActivo.fecha_inicio+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"}):""}{srvActivo.fecha_fin?` → ${new Date(srvActivo.fecha_fin+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"})}`:""}</div>}
+        <div style={{fontSize:12,color:T.ink3,marginBottom:6}}>Tareas: {srvTareas.filter(t=>t.done).length}/{srvTareas.length}{srvExtras.length>0?` + ${srvExtras.length} extra`:""}</div>
+        <div style={{height:6,background:T.bg,borderRadius:999,overflow:"hidden",marginBottom:14}}><div style={{height:"100%",background:T.olive,width:`${srvTareas.length?(srvTareas.filter(t=>t.done).length/srvTareas.length)*100:0}%`}}/></div>
 
         {/* Cronómetro */}
         {jornadaId&&!jornadaFin&&<>
-          <div style={{textAlign:"center",padding:"16px 0",marginBottom:12,background:"#F5F3F0",borderRadius:12}}>
-            <div style={{fontSize:11,color:pausado?"#D4A017":"#A6BE59",textTransform:"uppercase",letterSpacing:1,fontWeight:600,marginBottom:6}}>{pausado?"⏸ En pausa":"⏱️ Esta jornada"}</div>
-            <div style={{fontSize:36,fontWeight:700,color:pausado?"#D4A017":"#EC683E",fontFamily:"monospace",letterSpacing:2}}>{fmtEl(tiempoJornada)}</div>
-            {totalAcum>0&&<div style={{fontSize:12,color:"#8A8580",marginTop:6}}>📅 Total acumulado: {fmtHM(totalAcum*60)}</div>}
+          <div style={{background:"linear-gradient(150deg,#1A1A1A 0%,#2A2722 100%)",borderRadius:16,padding:16,color:"white",marginBottom:12,position:"relative",overflow:"hidden"}}>
+            <div style={{position:"absolute",top:-20,right:-20,width:100,height:100,borderRadius:999,background:T.olive+"24"}}/>
+            <div style={{position:"relative"}}>
+              <div style={{fontSize:10,color:"rgba(255,255,255,.7)",letterSpacing:1,textTransform:"uppercase",fontWeight:700,marginBottom:4}}>{pausado?"⏸ En pausa":"⏱ Esta jornada"}</div>
+              <div style={{fontSize:42,fontWeight:300,fontFamily:"monospace",letterSpacing:-2,lineHeight:1,fontVariantNumeric:"tabular-nums"}}>{fmtEl(tiempoJornada)}</div>
+              {totalAcum>0&&<div style={{fontSize:11,color:"rgba(255,255,255,.6)",marginTop:6}}>Acumulado: <b style={{color:"white"}}>{fmtHM(totalAcum*60)}</b></div>}
+            </div>
           </div>
           <div style={{display:"flex",gap:8,marginBottom:14}}>
-            <button className={`btn ${pausado?"bp":"bg"}`} style={{flex:1,justifyContent:"center",padding:"12px",fontSize:14}} onClick={togglePausa} disabled={saving2}>{pausado?"▶️ Reanudar":"⏸️ Pausar"}</button>
-            <button className="btn" style={{flex:1,justifyContent:"center",padding:"12px",fontSize:14,background:"#AFA3FF",color:"#fff",border:"none",borderRadius:100,cursor:"pointer",fontFamily:"'Inter Tight',sans-serif",fontWeight:600}} onClick={()=>setShowFinJornada(true)}>🌙 Terminar jornada</button>
+            <button onClick={togglePausa} disabled={saving2} style={{flex:1,padding:12,borderRadius:12,border:0,background:pausado?T.ink:T.bg,color:pausado?"white":T.ink,fontFamily:T.sans,fontSize:13,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>{pausado?"▶️ Reanudar":"⏸️ Pausar"}</button>
+            <button onClick={()=>setShowFinJornada(true)} style={{flex:1,padding:12,borderRadius:12,border:0,background:T.olive,color:T.ink,fontFamily:T.sans,fontSize:13,fontWeight:700,cursor:"pointer"}}>Terminar jornada</button>
           </div>
         </>}
-        {jornadaFin&&<div style={{background:"rgba(175,163,255,.08)",border:"1px solid rgba(175,163,255,.2)",borderRadius:12,padding:"10px 14px",marginBottom:12,fontSize:13,color:"#AFA3FF",textAlign:"center"}}>✅ Jornada de hoy completada — {fmtHM(jornadaDurMin||0)}</div>}
-        {!jornadaId&&!jornadaFin&&!showNuevaJornada&&<button className="btn bp" style={{width:"100%",justifyContent:"center",padding:"14px",fontSize:15,marginBottom:14}} onClick={iniciarJornada} disabled={saving2}>▶️ Iniciar jornada</button>}
+        {jornadaFin&&<div style={{background:T.olive+"14",borderRadius:12,padding:"10px 14px",marginBottom:12,fontSize:13,color:"#4A7A2E",textAlign:"center",fontWeight:600}}>✅ Jornada completada — {fmtHM(jornadaDurMin||0)}</div>}
+        {!jornadaId&&!jornadaFin&&!showNuevaJornada&&<button onClick={iniciarJornada} disabled={saving2} style={{width:"100%",padding:"14px 0",borderRadius:999,border:0,background:T.ink,color:"white",fontFamily:T.sans,fontSize:15,fontWeight:700,cursor:"pointer",marginBottom:14}}>▶️ Iniciar jornada</button>}
 
         {/* Checklist tareas asignadas */}
         <div style={{fontSize:11,color:"#EC683E",fontWeight:600,textTransform:"uppercase",letterSpacing:1,marginBottom:6,marginTop:8}}>Tareas asignadas</div>
