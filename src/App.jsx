@@ -6947,20 +6947,36 @@ function Reservas({tok,rol,perfil,navTarget,setNavTarget,setPage}){
     {sel&&tabR!=="airbnb"&&<RvEventDetail reserva={sel} tok={tok} perfil={perfil} rol={rol} isA={isA} onClose={()=>setSel(null)} onChanged={r=>{setReservas(prev=>prev.map(x=>x.id===r.id?r:x));setSel(r);}}/>}
     {selAb&&<RvBnbDetail reserva={selAb} tok={tok} perfil={perfil} onClose={()=>setSelAb(null)} onChanged={a=>{setAirbnbs(prev=>prev.map(x=>x.id===a.id?a:x));setSelAb(a);}}/>}
     {/* MODAL SEÑA */}
-    {showSeña&&sel&&<div className="ov" onClick={()=>setShowSeña(false)}>
-      <div className="modal" style={{maxWidth:400}} onClick={e=>e.stopPropagation()}>
-        <h3>💰 Registrar seña cobrada</h3>
-        <div style={{background:"rgba(201,168,76,.06)",border:"1px solid rgba(201,168,76,.15)",borderRadius:10,padding:"12px 14px",marginBottom:16}}>
-          <div style={{fontSize:13,color:"#EC683E",fontWeight:600}}>{sel.nombre}</div>
-          <div style={{fontSize:12,color:"#8A8580",marginTop:3}}>Precio total: {(parseFloat(sel.precio_total)||parseFloat(sel.precio)||0).toLocaleString("es-ES")}€</div>
+    {showSeña&&sel&&<div style={{position:"fixed",inset:0,background:"rgba(20,15,10,.6)",zIndex:999,display:"flex",alignItems:"flex-end",fontFamily:T.sans}}>
+      <div style={{width:"100%",background:T.bg,borderTopLeftRadius:24,borderTopRightRadius:24,maxHeight:"88vh",overflow:"auto",paddingBottom:34}} onClick={e=>e.stopPropagation()}>
+        <div style={{padding:"14px 20px 0",display:"flex",justifyContent:"center"}}><div style={{width:44,height:4,borderRadius:999,background:T.line}}/></div>
+        <div style={{padding:"14px 20px 16px",display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:`1px solid ${T.line}`}}>
+          <div><div style={{fontSize:12,color:T.ink3,fontWeight:500,marginBottom:2}}>{sel.nombre}</div><div style={{fontSize:22,fontWeight:700,color:T.ink,letterSpacing:-.6}}>Registrar cobro</div></div>
+          <button onClick={()=>setShowSeña(false)} style={{width:32,height:32,borderRadius:999,background:T.surface,border:`1px solid ${T.line}`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}><FmIcon name="x" size={15} stroke={T.ink}/></button>
         </div>
-        <div className="fg">
-          <label>Importe de la seña (€) *</label>
-          <input type="number" inputMode="decimal" className="fi" value={señaImporte} onChange={e=>setSeñaImporte(e.target.value)} placeholder="Ej: 1500" autoFocus/>
-        </div>
-        <div className="mft">
-          <button className="btn bg" onClick={()=>setShowSeña(false)}>Cancelar</button>
-          <button className="btn bp" onClick={registrarSeña} disabled={cobroSaving||!señaImporte}>{cobroSaving?"Guardando…":"💰 Confirmar cobro"}</button>
+        <div style={{padding:"16px 20px",display:"flex",flexDirection:"column",gap:14}}>
+          {/* Resumen */}
+          <div style={{background:"linear-gradient(135deg,#1A1A1A,#2a2520)",borderRadius:18,padding:16,color:"#fff"}}>
+            <div style={{fontSize:10,color:"rgba(255,255,255,.6)",letterSpacing:1,textTransform:"uppercase",fontWeight:700,marginBottom:4}}>Pendiente de cobro</div>
+            <div style={{fontSize:34,fontWeight:700,letterSpacing:-1,lineHeight:1}}>{fmtE(Math.max(0,getPrecioReserva(sel)-(parseFloat(sel.seña_cobrada?sel.seña_importe||0:0))))}</div>
+            <div style={{fontSize:11,color:"rgba(255,255,255,.5)",marginTop:6}}>Total {fmtE(getPrecioReserva(sel))} · Cobrado {fmtE(parseFloat(sel.seña_cobrada?sel.seña_importe||0:0))}</div>
+          </div>
+          {/* Importe */}
+          <div>
+            <div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase",marginBottom:8}}>Importe a cobrar</div>
+            <div style={{display:"flex",alignItems:"center",gap:12,background:T.surface,border:`1px solid ${T.line}`,borderRadius:16,padding:"14px 16px"}}>
+              <input type="number" inputMode="decimal" value={señaImporte} onChange={e=>setSeñaImporte(e.target.value)} placeholder="0" autoFocus style={{flex:1,background:"transparent",border:0,outline:"none",fontFamily:T.sans,fontSize:26,fontWeight:700,color:T.ink,letterSpacing:-.6,width:"100%"}}/>
+              <span style={{fontSize:20,fontWeight:700,color:T.ink3}}>€</span>
+            </div>
+            <div style={{display:"flex",gap:6,marginTop:8,flexWrap:"wrap"}}>
+              {[{l:"Señal 20%",v:Math.round(getPrecioReserva(sel)*.2)},{l:"50%",v:Math.round(getPrecioReserva(sel)*.5)},{l:"Saldo total",v:Math.max(0,getPrecioReserva(sel)-(parseFloat(sel.seña_cobrada?sel.seña_importe||0:0)))}].map((q,i)=><button key={i} onClick={()=>setSeñaImporte(String(q.v))} style={{padding:"7px 12px",borderRadius:999,border:`1px solid ${T.line}`,background:T.surface,color:T.ink2,fontFamily:T.sans,fontSize:11,fontWeight:700,cursor:"pointer"}}>{q.l} · {fmtE(q.v)}</button>)}
+            </div>
+          </div>
+          {/* Botones */}
+          <div style={{display:"flex",gap:8,paddingTop:4}}>
+            <button onClick={()=>setShowSeña(false)} style={{flex:1,padding:"14px 0",borderRadius:999,border:`1px solid ${T.line}`,background:T.surface,color:T.ink,fontFamily:T.sans,fontWeight:600,fontSize:14,cursor:"pointer"}}>Cancelar</button>
+            <button onClick={registrarSeña} disabled={cobroSaving||!señaImporte} style={{flex:2,padding:"14px 0",borderRadius:999,border:0,background:cobroSaving||!señaImporte?T.ink+"55":T.ink,color:"#fff",fontFamily:T.sans,fontWeight:700,fontSize:14,cursor:cobroSaving||!señaImporte?"not-allowed":"pointer"}}>{cobroSaving?"Guardando…":"Confirmar cobro"}</button>
+          </div>
         </div>
       </div>
     </div>}
