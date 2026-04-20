@@ -6738,12 +6738,14 @@ function TareasComerciales({entidad_tipo,entidad_id,entidad_nombre,tok,perfil,ro
   const hechas=tareas.filter(t=>t.estado==="hecha"||t.estado==="Hecha"||t.estado==="completada");
   const urgencia=(t)=>{if(!t.fecha_limite)return"normal";if(t.fecha_limite<hoy)return"vencida";if(t.fecha_limite===hoy)return"hoy";const d=Math.ceil((new Date(t.fecha_limite+"T12:00:00")-new Date())/(86400000));return d<=3?"proxima":"normal";};
   const colUrg={vencida:"#F35757",hoy:"#D4A017",proxima:"#D4A017",normal:"#A6BE59"};
-  return <div style={{marginTop:16,borderTop:"1px solid rgba(0,0,0,.06)",paddingTop:14}}>
-    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-      <span style={{fontSize:13,color:"#8A8580"}}>{pend.length} pendiente{pend.length!==1?"s":""}</span>
-      <button className="btn bp sm" onClick={()=>setShowForm(!showForm)}>+ Tarea</button>
+  return <div style={{background:T.surface,borderRadius:20,border:`1px solid ${T.line}`,overflow:"hidden",fontFamily:T.sans,marginTop:16}}>
+    {/* Header */}
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"12px 14px",borderBottom:`1px solid ${T.line}`}}>
+      <div style={{fontSize:13,fontWeight:700,color:T.ink}}>Tareas <span style={{fontSize:10,color:T.ink3,fontWeight:600}}>{pend.length} pendiente{pend.length!==1?"s":""}</span></div>
+      <button onClick={()=>setShowForm(!showForm)} style={{height:28,padding:"0 12px",borderRadius:999,background:T.ink,color:"#fff",border:0,fontFamily:T.sans,fontSize:11,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:4}}><FmIcon name="plus" size={11} stroke="#fff"/>Tarea</button>
     </div>
-    {showForm&&<div style={{background:"#F5F3F0",borderRadius:12,padding:14,marginBottom:14}}>
+    {/* Form */}
+    {showForm&&<div style={{padding:14,borderBottom:`1px solid ${T.line}`,background:T.bg}}>
       <div className="g2">
         <div className="fg"><label>Tipo</label><select className="fi" value={form.tipo} onChange={e=>setForm(v=>({...v,tipo:e.target.value}))}>{Object.entries(TAREA_TIPOS).map(([k,v])=><option key={k} value={k}>{v} {k}</option>)}</select></div>
         <div className="fg"><label>Fecha límite</label><input type="date" className="fi" value={form.fecha_limite} onChange={e=>setForm(v=>({...v,fecha_limite:e.target.value}))}/></div>
@@ -6751,27 +6753,29 @@ function TareasComerciales({entidad_tipo,entidad_id,entidad_nombre,tok,perfil,ro
       <div className="fg"><label>Título *</label><input className="fi" value={form.titulo} onChange={e=>setForm(v=>({...v,titulo:e.target.value}))} placeholder="Ej: Llamar para confirmar seña"/></div>
       <div className="fg"><label>Notas</label><textarea className="fi" rows={2} value={form.descripcion} onChange={e=>setForm(v=>({...v,descripcion:e.target.value}))} placeholder="Instrucciones…"/></div>
       {isA&&<div className="fg"><label>Asignar a</label><AsignarUsuario tok={tok} value={form.asignado_a} onChange={(id,n)=>setForm(v=>({...v,asignado_a:id,asignado_nombre:n}))}/></div>}
-      <div style={{display:"flex",gap:8}}><button className="btn bg sm" onClick={()=>setShowForm(false)}>Cancelar</button><button className="btn bp sm" onClick={crear} disabled={saving||!form.titulo}>{saving?"…":"✓ Crear"}</button></div>
+      <div style={{display:"flex",gap:8}}><button onClick={()=>setShowForm(false)} style={{flex:1,padding:"10px 0",borderRadius:999,border:`1px solid ${T.line}`,background:T.surface,color:T.ink,fontFamily:T.sans,fontWeight:600,fontSize:12,cursor:"pointer"}}>Cancelar</button><button onClick={crear} disabled={saving||!form.titulo} style={{flex:2,padding:"10px 0",borderRadius:999,border:0,background:saving||!form.titulo?T.ink+"55":T.ink,color:"#fff",fontFamily:T.sans,fontWeight:700,fontSize:12,cursor:saving||!form.titulo?"not-allowed":"pointer"}}>{saving?"…":"Crear tarea"}</button></div>
     </div>}
-    {pend.length===0&&!showForm&&<div style={{color:"#8A8580",fontSize:12,textAlign:"center",padding:"14px 0"}}>Sin tareas pendientes ✅</div>}
-    {pend.map(t=>{const u=urgencia(t);const col=colUrg[u];return <div key={t.id} style={{background:"#fff",borderRadius:12,padding:"10px 12px",marginBottom:6,borderLeft:`3px solid ${col}`,boxShadow:"0 1px 4px rgba(0,0,0,.04)"}}>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8}}>
-        <div style={{minWidth:0}}>
-          <div style={{fontSize:13,fontWeight:600,color:"#1A1A1A"}}>{TAREA_TIPOS[t.tipo]} {t.titulo}</div>
-          {t.descripcion&&<div style={{fontSize:11,color:"#8A8580",marginTop:2}}>{t.descripcion}</div>}
-          <div style={{display:"flex",gap:8,marginTop:4,flexWrap:"wrap"}}>
-            {t.fecha_limite&&<span style={{fontSize:11,color:col,fontWeight:600}}>{u==="vencida"?"⚠️ Vencida":u==="hoy"?"🔴 Hoy":""} 📅 {new Date(t.fecha_limite+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"})}</span>}
-            {t.asignado_nombre&&<span style={{fontSize:11,color:"#8A8580"}}>👤 {t.asignado_nombre}</span>}
-          </div>
-        </div>
-        <div style={{display:"flex",gap:4,flexShrink:0}}>
-          <button className="btn bp sm" onClick={()=>marcarHecha(t)}>✓</button>
-          {isA&&<button className="btn br sm" onClick={()=>eliminar(t.id)}>🗑</button>}
+    {/* Lista pendientes */}
+    {pend.map(t=>{const u=urgencia(t);const col=colUrg[u];return<div key={t.id} style={{display:"flex",alignItems:"center",gap:12,padding:"12px 14px",borderBottom:`1px solid ${T.line}`}}>
+      <button onClick={()=>marcarHecha(t)} style={{width:22,height:22,borderRadius:999,border:`2px solid ${col}`,background:"transparent",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",flexShrink:0}}/>
+      <div style={{flex:1,minWidth:0}}>
+        <div style={{fontSize:13,fontWeight:600,color:T.ink}}>{TAREA_TIPOS[t.tipo]||"📋"} {t.titulo}</div>
+        {t.descripcion&&<div style={{fontSize:11,color:T.ink3,marginTop:2}}>{t.descripcion}</div>}
+        <div style={{display:"flex",gap:8,marginTop:3,flexWrap:"wrap",fontSize:10,color:T.ink3}}>
+          {t.fecha_limite&&<span style={{color:col,fontWeight:600}}>{u==="vencida"?"Vencida":u==="hoy"?"Hoy":new Date(t.fecha_limite+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"})}</span>}
+          {t.asignado_nombre&&<span>{t.asignado_nombre}</span>}
         </div>
       </div>
+      {isA&&<button onClick={()=>eliminar(t.id)} style={{width:28,height:28,borderRadius:999,background:"#FEF2F2",border:"1px solid #FECACA",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",flexShrink:0}}><FmIcon name="x" size={11} stroke="#D9443A"/></button>}
     </div>;})}
-    {hechas.length>0&&<details style={{marginTop:10}}><summary style={{fontSize:12,color:"#8A8580",cursor:"pointer"}}>✅ {hechas.length} completada{hechas.length!==1?"s":""}</summary>
-      {hechas.map(t=><div key={t.id} style={{padding:"6px 10px",opacity:.6,fontSize:12,color:"#8A8580",borderBottom:"1px solid rgba(0,0,0,.04)"}}>✅ {TAREA_TIPOS[t.tipo]} {t.titulo} <span style={{fontSize:10}}>— {t.completada_por} · {fmtDT(t.completada_ts)}</span></div>)}
+    {pend.length===0&&!showForm&&<div style={{padding:"20px 14px",textAlign:"center",color:T.ink3,fontSize:12}}>Sin tareas pendientes</div>}
+    {/* Completadas */}
+    {hechas.length>0&&<details><summary style={{fontSize:12,color:T.ink3,cursor:"pointer",padding:"10px 14px",borderTop:`1px solid ${T.line}`}}>✅ {hechas.length} completada{hechas.length!==1?"s":""}</summary>
+      {hechas.map(t=><div key={t.id} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 14px",borderTop:`1px solid ${T.line}`}}>
+        <div style={{width:22,height:22,borderRadius:999,background:T.olive,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><FmIcon name="check" size={12} stroke="white" sw={2.5}/></div>
+        <div style={{flex:1,fontSize:12,color:T.ink3,textDecoration:"line-through"}}>{TAREA_TIPOS[t.tipo]||""} {t.titulo}</div>
+        <div style={{fontSize:10,color:T.ink4}}>{t.completada_por}</div>
+      </div>)}
     </details>}
   </div>;
 }
