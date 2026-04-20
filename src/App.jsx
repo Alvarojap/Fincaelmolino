@@ -1762,26 +1762,42 @@ function DashQuickAction({color,icon,label,onClick}){return <button onClick={onC
 function DashEventRow({color,date,title,price,status,onClick}){return <div onClick={onClick} style={{background:color,borderRadius:20,padding:16,display:"flex",alignItems:"center",gap:14,color:T.ink,cursor:"pointer"}}><div style={{flex:1,minWidth:0}}><div style={{fontSize:11,fontWeight:700,letterSpacing:.3,textTransform:"uppercase",opacity:.75}}>{date} · {status}</div><div style={{fontSize:17,fontWeight:700,letterSpacing:-.4,marginTop:2,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{title}</div><div style={{fontSize:14,fontWeight:600,marginTop:4}}>{price}</div></div><div style={{width:40,height:40,borderRadius:999,background:T.ink,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><FmIcon name="arrow" size={18} stroke={color} sw={2.2}/></div></div>;}
 
 function DashA({reservas,jsem,jpunt,cwk,setPage,tok,perfil,rol}){
-  const[tareasPend,setTareasPend]=useState([]);
-  const[contactosResumen,setContactosResumen]=useState(null);
+  const[tareasPend,setTareasPend]=useState([]);const[contactosResumen,setContactosResumen]=useState(null);
+  const[kpiData,setKpiData]=useState(null);const[airbnbs,setAirbnbs]=useState([]);
+  const[rangeEvol,setRangeEvol]=useState("mensual");
   useEffect(()=>{autoCobrarAirbnb(tok);ejecutarMotorCoordinacion(tok);
     sbGet("tareas_comerciales","?estado=eq.pendiente&order=fecha_limite.asc.nullslast&limit=10&select=*",tok).then(setTareasPend).catch(()=>{});
-    sbGet("contactos","?select=estado",tok).then(cs=>{const r={lead:0,visitante:0,cliente:0,recurrente:0};cs.forEach(c=>{if(r[c.estado]!==undefined)r[c.estado]++;});setContactosResumen(r);}).catch(()=>{});},[]);
+    sbGet("contactos","?select=estado",tok).then(cs=>{const r={lead:0,visitante:0,cliente:0,recurrente:0};cs.forEach(c=>{if(r[c.estado]!==undefined)r[c.estado]++;});setContactosResumen(r);}).catch(()=>{});
+    // Load financial data
+    (async()=>{try{
+      const año=new Date().getFullYear();const hoyStr=new Date().toISOString().split("T")[0];
+      const[res,abs,gastos,cfgR]=await Promise.all([sbGet("reservas",`?fecha=gte.${año}-01-01&fecha=lte.${año}-12-31&select=*`,tok),sbGet("reservas_airbnb",`?fecha_entrada=gte.${año}-01-01&fecha_entrada=lte.${año}-12-31&select=*`,tok),sbGet("gastos",`?fecha=gte.${año}-01-01&fecha=lte.${año}-12-31&select=*`,tok).catch(()=>[]),sbGet("configuracion","?select=*",tok).catch(()=>[])]);
+      setAirbnbs(abs);const cfg={};cfgR.forEach(c=>cfg[c.clave]=c.valor);const comPct=parseFloat(cfg.comision_pct)||10;
+      const fE=res.reduce((s,r)=>s+getPrecioReserva(r),0);const fA=abs.reduce((s,a)=>s+(parseFloat(a.precio)||0),0);const fac=fE+fA;
+      let cE=0;for(const r of res){const sn=parseFloat(r.seña_importe)||0;const pt=parseFloat(r.precio_total)||parseFloat(r.precio)||0;if(r.seña_cobrada)cE+=sn;if(r.saldo_cobrado)cE+=(pt-sn);}
+      const cA=abs.filter(a=>a.cobrado||a.fecha_entrada<hoyStr).reduce((s,a)=>s+(parseFloat(a.precio)||0),0);
+      const yC=cE+cA;const pend=fac-yC;const gR=gastos.reduce((s,g)=>s+(parseFloat(g.importe)||0),0);const ben=yC-gR;const com=fac*(comPct/100);
+      setKpiData({facturacion:fac,yaCobrado:yC,pendiente:pend,gastosReales:gR,beneficio:ben,comision:com,comPct,fE,fA,reservas:res,airbnbs:abs,gastos});
+    }catch(_){}})();
+  },[]);
   const [meteo,setMeteo]=useState(null);
   const cargarMeteo=()=>fetchMeteo().then(d=>{if(d)setMeteo(d);});
   useEffect(()=>{localStorage.removeItem("fm_meteo_cache");cargarMeteo();},[]);
   const temp=getTemporada();
-  const sj={}; jsem.forEach(r=>sj[r.tarea_id]=r);
+  const sj={};jsem.forEach(r=>sj[r.tarea_id]=r);
   const actv=JARDIN_T[temp].filter(t=>tocaSemana({...t,frec:t.frec},cwk));
   const comp=actv.filter(t=>sj[t.id]?.done).length+jpunt.filter(t=>t.done).length;
   const tot=actv.length+jpunt.length;
   const inc=jsem.filter(r=>r.nota&&r.tarea_id!=="VERIFICACION_FINAL").length+jpunt.filter(r=>r.nota).length;
   const ing=reservas.filter(r=>r.estado==="precio_total"||r.estado==="finalizada").reduce((s,r)=>s+(parseFloat(r.precio)||0),0);
-  const prox=[...reservas].find(r=>new Date(r.fecha)>=new Date());
   const ACTIVOS=["visita","pendiente_contrato","contrato_firmado","reserva_pagada","precio_total"];
   const proximas=reservas.filter(r=>ACTIVOS.includes(r.estado)&&new Date(r.fecha)>=new Date()).sort((a,b)=>a.fecha.localeCompare(b.fecha));
   const hoyS=new Date().toISOString().split("T")[0];
   const evColors=[T.terracotta,T.lavender,T.gold,T.olive,T.softBlue];
+  const fmtEur=v=>v>=1000?`${(v/1000).toFixed(1).replace(".",",")}k€`:`${Math.round(v).toLocaleString("es-ES")}€`;
+
+  // Evolution chart data
+  const mesesData=kpiData?Array.from({length:12},(_,i)=>{const mr=[...(kpiData.reservas||[]),...(kpiData.airbnbs||[])].filter(r=>{const f=new Date((r.fecha||r.fecha_entrada)+"T12:00:00");return f.getMonth()===i;});const real=mr.reduce((s,r)=>s+getPrecioReserva(r),0);return{l:["E","F","M","A","M","J","J","A","S","O","N","D"][i],real:i>new Date().getMonth()?0:real,proj:real||0,fut:i>new Date().getMonth()};}):[];
 
   return <>
     {/* Greeting */}
@@ -1803,45 +1819,75 @@ function DashA({reservas,jsem,jpunt,cwk,setPage,tok,perfil,rol}){
       <FmCard pad={12} radius={20}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
           <span style={{fontSize:11,fontWeight:600,color:T.ink3,textTransform:"uppercase",letterSpacing:1}}>Próximos 7 días</span>
-          <button onClick={()=>{localStorage.removeItem("fm_meteo_cache");cargarMeteo();}} style={{fontSize:10,padding:"2px 6px",opacity:.5,cursor:"pointer",background:"none",border:`1px solid ${T.line}`,borderRadius:4,color:T.ink3}}>🔄</button>
+          <span style={{fontSize:11,color:T.ink3}}>San Javier, Murcia</span>
         </div>
         <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:2}}>
-          {meteo.map((dia,i)=>{const esHoy=dia.fecha===hoyS;const d=new Date(dia.fecha+"T12:00:00");const dias=["Dom","Lun","Mar","Mié","Jue","Vie","Sáb"];const lbl=dias[d.getDay()];
+          {meteo.map((dia,i)=>{const esHoy=dia.fecha===hoyS;const d=new Date(dia.fecha+"T12:00:00");const dias=["Dom","Lun","Mar","Mié","Jue","Vie","Sáb"];
             return <div key={dia.fecha} style={{padding:"6px 2px",borderRadius:12,background:esHoy?T.terracotta+"1a":"transparent",textAlign:"center"}}>
-              <div style={{fontSize:9,color:T.ink3,fontWeight:500,textTransform:"uppercase",marginBottom:3}}>{lbl}</div>
+              <div style={{fontSize:9,color:T.ink3,fontWeight:500,textTransform:"uppercase",marginBottom:3}}>{dias[d.getDay()]}</div>
               <div style={{fontSize:20,margin:"2px 0"}}>{getWIcon(dia.estadoCielo)}</div>
               <div style={{fontSize:12,fontWeight:600,color:esHoy?T.terracotta:T.ink,marginTop:2}}>{Math.round(dia.tempMax)}°</div>
-            </div>;
-          })}
+            </div>;})}
         </div>
       </FmCard>
     </div>}
 
-    {/* Atención ahora */}
+    {/* Atención ahora — dark card */}
     <div style={{padding:"0 20px 16px"}}>
       <AtencionAhora tok={tok} setPage={setPage}/>
     </div>
 
-    {/* KPIs rápidos */}
-    <div style={{padding:"0 20px 16px"}}>
-      <FmSH title="Resumen" action={<span onClick={()=>setPage("analisis")} style={{cursor:"pointer"}}>Ver detalle →</span>}/>
+    {/* KPIs financieros */}
+    {kpiData&&<div style={{padding:"0 20px 18px"}}>
+      <FmSH title={`Finanzas · ${new Date().getFullYear()}`} action={<span onClick={()=>setPage("analisis")} style={{cursor:"pointer"}}>Detalle →</span>}/>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
         {[
-          {l:"Reservas activas",v:reservas.filter(r=>ACTIVOS.includes(r.estado)).length,c:T.terracotta},
-          {l:"Ingresos confirmados",v:`${ing.toLocaleString("es-ES")}€`,c:T.olive},
-          {l:"Jardín semanal",v:`${comp}/${tot}`,c:T.lavender},
-          {l:"Incidencias",v:inc,c:inc>0?T.coral:T.success},
+          {label:"Facturación proy.",value:fmtEur(kpiData.facturacion),delta:`Ev. ${fmtEur(kpiData.fE)} + Ab. ${fmtEur(kpiData.fA)}`,mood:"up",color:T.olive},
+          {label:"Ya cobrado",value:fmtEur(kpiData.yaCobrado),delta:`${Math.round(kpiData.yaCobrado/(kpiData.facturacion||1)*100)}% del total`,mood:"neutral",color:T.softBlue},
+          {label:"Pendiente cobro",value:fmtEur(kpiData.pendiente),delta:`${reservas.filter(r=>r.estado_pago!=="pagado_completo"&&r.estado!=="cancelada").length} eventos`,mood:"neutral",color:T.gold},
+          {label:"Gastos reales",value:fmtEur(kpiData.gastosReales),delta:"YTD",mood:"neutral",color:T.lavender},
+          {label:"Beneficio est.",value:fmtEur(kpiData.beneficio),delta:`${Math.round(kpiData.beneficio/(kpiData.facturacion||1)*100)}% margen`,mood:kpiData.beneficio>0?"up":"down",color:T.terracotta},
+          {label:"Comisión gestor",value:fmtEur(kpiData.comision),delta:`${kpiData.comPct}% s/fact.`,mood:"neutral",color:"#F2995E"},
         ].map((k,i)=><FmCard key={i} pad={14} radius={20}>
-          <div style={{width:26,height:3,background:k.c,borderRadius:2,marginBottom:10}}/>
-          <div style={{fontSize:10,color:T.ink3,fontWeight:500,letterSpacing:.3,textTransform:"uppercase",marginBottom:4}}>{k.l}</div>
-          <div style={{fontSize:22,fontWeight:700,color:T.ink,letterSpacing:-.5,lineHeight:1}}>{k.v}</div>
+          <div style={{width:28,height:3,background:k.color,borderRadius:2,marginBottom:10}}/>
+          <div style={{fontSize:10,color:T.ink3,fontWeight:600,letterSpacing:.3,textTransform:"uppercase",marginBottom:4}}>{k.label}</div>
+          <div style={{fontSize:22,fontWeight:700,color:T.ink,letterSpacing:-.6,lineHeight:1}}>{k.value}</div>
+          <div style={{fontSize:10.5,color:T.ink3,marginTop:6,display:"flex",alignItems:"center",gap:3,fontWeight:500}}>
+            {k.mood==="up"&&<span style={{color:T.success,fontWeight:700}}>↑</span>}
+            {k.mood==="down"&&<span style={{color:T.danger,fontWeight:700}}>↓</span>}
+            {k.delta}
+          </div>
         </FmCard>)}
       </div>
-    </div>
+    </div>}
 
-    {/* Financial KPIs & Charts */}
-    <div style={{padding:"0 20px 16px"}}><FinancialKPIs tok={tok}/></div>
-    <div style={{padding:"0 20px 16px"}}><FinancialCharts tok={tok}/></div>
+    {/* Evolución chart */}
+    {kpiData&&mesesData.length>0&&<div style={{padding:"0 20px 18px"}}>
+      <FmCard pad={16} radius={20}>
+        <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:14}}>
+          <div>
+            <div style={{fontSize:11,color:T.ink3,letterSpacing:.8,textTransform:"uppercase",fontWeight:700}}>Evolución {new Date().getFullYear()}</div>
+            <div style={{fontSize:22,fontWeight:700,color:T.ink,letterSpacing:-.5,marginTop:4}}>{fmtEur(kpiData.yaCobrado)} {kpiData.facturacion>0&&<span style={{fontSize:13,color:T.success,fontWeight:600}}>↑ {Math.round(kpiData.yaCobrado/(kpiData.facturacion||1)*100)}%</span>}</div>
+          </div>
+          <div style={{display:"flex",background:T.bg,borderRadius:999,padding:3,gap:2}}>
+            {["mensual","semanal"].map(k=><button key={k} onClick={()=>setRangeEvol(k)} style={{padding:"7px 12px",borderRadius:999,border:0,background:rangeEvol===k?T.ink:"transparent",color:rangeEvol===k?"#fff":T.ink3,fontSize:11,fontWeight:700,cursor:"pointer",textTransform:"capitalize",fontFamily:T.sans}}>{k}</button>)}
+          </div>
+        </div>
+        <div style={{display:"flex",alignItems:"flex-end",gap:4,height:150,padding:"0 2px"}}>
+          {mesesData.map((d,i)=>{const max=Math.max(...mesesData.map(x=>Math.max(x.real,x.proj)))*1.1||1;const rh=Math.max(2,(d.real/max)*150);const ph=Math.max(2,(d.proj/max)*150);const esActual=i===new Date().getMonth();
+            return <div key={i} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"flex-end",height:150}}>
+              <div style={{position:"relative",width:"100%",height:ph,display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
+                {d.fut&&<div style={{position:"absolute",left:"50%",transform:"translateX(-50%)",bottom:0,width:"70%",height:ph,border:`1.5px dashed ${T.ink3}`,borderRadius:6,background:"transparent"}}/>}
+                {!d.fut&&<div style={{position:"relative",zIndex:1,width:"70%",height:rh,background:esActual?T.terracotta:T.olive,borderRadius:6}}/>}
+              </div>
+            </div>;})}
+        </div>
+        <div style={{display:"flex",gap:4,marginTop:6}}>{mesesData.map((d,i)=><div key={i} style={{flex:1,textAlign:"center",fontSize:9,color:T.ink3,fontWeight:600}}>{d.l}</div>)}</div>
+        <div style={{display:"flex",gap:16,marginTop:14,paddingTop:12,borderTop:`1px solid ${T.line}`}}>
+          {[{color:T.olive,label:"Real"},{color:"transparent",border:T.ink3,label:"Proyectado"},{color:T.terracotta,label:"Mes actual"}].map((l,i)=><div key={i} style={{display:"flex",alignItems:"center",gap:6}}><div style={{width:10,height:10,borderRadius:3,background:l.color,border:l.border?`1.5px dashed ${l.border}`:"0"}}/><span style={{fontSize:11,color:T.ink2,fontWeight:500}}>{l.label}</span></div>)}
+        </div>
+      </FmCard>
+    </div>}
 
     {/* Accesos rápidos */}
     <div style={{padding:"0 20px 16px"}}>
@@ -1853,6 +1899,22 @@ function DashA({reservas,jsem,jpunt,cwk,setPage,tok,perfil,rol}){
       </div>
     </div>
 
+    {/* Tareas pendientes — colored cards */}
+    {tareasPend.length>0&&<div style={{padding:"0 20px 18px"}}>
+      <FmSH title="Tareas pendientes" action={`${tareasPend.length} total`}/>
+      <div style={{display:"flex",flexDirection:"column",gap:10}}>
+        {tareasPend.slice(0,4).map((t,i)=>{const color=!t.fecha_limite||t.fecha_limite<hoyS?T.coral:t.fecha_limite===hoyS?T.gold:T.softBlue;const dueLabel=!t.fecha_limite?"Sin fecha":t.fecha_limite===hoyS?"Hoy":t.fecha_limite<hoyS?"Vencida":new Date(t.fecha_limite+"T12:00:00").toLocaleDateString("es-ES",{weekday:"short",day:"numeric"});
+          return <div key={t.id} style={{background:color,borderRadius:20,padding:16,display:"flex",alignItems:"center",gap:14,color:T.ink,cursor:"pointer"}} onClick={()=>{if(t.entidad_tipo==="reserva")setPage("reservas");else if(t.entidad_tipo==="visita")setPage("visitas");else if(t.entidad_tipo==="airbnb")setPage("airbnb");}}>
+            <div style={{width:32,height:32,borderRadius:8,background:T.ink,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}} onClick={async e=>{e.stopPropagation();try{await sbPatch("tareas_comerciales",`id=eq.${t.id}`,{estado:"hecha",completada_por:perfil.nombre,completada_ts:new Date().toISOString()},tok);if(t.entidad_tipo&&t.entidad_id){await addHistorial(t.entidad_tipo,t.entidad_id,`Tarea completada: "${t.titulo}"`,perfil.nombre,tok).catch(()=>{});const cid=await getContactoDeEntidad(t.entidad_tipo,t.entidad_id,tok);if(cid){const TICONS={llamada:"📞",whatsapp:"💬",email:"📧",seguimiento:"📋",cobro:"💰",contrato:"📄"};const ti=["llamada","whatsapp","email"].includes(t.tipo)?t.tipo:"nota";await autoInteraccion(cid,ti,`${TICONS[t.tipo]||"🔧"} ${t.titulo}`,"positivo",tok,perfil.nombre);}}setTareasPend(prev=>prev.filter(x=>x.id!==t.id));}catch(_){}}}><FmIcon name="check" size={16} stroke={color} sw={2.4}/></div>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:11,fontWeight:700,letterSpacing:.3,textTransform:"uppercase",opacity:.75}}>{dueLabel} · {t.asignado_nombre||"Admin"}</div>
+              <div style={{fontSize:15,fontWeight:700,letterSpacing:-.3,marginTop:2,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{t.titulo}</div>
+            </div>
+            <FmIcon name="chevR" size={18} stroke={T.ink} sw={2.4}/>
+          </div>;})}
+      </div>
+    </div>}
+
     {/* Próximos eventos */}
     {proximas.length>0&&<div style={{padding:"0 20px 16px"}}>
       <FmSH title="Próximos eventos" action={<span onClick={()=>setPage("reservas")} style={{cursor:"pointer"}}>Ver {proximas.length} →</span>}/>
@@ -1863,33 +1925,14 @@ function DashA({reservas,jsem,jpunt,cwk,setPage,tok,perfil,rol}){
       </div>
     </div>}
 
-    {/* Tareas pendientes */}
-    {tareasPend.length>0&&<div style={{padding:"0 20px 16px"}}>
-      <FmCard pad={16} radius={20}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-          <span style={{fontSize:13,fontWeight:700,color:T.ink}}>📋 Tareas pendientes</span>
-          <FmPill color={T.terracotta}>{tareasPend.length}</FmPill>
-        </div>
-        {tareasPend.map(t=>{const u=!t.fecha_limite?"normal":t.fecha_limite<hoyS?"vencida":t.fecha_limite===hoyS?"hoy":"normal";const col=u==="vencida"?T.coral:u==="hoy"?T.gold:T.olive;
-          return <div key={t.id} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 0",borderBottom:`1px solid ${T.line}`}}>
-            <button style={{width:28,height:28,borderRadius:999,background:T.ink,color:"white",border:"none",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",flexShrink:0}} onClick={async()=>{try{await sbPatch("tareas_comerciales",`id=eq.${t.id}`,{estado:"hecha",completada_por:perfil.nombre,completada_ts:new Date().toISOString()},tok);if(t.entidad_tipo&&t.entidad_id){await addHistorial(t.entidad_tipo,t.entidad_id,`Tarea completada: "${t.titulo}"`,perfil.nombre,tok).catch(()=>{});const cid=await getContactoDeEntidad(t.entidad_tipo,t.entidad_id,tok);if(cid){const TICONS={llamada:"📞",whatsapp:"💬",email:"📧",seguimiento:"📋",cobro:"💰",contrato:"📄"};const ti=["llamada","whatsapp","email"].includes(t.tipo)?t.tipo:"nota";await autoInteraccion(cid,ti,`${TICONS[t.tipo]||"🔧"} ${t.titulo}`,"positivo",tok,perfil.nombre);}}setTareasPend(prev=>prev.filter(x=>x.id!==t.id));}catch(_){}}}><FmIcon name="check" size={14} stroke="white" sw={2.5}/></button>
-            <div style={{flex:1,minWidth:0}}>
-              <div style={{fontSize:13,fontWeight:600,color:T.ink,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{TAREA_TIPOS[t.tipo]||"📋"} {t.titulo}</div>
-              <div style={{fontSize:11,color:T.ink3}}>{t.entidad_nombre}{t.fecha_limite&&<> · <span style={{color:col,fontWeight:600}}>{u==="vencida"?"⚠️ ":""}📅 {new Date(t.fecha_limite+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"})}</span></>}</div>
-            </div>
-          </div>;
-        })}
-      </FmCard>
-    </div>}
-
-    {/* Contactos + Jardín + Reservas */}
+    {/* Contactos */}
     {contactosResumen&&<div style={{padding:"0 20px 16px"}}>
       <FmCard pad={16} radius={20}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
           <span style={{fontSize:13,fontWeight:700,color:T.ink}}>👥 Contactos</span>
           <span style={{fontSize:12,color:T.terracotta,fontWeight:600,cursor:"pointer"}} onClick={()=>setPage("contactos")}>Ver todos →</span>
         </div>
-        <div style={{display:"flex",gap:12,flexWrap:"wrap",fontSize:12}}>
+        <div style={{display:"flex",gap:12,flexWrap:"wrap"}}>
           <FmPill color={T.ink3} icon>Leads {contactosResumen.lead}</FmPill>
           <FmPill color="#9B8324" bg={T.gold+"33"} icon>Visitantes {contactosResumen.visitante}</FmPill>
           <FmPill color="#5A8A3E" bg={T.olive+"33"} icon>Clientes {contactosResumen.cliente}</FmPill>
@@ -1898,6 +1941,7 @@ function DashA({reservas,jsem,jpunt,cwk,setPage,tok,perfil,rol}){
       </FmCard>
     </div>}
 
+    {/* Jardín + Reservas */}
     <div style={{padding:"0 20px 20px"}}>
       <div className="g2">
         <FmCard pad={16} radius={20}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}><span style={{fontSize:13,fontWeight:700,color:T.ink}}>🌿 Jardín</span><span style={{fontSize:12,color:T.terracotta,fontWeight:600,cursor:"pointer"}} onClick={()=>setPage("jcheck")}>Ver →</span></div>{actv.slice(0,5).map(t=><MTask key={t.id} lbl={t.txt} done={sj[t.id]?.done}/>)}</FmCard>
