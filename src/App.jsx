@@ -1836,9 +1836,6 @@ function RvEventDetail({reserva,tok,perfil,rol,isA,onClose,onChanged}){
   const fecha=localR.fecha?new Date(localR.fecha+"T12:00:00"):null;
   const fechaFmt=fecha?fecha.toLocaleDateString("es-ES",{day:"numeric",month:"short",year:"numeric"}):"—";
   const initials=(contacto?.nombre||localR.contacto||"").split(" ").map(p=>p[0]).slice(0,2).join("").toUpperCase()||"?";
-  const costs={limpieza:280,jardineria:120,lavanderia:95,comision:Math.round(total*.10)};
-  const margin=total-(costs.limpieza+costs.jardineria+costs.lavanderia+costs.comision);
-  const marginPct=total>0?Math.round(margin/total*100):0;
   const gBtn={width:36,height:36,borderRadius:999,background:"rgba(255,255,255,.14)",border:0,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"};
 
   const regSeña=async()=>{
@@ -1915,21 +1912,6 @@ function RvEventDetail({reserva,tok,perfil,rol,isA,onClose,onChanged}){
         {total===0&&isA&&<div style={{background:T.surface,border:`1px solid ${T.line}`,borderRadius:20,padding:16,marginBottom:12}}>
           <div style={{color:T.ink3,fontSize:13,marginBottom:10}}>Sin precios asignados</div>
           <button onClick={()=>{setFormPrecios({precio_finca:"",precio_casa:"",incluye_casa:!!localR.incluye_casa});setEditPrecios(true);}} style={{background:T.ink,color:"white",border:0,borderRadius:12,padding:"12px 16px",fontFamily:T.sans,fontWeight:700,fontSize:13,cursor:"pointer",display:"flex",alignItems:"center",gap:8}}><FmIcon name="edit" size={14} stroke="white"/>Añadir precios</button>
-        </div>}
-
-        {/* Rentabilidad */}
-        {total>0&&<div style={{background:T.olive,borderRadius:20,padding:16,marginBottom:12,color:T.ink}}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
-            <div><div style={{fontSize:10.5,fontWeight:700,letterSpacing:.6,textTransform:"uppercase",opacity:.75}}>Rentabilidad</div>
-              <div style={{fontFamily:T.sans,fontSize:28,fontWeight:700,letterSpacing:-.9,lineHeight:1}}>+{marginPct}%</div>
-              <div style={{fontSize:12,fontWeight:600,opacity:.8,marginTop:4}}>Margen estimado · {fE(margin)}</div>
-            </div>
-          </div>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:6,background:"rgba(26,26,26,.08)",padding:8,borderRadius:12}}>
-            {[["Limpieza",costs.limpieza],["Jardín",costs.jardineria],["Lavand.",costs.lavanderia],["Comisión",costs.comision]].map(([k,v])=>(
-              <div key={k} style={{textAlign:"center"}}><div style={{fontSize:9,fontWeight:700,letterSpacing:.3,textTransform:"uppercase",color:T.ink,opacity:.7}}>{k}</div><div style={{fontSize:13,fontWeight:700,color:T.ink,fontFamily:T.sans,letterSpacing:-.2}}>{fE(v)}</div></div>
-            ))}
-          </div>
         </div>}
 
         {/* Contacto */}
@@ -2073,18 +2055,6 @@ function RvBnbDetail({reserva,tok,perfil,onClose,onChanged}){
           <div style={{fontSize:10,color:T.ink3,fontWeight:600,letterSpacing:.3,textTransform:"uppercase",marginBottom:5}}>Notas</div>
           <div style={{fontSize:13,color:T.ink,lineHeight:1.5}}>{localR.notas}</div>
         </div>}
-
-        {/* Servicios */}
-        <div style={{fontSize:10.5,color:T.ink3,letterSpacing:.6,fontWeight:700,textTransform:"uppercase",marginBottom:10}}>Servicios</div>
-        <div style={{background:T.surface,border:`1px solid ${T.line}`,borderRadius:18,padding:6,marginBottom:12}}>
-          {[{t:"Limpieza check-in",when:`${inFmt} · 10:00`,c:T.lavender},{t:"Limpieza post check-out",when:`${outFmt} · 12:00`,c:T.lavender}].map((s,i)=>(
-            <div key={i} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 10px",borderBottom:i<1?`1px solid ${T.line}`:0}}>
-              <div style={{width:36,height:36,borderRadius:10,background:s.c+"50",display:"flex",alignItems:"center",justifyContent:"center"}}><FmIcon name="broom" size={16} stroke={T.ink}/></div>
-              <div style={{flex:1}}><div style={{fontSize:13,fontWeight:600,color:T.ink}}>{s.t}</div><div style={{fontSize:11,color:T.ink3}}>{s.when}</div></div>
-              <FmIcon name="check" size={16} stroke={T.olive}/>
-            </div>
-          ))}
-        </div>
 
         <Historial entidad_tipo="reserva_airbnb" entidad_id={localR.id} tok={tok} perfil={perfil||{nombre:"Admin"}}/>
         <button onClick={onClose} style={{width:"100%",padding:"13px 16px",borderRadius:14,border:`1px solid ${T.line}`,background:T.surface,color:T.ink3,fontWeight:700,fontSize:13,cursor:"pointer",fontFamily:T.sans,marginTop:8}}>← Volver a reservas</button>
