@@ -6175,18 +6175,20 @@ function Reservas({tok,rol,perfil,navTarget,setNavTarget,setPage}){
           <div className="g2" style={{marginBottom:14}}>
             {[{l:"FECHA",v:new Date(sel.fecha).toLocaleDateString("es-ES",{day:"numeric",month:"long",year:"numeric"})},{l:"TOTAL",v:`${getPrecioReserva(sel).toLocaleString("es-ES")}€`,gold:true},{l:"TIPO",v:sel.tipo},{l:"CONTACTO",v:sel.contacto}].filter(x=>x.v).map(x=><div key={x.l} style={{background:"#F5F3F0",borderRadius:8,padding:11}}><div style={{fontSize:10,color:"#8A8580"}}>{x.l}</div><div style={{fontSize:x.gold?16:12,fontWeight:x.gold?700:400,color:x.gold?"#EC683E":"#1A1A1A",marginTop:3}}>{x.v}</div></div>)}
           </div>
-          {(sel.precio_finca>0||sel.precio_casa>0)&&<div style={{background:"#F5F3F0",borderRadius:8,padding:11,marginBottom:14,fontSize:12}}>
-            <div style={{display:"flex",justifyContent:"space-between"}}><span>💰 Precio finca</span><strong>{(parseFloat(sel.precio_finca)||0).toLocaleString("es-ES")}€</strong></div>
-            {sel.incluye_casa&&<div style={{display:"flex",justifyContent:"space-between",marginTop:4}}><span>🏠 Precio casa</span><strong>{(parseFloat(sel.precio_casa)||0).toLocaleString("es-ES")}€</strong></div>}
-            <span className="badge" style={{background:sel.incluye_casa?"rgba(175,163,255,.12)":"#F0EDE8",color:sel.incluye_casa?"#AFA3FF":"#8A8580",marginTop:6,display:"inline-block"}}>{sel.incluye_casa?"Finca + Casa":"Solo finca"}</span>
+          <div style={{background:"#F5F3F0",borderRadius:8,padding:11,marginBottom:14,fontSize:12}}>
+            {getPrecioReserva(sel)>0?<>
+              <div style={{display:"flex",justifyContent:"space-between"}}><span>💰 Precio finca</span><strong>{(parseFloat(sel.precio_finca)||parseFloat(sel.precio)||0).toLocaleString("es-ES")}€</strong></div>
+              {sel.incluye_casa&&<div style={{display:"flex",justifyContent:"space-between",marginTop:4}}><span>🏠 Precio casa</span><strong>{(parseFloat(sel.precio_casa)||0).toLocaleString("es-ES")}€</strong></div>}
+              <span className="badge" style={{background:sel.incluye_casa?"rgba(175,163,255,.12)":"#F0EDE8",color:sel.incluye_casa?"#AFA3FF":"#8A8580",marginTop:6,display:"inline-block"}}>{sel.incluye_casa?"Finca + Casa":"Solo finca"}</span>
+            </>:<div style={{color:T.ink3,fontSize:13,padding:"8px 0"}}>⚠️ Sin precios asignados</div>}
             {isA&&sel.incluye_casa&&<div style={{display:"flex",gap:6,marginTop:8,flexWrap:"wrap"}}>
               {sel.bloqueo_dia_anterior&&!sel.dia_anterior_desbloqueado&&<button className="btn bg sm" onClick={async()=>{try{await sbPatch("reservas",`id=eq.${sel.id}`,{dia_anterior_desbloqueado:true},tok);setSel(p=>({...p,dia_anterior_desbloqueado:true}));setReservas(prev=>prev.map(r=>r.id===sel.id?{...r,dia_anterior_desbloqueado:true}:r));}catch(_){}}}>🔓 Desbloquear día anterior</button>}
               {sel.bloqueo_dia_posterior&&!sel.dia_posterior_desbloqueado&&<button className="btn bg sm" onClick={async()=>{try{await sbPatch("reservas",`id=eq.${sel.id}`,{dia_posterior_desbloqueado:true},tok);setSel(p=>({...p,dia_posterior_desbloqueado:true}));setReservas(prev=>prev.map(r=>r.id===sel.id?{...r,dia_posterior_desbloqueado:true}:r));}catch(_){}}}>🔓 Desbloquear día posterior</button>}
               {sel.dia_anterior_desbloqueado&&<span style={{fontSize:11,color:"#A6BE59"}}>✅ Día anterior desbloqueado</span>}
               {sel.dia_posterior_desbloqueado&&<span style={{fontSize:11,color:"#A6BE59"}}>✅ Día posterior desbloqueado</span>}
             </div>}
-            {isA&&<button onClick={()=>{setFormPrecios({precio_finca:String(sel.precio_finca||sel.precio||""),precio_casa:String(sel.precio_casa||""),incluye_casa:!!sel.incluye_casa});setEditPrecios(true);}} style={{background:T.bg,border:0,borderRadius:8,padding:"4px 8px",cursor:"pointer",display:"flex",alignItems:"center",gap:4,fontSize:11,color:T.ink3,fontWeight:600,marginTop:8}}><FmIcon name="edit" size={12} stroke={T.ink3}/> Editar precios</button>}
-          </div>}
+            {isA&&<button onClick={()=>{setFormPrecios({precio_finca:String(sel.precio_finca||sel.precio||""),precio_casa:String(sel.precio_casa||""),incluye_casa:!!sel.incluye_casa});setEditPrecios(true);}} style={{width:"100%",marginTop:10,padding:"10px 14px",borderRadius:10,background:T.ink,color:"white",border:0,cursor:"pointer",fontFamily:T.sans,fontWeight:600,fontSize:13,display:"flex",alignItems:"center",justifyContent:"center",gap:6}}><FmIcon name="edit" size={14} stroke="white"/>{getPrecioReserva(sel)>0?"Editar precios":"Añadir precios"}</button>}
+          </div>
           {sel.obs&&<div style={{background:"#F5F3F0",borderRadius:8,padding:11,marginBottom:14}}><div style={{fontSize:10,color:"#8A8580",marginBottom:5}}>OBSERVACIONES</div><div style={{fontSize:12,color:"#1A1A1A",lineHeight:1.5}}>{sel.obs}</div></div>}
           {isA&&<><hr className="div"/>
             <div style={{fontSize:10,color:"#8A8580",marginBottom:9,textTransform:"uppercase",letterSpacing:1}}>Cambiar estado</div>
