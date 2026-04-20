@@ -4097,48 +4097,54 @@ function Limpieza({perfil,tok,rol}){
     {/* MODAL VERIFICACIÓN FINAL */}
     {showFinal&&!isA&&(
       <div className="ov" style={{alignItems:"flex-end",padding:0}}>
-        <div style={{background:"#FFFFFF",border:"1px solid rgba(201,168,76,.25)",borderRadius:"20px 20px 0 0",padding:"24px 20px 36px",width:"100%",maxWidth:540,maxHeight:"92vh",overflowY:"auto"}}>
-          <div style={{textAlign:"center",marginBottom:20}}>
-            <div style={{fontSize:36,marginBottom:8}}>🧹</div>
-            <div style={{fontFamily:"'Inter Tight',sans-serif",fontSize:20,color:"#1A1A1A",marginBottom:4}}>¡Comprobación final!</div>
-            <div style={{fontSize:13,color:"#8A8580"}}>Has completado todas las tareas. Verifica que la casa está perfecta antes de cerrar.</div>
-          </div>
+        <div style={{background:T.bg,borderRadius:"24px 24px 0 0",padding:"24px 20px 36px",width:"100%",maxWidth:540,maxHeight:"92vh",overflowY:"auto"}}>
+          <div style={{width:40,height:4,borderRadius:999,background:T.line,margin:"0 auto 14px"}}/>
 
-          {!finalMode&&(
-            <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:20}}>
-              <button className="btn bp" style={{width:"100%",justifyContent:"center",padding:"14px",fontSize:15}} onClick={()=>setFinalMode("ok")}>✅ Todo correcto — casa lista</button>
-              <button className="btn bg" style={{width:"100%",justifyContent:"center",padding:"14px",fontSize:15}} onClick={()=>setFinalMode("incidencia")}>⚠️ Hay incidencias — cerrar con nota</button>
+          {!finalMode&&<>
+            <div style={{textAlign:"center",marginBottom:20}}>
+              <div style={{fontSize:30,fontWeight:700,color:T.ink,letterSpacing:-.8,lineHeight:1.05}}>Cierre del servicio</div>
+              <div style={{fontSize:13,color:T.ink3,marginTop:6}}>Todas las tareas completadas. ¿Cómo quieres cerrar?</div>
             </div>
-          )}
+            <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:20}}>
+              <button onClick={()=>setFinalMode("ok")} style={{width:"100%",padding:16,borderRadius:16,background:T.ink,color:"white",border:0,fontFamily:T.sans,fontWeight:700,fontSize:15,cursor:"pointer"}}>✅ Todo correcto — casa lista</button>
+              <button onClick={()=>setFinalMode("incidencia")} style={{width:"100%",padding:16,borderRadius:16,background:T.surface,color:T.ink,border:`1px solid ${T.line}`,fontFamily:T.sans,fontWeight:700,fontSize:15,cursor:"pointer"}}>⚠️ Cerrar con incidencias</button>
+            </div>
+          </>}
 
           {finalMode==="ok"&&finalStep==="check"&&<>
-            <div style={{fontSize:12,color:"#EC683E",fontWeight:600,marginBottom:12,textTransform:"uppercase",letterSpacing:1}}>✅ Marca cada punto antes de confirmar</div>
-            {LIMP_CF.map(item=>(
-              <div key={item.id} onClick={()=>setFinalCheck(prev=>({...prev,[item.id]:!prev[item.id]}))}
-                style={{display:"flex",alignItems:"center",gap:12,padding:"11px 12px",borderRadius:10,marginBottom:6,cursor:"pointer",background:finalCheck[item.id]?"rgba(16,185,129,.08)":"#0f1117",border:`1px solid ${finalCheck[item.id]?"rgba(16,185,129,.25)":"rgba(255,255,255,.06)"}`,transition:"all .15s"}}>
-                <div style={{width:24,height:24,borderRadius:6,flexShrink:0,background:finalCheck[item.id]?"#10b981":"transparent",border:`2px solid ${finalCheck[item.id]?"#10b981":"rgba(255,255,255,.2)"}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,color:"#fff",fontWeight:700}}>{finalCheck[item.id]?"✓":""}</div>
-                <span style={{fontSize:14,color:finalCheck[item.id]?"#10b981":"#c9c5b8"}}>{item.txt}</span>
-              </div>
-            ))}
+            <div style={{fontSize:11,color:T.ink3,letterSpacing:1,textTransform:"uppercase",fontWeight:700,marginBottom:4}}>Cierre final</div>
+            <div style={{fontSize:24,fontWeight:700,color:T.ink,letterSpacing:-.6,marginBottom:4}}>Check · {LIMP_CF.length} puntos</div>
+            <div style={{fontSize:13,color:T.ink3,marginBottom:14}}>{Object.values(finalCheck).filter(Boolean).length}/{LIMP_CF.length} verificados</div>
+            <div style={{background:T.surface,borderRadius:16,border:`1px solid ${T.line}`,overflow:"hidden"}}>
+              {LIMP_CF.map((item,i)=>{const ok=!!finalCheck[item.id];return(
+                <button key={item.id} onClick={()=>setFinalCheck(prev=>({...prev,[item.id]:!prev[item.id]}))} style={{width:"100%",background:"transparent",border:0,cursor:"pointer",display:"flex",alignItems:"center",gap:12,padding:"14px 14px",textAlign:"left",borderBottom:i<LIMP_CF.length-1?`1px solid ${T.line}`:"none",fontFamily:T.sans}}>
+                  <div style={{width:26,height:26,borderRadius:999,background:ok?T.olive:"transparent",border:`2px solid ${ok?T.olive:T.line}`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{ok&&<FmIcon name="check" size={14} stroke="white" sw={3}/>}</div>
+                  <div style={{flex:1}}><div style={{fontSize:10,color:T.ink3,fontWeight:600}}>{String(i+1).padStart(2,"0")}</div><div style={{fontSize:13,color:ok?T.ink3:T.ink,fontWeight:ok?400:600,textDecoration:ok?"line-through":"none",marginTop:1}}>{item.txt}</div></div>
+                </button>
+              );})}
+            </div>
             <div style={{display:"flex",gap:8,marginTop:16}}>
-              <button className="btn bg" style={{flex:1,justifyContent:"center"}} onClick={()=>setFinalMode(null)}>← Volver</button>
-              <button className="btn bp" style={{flex:2,justifyContent:"center",padding:"12px",fontSize:15}} onClick={()=>guardarFinal("ok")} disabled={finalSaving}>✅ Servicio terminado y verificado</button>
+              <button onClick={()=>setFinalMode(null)} style={{flex:1,padding:12,borderRadius:999,border:`1px solid ${T.line}`,background:T.surface,color:T.ink,fontFamily:T.sans,fontWeight:600,fontSize:13,cursor:"pointer"}}>← Volver</button>
+              <button onClick={()=>guardarFinal("ok")} disabled={finalSaving} style={{flex:2,padding:12,borderRadius:999,border:0,background:Object.values(finalCheck).filter(Boolean).length===LIMP_CF.length?T.ink:T.ink+"55",color:"white",fontFamily:T.sans,fontWeight:700,fontSize:13,cursor:Object.values(finalCheck).filter(Boolean).length===LIMP_CF.length?"pointer":"not-allowed"}}>{finalSaving?"Guardando…":"Cerrar servicio →"}</button>
             </div>
           </>}
           {finalMode==="ok"&&finalStep==="consumo"&&<>
-            <div style={{textAlign:"center",marginBottom:16}}>
-              <div style={{fontSize:28,marginBottom:6}}>📦</div>
-              <div style={{fontFamily:"'Inter Tight',sans-serif",fontSize:18,fontWeight:800,color:"#1A1A1A",marginBottom:4}}>¿Has consumido productos?</div>
-              <div style={{fontSize:13,color:"#8A8580"}}>Registra lo que has gastado en este servicio</div>
+            <div style={{marginBottom:16}}>
+              <div style={{fontSize:11,color:T.ink3,letterSpacing:1,textTransform:"uppercase",fontWeight:700,marginBottom:4}}>Paso final</div>
+              <div style={{fontSize:24,fontWeight:700,color:T.ink,letterSpacing:-.6}}>Productos consumidos</div>
+              <div style={{fontSize:13,color:T.ink3,marginTop:4}}>Ajusta cantidades para actualizar el almacén</div>
             </div>
-            {consumoItems.length===0?<div style={{color:"#8A8580",fontSize:13,textAlign:"center",padding:"16px 0"}}>No hay artículos con stock en casa</div>
-            :consumoItems.map((it,idx)=><div key={it.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderBottom:"1px solid rgba(0,0,0,.04)"}}>
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{fontSize:13,fontWeight:600,color:"#1A1A1A"}}>{it.nombre}</div>
-                <div style={{fontSize:11,color:"#8A8580"}}>Stock: {parseFloat(it.stock_casa)||0} {it.unidad||""}</div>
+            {consumoItems.length===0?<div style={{color:T.ink3,fontSize:13,textAlign:"center",padding:"16px 0"}}>No hay artículos con stock en casa</div>
+            :consumoItems.map((it,idx)=>{const colors=[T.olive,T.softBlue,T.lavender,"#F2995E",T.gold,T.terracotta];const color=colors[idx%colors.length];return<div key={it.id} style={{background:T.surface,borderRadius:16,padding:14,border:`1px solid ${T.line}`,marginBottom:8}}>
+              <div style={{display:"flex",alignItems:"center",gap:12}}>
+                <div style={{width:34,height:34,borderRadius:8,background:color,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}><FmIcon name="box" size={14} stroke={T.ink}/></div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:13,fontWeight:700,color:T.ink,letterSpacing:-.1}}>{it.nombre}</div>
+                  <div style={{fontSize:11,color:T.ink3}}>Stock: {parseFloat(it.stock_casa)||0} {it.unidad||""}</div>
+                </div>
+                <input type="number" min="0" step={it.es_liquido?"0.25":"1"} value={it.usado||""} onChange={e=>setConsumoItems(prev=>prev.map((p,i)=>i===idx?{...p,usado:parseFloat(e.target.value)||0}:p))} placeholder="0" style={{width:70,textAlign:"center",fontSize:18,fontWeight:700,padding:"8px",borderRadius:10,border:`1px solid ${T.line}`,background:T.surface,fontFamily:T.sans,outline:"none"}}/>
               </div>
-              <input type="number" min="0" step={it.es_liquido?"0.25":"1"} value={it.usado||""} onChange={e=>setConsumoItems(prev=>prev.map((p,i)=>i===idx?{...p,usado:parseFloat(e.target.value)||0}:p))} placeholder="0" style={{width:70,textAlign:"center",fontSize:18,fontWeight:700,padding:"8px",borderRadius:10,border:"1.5px solid transparent",background:"#F5F3F0",fontFamily:"'Inter Tight',sans-serif",outline:"none"}}/>
-            </div>)}
+            </div>;})}
             <div style={{display:"flex",gap:8,marginTop:16}}>
               <button className="btn bg" style={{flex:1,justifyContent:"center"}} onClick={()=>prepararPasoHora()}>Saltar</button>
               <button className="btn bp" style={{flex:2,justifyContent:"center",padding:"12px",fontSize:15}} onClick={registrarConsumo} disabled={finalSaving}>{finalSaving?"Registrando…":"📦 Registrar y continuar"}</button>
