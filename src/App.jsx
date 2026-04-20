@@ -4023,66 +4023,146 @@ function Limpieza({perfil,tok,rol}){
     </div>
 
     {/* DETALLE SERVICIO — pantalla completa */}
-    {srv&&<div style={{position:"fixed",inset:0,background:T.bg,zIndex:30,overflow:"auto",paddingBottom:40,fontFamily:T.sans}}>
-      {/* Header nav */}
-      <div style={{padding:"54px 20px 14px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-        <button onClick={()=>setActId(null)} style={{width:36,height:36,borderRadius:999,background:T.surface,border:`1px solid ${T.line}`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}><FmIcon name="chevL" size={16} stroke={T.ink}/></button>
-        <div style={{fontSize:11,color:T.ink3,letterSpacing:1,textTransform:"uppercase",fontWeight:600}}>{srv.id?.toString().slice(-6)||srv.id}</div>
-        <div style={{display:"flex",gap:6}}>
-          {isA&&<button onClick={()=>setShowEx(true)} style={{height:32,padding:"0 12px",borderRadius:999,background:T.ink,color:"#fff",border:0,fontFamily:T.sans,fontSize:11,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:4}}><FmIcon name="plus" size={12} stroke="#fff"/>Extra</button>}
-          {isA&&<button onClick={async()=>{if(!window.confirm(`¿Eliminar "${srv.nombre}"?`))return;await sbDelete("servicio_tareas",`servicio_id=eq.${srv.id}`,tok);await sbDelete("servicios",`id=eq.${srv.id}`,tok);setActId(null);setTareas([]);await loadSrvs();}} style={{width:32,height:32,borderRadius:999,background:"#FEF2F2",border:"1px solid #FECACA",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}><FmIcon name="x" size={14} stroke="#D9443A"/></button>}
-        </div>
-      </div>
-      {/* Título + estado */}
-      <div style={{padding:"0 20px 14px"}}>
-        <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8,flexWrap:"wrap"}}>
-          <OpsStatePill estado={srv.estado||(srv.verificado?"completado":"en_curso")}/>
-          {srv.limpiadora_nombre&&<div style={{display:"flex",alignItems:"center",gap:4}}><OpsAvatar name={srv.limpiadora_nombre} size={18}/><span style={{fontSize:11,color:T.ink3,fontWeight:600}}>{srv.limpiadora_nombre}</span></div>}
-        </div>
-        <div style={{fontSize:28,fontWeight:700,color:T.ink,letterSpacing:-.8,lineHeight:1.05}}>{srv.nombre}</div>
-        <div style={{fontSize:11,color:T.ink3,marginTop:4,display:"flex",alignItems:"center",gap:4}}><FmIcon name="calendar" size={11} stroke={T.ink3}/>{new Date(srv.fecha).toLocaleDateString("es-ES",{day:"numeric",month:"long"})} · {comp}/{tot} tareas</div>
-      </div>
-      {/* Coste — bloque terracotta */}
-      {parseFloat(srv.coste_calculado)>0&&<div style={{padding:"0 20px 14px"}}>
-        <div style={{background:T.terracotta,borderRadius:20,padding:16,color:T.ink}}>
-          <div style={{display:"flex",alignItems:"flex-end",justifyContent:"space-between",gap:10}}>
-            <div><div style={{fontSize:10,color:"rgba(30,20,10,.65)",letterSpacing:1,textTransform:"uppercase",fontWeight:700}}>Total calculado</div><div style={{fontSize:40,fontWeight:700,letterSpacing:-1.5,lineHeight:1,marginTop:6}}>{parseFloat(srv.coste_calculado).toLocaleString("es-ES")}€</div></div>
-            <div style={{textAlign:"right",fontSize:11,color:"rgba(30,20,10,.75)",lineHeight:1.6}}>{srv.modalidad_pago==="horas"?<><div><b>{srv.horas_trabajadas||0}h</b> × {srv.tarifa_hora||0}€</div><div style={{opacity:.7}}>por horas</div></>:<div>Precio fijo</div>}</div>
+    {srv&&(
+      <div style={{position:"fixed",inset:0,background:T.bg,zIndex:30,overflow:"auto",paddingBottom:40,fontFamily:T.sans}}>
+
+        {/* Header */}
+        <div style={{padding:"54px 20px 14px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <button onClick={()=>setActId(null)} style={{width:36,height:36,borderRadius:999,background:T.surface,border:"1px solid "+T.line,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}>
+            <FmIcon name="chevL" size={16} stroke={T.ink}/>
+          </button>
+          <div style={{fontSize:11,color:T.ink3,letterSpacing:1,textTransform:"uppercase",fontWeight:600}}>
+            {String(srv.id).slice(-6)}
+          </div>
+          <div style={{display:"flex",gap:6}}>
+            {isA&&<button onClick={()=>setShowEx(true)} style={{height:32,padding:"0 12px",borderRadius:999,background:T.ink,color:"#fff",border:0,fontFamily:T.sans,fontSize:11,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:4}}><FmIcon name="plus" size={12} stroke="#fff"/>Extra</button>}
+            {isA&&<button onClick={async()=>{if(!window.confirm(`¿Eliminar "${srv.nombre}"?`))return;await sbDelete("servicio_tareas",`servicio_id=eq.${srv.id}`,tok);await sbDelete("servicios",`id=eq.${srv.id}`,tok);setActId(null);setTareas([]);await loadSrvs();}} style={{width:32,height:32,borderRadius:999,background:"#FEF2F2",border:"1px solid #FECACA",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}><FmIcon name="x" size={14} stroke="#D9443A"/></button>}
           </div>
         </div>
-      </div>}
-      {/* Banner verificado */}
-      {yaVerif&&<div style={{padding:"0 20px 14px"}}><div style={{background:srv.verificado_ok?T.olive+"14":T.gold+"14",border:`1px solid ${srv.verificado_ok?T.olive+"44":T.gold+"44"}`,borderRadius:16,padding:"12px 16px",display:"flex",alignItems:"center",gap:10}}>
-        <div style={{width:28,height:28,borderRadius:999,background:srv.verificado_ok?T.olive:T.gold,display:"flex",alignItems:"center",justifyContent:"center"}}><FmIcon name={srv.verificado_ok?"check":"warn"} size={14} stroke="white" sw={2.5}/></div>
-        <div><div style={{fontSize:13,fontWeight:700,color:srv.verificado_ok?"#4A7A2E":"#8A6B0F"}}>{srv.verificado_ok?"Servicio verificado":"Cerrado con incidencias"}</div>{srv.verificado_nota&&<div style={{fontSize:11,color:T.ink3,marginTop:2}}>{srv.verificado_nota}</div>}</div>
-      </div></div>}
-      {/* Contenido del checklist — mantener toda la lógica existente */}
-      <div style={{padding:"0 20px"}}>
+
+        {/* Título + estado + vínculo */}
+        <div style={{padding:"0 20px 14px"}}>
+          {(()=>{const m=getOpsMeta(srv.estado||(srv.verificado?"completado":"en_curso"));return(
+            <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8,flexWrap:"wrap"}}>
+              <span style={{display:"inline-flex",alignItems:"center",gap:4,height:22,padding:"0 9px",borderRadius:999,background:m.bg,color:m.ink,fontSize:10.5,fontWeight:700}}>
+                <span style={{width:5,height:5,borderRadius:999,background:m.color}}/>{m.label}
+              </span>
+              {srv.limpiadora_nombre&&<div style={{display:"inline-flex",alignItems:"center",gap:4,height:22,padding:"0 9px",borderRadius:999,background:T.lavender+"22",color:"#4A3A8A",fontSize:10.5,fontWeight:700}}>
+                <OpsAvatar name={srv.limpiadora_nombre} size={14}/>{srv.limpiadora_nombre}
+              </div>}
+            </div>
+          );})()}
+          <div style={{fontSize:28,fontWeight:700,color:T.ink,letterSpacing:-.8,lineHeight:1.05}}>{srv.nombre}</div>
+          <div style={{fontSize:11,color:T.ink3,marginTop:4,display:"flex",alignItems:"center",gap:4}}>
+            <FmIcon name="calendar" size={11} stroke={T.ink3}/>{new Date(srv.fecha).toLocaleDateString("es-ES",{day:"numeric",month:"long"})} · {comp}/{tot} tareas
+          </div>
+          {srv.reserva_nombre&&(
+            <div style={{marginTop:8,padding:"10px 12px",background:T.surface,border:"1px solid "+T.line,borderRadius:14,display:"flex",alignItems:"center",gap:10}}>
+              <FmIcon name="calendar" size={14} stroke={T.terracotta}/>
+              <div style={{flex:1,fontSize:12,color:T.ink}}>Vinculado a <b>{srv.reserva_nombre}</b></div>
+              <FmIcon name="chevR" size={14} stroke={T.ink3}/>
+            </div>
+          )}
+        </div>
+
+        {/* Asignación */}
+        <div style={{padding:"0 20px 14px"}}>
+          <div style={{fontSize:11,color:T.ink3,letterSpacing:1,textTransform:"uppercase",fontWeight:700,marginBottom:8}}>Asignación</div>
+          <div style={{background:T.surface,borderRadius:16,padding:14,border:"1px solid "+T.line}}>
+            <div style={{display:"flex",gap:12,alignItems:"center",marginBottom:12}}>
+              <OpsAvatar name={srv.limpiadora_nombre||"?"} size={38}/>
+              <div style={{flex:1}}>
+                <div style={{fontSize:13,fontWeight:700,color:T.ink}}>{srv.limpiadora_nombre||"Sin asignar"}</div>
+                <div style={{fontSize:11,color:T.ink3}}>Limpiadora · {srv.modalidad_pago||"horas"} · {srv.tarifa_hora||0}€/h</div>
+              </div>
+            </div>
+            <div style={{height:1,background:T.line,margin:"0 0 12px"}}/>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <div>
+                <div style={{fontSize:10,color:T.ink3,textTransform:"uppercase",letterSpacing:.5,fontWeight:600}}>Fecha programada</div>
+                <div style={{fontSize:14,fontWeight:700,color:T.ink,marginTop:3}}>{srv.fecha?new Date(srv.fecha).toLocaleDateString("es-ES",{weekday:"short",day:"numeric",month:"long"}):"Sin confirmar"}</div>
+              </div>
+              <FmIcon name="calendar" size={16} stroke={T.ink3}/>
+            </div>
+          </div>
+        </div>
+
+        {/* Coste — bloque terracotta */}
+        <div style={{padding:"0 20px 14px"}}>
+          <div style={{fontSize:11,color:T.ink3,letterSpacing:1,textTransform:"uppercase",fontWeight:700,marginBottom:8}}>Coste</div>
+          <div style={{background:T.terracotta,borderRadius:20,padding:18,color:T.ink}}>
+            <div style={{display:"flex",alignItems:"flex-end",justifyContent:"space-between",gap:10}}>
+              <div>
+                <div style={{fontSize:10,color:"rgba(30,20,10,0.65)",letterSpacing:1,textTransform:"uppercase",fontWeight:700}}>Total calculado</div>
+                <div style={{fontSize:44,fontWeight:700,letterSpacing:-1.5,lineHeight:1,marginTop:6}}>
+                  {parseFloat(srv.coste_calculado||0)>0?parseFloat(srv.coste_calculado).toLocaleString("es-ES")+"€":"—"}
+                </div>
+              </div>
+              <div style={{textAlign:"right",fontSize:11,color:"rgba(30,20,10,0.75)",lineHeight:1.6}}>
+                {srv.modalidad_pago==="horas"
+                  ?<><div><b>{srv.horas_trabajadas||0}h</b> × {srv.tarifa_hora||0}€</div><div style={{opacity:.7}}>modalidad por horas</div></>
+                  :<div>Precio fijo</div>
+                }
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Progreso zonas */}
+        {(()=>{
+          const zComputed=useZonas?LIMP_ZONAS.filter(z=>{const cr=tMap[z.id+"_cerrada"];return !!cr?.done;}).length:0;
+          const totalZonas=useZonas?LIMP_ZONAS.length:0;
+          const pct=tot?Math.round(comp/tot*100):0;
+          return <div style={{padding:"0 20px 14px"}}>
+            <div style={{fontSize:11,color:T.ink3,letterSpacing:1,textTransform:"uppercase",fontWeight:700,marginBottom:8}}>
+              Progreso · {useZonas?`${zComputed}/${totalZonas} zonas · `:""}{comp}/{tot} tareas
+            </div>
+            <div style={{background:T.surface,borderRadius:16,padding:14,border:"1px solid "+T.line}}>
+              {useZonas&&<div style={{display:"flex",gap:3,marginBottom:12,flexWrap:"wrap"}}>
+                {LIMP_ZONAS.map((z,i)=>{
+                  const done=!!tMap[z.id+"_cerrada"]?.done;
+                  const zt2=getZonaTareas(z);
+                  const partial=zt2.some(t2=>tMap[t2.id]?.done)&&!done;
+                  return(
+                    <div key={i} style={{width:20,height:20,borderRadius:5,background:done?T.olive:partial?T.gold+"44":T.bg,border:"1px solid "+(done?T.olive:partial?T.gold:T.line),display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                      {done&&<FmIcon name="check" size={11} stroke="white" sw={2.5}/>}
+                      {partial&&<div style={{width:6,height:6,borderRadius:999,background:T.gold}}/>}
+                    </div>
+                  );
+                })}
+              </div>}
+              <div style={{height:5,background:T.bg,borderRadius:999,overflow:"hidden",marginBottom:8}}>
+                <div style={{width:(pct)+"%",height:"100%",background:pct===100?T.olive:pct>40?T.terracotta:"#F35757"}}/>
+              </div>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:12,color:T.ink3}}>
+                <span>{pct===100?"Todas las tareas completadas":srv.hora_inicio?"Servicio en curso":"El servicio aún no ha comenzado"}</span>
+                <span style={{fontWeight:700,color:pct===100?T.olive:T.ink}}>{pct}%</span>
+              </div>
+            </div>
+          </div>;
+        })()}
+
+        {/* Banner verificado */}
+        {yaVerif&&<div style={{padding:"0 20px 14px"}}><div style={{background:srv.verificado_ok?T.olive+"14":T.gold+"14",border:`1px solid ${srv.verificado_ok?T.olive+"44":T.gold+"44"}`,borderRadius:16,padding:"12px 16px",display:"flex",alignItems:"center",gap:10}}>
+          <div style={{width:28,height:28,borderRadius:999,background:srv.verificado_ok?T.olive:T.gold,display:"flex",alignItems:"center",justifyContent:"center"}}><FmIcon name={srv.verificado_ok?"check":"warn"} size={14} stroke="white" sw={2.5}/></div>
+          <div><div style={{fontSize:13,fontWeight:700,color:srv.verificado_ok?"#4A7A2E":"#8A6B0F"}}>{srv.verificado_ok?"Servicio verificado":"Cerrado con incidencias"}</div>{srv.verificado_nota&&<div style={{fontSize:11,color:T.ink3,marginTop:2}}>{srv.verificado_nota}</div>}</div>
+        </div></div>}
+
+        {/* Zonas y tareas */}
+        <div style={{padding:"0 20px 14px"}}>
+          <div style={{fontSize:11,color:T.ink3,letterSpacing:1,textTransform:"uppercase",fontWeight:700,marginBottom:8}}>Zonas y tareas</div>
 
           {/* Hora inicio — limpiadora */}
           {isL&&!yaVerif&&<>
             {!srv.hora_inicio?(
               <button className="btn bp" style={{width:"100%",justifyContent:"center",padding:"14px",fontSize:15,marginBottom:14}} onClick={iniciarServicio} disabled={saving}>▶️ Iniciar servicio</button>
             ):(
-              <div style={{background:"rgba(16,185,129,.08)",border:"1px solid rgba(16,185,129,.2)",borderRadius:10,padding:"10px 14px",marginBottom:14,display:"flex",alignItems:"center",gap:8}}>
+              <div style={{background:"rgba(16,185,129,.08)",border:"1px solid rgba(16,185,129,.2)",borderRadius:14,padding:"10px 14px",marginBottom:14,display:"flex",alignItems:"center",gap:8}}>
                 <span style={{fontSize:18}}>⏱️</span>
-                <div style={{fontSize:13,color:"#A6BE59",fontWeight:500}}>En curso desde las <strong>{srv.hora_inicio?.slice(0,5)}</strong></div>
+                <div style={{fontSize:13,color:T.olive,fontWeight:500}}>En curso desde las <strong>{srv.hora_inicio?.slice(0,5)}</strong></div>
               </div>
             )}
           </>}
-
-          {/* Barra progreso */}
-          {(()=>{
-            const zComp=useZonas?LIMP_ZONAS.filter(z=>{const cr=tMap[z.id+"_cerrada"];return !!cr?.done;}).length:0;
-            const pct=tot?Math.round(comp/tot*100):0;
-            return <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6,fontSize:12,color:"#8A8580"}}>
-              <span>{useZonas?`${zComp}/${LIMP_ZONAS.length} zonas · `:""}{comp}/{tot} tareas</span>
-              <span style={{fontWeight:700,color:pct===100?"#A6BE59":"#1A1A1A"}}>{pct}%</span>
-            </div>;
-          })()}
-          <div className="prog" style={{marginBottom:14,height:10}}>
-            <div className="pfill" style={{width:`${tot?(comp/tot)*100:0}%`,background:tot&&comp/tot>.8?"#A6BE59":comp/tot>.4?"#EC683E":"#F35757"}}/>
-          </div>
 
           {/* Botón verificación si todo hecho y no verificado */}
           {!isA&&todoHecho&&!yaVerif&&(
@@ -4168,8 +4248,8 @@ function Limpieza({perfil,tok,rol}){
 
           {/* EXTRAS */}
           {extras.length>0&&<>
-            <hr className="div"/>
-            <div style={{fontSize:12,color:"#EC683E",fontWeight:600,marginBottom:9}}>⭐ Extras</div>
+            <div style={{height:1,background:T.line,margin:"14px 0"}}/>
+            <div style={{fontSize:11,color:T.terracotta,fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginBottom:9}}>Extras</div>
             {extras.map(t=>(
               <div key={t.id} className={`cli${t.done?" done":""}`}>
                 {!isA?<div className={`chk${t.done?" on":""}`} onClick={()=>toggleT(t.id)} style={{cursor:"pointer"}}/>:<span style={{fontSize:17,flexShrink:0}}>{t.done?"✅":"⬜"}</span>}
@@ -4184,7 +4264,16 @@ function Limpieza({perfil,tok,rol}){
             ))}
           </>}
         </div>
-    </div>}
+
+        {/* Botones acción */}
+        {isA&&<div style={{padding:"0 20px 14px",display:"flex",gap:8}}>
+          <button onClick={()=>setShowEx(true)} style={{flex:1,padding:"13px 0",borderRadius:999,border:"1px solid "+T.line,background:T.surface,color:T.ink,fontFamily:T.sans,fontWeight:600,fontSize:13,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+            <FmIcon name="plus" size={14} stroke={T.ink}/>Añadir extra
+          </button>
+        </div>}
+
+      </div>
+    )}
 
     {/* MODAL NUEVO SERVICIO */}
     {showNew&&<div className="ov" onClick={()=>setShowNew(false)}>
