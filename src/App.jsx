@@ -1871,11 +1871,15 @@ function RvEventDetail({reserva,tok,perfil,rol,isA,onClose,onChanged,isDesktopPa
   const [cobroSaving,setCobroSaving]=useState(false);
   const [servicios,setServicios]=useState([]);
   const [contacto,setContacto]=useState(null);
+  const [vincularContacto,setVincularContacto]=useState(false);
+  const [busqContacto,setBusqContacto]=useState("");
+  const [contactosBusq,setContactosBusq]=useState([]);
 
   useEffect(()=>{
     if(localR.contacto_id)sbGet("contactos",`?id=eq.${localR.contacto_id}&select=*`,tok).then(([c])=>setContacto(c||null)).catch(()=>{});
     sbGet("coordinacion_servicios",`?reserva_id=eq.${localR.id}&select=*&order=created_at.asc&limit=5`,tok).then(setServicios).catch(()=>{});
   },[localR.id]);
+  useEffect(()=>{if(!busqContacto||busqContacto.length<2){setContactosBusq([]);return;}sbGet("contactos",`?or=(nombre.ilike.*${busqContacto}*,telefono.ilike.*${busqContacto}*)&limit=10`,tok).then(r=>setContactosBusq(r||[])).catch(()=>setContactosBusq([]));},[busqContacto]);
 
   const fecha=localR.fecha?new Date(localR.fecha+"T12:00:00"):null;
   const fechaFmt=fecha?fecha.toLocaleDateString("es-ES",{day:"numeric",month:"short",year:"numeric"}):"—";
@@ -1982,14 +1986,39 @@ function RvEventDetail({reserva,tok,perfil,rol,isA,onClose,onChanged,isDesktopPa
         </div>);})()}
 
         {/* Contacto */}
-        {(contacto||localR.contacto)&&<><div style={{fontSize:10.5,color:T.ink3,letterSpacing:.6,fontWeight:700,textTransform:"uppercase",marginBottom:10,marginTop:6}}>Contacto</div>
-        <div style={{background:T.surface,border:`1px solid ${T.line}`,borderRadius:18,padding:12,marginBottom:12}}>
+        <div style={{fontSize:10.5,color:T.ink3,letterSpacing:.6,fontWeight:700,textTransform:"uppercase",marginBottom:10,marginTop:6}}>Contacto vinculado</div>
+        {contacto?<div style={{background:T.surface,border:`1px solid ${T.line}`,borderRadius:18,padding:12,marginBottom:12}}>
           <div style={{display:"flex",alignItems:"center",gap:12}}>
-            <div style={{width:44,height:44,borderRadius:999,background:T.terracotta+"40",color:T.ink,fontFamily:T.sans,fontWeight:700,fontSize:15,display:"flex",alignItems:"center",justifyContent:"center"}}>{initials}</div>
-            <div style={{flex:1}}><div style={{fontSize:14,fontWeight:700,color:T.ink}}>{contacto?.nombre||localR.contacto}</div><div style={{fontSize:11,color:T.ink3}}>{contacto?.telefono||"—"}</div></div>
-            {(contacto?.telefono)&&<button onClick={()=>window.open("https://wa.me/"+(contacto.telefono||"").replace(/\D/g,""))} style={{width:38,height:38,borderRadius:999,background:T.olive,border:0,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}><FmIcon name="whatsapp" size={17} stroke={T.ink}/></button>}
+            <div style={{width:42,height:42,borderRadius:999,background:T.terracotta+"40",color:T.ink,fontFamily:T.sans,fontWeight:700,fontSize:14,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{initials}</div>
+            <div style={{flex:1}}><div style={{fontSize:13,fontWeight:700,color:T.ink}}>{contacto.nombre}</div><div style={{fontSize:11,color:T.ink3}}>{contacto.telefono||contacto.email||""}</div></div>
+            {contacto.telefono&&<button onClick={()=>window.open("https://wa.me/"+(contacto.telefono||"").replace(/\D/g,""))} style={{width:34,height:34,borderRadius:999,background:T.olive,border:0,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><FmIcon name="whatsapp" size={15} stroke={T.ink}/></button>}
+            <button onClick={()=>setVincularContacto(true)} style={{width:34,height:34,borderRadius:999,background:T.bg,border:`1px solid ${T.line}`,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><FmIcon name="edit" size={14} stroke={T.ink3}/></button>
           </div>
-        </div></>}
+        </div>
+        :<div style={{background:T.surface,borderRadius:18,padding:14,border:`1px dashed ${T.line}`,marginBottom:12}}>
+          <div style={{fontSize:13,color:T.ink3,textAlign:"center",padding:"4px 0",marginBottom:8}}>Sin contacto asignado</div>
+          <div style={{display:"flex",gap:8}}>
+            <button onClick={()=>setVincularContacto(true)} style={{flex:1,padding:"10px 0",borderRadius:12,border:`1px solid ${T.line}`,background:T.surface,color:T.ink,fontFamily:T.sans,fontSize:12,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}><FmIcon name="search" size={13} stroke={T.ink}/>Buscar contacto</button>
+            <button onClick={()=>{}} style={{flex:1,padding:"10px 0",borderRadius:12,border:0,background:T.ink,color:"#fff",fontFamily:T.sans,fontSize:12,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}><FmIcon name="plus" size={13} stroke="white"/>Nuevo contacto</button>
+          </div>
+        </div>}
+        {/* Sheet vincular contacto */}
+        {vincularContacto&&<div style={{position:"fixed",inset:0,background:"rgba(20,15,10,.6)",zIndex:1000,display:"flex",alignItems:"flex-end",fontFamily:T.sans}}>
+          <div style={{width:"100%",background:T.bg,borderTopLeftRadius:24,borderTopRightRadius:24,maxHeight:"80vh",overflow:"auto",paddingBottom:28}}>
+            <div style={{padding:"14px 0 0",display:"flex",justifyContent:"center"}}><div style={{width:44,height:4,borderRadius:999,background:T.line}}/></div>
+            <div style={{padding:"14px 20px 12px",display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:`1px solid ${T.line}`}}><div style={{fontSize:18,fontWeight:700,color:T.ink,letterSpacing:-.4}}>Vincular contacto</div><button onClick={()=>{setVincularContacto(false);setBusqContacto("");}} style={{width:30,height:30,borderRadius:999,background:T.surface,border:`1px solid ${T.line}`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}><FmIcon name="x" size={13} stroke={T.ink}/></button></div>
+            <div style={{padding:"12px 20px 8px"}}><div style={{display:"flex",alignItems:"center",gap:8,background:T.surface,borderRadius:12,padding:"10px 14px",border:`1px solid ${T.line}`}}><FmIcon name="search" size={14} stroke={T.ink3}/><input autoFocus value={busqContacto} onChange={e=>setBusqContacto(e.target.value)} placeholder="Buscar por nombre o teléfono…" style={{flex:1,background:"transparent",border:0,outline:"none",fontFamily:T.sans,fontSize:14,color:T.ink}}/></div></div>
+            <div style={{padding:"0 20px 12px",display:"flex",flexDirection:"column",gap:6}}>
+              {contactosBusq.map(c=><div key={c.id} onClick={async()=>{await sbPatch("reservas",`id=eq.${localR.id}`,{contacto_id:c.id},tok);const u={...localR,contacto_id:c.id};setLocalR(u);onChanged&&onChanged(u);setContacto(c);setVincularContacto(false);setBusqContacto("");}} style={{display:"flex",alignItems:"center",gap:12,padding:"12px 14px",background:T.surface,borderRadius:14,border:`1px solid ${T.line}`,cursor:"pointer"}}>
+                <div style={{width:40,height:40,borderRadius:999,background:T.olive+"40",color:T.ink,fontWeight:700,fontSize:14,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{c.nombre?.split(" ").map(p=>p[0]).slice(0,2).join("").toUpperCase()||"?"}</div>
+                <div style={{flex:1}}><div style={{fontSize:13,fontWeight:700,color:T.ink}}>{c.nombre}</div><div style={{fontSize:11,color:T.ink3}}>{c.telefono||c.email||""}</div></div>
+                <FmIcon name="chevR" size={14} stroke={T.ink3}/>
+              </div>)}
+              {busqContacto&&busqContacto.length>=2&&contactosBusq.length===0&&<div style={{textAlign:"center",padding:"20px 0",color:T.ink3,fontSize:13}}>Sin resultados para "{busqContacto}"</div>}
+              {(!busqContacto||busqContacto.length<2)&&<div style={{textAlign:"center",padding:"16px 0",color:T.ink3,fontSize:12}}>Escribe para buscar un contacto</div>}
+            </div>
+          </div>
+        </div>}
 
         {/* Servicios automáticos */}
         {servicios.length>0&&<><div style={{fontSize:10.5,color:T.ink3,letterSpacing:.6,fontWeight:700,textTransform:"uppercase",marginBottom:10,marginTop:6}}>Servicios automáticos</div>
