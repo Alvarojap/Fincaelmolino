@@ -1761,10 +1761,12 @@ function DashAlertRow({dot,label,sub,onClick}){return <div onClick={onClick} sty
 function DashQuickAction({color,icon,label,onClick}){return <button onClick={onClick} style={{background:T.surface,border:`1px solid ${T.line}`,borderRadius:20,padding:"14px 8px",display:"flex",flexDirection:"column",alignItems:"center",gap:8,cursor:"pointer",fontFamily:T.sans,minHeight:90,boxShadow:T.shadowSm,width:"100%"}}><div style={{width:36,height:36,borderRadius:10,background:color+"1f",color,display:"flex",alignItems:"center",justifyContent:"center"}}><FmIcon name={icon} size={18} sw={2} stroke={color}/></div><span style={{fontSize:11,fontWeight:600,color:T.ink,textAlign:"center",lineHeight:1.2,letterSpacing:-.1}}>{label}</span></button>;}
 function DashEventRow({color,date,title,price,status,onClick}){return <div onClick={onClick} style={{background:color,borderRadius:20,padding:16,display:"flex",alignItems:"center",gap:14,color:T.ink,cursor:"pointer"}}><div style={{flex:1,minWidth:0}}><div style={{fontSize:11,fontWeight:700,letterSpacing:.3,textTransform:"uppercase",opacity:.75}}>{date} · {status}</div><div style={{fontSize:17,fontWeight:700,letterSpacing:-.4,marginTop:2,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{title}</div><div style={{fontSize:14,fontWeight:600,marginTop:4}}>{price}</div></div><div style={{width:40,height:40,borderRadius:999,background:T.ink,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><FmIcon name="arrow" size={18} stroke={color} sw={2.2}/></div></div>;}
 
+function MiniBarChart({data,color}){const max=Math.max(...data.map(d=>d.v),1);const h=60;return<div><div style={{display:"flex",alignItems:"flex-end",gap:3,height:h}}>{data.map((d,i)=><div key={i} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"flex-end",height:h}}><div style={{width:"100%",height:Math.max(2,d.v/max*h),background:d.v>0?color:T.line,borderRadius:3}}/></div>)}</div><div style={{display:"flex",gap:3,marginTop:4}}>{data.map((d,i)=><div key={i} style={{flex:1,textAlign:"center",fontSize:8,color:T.ink3,fontWeight:600}}>{d.l}</div>)}</div></div>;}
+
 function DashA({reservas,jsem,jpunt,cwk,setPage,tok,perfil,rol}){
   const[tareasPend,setTareasPend]=useState([]);const[contactosDestacados,setContactosDestacados]=useState([]);
   const[kpiData,setKpiData]=useState(null);const[airbnbs,setAirbnbs]=useState([]);
-  const[rangeEvol,setRangeEvol]=useState("mensual");
+  const[rangeEvol,setRangeEvol]=useState("mensual");const[kpiAbierto,setKpiAbierto]=useState(null);
   const[coordsPend,setCoordsPend]=useState([]);const[articulosDash,setArticulosDash]=useState([]);const[visitasDash,setVisitasDash]=useState([]);
   useEffect(()=>{autoCobrarAirbnb(tok);ejecutarMotorCoordinacion(tok);
     const hoyLoad=new Date().toISOString().split("T")[0];
@@ -1902,7 +1904,7 @@ function DashA({reservas,jsem,jpunt,cwk,setPage,tok,perfil,rol}){
           {label:"Gastos reales",value:fmtE(kpiData.gastosReales),delta:"YTD",mood:"neutral",color:T.lavender},
           {label:"Beneficio est.",value:fmtE(kpiData.beneficio),delta:`${Math.round(kpiData.beneficio/(kpiData.facturacion||1)*100)}% margen`,mood:kpiData.beneficio>0?"up":"down",color:T.terracotta},
           {label:"Comisión gestor",value:fmtE(kpiData.comision),delta:`${kpiData.comPct}% s/fact.`,mood:"neutral",color:"#F2995E"},
-        ].map((k,i)=><FmCard key={i} pad={14} radius={20}>
+        ].map((k,i)=><FmCard key={i} pad={14} radius={20} onClick={()=>setKpiAbierto(kpiAbierto===i?null:i)} style={{border:kpiAbierto===i?`2px solid ${k.color}`:`1px solid ${T.line}`,cursor:"pointer"}}>
           <div style={{width:28,height:3,background:k.color,borderRadius:2,marginBottom:10}}/>
           <div style={{fontSize:10,color:T.ink3,fontWeight:600,letterSpacing:.3,textTransform:"uppercase",marginBottom:4}}>{k.label}</div>
           <div style={{fontSize:22,fontWeight:700,color:T.ink,letterSpacing:-.6,lineHeight:1}}>{k.value}</div>
@@ -1914,6 +1916,58 @@ function DashA({reservas,jsem,jpunt,cwk,setPage,tok,perfil,rol}){
         </FmCard>)}
       </div>
     </div>}
+
+    {/* KPI Detalle expandido */}
+    {kpiAbierto!==null&&kpiData&&(()=>{
+      const gastos=kpiData.gastos||[];const kpiLabels=["Facturación proyectada","Ya cobrado","Pendiente de cobro","Gastos reales","Beneficio estimado","Comisión gestor"];
+      const renderDetalle=(idx)=>{
+        if(idx===0)return<div>
+          <div style={{display:"flex",justifyContent:"space-around",marginBottom:12}}>
+            <div style={{textAlign:"center"}}><div style={{fontSize:10,color:T.ink3,textTransform:"uppercase",letterSpacing:.5,fontWeight:600}}>Eventos</div><div style={{fontSize:20,fontWeight:700,color:T.terracotta,letterSpacing:-.5}}>{fmtE(kpiData.fE)}</div><div style={{fontSize:11,color:T.ink3}}>{(kpiData.reservas||[]).filter(r=>r.estado!=="cancelada").length} reservas</div></div>
+            <div style={{textAlign:"center"}}><div style={{fontSize:10,color:T.ink3,textTransform:"uppercase",letterSpacing:.5,fontWeight:600}}>Airbnb</div><div style={{fontSize:20,fontWeight:700,color:T.softBlue,letterSpacing:-.5}}>{fmtE(kpiData.fA)}</div><div style={{fontSize:11,color:T.ink3}}>{airbnbs.length} reservas</div></div>
+          </div>
+          <MiniBarChart data={Array.from({length:12},(_,i)=>{const m=[...(kpiData.reservas||[]),...airbnbs].filter(r=>{const f=new Date((r.fecha||r.fecha_entrada)+"T12:00:00");return f.getFullYear()===anio&&f.getMonth()===i&&r.estado!=="cancelada";});return{l:["E","F","M","A","M","J","J","A","S","O","N","D"][i],v:m.reduce((s,r)=>s+getPrecioReserva(r),0)};})} color={T.olive}/>
+        </div>;
+        if(idx===1)return<div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:14}}>
+            {[{l:"Señas cobradas",v:fmtE(reservas.filter(r=>r.seña_cobrada).reduce((s,r)=>s+(parseFloat(r.seña_importe)||0),0)),c:T.gold},{l:"Pagos totales",v:fmtE(reservas.filter(r=>r.estado_pago==="pagado_completo").reduce((s,r)=>s+getPrecioReserva(r),0)),c:T.olive},{l:"Airbnb cobrado",v:fmtE(airbnbs.filter(a=>a.cobrado).reduce((s,a)=>s+getPrecioReserva(a),0)),c:T.softBlue}].map((it,i)=><div key={i} style={{background:T.bg,borderRadius:12,padding:"10px 8px",textAlign:"center"}}><div style={{fontSize:9,color:T.ink3,textTransform:"uppercase",letterSpacing:.5,fontWeight:600,marginBottom:4}}>{it.l}</div><div style={{fontSize:15,fontWeight:700,color:it.c,letterSpacing:-.3}}>{it.v}</div></div>)}
+          </div>
+          <div style={{fontSize:11,fontWeight:600,color:T.ink3,textTransform:"uppercase",letterSpacing:.5,marginBottom:8}}>Pendientes de cobro</div>
+          {reservas.filter(r=>!["cancelada","finalizada"].includes(r.estado)&&r.estado_pago!=="pagado_completo").slice(0,4).map(r=>{const p=getPrecioReserva(r)-(parseFloat(r.seña_cobrada?r.seña_importe||0:0));const d=Math.ceil((new Date(r.fecha+"T12:00:00")-new Date())/(864e5));const uc=d<30?"#D9443A":d<90?T.gold:T.success;
+            return<div key={r.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderBottom:`1px solid ${T.line}`}}><div><div style={{fontSize:13,fontWeight:600,color:T.ink}}>{r.nombre}</div><div style={{fontSize:11,color:T.ink3}}>{new Date(r.fecha+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"})}</div></div><div style={{textAlign:"right"}}><div style={{fontSize:13,fontWeight:700,color:uc}}>{fmtE(p)}</div><div style={{fontSize:10,color:uc}}>{d<0?"Vencido":d===0?"Hoy":d<30?"<30d":"OK"}</div></div></div>;})}
+        </div>;
+        if(idx===2)return<div>
+          {reservas.filter(r=>!["cancelada","finalizada"].includes(r.estado)&&r.estado_pago!=="pagado_completo").length===0?<div style={{color:T.ink3,fontSize:13,textAlign:"center",padding:"12px 0"}}>✅ Sin cobros pendientes</div>
+          :reservas.filter(r=>!["cancelada","finalizada"].includes(r.estado)&&r.estado_pago!=="pagado_completo").sort((a,b)=>new Date(a.fecha)-new Date(b.fecha)).map(r=>{const p=getPrecioReserva(r)-(parseFloat(r.seña_cobrada?r.seña_importe||0:0));const d=Math.ceil((new Date(r.fecha+"T12:00:00")-new Date())/(864e5));const uc=d<30?"#D9443A":d<90?T.gold:T.success;
+            return<div key={r.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderBottom:`1px solid ${T.line}`}}><span style={{width:8,height:8,borderRadius:999,background:uc,flexShrink:0}}/><div style={{flex:1}}><div style={{fontSize:13,fontWeight:600,color:T.ink}}>{r.nombre}</div><div style={{fontSize:11,color:T.ink3}}>{r.seña_cobrada?"Falta saldo":"Sin seña"} · {new Date(r.fecha+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"})}</div></div><div style={{fontSize:13,fontWeight:700,color:uc}}>{fmtE(p)}</div></div>;})}
+        </div>;
+        if(idx===3){const porCat={};gastos.forEach(g=>{porCat[g.categoria]=(porCat[g.categoria]||0)+(parseFloat(g.importe)||0);});const totalG=Object.values(porCat).reduce((s,v)=>s+v,0)||1;const cats=Object.entries(porCat).sort((a,b)=>b[1]-a[1]);const catCol={personal:T.lavender,comision:T.terracotta,consumibles:T.olive,suministros:T.softBlue,mantenimiento:T.gold,otros:T.ink4};
+          return<div>{cats.map(([cat,val],i)=><div key={i} style={{marginBottom:10}}><div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span style={{fontSize:12,fontWeight:600,color:T.ink,textTransform:"capitalize"}}>{cat}</span><span style={{fontSize:12,fontWeight:700,color:T.ink}}>{fmtE(val)}</span></div><div style={{height:6,background:T.bg,borderRadius:999}}><div style={{height:6,borderRadius:999,background:catCol[cat]||T.ink3,width:Math.round(val/totalG*100)+"%"}}/></div></div>)}
+            <div style={{marginTop:12,paddingTop:12,borderTop:`1px solid ${T.line}`}}><div style={{fontSize:11,fontWeight:600,color:T.ink3,textTransform:"uppercase",letterSpacing:.5,marginBottom:8}}>Últimos gastos</div>
+              {[...gastos].sort((a,b)=>new Date(b.fecha)-new Date(a.fecha)).slice(0,4).map(g=><div key={g.id} style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:`1px solid ${T.line}`}}><div><div style={{fontSize:12,fontWeight:600,color:T.ink}}>{g.concepto}</div><div style={{fontSize:10,color:T.ink3}}>{new Date(g.fecha+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"})}</div></div><div style={{fontSize:12,fontWeight:700,color:T.ink}}>{fmtE(g.importe)}</div></div>)}
+            </div></div>;}
+        if(idx===4){const tC=kpiData.yaCobrado;const tG=kpiData.gastosReales;const ben=tC-tG;const mar=tC>0?Math.round(ben/tC*100):0;
+          return<div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:14}}>{[{l:"Cobrado",v:fmtE(tC),c:T.olive},{l:"Gastos",v:fmtE(tG),c:"#D9443A"},{l:"Beneficio",v:fmtE(ben),c:T.terracotta}].map((it,i)=><div key={i} style={{background:T.bg,borderRadius:12,padding:"10px 8px",textAlign:"center"}}><div style={{fontSize:9,color:T.ink3,textTransform:"uppercase",letterSpacing:.5,fontWeight:600,marginBottom:4}}>{it.l}</div><div style={{fontSize:15,fontWeight:700,color:it.c,letterSpacing:-.3}}>{it.v}</div></div>)}</div>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 14px",background:T.bg,borderRadius:12,marginBottom:10}}><span style={{fontSize:13,fontWeight:600,color:T.ink}}>Margen actual</span><span style={{fontSize:16,fontWeight:700,color:mar>50?T.success:mar>30?T.gold:"#D9443A"}}>{mar}%</span></div>
+            <MiniBarChart data={Array.from({length:12},(_,i)=>{const m=(kpiData.reservas||[]).filter(r=>{const f=new Date(r.fecha+"T12:00:00");return f.getFullYear()===anio&&f.getMonth()===i&&r.estado!=="cancelada";});const gm=gastos.filter(g=>{const f=new Date(g.fecha+"T12:00:00");return f.getFullYear()===anio&&f.getMonth()===i;});return{l:["E","F","M","A","M","J","J","A","S","O","N","D"][i],v:Math.max(0,m.reduce((s,r)=>s+getPrecioReserva(r),0)-gm.reduce((s,g)=>s+(parseFloat(g.importe)||0),0))};})} color={T.lavender}/>
+          </div>;}
+        if(idx===5){const comPct=kpiData.comPct;const base=kpiData.facturacion;const comTotal=base*comPct/100;const yaReg=gastos.filter(g=>g.categoria==="comision").reduce((s,g)=>s+(parseFloat(g.importe)||0),0);
+          return<div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>{[{l:"Base cálculo",v:fmtE(base),c:T.ink},{l:`Comisión ${comPct}%`,v:fmtE(comTotal),c:T.terracotta},{l:"Ya registrada",v:fmtE(yaReg),c:T.olive},{l:"Pendiente",v:fmtE(Math.max(0,comTotal-yaReg)),c:T.gold}].map((it,i)=><div key={i} style={{background:T.bg,borderRadius:12,padding:"10px 8px",textAlign:"center"}}><div style={{fontSize:9,color:T.ink3,textTransform:"uppercase",letterSpacing:.5,fontWeight:600,marginBottom:4}}>{it.l}</div><div style={{fontSize:15,fontWeight:700,color:it.c,letterSpacing:-.3}}>{it.v}</div></div>)}</div>
+            <div style={{fontSize:11,fontWeight:600,color:T.ink3,textTransform:"uppercase",letterSpacing:.5,marginBottom:8}}>Por reserva</div>
+            {reservas.filter(r=>r.estado!=="cancelada").slice(0,5).map(r=><div key={r.id} style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:`1px solid ${T.line}`}}><div style={{fontSize:12,fontWeight:600,color:T.ink}}>{r.nombre}</div><div style={{fontSize:12,fontWeight:700,color:T.terracotta}}>{fmtE(getPrecioReserva(r)*comPct/100)}</div></div>)}
+          </div>;}
+        return null;
+      };
+      return<div style={{margin:"0 20px 16px",background:T.surface,borderRadius:20,border:`1px solid ${T.line}`,padding:16,boxShadow:"0 8px 28px rgba(40,30,20,.10)"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+          <div style={{fontSize:13,fontWeight:700,color:T.ink,letterSpacing:-.2,textTransform:"uppercase"}}>{kpiLabels[kpiAbierto]}</div>
+          <button onClick={()=>setKpiAbierto(null)} style={{width:28,height:28,borderRadius:999,background:T.bg,border:0,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}><FmIcon name="x" size={14} stroke={T.ink3}/></button>
+        </div>
+        {renderDetalle(kpiAbierto)}
+      </div>;
+    })()}
 
     {/* 5. Evolución chart con línea beneficio */}
     {kpiData&&mesesData.length>0&&<div style={{padding:"0 20px 18px"}}>
