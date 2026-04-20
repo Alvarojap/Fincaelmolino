@@ -2123,7 +2123,7 @@ function RvBnbDetail({reserva,tok,perfil,onClose,onChanged}){
 
 // ─── DESKTOP RESERVAS ─────────────────────────────────────────────────────────
 function sMeta(s){const m={Visita:{bg:"#E9F0FC",ink:"#2B4B80",dot:"#7FB2FF"},Confirmada:{bg:"#FBF3C7",ink:"#7A6B15",dot:"#ECD227"},"Seña OK":{bg:"#F8DCC4",ink:"#8F4A1C",dot:"#EC683E"},Pagado:{bg:"#DCE8BC",ink:"#4D6B1F",dot:"#7E9B3E"},Finalizada:{bg:"#EEEAE3",ink:"#7A766F",dot:"#BFB9AE"},Cancelada:{bg:"#F5E0DE",ink:"#9B3C33",dot:"#D9443A"},Cobrado:{bg:"#DCE8BC",ink:"#4D6B1F",dot:"#7E9B3E"},Pendiente:{bg:"#FBDCDC",ink:"#9B3C33",dot:"#F35757"}};return m[s]||m.Visita;}
-function ReservasDesktopLayout({reservas,airbnbs,setPage,page,perfil,tok,abrirReserva,selAb,setSelAb,sel,setSel,contactoVinc,setShowTipoRes,setEditPrecios}){
+function ReservasDesktopLayout({reservas,airbnbs,setPage,page,perfil,tok,abrirReserva,selAb,setSelAb,sel,setSel,contactoVinc,setShowTipoRes,setEditPrecios,setShowSeña}){
   const[tab,setTab]=useState("activas");const[busq,setBusq]=useState("");
   const fE=v=>(Math.round(parseFloat(v)||0)).toLocaleString("es-ES")+"€";
   const lista=tab==="activas"?reservas.filter(r=>!["cancelada","finalizada"].includes(r.estado||"")):tab==="airbnb"?airbnbs:tab==="finalizadas"?reservas.filter(r=>r.estado==="finalizada"):reservas.filter(r=>r.estado==="cancelada");
@@ -2132,11 +2132,11 @@ function ReservasDesktopLayout({reservas,airbnbs,setPage,page,perfil,tok,abrirRe
   const navItems=[{k:"home",i:"home",l:"Inicio"},{k:"contactos",i:"users",l:"Contactos"},{k:"reservas",i:"calendar",l:"Reservas"},{k:"almacen",i:"box",l:"Almacén"},{k:"analisis",i:"chart",l:"Análisis"},{k:"limpieza",i:"settings",l:"Limpieza"},{k:"jadmin",i:"leaf",l:"Jardinería"},{k:"gastos",i:"euro",l:"Gastos"},{k:"ajustes",i:"settings",l:"Ajustes"}];
   return <div style={{display:"flex",background:T.bg,fontFamily:T.sans,height:"100vh",color:T.ink,overflow:"hidden",position:"fixed",inset:0,zIndex:1}}>
     {/* Sidebar */}
-    <div style={{width:220,background:T.surface,borderRight:`1px solid ${T.line}`,padding:"20px 12px",display:"flex",flexDirection:"column",height:"100vh",flexShrink:0,overflowY:"auto"}}>
-      <div style={{display:"flex",alignItems:"center",gap:10,padding:"0 6px 20px",borderBottom:`1px solid ${T.line}`,marginBottom:12}}><LogoMark size={28}/><div><div style={{fontSize:14,fontWeight:700,color:T.ink,letterSpacing:-.4,lineHeight:1.1}}>Finca El Molino</div><div style={{fontSize:10,color:T.ink3,fontWeight:500}}>Administración</div></div></div>
-      {navItems.map(it=>{const on=page===it.k;return<div key={it.k} onClick={()=>setPage(it.k)} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 10px",borderRadius:11,background:on?T.ink:"transparent",color:on?"#fff":T.ink2,fontSize:13,fontWeight:on?700:500,cursor:"pointer",marginBottom:2}}><FmIcon name={it.i} size={15} stroke={on?"#fff":T.ink2} sw={on?2.2:1.8}/><span style={{flex:1}}>{it.l}</span></div>;})}
+    <div style={{width:220,background:T.ink,padding:"20px 12px",display:"flex",flexDirection:"column",height:"100vh",flexShrink:0,overflowY:"auto"}}>
+      <div style={{display:"flex",alignItems:"center",gap:10,padding:"0 6px 20px",borderBottom:"1px solid rgba(255,255,255,.12)",marginBottom:12}}><LogoMark size={28}/><div><div style={{fontSize:14,fontWeight:700,color:"#fff",letterSpacing:-.4,lineHeight:1.1}}>Finca El Molino</div><div style={{fontSize:10,color:"rgba(255,255,255,.5)",fontWeight:500}}>Administración</div></div></div>
+      {navItems.map(it=>{const on=page===it.k;return<div key={it.k} onClick={()=>setPage(it.k)} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 10px",borderRadius:11,background:on?"rgba(255,255,255,.12)":"transparent",color:on?"#fff":"rgba(255,255,255,.6)",fontSize:13,fontWeight:on?700:500,cursor:"pointer",marginBottom:2}}><FmIcon name={it.i} size={15} stroke={on?"#fff":"rgba(255,255,255,.6)"} sw={on?2.2:1.8}/><span style={{flex:1}}>{it.l}</span></div>;})}
       <div style={{flex:1}}/>
-      <div style={{display:"flex",alignItems:"center",gap:10,padding:"10px 8px",borderTop:`1px solid ${T.line}`,marginTop:8}}><div style={{width:32,height:32,borderRadius:999,background:T.olive,color:T.ink,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:13,flexShrink:0}}>{perfil?.nombre?.slice(0,1)||"A"}</div><div style={{flex:1,minWidth:0}}><div style={{fontSize:12,fontWeight:700,color:T.ink,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{perfil?.nombre||"Admin"}</div><div style={{fontSize:10,color:T.ink3}}>Administrador</div></div></div>
+      <div style={{display:"flex",alignItems:"center",gap:10,padding:"10px 8px",borderTop:"1px solid rgba(255,255,255,.12)",marginTop:8}}><div style={{width:32,height:32,borderRadius:999,background:T.olive,color:T.ink,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:13,flexShrink:0}}>{perfil?.nombre?.slice(0,1)||"A"}</div><div style={{flex:1,minWidth:0}}><div style={{fontSize:12,fontWeight:700,color:"#fff",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{perfil?.nombre||"Admin"}</div><div style={{fontSize:10,color:"rgba(255,255,255,.5)"}}>Administrador</div></div></div>
     </div>
     {/* Panel lista */}
     <div style={{width:380,borderRight:`1px solid ${T.line}`,background:T.surface,display:"flex",flexDirection:"column",height:"100vh",flexShrink:0}}>
@@ -2170,7 +2170,7 @@ function ReservasDesktopLayout({reservas,airbnbs,setPage,page,perfil,tok,abrirRe
             <div style={{fontSize:32,fontWeight:700,letterSpacing:-1,lineHeight:1.05}}>{selActivo.nombre||selActivo.huesped}</div>
             <div style={{fontSize:13,color:T.ink3,marginTop:6,fontWeight:500}}>{selActivo.fecha?new Date(selActivo.fecha+"T12:00:00").toLocaleDateString("es-ES",{weekday:"long",day:"numeric",month:"long",year:"numeric"}):selActivo.fecha_entrada?new Date(selActivo.fecha_entrada+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"long"})+" → "+new Date(selActivo.fecha_salida+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"long",year:"numeric"}):"—"}</div>
           </div>
-          <div style={{display:"flex",gap:8,flexShrink:0}}><button onClick={()=>setEditPrecios&&setEditPrecios(true)} style={{padding:"9px 14px",borderRadius:11,border:`1px solid ${T.line}`,background:T.surface,fontWeight:700,fontSize:12,cursor:"pointer",fontFamily:T.sans,display:"flex",gap:6,alignItems:"center",color:T.ink}}><FmIcon name="edit" size={13} stroke={T.ink2}/>Precios</button><button style={{padding:"9px 16px",borderRadius:11,border:0,background:T.ink,color:"#fff",fontWeight:700,fontSize:12,cursor:"pointer",fontFamily:T.sans}}>Registrar cobro</button></div>
+          <div style={{display:"flex",gap:8,flexShrink:0}}><button onClick={()=>setEditPrecios&&setEditPrecios(true)} style={{padding:"9px 14px",borderRadius:11,border:`1px solid ${T.line}`,background:T.surface,fontWeight:700,fontSize:12,cursor:"pointer",fontFamily:T.sans,display:"flex",gap:6,alignItems:"center",color:T.ink}}><FmIcon name="edit" size={13} stroke={T.ink2}/>Precios</button><button onClick={()=>setShowSeña&&setShowSeña(true)} style={{padding:"9px 16px",borderRadius:11,border:0,background:T.ink,color:"#fff",fontWeight:700,fontSize:12,cursor:"pointer",fontFamily:T.sans}}>Registrar cobro</button></div>
         </div>
         {/* Grid cobro + rentabilidad */}
         <div style={{display:"grid",gridTemplateColumns:"1.3fr 1fr",gap:16,marginBottom:16}}>
@@ -6910,7 +6910,7 @@ function Reservas({tok,rol,perfil,navTarget,setNavTarget,setPage}){
 
   if(load)return <div className="loading"><div className="spin"/><span>Cargando…</span></div>;
 
-  if(isDesktopR)return<ReservasDesktopLayout reservas={reservas} airbnbs={airbnbs} setPage={setPage} page="reservas" perfil={perfil} tok={tok} abrirReserva={abrirReserva} selAb={selAb} setSelAb={setSelAb} sel={sel} setSel={setSel} contactoVinc={contactoVinc} setShowTipoRes={setShowTipoRes} setEditPrecios={setEditPrecios}/>;
+  if(isDesktopR)return<ReservasDesktopLayout reservas={reservas} airbnbs={airbnbs} setPage={setPage} page="reservas" perfil={perfil} tok={tok} abrirReserva={abrirReserva} selAb={selAb} setSelAb={setSelAb} sel={sel} setSel={setSel} contactoVinc={contactoVinc} setShowTipoRes={setShowTipoRes} setEditPrecios={setEditPrecios} setShowSeña={setShowSeña}/>;
 
   const activas=reservas.filter(r=>ACTIVOS.includes(r.estado));
   const finalizadas=reservas.filter(r=>r.estado==="finalizada");
