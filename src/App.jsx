@@ -5981,6 +5981,7 @@ function Reservas({tok,rol,perfil,navTarget,setNavTarget,setPage}){
   const [señaImporte,setSeñaImporte]=useState("");
   const [showPagoTotal,setShowPagoTotal]=useState(false);
   const [cobroSaving,setCobroSaving]=useState(false);
+  const [editPrecios,setEditPrecios]=useState(false);const [formPrecios,setFormPrecios]=useState({precio_finca:"",precio_casa:"",incluye_casa:false});
   const [showTipoRes,setShowTipoRes]=useState(false);
   const [showFormAb,setShowFormAb]=useState(false);const [savingAb,setSavingAb]=useState(false);
   const hoyR=new Date().toISOString().split("T")[0];
@@ -6184,6 +6185,7 @@ function Reservas({tok,rol,perfil,navTarget,setNavTarget,setPage}){
               {sel.dia_anterior_desbloqueado&&<span style={{fontSize:11,color:"#A6BE59"}}>✅ Día anterior desbloqueado</span>}
               {sel.dia_posterior_desbloqueado&&<span style={{fontSize:11,color:"#A6BE59"}}>✅ Día posterior desbloqueado</span>}
             </div>}
+            {isA&&<button onClick={()=>{setFormPrecios({precio_finca:String(sel.precio_finca||sel.precio||""),precio_casa:String(sel.precio_casa||""),incluye_casa:!!sel.incluye_casa});setEditPrecios(true);}} style={{background:T.bg,border:0,borderRadius:8,padding:"4px 8px",cursor:"pointer",display:"flex",alignItems:"center",gap:4,fontSize:11,color:T.ink3,fontWeight:600,marginTop:8}}><FmIcon name="edit" size={12} stroke={T.ink3}/> Editar precios</button>}
           </div>}
           {sel.obs&&<div style={{background:"#F5F3F0",borderRadius:8,padding:11,marginBottom:14}}><div style={{fontSize:10,color:"#8A8580",marginBottom:5}}>OBSERVACIONES</div><div style={{fontSize:12,color:"#1A1A1A",lineHeight:1.5}}>{sel.obs}</div></div>}
           {isA&&<><hr className="div"/>
@@ -6318,6 +6320,19 @@ function Reservas({tok,rol,perfil,navTarget,setNavTarget,setPage}){
         </button>
       </div>
       <button onClick={()=>setShowTipoRes(false)} style={{width:"100%",marginTop:12,padding:14,borderRadius:16,background:T.bg,border:0,color:T.ink3,fontFamily:T.sans,fontWeight:600,fontSize:13,cursor:"pointer"}}>Cancelar</button>
+    </div></div>}
+
+    {/* MODAL EDITAR PRECIOS */}
+    {editPrecios&&sel&&<div className="ov" onClick={()=>setEditPrecios(false)}><div className="modal" style={{maxWidth:400}} onClick={e=>e.stopPropagation()}>
+      <h3>Editar precios</h3>
+      <div style={{display:"flex",gap:8,marginBottom:14}}>
+        <button onClick={()=>setFormPrecios(v=>({...v,incluye_casa:false}))} style={{flex:1,padding:"10px 0",borderRadius:12,border:`1px solid ${formPrecios.incluye_casa?T.line:T.ink}`,background:formPrecios.incluye_casa?T.surface:T.ink,color:formPrecios.incluye_casa?T.ink2:"white",fontFamily:T.sans,fontWeight:600,fontSize:13,cursor:"pointer"}}>Solo finca</button>
+        <button onClick={()=>setFormPrecios(v=>({...v,incluye_casa:true}))} style={{flex:1,padding:"10px 0",borderRadius:12,border:`1px solid ${formPrecios.incluye_casa?T.ink:T.line}`,background:formPrecios.incluye_casa?T.ink:T.surface,color:formPrecios.incluye_casa?"white":T.ink2,fontFamily:T.sans,fontWeight:600,fontSize:13,cursor:"pointer"}}>Finca + Casa</button>
+      </div>
+      <div className="fg"><label>Precio finca (€)</label><input type="number" inputMode="decimal" className="fi" value={formPrecios.precio_finca} onChange={e=>setFormPrecios(v=>({...v,precio_finca:e.target.value}))}/></div>
+      {formPrecios.incluye_casa&&<div className="fg"><label>Precio casa (€)</label><input type="number" inputMode="decimal" className="fi" value={formPrecios.precio_casa} onChange={e=>setFormPrecios(v=>({...v,precio_casa:e.target.value}))}/></div>}
+      <div style={{display:"flex",justifyContent:"space-between",padding:"10px 14px",background:T.bg,borderRadius:12,marginBottom:20}}><span style={{fontSize:13,color:T.ink3}}>Total</span><span style={{fontSize:16,fontWeight:700,color:T.ink}}>{((parseFloat(formPrecios.precio_finca)||0)+(formPrecios.incluye_casa?parseFloat(formPrecios.precio_casa)||0:0)).toLocaleString("es-ES")}€</span></div>
+      <div className="mft"><button className="btn bg" onClick={()=>setEditPrecios(false)}>Cancelar</button><button className="btn bp" onClick={async()=>{const total=(parseFloat(formPrecios.precio_finca)||0)+(formPrecios.incluye_casa?parseFloat(formPrecios.precio_casa)||0:0);await sbPatch("reservas",`id=eq.${sel.id}`,{precio_finca:parseFloat(formPrecios.precio_finca)||0,precio_casa:formPrecios.incluye_casa?parseFloat(formPrecios.precio_casa)||0:0,precio_total:total,precio:total,incluye_casa:formPrecios.incluye_casa},tok);setSel(prev=>({...prev,precio_finca:parseFloat(formPrecios.precio_finca)||0,precio_casa:formPrecios.incluye_casa?parseFloat(formPrecios.precio_casa)||0:0,precio_total:total,precio:total,incluye_casa:formPrecios.incluye_casa}));setEditPrecios(false);await load_();}}>Guardar precios</button></div>
     </div></div>}
 
     {/* MODAL NUEVA AIRBNB */}
@@ -6613,6 +6628,7 @@ function Contactos({perfil,tok,rol,setPage}){
   const[showInter,setShowInter]=useState(false);
   const[showVisita,setShowVisita]=useState(false);
   const[showEstado,setShowEstado]=useState(false);
+  const[showMenuC,setShowMenuC]=useState(false);
 
   const formVacio={nombre:"",telefono:"",email:"",origen:"directo",tipo_evento:"boda",estado:"lead",fecha_evento_prevista:"",mes_evento_previsto:"",anio_evento_previsto:"",presupuesto_estimado:"",notas:"",asignado_a:perfil?.id,asignado_nombre:perfil?.nombre};
   const[form,setForm]=useState(formVacio);
@@ -6713,7 +6729,7 @@ function Contactos({perfil,tok,rol,setPage}){
         <button onClick={()=>setSel(null)} style={{width:36,height:36,borderRadius:999,background:"rgba(255,255,255,.18)",border:0,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}><FmIcon name="chevL" size={16} stroke="white"/></button>
         <div style={{display:"flex",gap:8}}>
           <button onClick={abrirEditar} style={{width:36,height:36,borderRadius:999,background:"rgba(255,255,255,.18)",border:0,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}><FmIcon name="edit" size={15} stroke="white"/></button>
-          <button onClick={()=>setShowEstado(true)} style={{width:36,height:36,borderRadius:999,background:"rgba(255,255,255,.18)",border:0,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}><FmIcon name="more" size={15} stroke="white"/></button>
+          <button onClick={()=>setShowMenuC(true)} style={{width:36,height:36,borderRadius:999,background:"rgba(255,255,255,.18)",border:0,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}><FmIcon name="more" size={15} stroke="white"/></button>
         </div>
       </div>
       <div style={{display:"flex",alignItems:"center",gap:14}}>
@@ -6810,6 +6826,15 @@ function Contactos({perfil,tok,rol,setPage}){
     {showEstado&&<div className="ov" onClick={()=>setShowEstado(false)}><div className="modal" style={{maxWidth:360}} onClick={e=>e.stopPropagation()}>
       <h3>Cambiar estado</h3>
       {Object.entries(ESTADO_CONTACTO).map(([k,v])=><button key={k} className="btn bg" style={{width:"100%",justifyContent:"flex-start",marginBottom:6,borderColor:sel.estado===k?v.col:undefined,color:sel.estado===k?v.col:undefined}} onClick={()=>cambiarEstado(sel,k)}>{v.ico} {v.lbl}{sel.estado===k?" ✓":""}</button>)}
+    </div></div>}
+    {showMenuC&&sel&&<div className="ov" onClick={()=>setShowMenuC(false)}><div className="modal" style={{maxWidth:380}} onClick={e=>e.stopPropagation()}>
+      <div style={{fontSize:14,fontWeight:600,color:T.ink,marginBottom:16}}>{sel.nombre}</div>
+      <div style={{display:"flex",flexDirection:"column",gap:8}}>
+        <button onClick={()=>{setShowMenuC(false);setShowEstado(true);}} style={{width:"100%",padding:14,borderRadius:14,background:T.bg,border:0,color:T.ink,fontFamily:T.sans,fontWeight:600,fontSize:14,cursor:"pointer",textAlign:"left"}}>🏷 Cambiar estado</button>
+        <button onClick={()=>{setShowMenuC(false);abrirEditar();}} style={{width:"100%",padding:14,borderRadius:14,background:T.bg,border:0,color:T.ink,fontFamily:T.sans,fontWeight:600,fontSize:14,cursor:"pointer",textAlign:"left"}}>✏️ Editar contacto</button>
+        <button onClick={async()=>{if(!window.confirm(`¿Eliminar "${sel.nombre}"? No se puede deshacer.`))return;await sbDelete("contactos",`id=eq.${sel.id}`,tok);setSel(null);setShowMenuC(false);await cargar();}} style={{width:"100%",padding:14,borderRadius:14,background:"#FEF2F2",border:"1px solid #FECACA",color:"#D9443A",fontFamily:T.sans,fontWeight:600,fontSize:14,cursor:"pointer",textAlign:"left"}}>🗑️ Eliminar contacto</button>
+      </div>
+      <button onClick={()=>setShowMenuC(false)} style={{width:"100%",marginTop:10,padding:14,borderRadius:14,background:T.bg,border:0,color:T.ink3,fontFamily:T.sans,fontWeight:600,cursor:"pointer"}}>Cancelar</button>
     </div></div>}
   </div>;
 
@@ -7061,7 +7086,7 @@ function Visitas({perfil,tok,rol,setPage,navTarget,setNavTarget}){
   };
 
   const abrirConvertir=()=>{
-    setFormRes({fecha_evento:sel.fecha_evento_prevista||"",precio:"",contacto:sel.telefono||"",obs:sel.nota||"",estado:"visita"});
+    setFormRes({fecha_evento:sel.fecha_evento_prevista||"",precio_finca:"",precio_casa:"",incluye_casa:false,contacto:sel.telefono||"",obs:sel.nota||"",estado:"visita"});
     setShowConvertir(true);
   };
 
@@ -7069,7 +7094,8 @@ function Visitas({perfil,tok,rol,setPage,navTarget,setNavTarget}){
     if(!sel||saving||!formRes.fecha_evento)return;
     setSaving(true);
     try{
-      const [res]=await sbPost("reservas",{nombre:sel.nombre,fecha:formRes.fecha_evento,tipo:sel.tipo_evento||"Boda",precio:parseFloat(formRes.precio)||0,contacto:formRes.contacto||"",obs:formRes.obs||"",estado:formRes.estado||"visita",creado_por:perfil.id,contacto_id:sel.contacto_id||null},tok);
+      const pF=parseFloat(formRes.precio_finca)||0;const pC=formRes.incluye_casa?parseFloat(formRes.precio_casa)||0:0;const pT=pF+pC;
+      const [res]=await sbPost("reservas",{nombre:sel.nombre,fecha:formRes.fecha_evento,tipo:sel.tipo_evento||"Boda",incluye_casa:formRes.incluye_casa,precio_finca:pF,precio_casa:pC,precio_total:pT,precio:pT,contacto:formRes.contacto||"",obs:formRes.obs||"",estado:formRes.estado||"visita",creado_por:perfil.id,contacto_id:sel.contacto_id||null,bloqueo_dia_anterior:formRes.incluye_casa,bloqueo_dia_posterior:formRes.incluye_casa},tok);
       await sbPatch("visitas",`id=eq.${sel.id}`,{estado:"convertida",reserva_id:res.id},tok);
       if(sel.contacto_id){
         await sbPatch("contactos",`id=eq.${sel.contacto_id}`,{estado:"cliente",updated_at:new Date().toISOString()},tok).catch(()=>{});
@@ -7296,10 +7322,16 @@ function Visitas({perfil,tok,rol,setPage,navTarget,setNavTarget}){
           <input type="date" className="fi" value={formRes.fecha_evento} onChange={e=>setFormRes(v=>({...v,fecha_evento:e.target.value}))}/>
           {sel.fecha_evento_prevista&&formRes.fecha_evento===sel.fecha_evento_prevista&&<div style={{fontSize:12,color:"#A6BE59",marginTop:5}}>✅ Fecha pre-rellenada desde la visita — puedes cambiarla si es necesario</div>}
         </div>
-        <div className="g2">
-          <div className="fg"><label>Precio (€)</label><input type="number" inputMode="numeric" className="fi" value={formRes.precio} onChange={e=>setFormRes(v=>({...v,precio:e.target.value}))} placeholder="0"/></div>
-          <div className="fg"><label>Contacto</label><input className="fi" type="tel" value={formRes.contacto} onChange={e=>setFormRes(v=>({...v,contacto:e.target.value}))} placeholder="600 000 000"/></div>
+        <div style={{display:"flex",gap:8,marginBottom:14}}>
+          <button onClick={()=>setFormRes(v=>({...v,incluye_casa:false}))} style={{flex:1,padding:"10px 0",borderRadius:12,border:`1px solid ${formRes.incluye_casa?T.line:T.ink}`,background:formRes.incluye_casa?T.surface:T.ink,color:formRes.incluye_casa?T.ink2:"white",fontFamily:T.sans,fontWeight:600,fontSize:13,cursor:"pointer"}}>Solo finca</button>
+          <button onClick={()=>setFormRes(v=>({...v,incluye_casa:true}))} style={{flex:1,padding:"10px 0",borderRadius:12,border:`1px solid ${formRes.incluye_casa?T.ink:T.line}`,background:formRes.incluye_casa?T.ink:T.surface,color:formRes.incluye_casa?"white":T.ink2,fontFamily:T.sans,fontWeight:600,fontSize:13,cursor:"pointer"}}>Finca + Casa</button>
         </div>
+        <div className="g2">
+          <div className="fg"><label>Precio finca (€)</label><input type="number" inputMode="numeric" className="fi" value={formRes.precio_finca} onChange={e=>setFormRes(v=>({...v,precio_finca:e.target.value}))} placeholder="0"/></div>
+          {formRes.incluye_casa&&<div className="fg"><label>Precio casa (€)</label><input type="number" inputMode="numeric" className="fi" value={formRes.precio_casa} onChange={e=>setFormRes(v=>({...v,precio_casa:e.target.value}))} placeholder="0"/></div>}
+        </div>
+        {((parseFloat(formRes.precio_finca)||0)+(formRes.incluye_casa?parseFloat(formRes.precio_casa)||0:0))>0&&<div style={{display:"flex",justifyContent:"space-between",padding:"10px 14px",background:T.bg,borderRadius:12,marginBottom:14}}><span style={{fontSize:13,color:T.ink3,fontWeight:500}}>Total</span><span style={{fontSize:16,fontWeight:700,color:T.ink}}>{((parseFloat(formRes.precio_finca)||0)+(formRes.incluye_casa?parseFloat(formRes.precio_casa)||0:0)).toLocaleString("es-ES")}€</span></div>}
+        <div className="fg"><label>Contacto</label><input className="fi" type="tel" value={formRes.contacto} onChange={e=>setFormRes(v=>({...v,contacto:e.target.value}))} placeholder="600 000 000"/></div>
         <div className="fg"><label>Estado inicial</label>
           <select className="fi" value={formRes.estado} onChange={e=>setFormRes(v=>({...v,estado:e.target.value}))}>
             {ESTADOS.map(e=><option key={e.id} value={e.id}>{e.lbl}</option>)}
