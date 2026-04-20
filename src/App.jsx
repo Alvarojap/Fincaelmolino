@@ -3845,23 +3845,23 @@ function Limpieza({perfil,tok,rol}){
     setNewS(prev=>({...prev,limpiadora_id:id,modalidad_pago:l?.modalidad||"por_horas",tarifa_hora:l?.modalidad==="por_horas"?String(l?.tarifa_hora||""):""}));
   };
 
+  // tabLimp MUST be before any conditional returns (React hooks rule)
+  const [tabLimp,setTabLimp]=useState("todos");
+
   if(load)return <div className="loading"><div className="spin"/><span>Cargando…</span></div>;
-  if(!isA&&servicios.length===0)return <><div className="ph"><h2>Mi servicio</h2></div><div className="pb"><div className="empty"><span className="ico">🧹</span><p>Sin servicios asignados todavía</p></div></div></>;
+  if(!isA&&servicios.length===0)return <><div style={{padding:"28px 32px 16px"}}><div style={{fontSize:28,fontWeight:700,color:T.ink}}>Mi servicio</div></div><div className="pb"><div className="empty"><span className="ico">🧹</span><p>Sin servicios asignados todavía</p></div></div></>;
 
   const srv=servicios.find(s=>s.id===actId);
   const fijas=tareas.filter(t=>!t.es_extra);
   const extras=tareas.filter(t=>t.es_extra);
   const comp=fijas.filter(t=>t.done).length;
-  // Map tarea_id → DB row for zone rendering
   const tMap={};fijas.forEach(t=>{if(t.tarea_id)tMap[t.tarea_id]=t;});
-  // Check if tareas use new zone ids
   const allZonaIds=LIMP_ZONAS.flatMap(z=>getZonaTareas(z).map(t=>t.id));
   const useZonas=fijas.some(t=>allZonaIds.includes(t.tarea_id));
   const tot=tareas.length;
   const todoHecho=tot>0&&comp===tot;
   const yaVerif=srv?.verificado;
 
-  const [tabLimp,setTabLimp]=useState("todos");
   const srvFilt=tabLimp==="todos"?servicios:tabLimp==="pendientes"?servicios.filter(s=>["pendiente","pendiente_fecha"].includes(s.estado||"")||(!s.estado&&!s.verificado)):tabLimp==="activos"?servicios.filter(s=>["en_curso","programado","activo"].includes(s.estado||"")):servicios.filter(s=>["completado","finalizado"].includes(s.estado||"")||s.verificado);
   const costeLimp=(servicios.reduce((t,s)=>t+(parseFloat(s.coste_calculado)||0),0)).toLocaleString("es-ES")+"€";
 
