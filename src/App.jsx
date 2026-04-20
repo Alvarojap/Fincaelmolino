@@ -2905,7 +2905,7 @@ function DashL({perfil,setPage,tok}){
 function DashC({perfil,reservas,setPage}){
   const pend=reservas.filter(r=>r.estado==="visita"||r.estado==="pendiente_contrato").length;
   return <>
-    <div className="ph"><h2>Hola, {perfil.nombre.split(" ")[0]} 👋</h2><p>{new Date().toLocaleDateString("es-ES",{weekday:"long",year:"numeric",month:"long",day:"numeric"})}</p></div>
+    <div style={{padding:"28px 32px 16px"}}><div style={{fontSize:12,color:T.ink3,fontWeight:500}}>{new Date().toLocaleDateString("es-ES",{weekday:"long",day:"numeric",month:"long"})}</div><div style={{fontSize:28,fontWeight:700,color:T.ink,letterSpacing:-.8,lineHeight:1.02,marginTop:2}}>Hola, {perfil.nombre.split(" ")[0]} 👋</div></div>
     <div className="pb">
       <div className="sg"><SC lbl="Reservas activas" val={reservas.filter(r=>["visita","pendiente_contrato","contrato_firmado","reserva_pagada","precio_total"].includes(r.estado)).length} sub="en curso"/><SC lbl="Pendientes de firma" val={pend} valC={pend>0?"#f59e0b":undefined}/></div>
       <div className="g2">{[{ico:"📋",t:"Reservas",s:"Listado completo",id:"reservas"},{ico:"📅",t:"Calendario",s:"Disponibilidad",id:"calendario"}].map(it=>(
@@ -3515,7 +3515,7 @@ function Incidencias({tok}){
   };
   if(load)return <div className="loading"><div className="spin"/><span>Cargando…</span></div>;
   return <>
-    <div className="ph"><h2>Incidencias</h2><p>{items.length} anotaciones registradas</p></div>
+    <div style={{padding:"28px 32px 16px"}}><div style={{fontSize:12,color:T.ink3,fontWeight:500}}>{items.length} anotaciones registradas</div><div style={{fontSize:28,fontWeight:700,color:T.ink,letterSpacing:-.8,lineHeight:1.02,marginTop:2}}>Incidencias</div></div>
     <div className="pb">{items.length===0?<div className="empty"><span className="ico">✅</span><p>Sin incidencias registradas</p></div>:items.map(inc=><IncCard key={inc.id} inc={inc} onResp={saveResp}/>)}</div>
   </>;
 }
@@ -4503,7 +4503,7 @@ function Notifs({perfil,tok,rol}){
   if(load)return <div className="loading"><div className="spin"/><span>Cargando…</span></div>;
   const RL={jardinero:"Jardinero",limpieza:"Limpieza",comercial:"Comercial"};
   return <>
-    <div className="ph"><h2>🔔 Notificaciones</h2><p>{isA?"Envía avisos al equipo":`${notifs.filter(n=>!n.leida).length} sin leer`}</p></div>
+    <div style={{padding:"28px 32px 16px"}}><div style={{fontSize:12,color:T.ink3,fontWeight:500}}>{isA?"Envía avisos al equipo":`${notifs.filter(n=>!n.leida).length} sin leer`}</div><div style={{fontSize:28,fontWeight:700,color:T.ink,letterSpacing:-.8,lineHeight:1.02,marginTop:2}}>Notificaciones</div></div>
     <div className="pb">
       {isA&&<PanelSolicitudes tok={tok} perfil={perfil}/>}
       {isA&&<div className="card" style={{marginBottom:20}}>
@@ -4547,7 +4547,7 @@ function Usuarios({tok}){
   const RC={admin:"#c9a84c",jardinero:"#10b981",limpieza:"#6366f1",comercial:"#f59e0b"};
   if(load)return <div className="loading"><div className="spin"/><span>Cargando…</span></div>;
   return <>
-    <div className="ph"><h2>Usuarios del sistema</h2><p>Gestión de accesos</p></div>
+    <div style={{padding:"54px 20px 16px"}}><div style={{fontSize:12,color:T.ink3,fontWeight:500}}>Accesos y roles</div><div style={{fontSize:30,fontWeight:700,color:T.ink,letterSpacing:-1,lineHeight:1.02}}>Usuarios</div></div>
     <div className="pb">
       <div style={{marginBottom:20}}><button className="btn bp" onClick={()=>setShowAdd(true)}>➕ Añadir usuario</button></div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(250px,1fr))",gap:14}}>
@@ -4786,7 +4786,7 @@ function LimpiadorasPage({tok,rol}){
 
   if(load)return <div className="loading"><div className="spin"/><span>Cargando…</span></div>;
   return <>
-    <div className="ph"><h2>👩 Limpiadoras</h2><p>Gestión de limpiadoras y condiciones</p></div>
+    <div style={{padding:"28px 32px 16px"}}><div style={{fontSize:12,color:T.ink3,fontWeight:500}}>Gestión de limpiadoras y condiciones</div><div style={{fontSize:28,fontWeight:700,color:T.ink,letterSpacing:-.8,lineHeight:1.02,marginTop:2}}>Limpiadoras</div></div>
     <div className="pb">
       <div style={{marginBottom:14}}><button className="btn bp" onClick={()=>{setForm({nombre:"",modalidad:"por_horas",tarifa_hora:"",notas:"",pin:"",pinConfirm:""});setShowForm(true);}}>➕ Nueva limpiadora</button></div>
       {limpiadoras.length===0?<div className="empty"><span className="ico">🧹</span><p>Sin limpiadoras registradas</p></div>
@@ -4932,7 +4932,7 @@ function Lavanderia({perfil,tok,rol}){
 
   if(load)return <div className="loading"><div className="spin"/><span>Cargando…</span></div>;
   return <>
-    <div className="ph"><h2>🧺 Lavandería</h2><p>{enLav.length} envíos pendientes</p></div>
+    <div style={{padding:"28px 32px 16px"}}><div style={{fontSize:12,color:T.ink3,fontWeight:500}}>{enLav.length} envíos pendientes</div><div style={{fontSize:28,fontWeight:700,color:T.ink,letterSpacing:-.8,lineHeight:1.02,marginTop:2}}>Lavandería</div></div>
     <div className="pb">
       <button className="btn bp" style={{marginBottom:16}} onClick={()=>{setItems(articulos.map(a=>({...a,cantidad:0})));setNotas("");setShowEnvio(true);}}>➕ Enviar a lavandería</button>
 
@@ -5138,7 +5138,7 @@ function AlmacenPage({perfil,tok,rol}){
 
   if(load)return <div className="loading"><div className="spin"/><span>Cargando…</span></div>;
   return <>
-    <div className="ph"><h2>📦 Almacén</h2><p>{articulos.length} artículos · {bajos.length} con stock bajo</p></div>
+    <div style={{padding:"28px 32px 16px"}}><div style={{fontSize:12,color:T.ink3,fontWeight:500}}>{articulos.length} artículos · {bajos.length} con stock bajo</div><div style={{fontSize:28,fontWeight:700,color:T.ink,letterSpacing:-.8,lineHeight:1.02,marginTop:2}}>Almacén</div></div>
     <div className="pb">
       {bajos.length>0&&<div style={{background:"#FEE8E8",borderRadius:14,padding:"12px 16px",marginBottom:16,fontSize:13,color:"#F35757",fontWeight:600}}>⚠️ {bajos.length} artículo{bajos.length>1?"s":""} con stock bajo: {bajos.slice(0,5).map(a=>a.nombre).join(", ")}</div>}
 
@@ -5771,7 +5771,7 @@ function Ajustes({tok,rol}){
   if(load)return <div className="loading"><div className="spin"/><span>Cargando…</span></div>;
 
   return <>
-    <div className="ph"><h2>⚙️ Ajustes</h2><p>Configuración del sistema</p></div>
+    <div style={{padding:"54px 20px 16px"}}><div style={{fontSize:12,color:T.ink3,fontWeight:500}}>Sistema</div><div style={{fontSize:30,fontWeight:700,color:T.ink,letterSpacing:-1,lineHeight:1.02}}>Ajustes</div></div>
     <div className="pb" style={{maxWidth:600}}>
       {/* CONFIGURACIÓN FINANCIERA */}
       <div className="card" style={{marginBottom:16}}>
@@ -7159,7 +7159,7 @@ function NuevaReserva({perfil,tok,setPage,rol}){
     }catch(_){}setSaving(false);
   };
   return <>
-    <div className="ph"><h2>Nueva reserva</h2></div>
+    <div style={{padding:"28px 32px 16px"}}><div style={{fontSize:12,color:T.ink3,fontWeight:500}}>Crear evento</div><div style={{fontSize:28,fontWeight:700,color:T.ink,letterSpacing:-.8,lineHeight:1.02,marginTop:2}}>Nueva reserva</div></div>
     <div className="pb"><div style={{maxWidth:600}}>
       {ok&&<div style={{background:"rgba(16,185,129,.1)",border:"1px solid rgba(16,185,129,.3)",borderRadius:10,padding:"12px 15px",marginBottom:16,color:"#A6BE59",fontSize:13}}>✅ Reserva creada. Redirigiendo…</div>}
       <div className="card">
