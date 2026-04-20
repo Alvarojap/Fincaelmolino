@@ -5938,11 +5938,307 @@ function Calendario({tok,rol}){
     <div className="pb" style={{maxWidth:900}}><CalBase tok={tok} rol={rol}/></div>
   </>;
 }
-function CalLimpieza({tok}){
-  return <><div className="ph"><h2>Calendario</h2><p>Próximos eventos y alojamientos</p></div><div className="pb" style={{maxWidth:900}}><CalBase tok={tok} rol="limpieza"/></div></>;
+function CalLimpieza({tok,perfil}){
+  const [srv,setSrv]=useState(null);
+  const [tareas,setTareas]=useState([]);
+  const [coordP,setCoordP]=useState([]);
+  const [savingC,setSavingC]=useState(false);
+  const [saving,setSaving]=useState(false);
+  const [zonasOpen,setZonasOpen]=useState({0:true});
+  const [load,setLoad]=useState(true);
+  const [showDatePick,setShowDatePick]=useState(null);
+  const [customDate,setCustomDate]=useState("");
+  const t=perfil?.es_operario?SB_KEY:tok;
+  useEffect(()=>{
+    Promise.all([
+      sbGet("servicios","?select=*&order=fecha.desc&limit=1",t),
+      sbGet("coordinacion_servicios","?estado=in.(preguntando_si_lista,servicio_creado_pendiente_fecha)&select=*",t),
+    ]).then(([srvs,coords])=>{
+      setCoordP(coords.filter(c=>!c.tipo?.includes("jardin")));
+      if(srvs.length>0){setSrv(srvs[0]);sbGet("servicio_tareas",`?servicio_id=eq.${srvs[0].id}&select=*`,t).then(setTareas).catch(()=>{});}
+      setLoad(false);
+    }).catch(()=>setLoad(false));
+  },[]);
+  const toggleT=async(tareaId)=>{
+    if(saving)return;setSaving(true);
+    const cur=tareas.find(x=>x.id===tareaId);const nuevoDone=!cur?.done;
+    await sbPatch("servicio_tareas",`id=eq.${tareaId}`,{done:nuevoDone,completado_por:nuevoDone?(perfil?.nombre||"Staff"):null,completado_ts:nuevoDone?new Date().toISOString():null},tok).catch(()=>{});
+    setTareas(prev=>prev.map(x=>x.id===tareaId?{...x,done:nuevoDone}:x));setSaving(false);
+  };
+  const tMap={};tareas.forEach(x=>{if(x.tarea_id)tMap[x.tarea_id]=x;});
+  const allT=LIMP_ZONAS.flatMap(z=>[...(z.tareas||[]),...(z.subzonas?.flatMap(s=>s.tareas)||[])]);
+  const totalT=allT.length;const doneT=allT.filter(x=>tMap[x.id]?.done).length;
+  const pct=totalT>0?Math.round(doneT/totalT*100):0;const deg=Math.round(doneT/Math.max(totalT,1)*360);
+  const confirmarFecha=async(c,dia)=>{
+    if(savingC)return;setSavingC(true);const ds=dia.toISOString().split("T")[0];
+    try{await sbPatch("coordinacion_servicios",`id=eq.${c.id}`,{fecha_programada:ds,estado:"confirmado",respondido_por:perfil?.nombre||"Staff"},tok);
+      if(c.servicio_id)await sbPatch("servicios",`id=eq.${c.servicio_id}`,{fecha:ds},tok).catch(()=>{});
+      setCoordP(prev=>prev.filter(x=>x.id!==c.id));}catch(_){}setSavingC(false);
+  };
+  const getDias=(ini,fin)=>{const ds=[];const f=new Date(fin);let d=new Date(Math.max(new Date(ini),Date.now()));while(d<=f&&ds.length<5){ds.push(new Date(d));d=new Date(d.getTime()+86400000);}return ds;};
+  if(load)return <div className="loading"><div className="spin"/></div>;
+  return(
+    <div style={{paddingBottom:80}}>
+      <div style={{padding:"54px 20px 14px"}}>
+        <div style={{fontSize:11,color:T.ink3,letterSpacing:.6,fontWeight:600,textTransform:"uppercase"}}>Servicio activo</div>
+        <div style={{fontFamily:T.sans,fontSize:28,fontWeight:700,color:T.ink,letterSpacing:-1,lineHeight:1.05}}>Limpieza</div>
+        {srv&&<div style={{fontSize:12,color:T.ink3,marginTop:3}}>{srv.nombre} · {new Date(srv.fecha+"T12:00:00").toLocaleDateString("es-ES",{weekday:"long",day:"numeric",month:"short"})}</div>}
+      </div>
+      <div style={{padding:"0 16px"}}>
+        {coordP.map(c=>{
+          const fechaFmt=c.fecha_checkin_siguiente?new Date(c.fecha_checkin_siguiente+"T12:00:00").toLocaleDateString("es-ES",{weekday:"short",day:"numeric",month:"long"}):"—";
+          if(c.estado==="preguntando_si_lista")return(
+            <div key={c.id} style={{background:"#FEF8E4",border:`1px solid ${T.gold}55`,borderRadius:16,padding:14,marginBottom:12,display:"flex",gap:10,alignItems:"flex-start"}}>
+              <div style={{width:28,height:28,borderRadius:999,background:T.gold+"44",color:"#8A6B0F",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><FmIcon name="warn" size={14} stroke="#8A6B0F"/></div>
+              <div style={{flex:1}}>
+                <div style={{fontSize:12,fontWeight:700,color:"#6B5108"}}>Acción requerida</div>
+                <div style={{fontSize:11,color:"#8A6B0F",marginTop:2}}>{fechaFmt} — ¿está la casa lista?</div>
+                <div style={{display:"flex",gap:6,marginTop:8}}>
+                  <button disabled={savingC} onClick={async()=>{setSavingC(true);try{await sbPatch("coordinacion_servicios",`id=eq.${c.id}`,{estado:"casa_lista_confirmada",respondido_por:perfil?.nombre||"Staff"},tok);const adms=await sbGet("usuarios","?rol=eq.admin&select=id",tok).catch(()=>[]);for(const a of adms)await sbPost("notificaciones",{para:a.id,txt:`✅ ${perfil?.nombre||"Staff"} confirma: casa lista para ${fechaFmt}`},tok).catch(()=>{});setCoordP(prev=>prev.filter(x=>x.id!==c.id));}catch(_){}setSavingC(false);}} style={{padding:"7px 12px",borderRadius:8,border:`1px solid ${T.gold}88`,background:T.gold,color:T.ink,fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:T.sans}}>✅ Lista</button>
+                  <button disabled={savingC} onClick={async()=>{setSavingC(true);try{await sbPatch("coordinacion_servicios",`id=eq.${c.id}`,{estado:"servicio_creado_pendiente_fecha"},tok);setCoordP(prev=>prev.map(x=>x.id===c.id?{...x,estado:"servicio_creado_pendiente_fecha"}:x));}catch(_){}setSavingC(false);}} style={{padding:"7px 12px",borderRadius:8,border:`1px solid ${T.gold}88`,background:T.surface,color:"#8A6B0F",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:T.sans}}>Necesita limpieza</button>
+                </div>
+              </div>
+            </div>
+          );
+          const dias=getDias(c.ventana_inicio||new Date().toISOString(),c.ventana_fin||new Date(Date.now()+3*86400000).toISOString());
+          return(
+            <div key={c.id} style={{background:"#FEF8E4",border:`1px solid ${T.gold}55`,borderRadius:16,padding:14,marginBottom:12,display:"flex",gap:10,alignItems:"flex-start"}}>
+              <div style={{width:28,height:28,borderRadius:999,background:T.gold+"44",color:"#8A6B0F",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><FmIcon name="warn" size={14} stroke="#8A6B0F"/></div>
+              <div style={{flex:1}}>
+                <div style={{fontSize:12,fontWeight:700,color:"#6B5108"}}>Elegir día de limpieza</div>
+                <div style={{fontSize:11,color:"#8A6B0F",marginTop:2}}>Confirma fecha en la ventana disponible</div>
+                <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:8}}>
+                  {dias.map(d=><button key={d.toISOString()} disabled={savingC} onClick={()=>confirmarFecha(c,d)} style={{padding:"6px 10px",borderRadius:8,border:`1px solid ${T.gold}88`,background:T.surface,color:"#8A6B0F",fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:T.sans}}>{d.toLocaleDateString("es-ES",{weekday:"short",day:"numeric"})}</button>)}
+                  <button onClick={()=>{setShowDatePick(c);setCustomDate("");}} style={{padding:"6px 10px",borderRadius:8,border:`1px solid ${T.gold}88`,background:T.surface,color:"#8A6B0F",fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:T.sans}}>Otra fecha</button>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+        {srv?(
+          <div style={{background:T.olive+"18",border:`1px solid ${T.olive}44`,borderRadius:20,padding:16,marginBottom:14,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <div>
+              <div style={{fontSize:10,color:"#5A8A3E",letterSpacing:.8,textTransform:"uppercase",fontWeight:700}}>En curso{srv.hora_inicio?` · desde ${srv.hora_inicio}`:""}</div>
+              <div style={{fontFamily:T.sans,fontSize:17,color:T.ink,fontWeight:700,marginTop:2}}>{srv.nombre}</div>
+              <div style={{fontSize:11,color:T.ink3,marginTop:2}}>{LIMP_ZONAS.length} zonas · {totalT} tareas</div>
+            </div>
+            <div style={{width:54,height:54,borderRadius:999,background:`conic-gradient(${T.olive} ${deg}deg,${T.line} 0)`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+              <div style={{width:44,height:44,borderRadius:999,background:T.surface,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:T.sans,fontSize:13,fontWeight:700,color:T.ink}}>{pct}%</div>
+            </div>
+          </div>
+        ):(
+          <div style={{background:T.surface,border:`1px solid ${T.line}`,borderRadius:20,padding:16,marginBottom:14,textAlign:"center",color:T.ink3,fontSize:13}}>Sin servicio activo</div>
+        )}
+        <div style={{display:"flex",flexDirection:"column",gap:8}}>
+          {LIMP_ZONAS.map((z,zi)=>{
+            const zonaTareas=[...(z.tareas||[]),...(z.subzonas?.flatMap(s=>s.tareas)||[])];
+            const donePorZona=zonaTareas.filter(x=>tMap[x.id]?.done).length;
+            const totalPorZona=zonaTareas.length;
+            const zDone=totalPorZona>0&&donePorZona===totalPorZona;
+            const enProg=donePorZona>0&&!zDone;
+            const open=!!zonasOpen[zi];
+            return(
+              <div key={z.id} style={{background:T.surface,border:`1px solid ${T.line}`,borderRadius:16,overflow:"hidden"}}>
+                <button onClick={()=>setZonasOpen(prev=>({...prev,[zi]:!prev[zi]}))} style={{width:"100%",padding:"13px 14px",background:"transparent",border:0,cursor:"pointer",display:"flex",alignItems:"center",gap:12,fontFamily:T.sans,textAlign:"left"}}>
+                  <div style={{width:28,height:28,borderRadius:8,background:zDone?T.olive:enProg?T.gold+"44":T.bg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,flexShrink:0}}>
+                    {zDone?<FmIcon name="check" size={13} stroke="white"/>:<span>{z.emoji}</span>}
+                  </div>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:13,fontWeight:600,color:T.ink}}>{z.nombre}</div>
+                    {totalPorZona>0&&<div style={{fontSize:10.5,color:T.ink3,marginTop:1}}>{donePorZona}/{totalPorZona} tareas{enProg&&<span style={{color:T.gold}}> · en progreso</span>}</div>}
+                    {totalPorZona===0&&<div style={{fontSize:10.5,color:T.ink4,marginTop:1}}>Sin tareas registradas</div>}
+                  </div>
+                  <FmIcon name={open?"chevU":"chevD"} size={15} stroke={T.ink3}/>
+                </button>
+                {open&&zonaTareas.length>0&&(
+                  <div style={{padding:"0 14px 14px",borderTop:`1px solid ${T.line}`}}>
+                    <div style={{display:"flex",flexDirection:"column",marginTop:4}}>
+                      {zonaTareas.map((ta,ti)=>{
+                        const dbRow=tMap[ta.id];const done=!!dbRow?.done;
+                        return(
+                          <button key={ta.id} onClick={()=>dbRow&&toggleT(dbRow.id)} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",background:"transparent",border:0,cursor:dbRow?"pointer":"default",fontFamily:T.sans,textAlign:"left",borderBottom:ti<zonaTareas.length-1?`1px solid ${T.line}`:"none"}}>
+                            <div style={{width:20,height:20,borderRadius:6,background:done?T.olive:"transparent",border:`1.5px solid ${done?T.olive:T.ink4}`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{done&&<FmIcon name="check" size={11} stroke="white"/>}</div>
+                            <span style={{flex:1,fontSize:12.5,color:done?T.ink3:T.ink,textDecoration:done?"line-through":"none",fontWeight:done?400:500}}>{ta.txt}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {z.foto_requerida&&<button style={{marginTop:8,padding:"8px 12px",borderRadius:8,background:T.bg,border:`1px dashed ${T.ink4}`,color:T.ink2,fontFamily:T.sans,fontSize:11,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:6}}><FmIcon name="camera" size={13} stroke={T.ink2}/> Subir foto de zona</button>}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+      {showDatePick&&<div className="ov" onClick={()=>setShowDatePick(null)}><div className="modal" style={{maxWidth:360}} onClick={e=>e.stopPropagation()}>
+        <h3>📅 Elegir fecha</h3>
+        <div className="fg"><label>Fecha</label><input type="date" className="fi" value={customDate} onChange={e=>setCustomDate(e.target.value)}/></div>
+        <div className="mft"><button className="btn bg" onClick={()=>setShowDatePick(null)}>Cancelar</button><button className="btn bp" disabled={!customDate||savingC} onClick={()=>{confirmarFecha(showDatePick,new Date(customDate+"T12:00:00"));setShowDatePick(null);}}>{savingC?"…":"Confirmar"}</button></div>
+      </div></div>}
+    </div>
+  );
 }
-function CalJardin({tok}){
-  return <><div className="ph"><h2>Calendario de la finca</h2><p>Próximos eventos y alojamientos</p></div><div className="pb" style={{maxWidth:900}}><CalBase tok={tok} rol="jardinero"/></div></>;
+function CalJardin({tok,perfil}){
+  const [srvActivo,setSrvActivo]=useState(null);
+  const [srvTareas,setSrvTareas]=useState([]);
+  const [coordP,setCoordP]=useState([]);
+  const [jornadaId,setJornadaId]=useState(null);
+  const [jornadaFin,setJornadaFin]=useState(false);
+  const [tiempoSec,setTiempoSec]=useState(0);
+  const [pausado,setPausado]=useState(false);
+  const [pausasArr,setPausasArr]=useState([]);
+  const [savingT,setSavingT]=useState(false);
+  const [savingC,setSavingC]=useState(false);
+  const [savingJ,setSavingJ]=useState(false);
+  const [load,setLoad]=useState(true);
+  const hoyStr=new Date().toISOString().split("T")[0];
+  const jId=perfil?.es_operario?perfil.referencia_id:perfil?.id;
+  const t=perfil?.es_operario?SB_KEY:tok;
+  const loadData=async()=>{
+    try{
+      const[coords,srvs]=await Promise.all([
+        sbGet("coordinacion_servicios","?estado=in.(preguntando_si_lista,servicio_creado_pendiente_fecha)&select=*",t),
+        sbGet("jardin_servicios",`?jardinero_id=eq.${jId}&estado=eq.activo&select=*`,t).catch(()=>[]),
+      ]);
+      setCoordP(coords.filter(c=>c.tipo?.includes("jardin")));
+      if(srvs.length>0){
+        const s=srvs[0];setSrvActivo(s);
+        const tareas=await sbGet("jardin_servicio_tareas",`?servicio_id=eq.${s.id}&select=*&order=created_at.asc`,t).catch(()=>[]);
+        setSrvTareas(tareas.filter(x=>!x.añadida_por_jardinero));
+        let jorns=[];
+        try{jorns=await sbGet("jornadas_jardineria",`?servicio_id=eq.${s.id}&hora_inicio=gte.${hoyStr}T00:00:00&hora_inicio=lte.${hoyStr}T23:59:59&select=*`,t);}catch(_){}
+        if(jorns.length>0){
+          const j=jorns[0];setJornadaId(j.id);setPausasArr(j.pausas||[]);
+          if(j.hora_fin){setJornadaFin(true);}else{
+            const ts=new Date(j.hora_inicio).getTime();
+            if(ts>0)localStorage.setItem(`fm_jornada_inicio_${s.id}`,ts.toString());
+            const pArr=j.pausas||[];const lastP=pArr[pArr.length-1];setPausado(!!lastP&&!lastP.fin);
+          }
+        }
+      }
+    }catch(_){}setLoad(false);
+  };
+  useEffect(()=>{if(tok)loadData();},[]);
+  // Cronómetro con timestamps localStorage
+  useEffect(()=>{
+    const sId=srvActivo?.id;if(!sId||jornadaFin)return;
+    const inicio=parseInt(localStorage.getItem(`fm_jornada_inicio_${sId}`)||"0");if(!inicio)return;
+    const calcPausas=()=>{let ms=0;for(const p of pausasArr){if(p.inicio&&p.fin)ms+=(p.fin-p.inicio);else if(p.inicio&&!p.fin)ms+=(Date.now()-p.inicio);}return ms;};
+    const calc=()=>Math.max(0,Math.floor((Date.now()-inicio-calcPausas())/1000));
+    setTiempoSec(calc());const iv=setInterval(()=>setTiempoSec(calc()),1000);return()=>clearInterval(iv);
+  },[srvActivo?.id,jornadaFin,pausado,pausasArr]);
+  const fmtEl=s=>{const h=Math.floor(s/3600);const m=Math.floor((s%3600)/60);const ss=s%60;return `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(ss).padStart(2,"0")}`;};
+  const toggleTarea=async(tareaId)=>{
+    if(savingT)return;setSavingT(true);
+    const cur=srvTareas.find(x=>x.id===tareaId);const nuevoDone=!cur?.done;
+    await sbPatch("jardin_servicio_tareas",`id=eq.${tareaId}`,{done:nuevoDone,completado_por:nuevoDone?(perfil?.nombre||"Staff"):null,completado_ts:nuevoDone?new Date().toISOString():null},tok).catch(()=>{});
+    setSrvTareas(prev=>prev.map(x=>x.id===tareaId?{...x,done:nuevoDone}:x));setSavingT(false);
+  };
+  const togglePausa=async()=>{
+    if(!jornadaId||savingJ)return;setSavingJ(true);
+    const nowTs=Date.now();const newPausas=[...pausasArr];
+    if(!pausado){newPausas.push({inicio:nowTs});setPausado(true);}
+    else{const last=newPausas[newPausas.length-1];if(last&&!last.fin)last.fin=nowTs;setPausado(false);}
+    await sbPatch("jornadas_jardineria",`id=eq.${jornadaId}`,{pausas:newPausas},tok).catch(()=>{});
+    setPausasArr(newPausas);setSavingJ(false);
+  };
+  const iniciarJornada=async()=>{
+    if(!srvActivo||savingJ)return;setSavingJ(true);
+    const ahora=new Date();const tsInicio=ahora.getTime();
+    try{const[j]=await sbPost("jornadas_jardineria",{servicio_id:srvActivo.id,fecha:hoyStr,hora_inicio:ahora.toISOString(),pausas:[]},tok);
+      setJornadaId(j.id);setJornadaFin(false);setPausasArr([]);setPausado(false);
+      localStorage.setItem(`fm_jornada_inicio_${srvActivo.id}`,tsInicio.toString());
+      localStorage.setItem(`fm_jornada_id_${srvActivo.id}`,String(j.id));
+    }catch(_){}setSavingJ(false);
+  };
+  const finalizarJornada=async()=>{
+    if(!jornadaId||savingJ)return;setSavingJ(true);
+    const ahora=new Date();const inicio=parseInt(localStorage.getItem(`fm_jornada_inicio_${srvActivo?.id}`)||"0");
+    const durMin=inicio?Math.round((ahora.getTime()-inicio)/60000):0;
+    try{await sbPatch("jornadas_jardineria",`id=eq.${jornadaId}`,{hora_fin:ahora.toISOString(),duracion_minutos:durMin},tok);setJornadaFin(true);}catch(_){}setSavingJ(false);
+  };
+  const confirmarCoord=async(c,dia)=>{
+    if(savingC)return;setSavingC(true);const ds=dia.toISOString().split("T")[0];
+    try{await sbPatch("coordinacion_servicios",`id=eq.${c.id}`,{fecha_programada:ds,estado:"confirmado",respondido_por:perfil?.nombre||"Staff"},tok);
+      setCoordP(prev=>prev.filter(x=>x.id!==c.id));}catch(_){}setSavingC(false);
+  };
+  const doneT=srvTareas.filter(x=>x.done).length;const totalT=srvTareas.length;
+  if(load)return <div className="loading"><div className="spin"/></div>;
+  return(
+    <div style={{paddingBottom:80}}>
+      <div style={{padding:"54px 20px 14px"}}>
+        <div style={{fontSize:11,color:T.ink3,letterSpacing:.6,fontWeight:600,textTransform:"uppercase"}}>Dashboard</div>
+        <div style={{fontFamily:T.sans,fontSize:28,fontWeight:700,color:T.ink,letterSpacing:-1,lineHeight:1.05}}>Jardinería</div>
+        {perfil&&<div style={{fontSize:12,color:T.ink3,marginTop:3}}>Servicio activo · {perfil.nombre.split(" ")[0]}</div>}
+      </div>
+      <div style={{padding:"0 16px"}}>
+        {coordP.map(c=>{
+          const ventanaIni=c.ventana_inicio||new Date().toISOString();const ventanaFin=c.ventana_fin||new Date(Date.now()+3*86400000).toISOString();
+          const dias=[];let d=new Date(Math.max(new Date(ventanaIni),Date.now()));const f=new Date(ventanaFin);
+          while(d<=f&&dias.length<3){dias.push(new Date(d));d=new Date(d.getTime()+86400000);}
+          return(
+            <div key={c.id} style={{background:"#FEF8E4",border:`1px solid ${T.gold}55`,borderRadius:16,padding:14,marginBottom:12,display:"flex",gap:10,alignItems:"flex-start"}}>
+              <div style={{width:28,height:28,borderRadius:999,background:T.gold+"44",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><FmIcon name="warn" size={14} stroke="#8A6B0F"/></div>
+              <div style={{flex:1}}>
+                <div style={{fontSize:12,fontWeight:700,color:"#6B5108"}}>Coordinación pendiente</div>
+                <div style={{fontSize:11,color:"#8A6B0F",marginTop:2}}>{c.nombre_reserva||"Confirmar fecha de servicio de jardín"}</div>
+                <div style={{display:"flex",gap:6,marginTop:8,flexWrap:"wrap"}}>
+                  {dias.map((d,i)=><button key={d.toISOString()} disabled={savingC} onClick={()=>confirmarCoord(c,d)} style={{padding:"6px 10px",borderRadius:8,border:`1px solid ${T.gold}88`,background:i===0?T.gold:T.surface,color:i===0?T.ink:"#8A6B0F",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:T.sans}}>{d.toLocaleDateString("es-ES",{weekday:"short",day:"numeric"})}</button>)}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+        {srvActivo?(
+          <div style={{background:`linear-gradient(150deg,${T.olive} 0%,#8DA44A 100%)`,borderRadius:20,padding:20,color:"white",position:"relative",overflow:"hidden",marginBottom:14}}>
+            <div style={{position:"absolute",top:-30,right:-30,width:140,height:140,borderRadius:999,background:"rgba(255,255,255,.12)"}}/>
+            <div style={{position:"absolute",bottom:-50,left:-30,width:180,height:180,borderRadius:999,background:"rgba(255,255,255,.08)"}}/>
+            <div style={{position:"relative",display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
+              <div>
+                <div style={{fontSize:10,color:"rgba(255,255,255,.75)",letterSpacing:.8,textTransform:"uppercase",fontWeight:600}}>{jornadaFin?"Jornada finalizada":"Cronómetro activo"}</div>
+                <div style={{fontFamily:T.sans,fontSize:15,fontWeight:700,marginTop:2}}>{srvActivo.nombre}</div>
+              </div>
+              {!jornadaFin&&<div style={{width:10,height:10,borderRadius:999,background:pausado?"rgba(255,255,255,.4)":"#FF5555",boxShadow:pausado?"none":"0 0 10px #FF5555",animation:pausado?"none":"pulse 1.5s infinite"}}/>}
+            </div>
+            <div style={{position:"relative",fontFamily:"'SF Mono',Menlo,monospace",fontSize:50,fontWeight:300,letterSpacing:-2,marginTop:6,lineHeight:1,fontVariantNumeric:"tabular-nums"}}>
+              {jornadaFin?"—:—:—":fmtEl(tiempoSec)}
+            </div>
+            {!jornadaFin&&jornadaId&&(
+              <div style={{position:"relative",display:"flex",gap:8,marginTop:14}}>
+                <button onClick={togglePausa} disabled={savingJ} style={{flex:1,padding:12,borderRadius:12,border:0,background:"rgba(255,255,255,.22)",color:"white",fontFamily:T.sans,fontSize:13,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+                  <FmIcon name={pausado?"play":"pause"} size={15} stroke="white"/>{pausado?"Reanudar":"Pausar"}
+                </button>
+                <button onClick={finalizarJornada} disabled={savingJ} style={{flex:1,padding:12,borderRadius:12,border:0,background:T.ink,color:"white",fontFamily:T.sans,fontSize:13,fontWeight:700,cursor:"pointer"}}>{savingJ?"…":"Finalizar"}</button>
+              </div>
+            )}
+            {!jornadaFin&&!jornadaId&&(
+              <button onClick={iniciarJornada} disabled={savingJ} style={{position:"relative",marginTop:14,width:"100%",padding:14,borderRadius:12,border:0,background:"rgba(255,255,255,.22)",color:"white",fontFamily:T.sans,fontSize:14,fontWeight:700,cursor:"pointer"}}>{savingJ?"Iniciando…":"▶ Iniciar jornada"}</button>
+            )}
+          </div>
+        ):(
+          <div style={{background:T.surface,border:`1px solid ${T.line}`,borderRadius:20,padding:20,marginBottom:14,textAlign:"center",color:T.ink3,fontSize:13}}>Sin servicio de jardinería activo</div>
+        )}
+        {srvTareas.length>0&&(
+          <>
+            <div style={{fontSize:10.5,color:T.ink3,letterSpacing:.6,fontWeight:700,textTransform:"uppercase",marginBottom:8}}>Tareas · {doneT}/{totalT} hechas</div>
+            <div style={{background:T.surface,border:`1px solid ${T.line}`,borderRadius:16,padding:4,marginBottom:14}}>
+              {srvTareas.map((ta,i)=>(
+                <button key={ta.id} onClick={()=>toggleTarea(ta.id)} style={{width:"100%",padding:"10px 12px",background:"transparent",border:0,cursor:"pointer",display:"flex",alignItems:"center",gap:10,fontFamily:T.sans,textAlign:"left",borderBottom:i<srvTareas.length-1?`1px solid ${T.line}`:"none"}}>
+                  <div style={{width:20,height:20,borderRadius:6,background:ta.done?T.olive:"transparent",border:`1.5px solid ${ta.done?T.olive:T.ink4}`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{ta.done&&<FmIcon name="check" size={11} stroke="white"/>}</div>
+                  <span style={{flex:1,fontSize:13,color:ta.done?T.ink3:T.ink,textDecoration:ta.done?"line-through":"none",fontWeight:ta.done?400:500}}>{ta.txt}</span>
+                  {!ta.done&&<FmIcon name="clock" size={14} stroke={T.ink3}/>}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+        <div style={{fontSize:10.5,color:T.ink3,letterSpacing:.6,fontWeight:700,textTransform:"uppercase",marginBottom:8}}>Calendario</div>
+        <CalBase tok={tok} rol="jardinero"/>
+      </div>
+      <style>{`@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}`}</style>
+    </div>
+  );
 }
 
 // ─── HELPERS HISTORIAL Y DOCS ────────────────────────────────────────────────
