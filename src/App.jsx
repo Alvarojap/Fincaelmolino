@@ -3997,7 +3997,7 @@ function Limpieza({perfil,tok,rol}){
   const srvFilt=tabLimp==="todos"?servicios:tabLimp==="pendientes"?servicios.filter(s=>["pendiente","pendiente_fecha"].includes(s.estado||"")||(!s.estado&&!s.verificado)):tabLimp==="activos"?servicios.filter(s=>["en_curso","programado","activo"].includes(s.estado||"")):servicios.filter(s=>["completado","finalizado"].includes(s.estado||"")||s.verificado);
   const costeLimp=(servicios.reduce((t,s)=>t+(parseFloat(s.coste_calculado)||0),0)).toLocaleString("es-ES")+"€";
 
-  return <>
+  return <div style={{paddingBottom:100}}>
     {/* Header */}
     <div style={{padding:"54px 20px 16px",display:"flex",alignItems:"flex-end",justifyContent:"space-between"}}>
       <div><div style={{fontSize:12,color:T.ink3,fontWeight:500}}>Servicios</div><div style={{fontSize:30,fontWeight:700,color:T.ink,letterSpacing:-1,lineHeight:1.02}}>{isA?"Limpieza":"Mi servicio"}</div></div>
@@ -4321,7 +4321,7 @@ function Limpieza({perfil,tok,rol}){
         </div>
       </div>
     )}
-  </>;
+  </div>;
 }
 
 // ─── CHAT ────────────────────────────────────────────────────────────────────
