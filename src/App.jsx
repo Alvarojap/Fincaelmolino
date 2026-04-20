@@ -3891,24 +3891,31 @@ function Limpieza({perfil,tok,rol}){
         {/* DETALLE SERVICIO */}
         {srv&&<div>
           {/* Banner verificado */}
-          {yaVerif&&<div style={{background:srv.verificado_ok?"rgba(16,185,129,.1)":"rgba(245,158,11,.1)",border:`1px solid ${srv.verificado_ok?"rgba(16,185,129,.3)":"rgba(245,158,11,.3)"}`,borderRadius:10,padding:"12px 16px",marginBottom:14,display:"flex",alignItems:"center",gap:10}}>
-            <span style={{fontSize:20}}>{srv.verificado_ok?"✅":"⚠️"}</span>
+          {yaVerif&&<div style={{background:srv.verificado_ok?T.olive+"14":T.gold+"14",border:`1px solid ${srv.verificado_ok?T.olive+"44":T.gold+"44"}`,borderRadius:16,padding:"12px 16px",marginBottom:14,display:"flex",alignItems:"center",gap:10}}>
+            <div style={{width:28,height:28,borderRadius:999,background:srv.verificado_ok?T.olive:T.gold,display:"flex",alignItems:"center",justifyContent:"center"}}><FmIcon name={srv.verificado_ok?"check":"warn"} size={14} stroke="white" sw={2.5}/></div>
             <div>
-              <div style={{fontSize:13,fontWeight:600,color:srv.verificado_ok?"#10b981":"#f59e0b"}}>{srv.verificado_ok?"Servicio verificado":"Cerrado con incidencias"}</div>
-              <div style={{fontSize:11,color:"#8A8580",marginTop:2}}>{srv.verificado_nota}</div>
+              <div style={{fontSize:13,fontWeight:700,color:srv.verificado_ok?"#4A7A2E":"#8A6B0F"}}>{srv.verificado_ok?"Servicio verificado":"Cerrado con incidencias"}</div>
+              {srv.verificado_nota&&<div style={{fontSize:11,color:T.ink3,marginTop:2}}>{srv.verificado_nota}</div>}
             </div>
           </div>}
 
           {/* Cabecera servicio */}
-          <div style={{background:"rgba(201,168,76,.08)",border:"1px solid rgba(201,168,76,.15)",borderRadius:10,padding:"12px 16px",marginBottom:12,display:"flex",justifyContent:"space-between",alignItems:"center",gap:8}}>
-            <div style={{minWidth:0}}>
-              <div style={{fontSize:13,fontWeight:600,color:"#EC683E",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>🧹 {srv.nombre}</div>
-              <div style={{fontSize:11,color:"#8A8580"}}>{new Date(srv.fecha).toLocaleDateString("es-ES")} · {comp}/{tot} tareas</div>
+          <div style={{background:T.surface,border:`1px solid ${T.line}`,borderRadius:16,padding:14,marginBottom:12}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8}}>
+              <div style={{minWidth:0}}>
+                <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}>
+                  <OpsStatePill estado={srv.estado||(srv.verificado?"completado":"en_curso")}/>
+                  {srv.limpiadora_nombre&&<div style={{display:"flex",alignItems:"center",gap:4}}><OpsAvatar name={srv.limpiadora_nombre} size={18}/><span style={{fontSize:11,color:T.ink3,fontWeight:600}}>{srv.limpiadora_nombre}</span></div>}
+                </div>
+                <div style={{fontSize:18,fontWeight:700,color:T.ink,letterSpacing:-.3}}>{srv.nombre}</div>
+                <div style={{fontSize:11,color:T.ink3,marginTop:4,display:"flex",alignItems:"center",gap:4}}><FmIcon name="calendar" size={11} stroke={T.ink3}/>{new Date(srv.fecha).toLocaleDateString("es-ES",{day:"numeric",month:"long"})} · {comp}/{tot} tareas</div>
+                {parseFloat(srv.coste_calculado)>0&&<div style={{fontSize:14,fontWeight:700,color:T.terracotta,marginTop:6}}>{parseFloat(srv.coste_calculado).toLocaleString("es-ES")}€</div>}
+              </div>
+              {isA&&<div style={{display:"flex",gap:6,flexShrink:0}}>
+                <button onClick={()=>setShowEx(true)} style={{height:32,padding:"0 12px",borderRadius:999,background:T.ink,color:"#fff",border:0,fontFamily:T.sans,fontSize:11,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:4}}><FmIcon name="plus" size={12} stroke="#fff"/>Extra</button>
+                <button onClick={async()=>{if(!window.confirm(`¿Eliminar "${srv.nombre}"?`))return;await sbDelete("servicio_tareas",`servicio_id=eq.${srv.id}`,tok);await sbDelete("servicios",`id=eq.${srv.id}`,tok);setActId(null);setTareas([]);await loadSrvs();}} style={{width:32,height:32,borderRadius:999,background:"#FEF2F2",border:"1px solid #FECACA",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}><FmIcon name="x" size={14} stroke="#D9443A"/></button>
+              </div>}
             </div>
-            {isA&&<div style={{display:"flex",gap:6,flexShrink:0}}>
-              <button className="btn bg sm" onClick={()=>setShowEx(true)}>+ Extra</button>
-              <button className="btn br sm" onClick={async()=>{if(!window.confirm(`¿Eliminar "${srv.nombre}"?`))return;await sbDelete("servicio_tareas",`servicio_id=eq.${srv.id}`,tok);await sbDelete("servicios",`id=eq.${srv.id}`,tok);setActId(null);setTareas([]);await loadSrvs();}}>🗑</button>
-            </div>}
           </div>
 
           {/* Hora inicio — limpiadora */}
