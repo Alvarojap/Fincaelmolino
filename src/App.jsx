@@ -457,7 +457,7 @@ input,select,textarea{font-family:inherit}
 .drawer-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:300;backdrop-filter:blur(12px)}
 .drawer{position:fixed;left:0;top:0;bottom:0;width:min(300px,85vw);background:#1A1A1A;z-index:400;display:flex;flex-direction:column;overflow-y:auto;transform:translateX(-100%);transition:transform .28s cubic-bezier(.4,0,.2,1);box-shadow:8px 0 40px rgba(0,0,0,.2)}
 .drawer.open{transform:translateX(0)}
-.mob-bar{display:none;position:fixed;bottom:0;left:0;right:0;z-index:200;background:rgba(255,255,255,.96);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-top:1px solid #E5E0D6;padding:6px 8px;padding-bottom:max(22px,env(safe-area-inset-bottom))}
+.mob-bar{display:none;position:fixed;bottom:0;left:0;right:0;z-index:90;background:rgba(255,255,255,.96);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-top:1px solid #E5E0D6;padding:6px 8px;padding-bottom:max(22px,env(safe-area-inset-bottom))}
 .mob-bar-inner{display:flex;justify-content:space-around;align-items:center}
 .mob-btn{display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 10px;border:none;background:none;cursor:pointer;color:#7A766F;font-size:10px;font-family:inherit;font-weight:500;border-radius:14px;transition:all .15s ease;min-width:52px;position:relative;-webkit-tap-highlight-color:transparent}
 .mob-btn.on{color:#1A1A1A;font-weight:700}
@@ -2012,38 +2012,76 @@ function RvEventDetail({reserva,tok,perfil,rol,isA,onClose,onChanged,isDesktopPa
       </div>
 
       {/* Modales cobro */}
-      {showSeña&&<div className="ov" onClick={()=>setShowSeña(false)}><div className="modal" style={{maxWidth:400}} onClick={e=>e.stopPropagation()}>
-        <h3>💰 Registrar seña cobrada</h3>
-        <div style={{background:"rgba(201,168,76,.06)",border:"1px solid rgba(201,168,76,.15)",borderRadius:10,padding:"12px 14px",marginBottom:16}}>
-          <div style={{fontSize:13,color:"#EC683E",fontWeight:600}}>{localR.nombre}</div>
-          <div style={{fontSize:12,color:"#8A8580",marginTop:3}}>Precio total: {fE(total)}</div>
+      {/* Sheet cobro */}
+      {showSeña&&<div style={{position:"fixed",inset:0,background:"rgba(20,15,10,.6)",zIndex:999,display:"flex",alignItems:"flex-end",fontFamily:T.sans}}>
+        <div style={{width:"100%",background:T.bg,borderTopLeftRadius:24,borderTopRightRadius:24,maxHeight:"88vh",overflow:"auto",paddingBottom:34}} onClick={e=>e.stopPropagation()}>
+          <div style={{padding:"14px 20px 0",display:"flex",justifyContent:"center"}}><div style={{width:44,height:4,borderRadius:999,background:T.line}}/></div>
+          <div style={{padding:"14px 20px 16px",display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:`1px solid ${T.line}`}}>
+            <div><div style={{fontSize:12,color:T.ink3,fontWeight:500,marginBottom:2}}>{localR.nombre}</div><div style={{fontSize:22,fontWeight:700,color:T.ink,letterSpacing:-.6}}>Registrar cobro</div></div>
+            <button onClick={()=>setShowSeña(false)} style={{width:32,height:32,borderRadius:999,background:T.surface,border:`1px solid ${T.line}`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}><FmIcon name="x" size={15} stroke={T.ink}/></button>
+          </div>
+          <div style={{padding:"16px 20px",display:"flex",flexDirection:"column",gap:14}}>
+            <div style={{background:"linear-gradient(135deg,#1A1A1A,#2a2520)",borderRadius:18,padding:16,color:"#fff"}}>
+              <div style={{fontSize:10,color:"rgba(255,255,255,.6)",letterSpacing:1,textTransform:"uppercase",fontWeight:700,marginBottom:4}}>Pendiente de cobro</div>
+              <div style={{fontSize:34,fontWeight:700,letterSpacing:-1,lineHeight:1}}>{fE(pending)}</div>
+              <div style={{fontSize:11,color:"rgba(255,255,255,.5)",marginTop:6}}>Total {fE(total)} · Cobrado {fE(pagado)}</div>
+            </div>
+            <div>
+              <div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase",marginBottom:8}}>Importe a cobrar</div>
+              <div style={{display:"flex",alignItems:"center",gap:12,background:T.surface,border:`1px solid ${T.line}`,borderRadius:16,padding:"14px 16px"}}>
+                <input type="number" inputMode="decimal" value={señaImporte} onChange={e=>setSeñaImporte(e.target.value)} placeholder="0" autoFocus style={{flex:1,background:"transparent",border:0,outline:"none",fontFamily:T.sans,fontSize:26,fontWeight:700,color:T.ink,letterSpacing:-.6}}/>
+                <span style={{fontSize:20,fontWeight:700,color:T.ink3}}>€</span>
+              </div>
+              <div style={{display:"flex",gap:6,marginTop:8,flexWrap:"wrap"}}>
+                {[{l:"Señal 20%",v:Math.round(total*.2)},{l:"50%",v:Math.round(total*.5)},{l:"Total pdte",v:Math.round(pending)}].map((q,i)=><button key={i} onClick={()=>setSeñaImporte(String(q.v))} style={{padding:"7px 12px",borderRadius:999,border:`1px solid ${T.line}`,background:T.surface,color:T.ink2,fontFamily:T.sans,fontSize:11,fontWeight:700,cursor:"pointer"}}>{q.l} · {fE(q.v)}</button>)}
+              </div>
+            </div>
+            <div style={{display:"flex",gap:8,paddingTop:4}}>
+              <button onClick={()=>setShowSeña(false)} style={{flex:1,padding:"14px 0",borderRadius:999,border:`1px solid ${T.line}`,background:T.surface,color:T.ink,fontFamily:T.sans,fontWeight:600,fontSize:14,cursor:"pointer"}}>Cancelar</button>
+              <button onClick={regSeña} disabled={cobroSaving||!señaImporte} style={{flex:2,padding:"14px 0",borderRadius:999,border:0,background:cobroSaving||!señaImporte?T.ink+"55":T.ink,color:"#fff",fontFamily:T.sans,fontWeight:700,fontSize:14,cursor:cobroSaving||!señaImporte?"not-allowed":"pointer"}}>{cobroSaving?"Guardando…":"Confirmar cobro"}</button>
+            </div>
+          </div>
         </div>
-        <div className="fg"><label>Importe de la seña (€) *</label><input type="number" inputMode="decimal" className="fi" value={señaImporte} onChange={e=>setSeñaImporte(e.target.value)} placeholder="Ej: 1500" autoFocus/></div>
-        <div className="mft"><button className="btn bg" onClick={()=>setShowSeña(false)}>Cancelar</button><button className="btn bp" onClick={regSeña} disabled={cobroSaving||!señaImporte}>{cobroSaving?"Guardando…":"💰 Confirmar"}</button></div>
-      </div></div>}
-      {showPagoTotal&&<div className="ov" onClick={()=>setShowPagoTotal(false)}><div className="modal" style={{maxWidth:400}} onClick={e=>e.stopPropagation()}>
-        <h3>✅ Confirmar pago total</h3>
-        <div style={{fontSize:13,color:"#EC683E",fontWeight:600,marginBottom:8}}>{localR.nombre}</div>
-        <div style={{fontSize:12,color:"#8A8580",marginBottom:16}}>Saldo pendiente: <strong>{fE(pending)}</strong></div>
-        <div style={{background:"rgba(16,185,129,.06)",border:"1px solid rgba(16,185,129,.15)",borderRadius:8,padding:"10px 12px",marginBottom:14,fontSize:12,color:"#A6BE59"}}>✅ Se generará el gasto de comisión del gestor automáticamente</div>
-        <div className="mft"><button className="btn bg" onClick={()=>setShowPagoTotal(false)}>Cancelar</button><button className="btn bp" style={{background:"#A6BE59"}} onClick={regPago} disabled={cobroSaving}>{cobroSaving?"Procesando…":"✅ Confirmar pago"}</button></div>
-      </div></div>}
-      {editPrecios&&<div className="ov" onClick={()=>setEditPrecios(false)}><div className="modal" style={{maxWidth:400}} onClick={e=>e.stopPropagation()}>
-        <h3>Editar precios</h3>
-        <div style={{display:"flex",gap:8,marginBottom:14}}>
-          <button onClick={()=>setFormPrecios(v=>({...v,incluye_casa:false}))} style={{flex:1,padding:"10px 0",borderRadius:12,border:`1px solid ${formPrecios.incluye_casa?T.line:T.ink}`,background:formPrecios.incluye_casa?T.surface:T.ink,color:formPrecios.incluye_casa?T.ink2:"white",fontFamily:T.sans,fontWeight:600,fontSize:13,cursor:"pointer"}}>Solo finca</button>
-          <button onClick={()=>setFormPrecios(v=>({...v,incluye_casa:true}))} style={{flex:1,padding:"10px 0",borderRadius:12,border:`1px solid ${formPrecios.incluye_casa?T.ink:T.line}`,background:formPrecios.incluye_casa?T.ink:T.surface,color:formPrecios.incluye_casa?"white":T.ink2,fontFamily:T.sans,fontWeight:600,fontSize:13,cursor:"pointer"}}>Finca + Casa</button>
+      </div>}
+      {/* Sheet pago total */}
+      {showPagoTotal&&<div style={{position:"fixed",inset:0,background:"rgba(20,15,10,.6)",zIndex:999,display:"flex",alignItems:"flex-end",fontFamily:T.sans}}>
+        <div style={{width:"100%",background:T.bg,borderTopLeftRadius:24,borderTopRightRadius:24,paddingBottom:34}} onClick={e=>e.stopPropagation()}>
+          <div style={{padding:"14px 20px 0",display:"flex",justifyContent:"center"}}><div style={{width:44,height:4,borderRadius:999,background:T.line}}/></div>
+          <div style={{padding:"14px 20px 16px",borderBottom:`1px solid ${T.line}`}}><div style={{fontSize:22,fontWeight:700,color:T.ink,letterSpacing:-.6}}>Confirmar pago total</div></div>
+          <div style={{padding:"16px 20px",display:"flex",flexDirection:"column",gap:14}}>
+            <div style={{fontSize:13,color:T.ink,fontWeight:600}}>{localR.nombre}</div>
+            <div style={{fontSize:12,color:T.ink3}}>Saldo pendiente: <strong style={{color:T.ink}}>{fE(pending)}</strong></div>
+            <div style={{background:T.olive+"14",borderRadius:12,padding:"10px 12px",fontSize:12,color:"#4A7A2E"}}>✅ Se generará el gasto de comisión del gestor automáticamente</div>
+            <div style={{display:"flex",gap:8}}><button onClick={()=>setShowPagoTotal(false)} style={{flex:1,padding:"14px 0",borderRadius:999,border:`1px solid ${T.line}`,background:T.surface,color:T.ink,fontFamily:T.sans,fontWeight:600,fontSize:14,cursor:"pointer"}}>Cancelar</button><button onClick={regPago} disabled={cobroSaving} style={{flex:2,padding:"14px 0",borderRadius:999,border:0,background:T.olive,color:T.ink,fontFamily:T.sans,fontWeight:700,fontSize:14,cursor:"pointer"}}>{cobroSaving?"Procesando…":"Confirmar pago"}</button></div>
+          </div>
         </div>
-        <div className="fg"><label>Precio finca (€)</label><input type="number" className="fi" value={formPrecios.precio_finca} onChange={e=>setFormPrecios(v=>({...v,precio_finca:e.target.value}))}/></div>
-        {formPrecios.incluye_casa&&<div className="fg"><label>Precio casa (€)</label><input type="number" className="fi" value={formPrecios.precio_casa} onChange={e=>setFormPrecios(v=>({...v,precio_casa:e.target.value}))}/></div>}
-        <div style={{display:"flex",justifyContent:"space-between",padding:"10px 14px",background:T.bg,borderRadius:12,marginBottom:20}}><span style={{fontSize:13,color:T.ink3}}>Total</span><span style={{fontSize:16,fontWeight:700,color:T.ink}}>{((parseFloat(formPrecios.precio_finca)||0)+(formPrecios.incluye_casa?parseFloat(formPrecios.precio_casa)||0:0)).toLocaleString("es-ES")}€</span></div>
-        <div className="mft"><button className="btn bg" onClick={()=>setEditPrecios(false)}>Cancelar</button><button className="btn bp" onClick={async()=>{
-          const pf=parseFloat(formPrecios.precio_finca)||0;const pc=formPrecios.incluye_casa?parseFloat(formPrecios.precio_casa)||0:0;const nt=pf+pc;
-          await sbPatch("reservas",`id=eq.${localR.id}`,{precio_finca:pf,precio_casa:pc,precio_total:nt,precio:nt,incluye_casa:formPrecios.incluye_casa},tok);
-          const u={...localR,precio_finca:pf,precio_casa:pc,precio_total:nt,precio:nt,incluye_casa:formPrecios.incluye_casa};
-          setLocalR(u);onChanged&&onChanged(u);setEditPrecios(false);
-        }}>Guardar</button></div>
-      </div></div>}
+      </div>}
+      {/* Sheet editar precios */}
+      {editPrecios&&<div style={{position:"fixed",inset:0,background:"rgba(20,15,10,.6)",zIndex:1000,display:"flex",alignItems:"flex-end",fontFamily:T.sans}}>
+        <div style={{width:"100%",background:T.bg,borderTopLeftRadius:24,borderTopRightRadius:24,maxHeight:"88vh",overflow:"auto",paddingBottom:34}} onClick={e=>e.stopPropagation()}>
+          <div style={{padding:"14px 20px 0",display:"flex",justifyContent:"center"}}><div style={{width:44,height:4,borderRadius:999,background:T.line}}/></div>
+          <div style={{padding:"14px 20px 16px",display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:`1px solid ${T.line}`}}>
+            <div style={{fontSize:22,fontWeight:700,color:T.ink,letterSpacing:-.6}}>Editar precios</div>
+            <button onClick={()=>setEditPrecios(false)} style={{width:32,height:32,borderRadius:999,background:T.surface,border:`1px solid ${T.line}`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}><FmIcon name="x" size={15} stroke={T.ink}/></button>
+          </div>
+          <div style={{padding:"16px 20px",display:"flex",flexDirection:"column",gap:14}}>
+            <div style={{display:"flex",gap:8}}>
+              <button onClick={()=>setFormPrecios(v=>({...v,incluye_casa:false}))} style={{flex:1,padding:"10px 0",borderRadius:12,border:`1px solid ${formPrecios.incluye_casa?T.line:T.ink}`,background:formPrecios.incluye_casa?T.surface:T.ink,color:formPrecios.incluye_casa?T.ink2:"white",fontFamily:T.sans,fontWeight:600,fontSize:13,cursor:"pointer"}}>Solo finca</button>
+              <button onClick={()=>setFormPrecios(v=>({...v,incluye_casa:true}))} style={{flex:1,padding:"10px 0",borderRadius:12,border:`1px solid ${formPrecios.incluye_casa?T.ink:T.line}`,background:formPrecios.incluye_casa?T.ink:T.surface,color:formPrecios.incluye_casa?"white":T.ink2,fontFamily:T.sans,fontWeight:600,fontSize:13,cursor:"pointer"}}>Finca + Casa</button>
+            </div>
+            <div><div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase",marginBottom:8}}>Precio finca</div><div style={{display:"flex",alignItems:"center",gap:10,background:T.surface,border:`1px solid ${T.line}`,borderRadius:14,padding:"13px 16px"}}><input type="number" value={formPrecios.precio_finca} onChange={e=>setFormPrecios(v=>({...v,precio_finca:e.target.value}))} style={{flex:1,background:"transparent",border:0,outline:"none",fontFamily:T.sans,fontSize:20,fontWeight:700,color:T.ink}}/><span style={{fontSize:16,color:T.ink3,fontWeight:700}}>€</span></div></div>
+            {formPrecios.incluye_casa&&<div><div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase",marginBottom:8}}>Precio casa</div><div style={{display:"flex",alignItems:"center",gap:10,background:T.surface,border:`1px solid ${T.line}`,borderRadius:14,padding:"13px 16px"}}><input type="number" value={formPrecios.precio_casa} onChange={e=>setFormPrecios(v=>({...v,precio_casa:e.target.value}))} style={{flex:1,background:"transparent",border:0,outline:"none",fontFamily:T.sans,fontSize:20,fontWeight:700,color:T.ink}}/><span style={{fontSize:16,color:T.ink3,fontWeight:700}}>€</span></div></div>}
+            <div style={{background:T.ink,borderRadius:14,padding:14,color:"#fff"}}>
+              <div style={{fontSize:10,opacity:.6,fontWeight:700,letterSpacing:.5,textTransform:"uppercase"}}>Nuevo total</div>
+              <div style={{fontSize:26,fontWeight:700,letterSpacing:-.7,lineHeight:1,marginTop:4}}>{((parseFloat(formPrecios.precio_finca)||0)+(formPrecios.incluye_casa?parseFloat(formPrecios.precio_casa)||0:0)).toLocaleString("es-ES")}€</div>
+            </div>
+            <div style={{display:"flex",gap:8}}>
+              <button onClick={()=>setEditPrecios(false)} style={{flex:1,padding:"14px 0",borderRadius:999,border:`1px solid ${T.line}`,background:T.surface,color:T.ink,fontFamily:T.sans,fontWeight:600,fontSize:14,cursor:"pointer"}}>Cancelar</button>
+              <button onClick={async()=>{const pf=parseFloat(formPrecios.precio_finca)||0;const pc=formPrecios.incluye_casa?parseFloat(formPrecios.precio_casa)||0:0;const nt=pf+pc;await sbPatch("reservas",`id=eq.${localR.id}`,{precio_finca:pf,precio_casa:pc,precio_total:nt,precio:nt,incluye_casa:formPrecios.incluye_casa},tok);const u={...localR,precio_finca:pf,precio_casa:pc,precio_total:nt,precio:nt,incluye_casa:formPrecios.incluye_casa};setLocalR(u);onChanged&&onChanged(u);setEditPrecios(false);}} style={{flex:2,padding:"14px 0",borderRadius:999,border:0,background:T.ink,color:"#fff",fontFamily:T.sans,fontWeight:700,fontSize:14,cursor:"pointer"}}>Guardar precios</button>
+            </div>
+          </div>
+        </div>
+      </div>}
     </div>
   );
 }
