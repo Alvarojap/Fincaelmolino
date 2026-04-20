@@ -650,6 +650,8 @@ export default function App() {
   const [session,    setSession]    = useState(null);
   const [perfil,     setPerfil]     = useState(null);
   const [page,       setPage]       = useState("dashboard");
+  const [navTarget,  setNavTarget]  = useState(null);
+  const goToItem=(pg,item)=>{setNavTarget(item);setPage(pg);setDrawerOpen(false);};
   const [perm,       setPerm]       = useState(typeof Notification!=="undefined"?Notification.permission:"default");
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [authLoad,   setAuthLoad]   = useState(true);
@@ -732,7 +734,7 @@ export default function App() {
   if(!session||!perfil)return <><style>{CSS}</style><LoginScreen onLogin={login} onLoginOperario={loginOperario} desactivado={opDesactivado}/></>;
 
   const rol=perfil.rol;
-  const P={perfil,tok,setPage,rol};
+  const P={perfil,tok,setPage,rol,navTarget,setNavTarget,goToItem};
   const goTo=id=>{setPage(id);setDrawerOpen(false);};
 
   const PAGES={
@@ -1124,7 +1126,7 @@ function NotaModal({nota,setNota,foto,setFoto,onSave,onClose,tok}){
 }
 
 // ─── DASHBOARD ───────────────────────────────────────────────────────────────
-function Dashboard({perfil,tok,setPage,rol}){
+function Dashboard({perfil,tok,setPage,rol,goToItem}){
   const [reservas,setReservas]=useState([]);
   const [jsem,setJsem]=useState([]);
   const [jpunt,setJpunt]=useState([]);
@@ -1147,7 +1149,7 @@ function Dashboard({perfil,tok,setPage,rol}){
   if(rol==="jardinero")return <DashJ perfil={perfil} jsem={jsem} jpunt={jpunt} cwk={cwk} setPage={setPage} tok={tok}/>;
   if(rol==="limpieza") return <DashL perfil={perfil} setPage={setPage} tok={tok}/>;
   if(rol==="comercial")return <DashC perfil={perfil} reservas={reservas} setPage={setPage}/>;
-  return <DashA reservas={reservas} jsem={jsem} jpunt={jpunt} cwk={cwk} setPage={setPage} tok={tok} perfil={perfil} rol={rol}/>;
+  return <DashA reservas={reservas} jsem={jsem} jpunt={jpunt} cwk={cwk} setPage={setPage} tok={tok} perfil={perfil} rol={rol} goToItem={goToItem}/>;
 }
 // ─── FINANCIAL KPIs ─────────────────────────────────────────────────────────
 function FinancialKPIs({tok}){
@@ -1763,7 +1765,7 @@ function DashEventRow({color,date,title,price,status,onClick}){return <div onCli
 
 function MiniBarChart({data,color}){const max=Math.max(...data.map(d=>d.v),1);const h=60;return<div><div style={{display:"flex",alignItems:"flex-end",gap:3,height:h}}>{data.map((d,i)=><div key={i} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"flex-end",height:h}}><div style={{width:"100%",height:Math.max(2,d.v/max*h),background:d.v>0?color:T.line,borderRadius:3}}/></div>)}</div><div style={{display:"flex",gap:3,marginTop:4}}>{data.map((d,i)=><div key={i} style={{flex:1,textAlign:"center",fontSize:8,color:T.ink3,fontWeight:600}}>{d.l}</div>)}</div></div>;}
 
-function DashA({reservas,jsem,jpunt,cwk,setPage,tok,perfil,rol}){
+function DashA({reservas,jsem,jpunt,cwk,setPage,tok,perfil,rol,goToItem}){
   const[tareasPend,setTareasPend]=useState([]);const[contactosDestacados,setContactosDestacados]=useState([]);
   const[kpiData,setKpiData]=useState(null);const[airbnbs,setAirbnbs]=useState([]);
   const[rangeEvol,setRangeEvol]=useState("mensual");const[kpiAbierto,setKpiAbierto]=useState(null);
@@ -1822,17 +1824,21 @@ function DashA({reservas,jsem,jpunt,cwk,setPage,tok,perfil,rol}){
     const en30=new Date(Date.now()+30*24*60*60*1000).toISOString().split("T")[0];const lista=[];
     reservas.filter(r=>!["cancelada","finalizada"].includes(r.estado)&&r.estado_pago!=="pagado_completo"&&r.fecha>=hoyS&&r.fecha<=en30).slice(0,2).forEach(r=>{
       const pend=getPrecioReserva(r)-(parseFloat(r.seña_importe)||0);
-      lista.push({titulo:`Cobro pendiente · ${r.nombre}`,sub:`${fmtE(pend)} · ${new Date(r.fecha+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"})}`,color:"#D9443A",ir:()=>setPage("reservas")});
+      lista.push({titulo:`Cobro pendiente · ${r.nombre}`,sub:`${fmtE(pend)} · ${new Date(r.fecha+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"})}`,color:"#D9443A",ir:()=>goToItem?goToItem("reservas",r):setPage("reservas")});
     });
     coordsPend.slice(0,2).forEach(c=>{const esL=c.tipo?.includes("limpieza");
       lista.push({titulo:esL?"Limpieza pendiente confirmar":"Jardín pendiente confirmar",sub:c.fecha_checkout?`Checkout ${new Date(c.fecha_checkout+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"})}`:null,color:T.gold,ir:()=>setPage(esL?"limpieza":"jadmin")});
     });
     tareasPend.filter(t=>t.fecha_limite&&t.fecha_limite<hoyS).slice(0,2).forEach(t=>{
-      lista.push({titulo:t.titulo,sub:`Vencida · ${t.entidad_nombre||""}`,color:"#D9443A",ir:()=>{if(t.entidad_tipo==="reserva")setPage("reservas");else if(t.entidad_tipo==="visita")setPage("visitas");else setPage("contactos");}});
+      lista.push({titulo:t.titulo,sub:`Vencida · ${t.entidad_nombre||""}`,color:"#D9443A",ir:async()=>{
+        if(t.entidad_tipo==="reserva"){const[r]=await sbGet("reservas",`?id=eq.${t.entidad_id}&select=*`,tok).catch(()=>[]);goToItem?goToItem("reservas",r||null):setPage("reservas");}
+        else if(t.entidad_tipo==="visita"){const[v]=await sbGet("visitas",`?id=eq.${t.entidad_id}&select=*`,tok).catch(()=>[]);goToItem?goToItem("visitas",v||null):setPage("visitas");}
+        else setPage("contactos");
+      }});
     });
     const artBajos=articulosDash.filter(a=>(parseFloat(a.stock_casa||0)+parseFloat(a.stock_almacen||0))<=parseFloat(a.stock_minimo||1));
     if(artBajos.length>0)lista.push({titulo:`Stock bajo · ${artBajos.length} artículo${artBajos.length!==1?"s":""}`,sub:artBajos.slice(0,2).map(a=>a.nombre).join(", "),color:T.softBlue,ir:()=>setPage("almacen")});
-    visitasDash.slice(0,1).forEach(v=>lista.push({titulo:`Visita hoy · ${v.nombre}`,sub:v.hora?`${v.hora.slice(0,5)}h`:null,color:T.softBlue,ir:()=>setPage("visitas")}));
+    visitasDash.slice(0,1).forEach(v=>lista.push({titulo:`Visita hoy · ${v.nombre}`,sub:v.hora?`${v.hora.slice(0,5)}h`:null,color:T.softBlue,ir:()=>goToItem?goToItem("visitas",v):setPage("visitas")}));
     return lista.slice(0,5);
   },[reservas,coordsPend,tareasPend,articulosDash,visitasDash,hoyS]);
 
@@ -2034,7 +2040,7 @@ function DashA({reservas,jsem,jpunt,cwk,setPage,tok,perfil,rol}){
       <FmSH title="Tareas pendientes" action={`${tareasPend.length} total`}/>
       <div style={{display:"flex",flexDirection:"column",gap:10}}>
         {tareasPend.slice(0,4).map(t=>{const color=!t.fecha_limite||t.fecha_limite<hoyS?T.coral:t.fecha_limite===hoyS?T.gold:T.softBlue;const dueLabel=!t.fecha_limite?"Sin fecha":t.fecha_limite===hoyS?"Hoy":t.fecha_limite<hoyS?"Vencida":new Date(t.fecha_limite+"T12:00:00").toLocaleDateString("es-ES",{weekday:"short",day:"numeric"});
-          return <div key={t.id} style={{background:color,borderRadius:20,padding:16,display:"flex",alignItems:"center",gap:14,color:T.ink,cursor:"pointer"}} onClick={()=>{if(t.entidad_tipo==="reserva")setPage("reservas");else if(t.entidad_tipo==="visita")setPage("visitas");else if(t.entidad_tipo==="airbnb")setPage("airbnb");}}>
+          return <div key={t.id} style={{background:color,borderRadius:20,padding:16,display:"flex",alignItems:"center",gap:14,color:T.ink,cursor:"pointer"}} onClick={async()=>{const pg=t.entidad_tipo==="reserva"?"reservas":t.entidad_tipo==="visita"?"visitas":t.entidad_tipo==="airbnb"?"airbnb":"contactos";if(t.entidad_id&&goToItem){const tbl=t.entidad_tipo==="reserva"?"reservas":t.entidad_tipo==="visita"?"visitas":"reservas_airbnb";const[item]=await sbGet(tbl,`?id=eq.${t.entidad_id}&select=*`,tok).catch(()=>[]);goToItem(pg,item||null);}else setPage(pg);}}>
             <div style={{width:32,height:32,borderRadius:8,background:T.ink,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}} onClick={async e=>{e.stopPropagation();try{await sbPatch("tareas_comerciales",`id=eq.${t.id}`,{estado:"hecha",completada_por:perfil.nombre,completada_ts:new Date().toISOString()},tok);if(t.entidad_tipo&&t.entidad_id){await addHistorial(t.entidad_tipo,t.entidad_id,`Tarea completada: "${t.titulo}"`,perfil.nombre,tok).catch(()=>{});const cid=await getContactoDeEntidad(t.entidad_tipo,t.entidad_id,tok);if(cid){const TICONS={llamada:"📞",whatsapp:"💬",email:"📧",seguimiento:"📋",cobro:"💰",contrato:"📄"};const ti=["llamada","whatsapp","email"].includes(t.tipo)?t.tipo:"nota";await autoInteraccion(cid,ti,`${TICONS[t.tipo]||"🔧"} ${t.titulo}`,"positivo",tok,perfil.nombre);}}setTareasPend(prev=>prev.filter(x=>x.id!==t.id));}catch(_){}}}><FmIcon name="check" size={16} stroke={color} sw={2.4}/></div>
             <div style={{flex:1,minWidth:0}}>
               <div style={{fontSize:11,fontWeight:700,letterSpacing:.3,textTransform:"uppercase",opacity:.75}}>{dueLabel} · {t.asignado_nombre||"Admin"}</div>
@@ -2048,7 +2054,7 @@ function DashA({reservas,jsem,jpunt,cwk,setPage,tok,perfil,rol}){
     {/* 8. Próximo evento (solo 1) */}
     {proximoEvento&&<div style={{padding:"0 20px 18px"}}>
       <FmSH title="Próximo evento"/>
-      <DashEventRow color={T.terracotta} date={new Date(proximoEvento.fecha+"T12:00:00").toLocaleDateString("es-ES",{day:"2-digit",month:"short"}).toUpperCase()} title={proximoEvento.nombre} price={fmtE(getPrecioReserva(proximoEvento))} status={proximoEvento.estado_pago==="pagado_completo"?"Pagado":proximoEvento.seña_cobrada?"Seña OK":"Saldo pdte"} onClick={()=>setPage("reservas")}/>
+      <DashEventRow color={T.terracotta} date={new Date(proximoEvento.fecha+"T12:00:00").toLocaleDateString("es-ES",{day:"2-digit",month:"short"}).toUpperCase()} title={proximoEvento.nombre} price={fmtE(getPrecioReserva(proximoEvento))} status={proximoEvento.estado_pago==="pagado_completo"?"Pagado":proximoEvento.seña_cobrada?"Seña OK":"Saldo pdte"} onClick={()=>goToItem?goToItem("reservas",proximoEvento):setPage("reservas")}/>
     </div>}
 
     {/* 9. Contactos destacados */}
@@ -5967,7 +5973,7 @@ function TareasComerciales({entidad_tipo,entidad_id,entidad_nombre,tok,perfil,ro
 }
 
 // ─── RESERVAS ────────────────────────────────────────────────────────────────
-function Reservas({tok,rol,perfil}){
+function Reservas({tok,rol,perfil,navTarget,setNavTarget}){
   const isA=rol==="admin";
   const{refresh}=useContext(BadgeCtx);
   useEffect(()=>{marcarVistoTipo("reserva",String(perfil?.id),tok);setTimeout(refresh,500);},[]);
@@ -5976,6 +5982,7 @@ function Reservas({tok,rol,perfil}){
   const [filtro,setFiltro]=useState("activas");
   const [sel,setSel]=useState(null);
   const [load,setLoad]=useState(true);
+  useEffect(()=>{if(navTarget&&navTarget.id){setSel(navTarget);setNavTarget?.(null);}},[navTarget]);
   const [showSeña,setShowSeña]=useState(false);
   const [showRent,setShowRent]=useState(false);const [rentData,setRentData]=useState(null);const [loadRent,setLoadRent]=useState(false);
   const [señaImporte,setSeñaImporte]=useState("");
@@ -6824,7 +6831,7 @@ function Contactos({perfil,tok,rol,setPage}){
   </>;
 }
 
-function Visitas({perfil,tok,rol,setPage}){
+function Visitas({perfil,tok,rol,setPage,navTarget,setNavTarget}){
   const isA=rol==="admin", isC=rol==="comercial";
   const puedeEditar=isA||isC;
   const{refresh}=useContext(BadgeCtx);
@@ -6838,6 +6845,7 @@ function Visitas({perfil,tok,rol,setPage}){
   const [filtroTipo,setFiltroTipo]=useState("todas");
   const [showForm,setShowForm]=useState(false);
   const [sel,setSel]=useState(null);
+  useEffect(()=>{if(navTarget&&navTarget.id){setSel(navTarget);setNavTarget?.(null);}},[navTarget]);
   const [showConvertir,setShowConvertir]=useState(false);
   const [showNoPresentado,setShowNoPresentado]=useState(false);
   const [showRevertir,setShowRevertir]=useState(false);
@@ -7275,12 +7283,13 @@ function NotaVisita({sel,onGuardar,puedeEditar}){
 }
 
 // ─── RESERVAS AIRBNB ─────────────────────────────────────────────────────────
-function ReservasAirbnb({perfil,tok,rol}){
+function ReservasAirbnb({perfil,tok,rol,navTarget,setNavTarget}){
   const isA=rol==="admin";
   const [airbnbs,setAirbnbs]=useState([]);
   const [load,setLoad]=useState(true);
   const [showForm,setShowForm]=useState(false);
   const [sel,setSel]=useState(null);
+  useEffect(()=>{if(navTarget&&navTarget.id){setSel(navTarget);setNavTarget?.(null);}},[navTarget]);
   const [saving,setSaving]=useState(false);
   const hoy=new Date().toISOString().split("T")[0];
   const formVacio={huesped:"",fecha_entrada:hoy,fecha_salida:hoy,personas:"",precio:"",notas:""};
