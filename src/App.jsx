@@ -1876,9 +1876,10 @@ function RvEventDetail({reserva,tok,perfil,rol,isA,onClose,onChanged,isDesktopPa
   const [contactosBusq,setContactosBusq]=useState([]);
 
   useEffect(()=>{
-    if(localR.contacto_id)sbGet("contactos",`?id=eq.${localR.contacto_id}&select=*`,tok).then(([c])=>setContacto(c||null)).catch(()=>{});
+    setContacto(null);
+    if(localR?.contacto_id)sbGet("contactos",`?id=eq.${localR.contacto_id}&select=*`,tok).then(r=>setContacto(r?.[0]||null)).catch(()=>setContacto(null));
     sbGet("coordinacion_servicios",`?reserva_id=eq.${localR.id}&select=*&order=created_at.asc&limit=5`,tok).then(setServicios).catch(()=>{});
-  },[localR.id]);
+  },[localR?.id,localR?.contacto_id]);
   useEffect(()=>{if(!busqContacto||busqContacto.length<2){setContactosBusq([]);return;}sbGet("contactos",`?or=(nombre.ilike.*${busqContacto}*,telefono.ilike.*${busqContacto}*)&limit=10`,tok).then(r=>setContactosBusq(r||[])).catch(()=>setContactosBusq([]));},[busqContacto]);
 
   const fecha=localR.fecha?new Date(localR.fecha+"T12:00:00"):null;
@@ -6971,7 +6972,7 @@ function Reservas({tok,rol,perfil,navTarget,setNavTarget,setPage}){
   const canceladas=reservas.filter(r=>r.estado==="cancelada");
   const lista=tabR==="activas"?activas:tabR==="finalizadas"?finalizadas:tabR==="canceladas"?canceladas:reservas;
 
-  return <>
+  return <div style={{paddingBottom:100}}>
     {/* Header */}
     <div style={{padding:"54px 20px 16px",display:"flex",alignItems:"flex-end",justifyContent:"space-between",gap:10}}>
       <div><div style={{fontSize:12,color:T.ink3,fontWeight:500}}>Eventos & Airbnb · {new Date().getFullYear()}</div><div style={{fontSize:30,fontWeight:700,color:T.ink,letterSpacing:-1,lineHeight:1.02}}>Reservas</div></div>
@@ -7130,7 +7131,7 @@ function Reservas({tok,rol,perfil,navTarget,setNavTarget,setPage}){
       <div className="fg"><label>Notas</label><textarea className="fi" rows={2} value={formAb.notas} onChange={e=>setFormAb(v=>({...v,notas:e.target.value}))} placeholder="Observaciones…"/></div>
       <div className="mft"><button className="btn bg" onClick={()=>setShowFormAb(false)}>Cancelar</button><button className="btn bp" onClick={crearAirbnb} disabled={savingAb||!formAb.huesped}>{savingAb?"Creando…":"🏠 Crear reserva"}</button></div>
     </div></div>}
-  </>;
+  </div>;
 }
 
 // ─── COORDINACIÓN ───────────────────────────────────────────────────────────
