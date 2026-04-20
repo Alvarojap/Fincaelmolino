@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, createContext, useContext } from "react";
+import { useState, useEffect, useRef, createContext, useContext, useMemo } from "react";
 import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, ComposedChart, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 
 // ─── DESIGN TOKENS ──────────────────────────────────────────────────────────
@@ -1765,9 +1765,14 @@ function DashA({reservas,jsem,jpunt,cwk,setPage,tok,perfil,rol}){
   const[tareasPend,setTareasPend]=useState([]);const[contactosDestacados,setContactosDestacados]=useState([]);
   const[kpiData,setKpiData]=useState(null);const[airbnbs,setAirbnbs]=useState([]);
   const[rangeEvol,setRangeEvol]=useState("mensual");
+  const[coordsPend,setCoordsPend]=useState([]);const[articulosDash,setArticulosDash]=useState([]);const[visitasDash,setVisitasDash]=useState([]);
   useEffect(()=>{autoCobrarAirbnb(tok);ejecutarMotorCoordinacion(tok);
+    const hoyLoad=new Date().toISOString().split("T")[0];
     sbGet("tareas_comerciales","?estado=eq.pendiente&order=fecha_limite.asc.nullslast&limit=10&select=*",tok).then(setTareasPend).catch(()=>{});
     sbGet("contactos","?order=updated_at.desc&limit=3&estado=neq.perdido&select=*",tok).then(setContactosDestacados).catch(()=>{});
+    sbGet("coordinacion_servicios",`?estado=in.(preguntando_si_lista,servicio_creado_pendiente_fecha,pendiente_aprobacion_admin)&select=*&limit=10`,tok).then(setCoordsPend).catch(()=>{});
+    sbGet("almacen_articulos","?activo=neq.false&select=nombre,stock_casa,stock_almacen,stock_minimo",tok).then(setArticulosDash).catch(()=>{});
+    sbGet("visitas",`?fecha=eq.${hoyLoad}&estado=eq.pendiente&select=*`,tok).then(setVisitasDash).catch(()=>{});
     (async()=>{try{
       const año=new Date().getFullYear();const hoyStr=new Date().toISOString().split("T")[0];
       const[res,abs,gastos,cfgR]=await Promise.all([sbGet("reservas",`?fecha=gte.${año}-01-01&fecha=lte.${año}-12-31&select=*`,tok),sbGet("reservas_airbnb",`?fecha_entrada=gte.${año}-01-01&fecha_entrada=lte.${año}-12-31&select=*`,tok),sbGet("gastos",`?fecha=gte.${año}-01-01&fecha=lte.${año}-12-31&select=*`,tok).catch(()=>[]),sbGet("configuracion","?select=*",tok).catch(()=>[])]);
@@ -1810,6 +1815,25 @@ function DashA({reservas,jsem,jpunt,cwk,setPage,tok,perfil,rol}){
   // Próximo evento (solo 1)
   const proximoEvento=reservas.filter(r=>r.estado!=="cancelada"&&r.fecha>=hoyS).sort((a,b)=>a.fecha.localeCompare(b.fecha))[0];
 
+  // Alertas simples para panel Atención ahora
+  const alertasSimples=useMemo(()=>{
+    const en30=new Date(Date.now()+30*24*60*60*1000).toISOString().split("T")[0];const lista=[];
+    reservas.filter(r=>!["cancelada","finalizada"].includes(r.estado)&&r.estado_pago!=="pagado_completo"&&r.fecha>=hoyS&&r.fecha<=en30).slice(0,2).forEach(r=>{
+      const pend=getPrecioReserva(r)-(parseFloat(r.seña_importe)||0);
+      lista.push({titulo:`Cobro pendiente · ${r.nombre}`,sub:`${fmtE(pend)} · ${new Date(r.fecha+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"})}`,color:"#D9443A",ir:()=>setPage("reservas")});
+    });
+    coordsPend.slice(0,2).forEach(c=>{const esL=c.tipo?.includes("limpieza");
+      lista.push({titulo:esL?"Limpieza pendiente confirmar":"Jardín pendiente confirmar",sub:c.fecha_checkout?`Checkout ${new Date(c.fecha_checkout+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"})}`:null,color:T.gold,ir:()=>setPage(esL?"limpieza":"jadmin")});
+    });
+    tareasPend.filter(t=>t.fecha_limite&&t.fecha_limite<hoyS).slice(0,2).forEach(t=>{
+      lista.push({titulo:t.titulo,sub:`Vencida · ${t.entidad_nombre||""}`,color:"#D9443A",ir:()=>{if(t.entidad_tipo==="reserva")setPage("reservas");else if(t.entidad_tipo==="visita")setPage("visitas");else setPage("contactos");}});
+    });
+    const artBajos=articulosDash.filter(a=>(parseFloat(a.stock_casa||0)+parseFloat(a.stock_almacen||0))<=parseFloat(a.stock_minimo||1));
+    if(artBajos.length>0)lista.push({titulo:`Stock bajo · ${artBajos.length} artículo${artBajos.length!==1?"s":""}`,sub:artBajos.slice(0,2).map(a=>a.nombre).join(", "),color:T.softBlue,ir:()=>setPage("almacen")});
+    visitasDash.slice(0,1).forEach(v=>lista.push({titulo:`Visita hoy · ${v.nombre}`,sub:v.hora?`${v.hora.slice(0,5)}h`:null,color:T.softBlue,ir:()=>setPage("visitas")}));
+    return lista.slice(0,5);
+  },[reservas,coordsPend,tareasPend,articulosDash,visitasDash,hoyS]);
+
   return <>
     {/* 1. Greeting */}
     <div style={{padding:"54px 20px 16px"}}>
@@ -1844,7 +1868,28 @@ function DashA({reservas,jsem,jpunt,cwk,setPage,tok,perfil,rol}){
     </div>}
 
     {/* 3. Atención ahora */}
-    <div style={{padding:"0 20px 16px"}}><AtencionAhora tok={tok} setPage={setPage}/></div>
+    <div style={{padding:"0 20px 16px"}}>
+      <div style={{background:"linear-gradient(135deg, #1A1A1A 0%, #2a2520 100%)",borderRadius:20,padding:16}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:alertasSimples.length>0?12:0}}>
+          <div>
+            <div style={{fontSize:10,color:T.gold,letterSpacing:1,textTransform:"uppercase",fontWeight:600,marginBottom:2}}>Atención ahora</div>
+            <div style={{fontSize:14,fontWeight:600,letterSpacing:-.2,color:"white"}}>{alertasSimples.length===0?"Todo en orden":`${alertasSimples.length} asunto${alertasSimples.length!==1?"s":""} pendiente${alertasSimples.length!==1?"s":""}`}</div>
+          </div>
+          {alertasSimples.length>0&&<span style={{display:"inline-flex",alignItems:"center",height:22,padding:"0 9px",borderRadius:999,background:"rgba(236,210,39,.18)",color:T.gold,fontSize:11,fontWeight:600,whiteSpace:"nowrap"}}>Prioridad</span>}
+        </div>
+        {alertasSimples.length===0?<div style={{fontSize:13,color:"rgba(255,255,255,.40)",paddingTop:4}}>✅ Sin asuntos pendientes</div>
+        :<div style={{display:"flex",flexDirection:"column"}}>
+          {alertasSimples.map((a,i)=><div key={i} onClick={a.ir} style={{display:"flex",alignItems:"center",gap:10,padding:"7px 0",borderBottom:i<alertasSimples.length-1?"1px solid rgba(255,255,255,.07)":"none",cursor:a.ir?"pointer":"default"}}>
+            <span style={{width:8,height:8,borderRadius:999,background:a.color||T.gold,flexShrink:0}}/>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:13,fontWeight:600,color:"white",letterSpacing:-.2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{a.titulo}</div>
+              {a.sub&&<div style={{fontSize:11,color:"rgba(255,255,255,.50)",marginTop:1}}>{a.sub}</div>}
+            </div>
+            {a.ir&&<FmIcon name="chevR" size={14} stroke="rgba(255,255,255,.35)"/>}
+          </div>)}
+        </div>}
+      </div>
+    </div>
 
     {/* 4. KPIs financieros */}
     {kpiData&&<div style={{padding:"0 20px 18px"}}>
