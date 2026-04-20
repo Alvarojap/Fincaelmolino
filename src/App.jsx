@@ -5458,7 +5458,6 @@ function Gastos({tok}){
 
 // ─── ANÁLISIS ───────────────────────────────────────────────────────────────
 function Analisis({tok,rol}){
-  if(rol!=="admin")return null;
   const hoy=new Date();const hoyStr=hoy.toISOString().split("T")[0];const año=hoy.getFullYear();const mesIdx=hoy.getMonth();
   const [tab,setTab]=useState("proyeccion");
   const [load,setLoad]=useState(true);
@@ -5477,6 +5476,8 @@ function Analisis({tok,rol}){
       const c={};cfg.forEach(x=>c[x.clave]=x.valor);setF2025(parseFloat(c.facturacion_2025)||0);
     }catch(_){}setLoad(false);
   })();},[]);
+
+  if(rol!=="admin")return null;
 
   const fmt=v=>`${Math.round(v).toLocaleString("es-ES")}€`;
   const cw=typeof window!=="undefined"?Math.min(window.innerWidth-64,560):400;
@@ -5725,7 +5726,6 @@ const CONFIG_FIELDS=[
 ];
 
 function Ajustes({tok,rol}){
-  if(rol!=="admin")return null;
   const [valores,setValores]=useState({});
   const [load,setLoad]=useState(true);
   const [savingKey,setSavingKey]=useState(null);
@@ -5742,6 +5742,8 @@ function Ajustes({tok,rol}){
       setLoad(false);
     })();
   },[]);
+
+  if(rol!=="admin")return null;
 
   const guardar=async(clave)=>{
     setSavingKey(clave);setFeedback(prev=>({...prev,[clave]:null}));
