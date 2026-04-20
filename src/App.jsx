@@ -1763,6 +1763,16 @@ function DashAlertRow({dot,label,sub,onClick}){return <div onClick={onClick} sty
 function DashQuickAction({color,icon,label,onClick}){return <button onClick={onClick} style={{background:T.surface,border:`1px solid ${T.line}`,borderRadius:20,padding:"14px 8px",display:"flex",flexDirection:"column",alignItems:"center",gap:8,cursor:"pointer",fontFamily:T.sans,minHeight:90,boxShadow:T.shadowSm,width:"100%"}}><div style={{width:36,height:36,borderRadius:10,background:color+"1f",color,display:"flex",alignItems:"center",justifyContent:"center"}}><FmIcon name={icon} size={18} sw={2} stroke={color}/></div><span style={{fontSize:11,fontWeight:600,color:T.ink,textAlign:"center",lineHeight:1.2,letterSpacing:-.1}}>{label}</span></button>;}
 function DashEventRow({color,date,title,price,status,onClick}){return <div onClick={onClick} style={{background:color,borderRadius:20,padding:16,display:"flex",alignItems:"center",gap:14,color:T.ink,cursor:"pointer"}}><div style={{flex:1,minWidth:0}}><div style={{fontSize:11,fontWeight:700,letterSpacing:.3,textTransform:"uppercase",opacity:.75}}>{date} · {status}</div><div style={{fontSize:17,fontWeight:700,letterSpacing:-.4,marginTop:2,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{title}</div><div style={{fontSize:14,fontWeight:600,marginTop:4}}>{price}</div></div><div style={{width:40,height:40,borderRadius:999,background:T.ink,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><FmIcon name="arrow" size={18} stroke={color} sw={2.2}/></div></div>;}
 
+// ─── DESKTOP DASHBOARD COMPONENTS ────────────────────────────────────────────
+function BigKpi({label,value,delta,mood="neutral",color=T.olive,onClick}){return<div onClick={onClick} style={{background:T.surface,borderRadius:20,padding:20,border:`1px solid ${T.line}`,cursor:onClick?"pointer":"default"}}><div style={{width:32,height:3,background:color,borderRadius:2,marginBottom:12}}/><div style={{fontSize:11,color:T.ink3,fontWeight:600,letterSpacing:.4,textTransform:"uppercase"}}>{label}</div><div style={{fontSize:32,fontWeight:700,color:T.ink,letterSpacing:-1,lineHeight:1,marginTop:8}}>{value}</div><div style={{fontSize:12,color:T.ink3,marginTop:8,fontWeight:500,display:"flex",alignItems:"center",gap:4}}>{mood==="up"&&<span style={{color:T.success,fontWeight:700}}>↑</span>}{mood==="down"&&<span style={{color:T.danger,fontWeight:700}}>↓</span>}{delta}</div></div>;}
+function AttentionPanelDesktop({alertasSimples}){return<div style={{background:"#1A1A1A",borderRadius:24,padding:22,color:"#fff",height:"100%",boxSizing:"border-box"}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:16}}><div><div style={{fontSize:11,color:T.gold,letterSpacing:1,textTransform:"uppercase",fontWeight:700}}>Atención ahora</div><div style={{fontSize:22,fontWeight:700,marginTop:4,letterSpacing:-.5}}>{alertasSimples.length} asunto{alertasSimples.length!==1?"s":""}</div></div>{alertasSimples.length>0&&<div style={{background:"rgba(236,210,39,.18)",color:T.gold,padding:"6px 12px",borderRadius:999,fontSize:11,fontWeight:700,letterSpacing:.4,textTransform:"uppercase"}}>Prioridad</div>}</div>{alertasSimples.length===0?<div style={{fontSize:14,color:"rgba(255,255,255,.40)",paddingTop:8}}>✅ Sin asuntos</div>:alertasSimples.map((a,i)=><div key={i} onClick={a.ir} style={{display:"flex",alignItems:"center",gap:12,padding:"12px 0",borderTop:i>0?"1px solid rgba(255,255,255,.08)":"none",cursor:a.ir?"pointer":"default"}}><span style={{width:10,height:10,borderRadius:999,background:a.color||T.gold,flexShrink:0}}/><div style={{flex:1}}><div style={{fontSize:14,fontWeight:700,letterSpacing:-.2}}>{a.titulo}</div>{a.sub&&<div style={{fontSize:12,color:"rgba(255,255,255,.55)",fontWeight:500,marginTop:1}}>{a.sub}</div>}</div><FmIcon name="chevR" size={16} stroke="rgba(255,255,255,.5)"/></div>)}</div>;}
+function EventosBlockDesktop({reservas,setPage,goToItem}){const hoy=new Date().toISOString().split("T")[0];const prox=reservas.filter(r=>r.estado!=="cancelada"&&r.fecha>=hoy).sort((a,b)=>a.fecha.localeCompare(b.fecha)).slice(0,4);const colors=[T.terracotta,T.lavender,T.gold,T.olive];const fE=v=>(Math.round(parseFloat(v)||0)).toLocaleString("es-ES")+"€";return<div><div style={{display:"flex",alignItems:"baseline",justifyContent:"space-between",marginBottom:14}}><div style={{fontSize:13,fontWeight:700,color:T.ink,textTransform:"uppercase",letterSpacing:.4}}>Próximos eventos</div><div onClick={()=>setPage("reservas")} style={{fontSize:12,color:T.ink3,fontWeight:600,cursor:"pointer"}}>Ver todos →</div></div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>{prox.map((e,i)=>{const c=colors[i%colors.length];const f=new Date(e.fecha+"T12:00:00").toLocaleDateString("es-ES",{day:"2-digit",month:"short"}).toUpperCase();const ep=e.estado_pago==="pagado_completo"?"Pagado":e.seña_cobrada?"Seña OK":"Saldo pdte";return<div key={e.id} onClick={()=>goToItem?goToItem("reservas",e):setPage("reservas")} style={{background:c,borderRadius:18,padding:18,color:T.ink,cursor:"pointer"}}><div style={{fontSize:11,fontWeight:700,letterSpacing:.3,textTransform:"uppercase",opacity:.75}}>{f} · {ep}</div><div style={{fontSize:17,fontWeight:700,letterSpacing:-.4,marginTop:4,lineHeight:1.15,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{e.nombre}</div><div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginTop:14}}><div style={{fontSize:16,fontWeight:700}}>{fE(getPrecioReserva(e))}</div><div style={{width:36,height:36,borderRadius:999,background:T.ink,display:"flex",alignItems:"center",justifyContent:"center"}}><FmIcon name="arrow" size={16} stroke={c} sw={2.2}/></div></div></div>;})}
+    {prox.length===0&&<div style={{gridColumn:"span 2",color:T.ink3,fontSize:13,textAlign:"center",padding:"20px 0"}}>Sin eventos próximos</div>}</div></div>;}
+function TareasBlockDesktop({tareas,setPage,goToItem,tok}){const hoy=new Date().toISOString().split("T")[0];const colors=[T.coral,T.gold,T.softBlue,T.lavender,T.olive];return<div><div style={{display:"flex",alignItems:"baseline",justifyContent:"space-between",marginBottom:14}}><div style={{fontSize:13,fontWeight:700,color:T.ink,textTransform:"uppercase",letterSpacing:.4}}>Tareas pendientes</div><div style={{fontSize:12,color:T.ink3,fontWeight:600}}>{tareas.length} total</div></div><div style={{display:"flex",flexDirection:"column",gap:10}}>{tareas.slice(0,4).map((t,i)=>{const vencida=t.fecha_limite&&t.fecha_limite<hoy;const color=vencida?T.coral:t.fecha_limite===hoy?T.gold:colors[(i+2)%colors.length];const dl=!t.fecha_limite?"Sin fecha":vencida?"Vencida":t.fecha_limite===hoy?"Hoy":new Date(t.fecha_limite+"T12:00:00").toLocaleDateString("es-ES",{weekday:"short",day:"numeric"});return<div key={t.id} onClick={async()=>{if(t.entidad_id&&goToItem){const tbl=t.entidad_tipo==="reserva"?"reservas":t.entidad_tipo==="visita"?"visitas":"reservas_airbnb";const pg=t.entidad_tipo==="reserva"?"reservas":t.entidad_tipo==="visita"?"visitas":"airbnb";const[item]=await sbGet(tbl,`?id=eq.${t.entidad_id}&select=*`,tok).catch(()=>[]);goToItem(pg,item||null);}else setPage("reservas");}} style={{background:color,borderRadius:18,padding:16,display:"flex",alignItems:"center",gap:14,color:T.ink,cursor:"pointer"}}><div style={{width:36,height:36,borderRadius:10,background:T.ink,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><FmIcon name="check" size={18} stroke={color} sw={2.4}/></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:11,fontWeight:700,letterSpacing:.3,textTransform:"uppercase",opacity:.75}}>{dl} · {t.asignado_nombre||"Admin"}</div><div style={{fontSize:15,fontWeight:700,letterSpacing:-.3,marginTop:2,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{t.titulo}</div></div><FmIcon name="chevR" size={18} stroke={T.ink} sw={2.4}/></div>;})}
+    {tareas.length===0&&<div style={{color:T.ink3,fontSize:13,textAlign:"center",padding:"16px 0"}}>✅ Sin tareas</div>}</div></div>;}
+function ContactosBlockDesktop({contactos,setPage}){const colors=[T.lavender,T.olive,T.softBlue,T.coral];return<div><div style={{display:"flex",alignItems:"baseline",justifyContent:"space-between",marginBottom:14}}><div style={{fontSize:13,fontWeight:700,color:T.ink,textTransform:"uppercase",letterSpacing:.4}}>Contactos destacados</div><div onClick={()=>setPage("contactos")} style={{fontSize:12,color:T.ink3,fontWeight:600,cursor:"pointer"}}>Todos →</div></div><div style={{background:T.surface,borderRadius:20,border:`1px solid ${T.line}`,overflow:"hidden"}}>{contactos.map((c,i)=>{const color=colors[i%colors.length];const ini=c.nombre?.split(" ").map(p=>p[0]).slice(0,2).join("").toUpperCase()||"??";return<div key={c.id} onClick={()=>setPage("contactos")} style={{display:"flex",alignItems:"center",gap:14,padding:"14px 16px",borderBottom:i<contactos.length-1?`1px solid ${T.line}`:"none",cursor:"pointer"}}><div style={{width:44,height:44,borderRadius:12,background:color,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:14,color:T.ink,flexShrink:0}}>{ini}</div><div style={{flex:1,minWidth:0}}><div style={{fontSize:14,fontWeight:700,color:T.ink,letterSpacing:-.2}}>{c.nombre}</div><div style={{fontSize:11,color:T.ink3,fontWeight:500,marginTop:1}}>{c.tipo_evento||"Contacto"} · {c.estado}</div></div>{c.telefono&&<button onClick={e=>{e.stopPropagation();window.open("tel:"+c.telefono);}} style={{width:34,height:34,borderRadius:999,background:T.bg,border:0,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}><FmIcon name="phone" size={14} stroke={T.ink} sw={2}/></button>}<button style={{width:34,height:34,borderRadius:999,background:T.ink,border:0,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}><FmIcon name="chevR" size={14} stroke="#fff" sw={2.2}/></button></div>;})}
+    {contactos.length===0&&<div style={{padding:"16px",color:T.ink3,fontSize:13,textAlign:"center"}}>Sin contactos</div>}</div></div>;}
+
 function MiniBarChart({data,color}){const max=Math.max(...data.map(d=>d.v),1);const h=60;return<div><div style={{display:"flex",alignItems:"flex-end",gap:3,height:h}}>{data.map((d,i)=><div key={i} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"flex-end",height:h}}><div style={{width:"100%",height:Math.max(2,d.v/max*h),background:d.v>0?color:T.line,borderRadius:3}}/></div>)}</div><div style={{display:"flex",gap:3,marginTop:4}}>{data.map((d,i)=><div key={i} style={{flex:1,textAlign:"center",fontSize:8,color:T.ink3,fontWeight:600}}>{d.l}</div>)}</div></div>;}
 
 function DashA({reservas,jsem,jpunt,cwk,setPage,tok,perfil,rol,goToItem}){
@@ -1841,6 +1851,84 @@ function DashA({reservas,jsem,jpunt,cwk,setPage,tok,perfil,rol,goToItem}){
     visitasDash.slice(0,1).forEach(v=>lista.push({titulo:`Visita hoy · ${v.nombre}`,sub:v.hora?`${v.hora.slice(0,5)}h`:null,color:T.softBlue,ir:()=>goToItem?goToItem("visitas",v):setPage("visitas")}));
     return lista.slice(0,5);
   },[reservas,coordsPend,tareasPend,articulosDash,visitasDash,hoyS]);
+
+  const[isDesktop,setIsDesktop]=useState(typeof window!=="undefined"&&window.innerWidth>=768);
+  useEffect(()=>{const fn=()=>setIsDesktop(window.innerWidth>=768);window.addEventListener("resize",fn);return()=>window.removeEventListener("resize",fn);},[]);
+
+  // Render helpers for reuse in both layouts
+  const renderEvolucion=()=>kpiData&&mesesData.length>0?<>
+    <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:14}}>
+      <div><div style={{fontSize:11,color:T.ink3,letterSpacing:.8,textTransform:"uppercase",fontWeight:700}}>Evolución {anio}</div><div style={{fontSize:22,fontWeight:700,color:T.ink,letterSpacing:-.5,marginTop:4}}>{fmtE(kpiData.yaCobrado)}</div></div>
+      <div style={{display:"flex",background:T.bg,borderRadius:999,padding:3,gap:2}}>{["mensual","semanal"].map(k=><button key={k} onClick={()=>setRangeEvol(k)} style={{padding:"7px 12px",borderRadius:999,border:0,background:rangeEvol===k?T.ink:"transparent",color:rangeEvol===k?"#fff":T.ink3,fontSize:11,fontWeight:700,cursor:"pointer",textTransform:"capitalize",fontFamily:T.sans}}>{k}</button>)}</div>
+    </div>
+    <div style={{position:"relative",height:150}}>
+      <div style={{display:"flex",alignItems:"flex-end",gap:4,height:150,padding:"0 2px"}}>{mesesData.map((d,i)=>{const rh=Math.max(2,(d.facturacion/maxBar)*150);const ph=Math.max(2,(d.proj/maxBar)*150);return<div key={i} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"flex-end",height:150}}><div style={{position:"relative",width:"100%",height:ph,display:"flex",alignItems:"flex-end",justifyContent:"center"}}>{d.fut&&<div style={{position:"absolute",left:"50%",transform:"translateX(-50%)",bottom:0,width:"70%",height:ph,border:`1.5px dashed ${T.ink3}`,borderRadius:6,background:"transparent"}}/>}{!d.fut&&<div style={{position:"relative",zIndex:1,width:"70%",height:rh,background:d.esActual?T.terracotta:T.olive,borderRadius:6}}/>}</div></div>;})}</div>
+      <svg style={{position:"absolute",top:0,left:0,width:"100%",height:150,pointerEvents:"none"}} viewBox={`0 0 ${mesesData.length*100} 150`} preserveAspectRatio="none"><polyline fill="none" stroke={T.lavender} strokeWidth="3" strokeLinejoin="round" strokeLinecap="round" points={mesesData.map((d,i)=>`${i*100+50},${150-Math.max(2,(d.ben/maxBar)*150)}`).join(" ")}/></svg>
+    </div>
+    <div style={{display:"flex",gap:4,marginTop:6}}>{mesesData.map((d,i)=><div key={i} style={{flex:1,textAlign:"center",fontSize:9,color:T.ink3,fontWeight:600}}>{d.l}</div>)}</div>
+    <div style={{display:"flex",gap:14,marginTop:14,paddingTop:12,borderTop:`1px solid ${T.line}`,flexWrap:"wrap"}}>{[{color:T.olive,label:"Real"},{color:"transparent",border:T.ink3,label:"Proyectado"},{color:T.terracotta,label:"Mes actual"},{color:T.lavender,label:"Beneficio"}].map((l,i)=><div key={i} style={{display:"flex",alignItems:"center",gap:6}}><div style={{width:10,height:10,borderRadius:3,background:l.color,border:l.border?`1.5px dashed ${l.border}`:"0"}}/><span style={{fontSize:11,color:T.ink2,fontWeight:500}}>{l.label}</span></div>)}</div>
+  </>:null;
+
+  const renderDonut=()=>kpiData?<>
+    <FmSH title="Ingresos por fuente"/>
+    <div style={{display:"flex",alignItems:"center",gap:20}}>
+      <svg width={120} height={120} viewBox="0 0 120 120"><circle cx={cx} cy={cy} r={donutR} fill="none" stroke={T.softBlue} strokeWidth={16}/>{pctEv>0&&<circle cx={cx} cy={cy} r={donutR} fill="none" stroke={T.terracotta} strokeWidth={16} strokeDasharray={`${pctEv/100*2*Math.PI*donutR} ${2*Math.PI*donutR}`} strokeDashoffset={2*Math.PI*donutR*0.25} strokeLinecap="round"/>}<circle cx={cx} cy={cy} r={donutR2} fill={T.surface}/><text x={cx} y={cy-4} textAnchor="middle" style={{fontSize:18,fontWeight:700,fill:T.ink}}>—</text><text x={cx} y={cy+12} textAnchor="middle" style={{fontSize:9,fill:T.ink3,fontWeight:500}}>vs {anio-1}</text></svg>
+      <div style={{flex:1}}>{[{color:T.terracotta,label:"Eventos",value:fmtE(totalEv),pct:pctEv},{color:T.softBlue,label:"Airbnb",value:fmtE(totalAb),pct:pctAb}].map((s,i)=><div key={i} style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}><div style={{width:10,height:10,borderRadius:3,background:s.color,flexShrink:0}}/><div style={{flex:1}}><div style={{fontSize:12,fontWeight:600,color:T.ink}}>{s.label} <span style={{color:T.ink3,fontWeight:500}}>{s.pct}%</span></div><div style={{fontSize:14,fontWeight:700,color:T.ink,marginTop:2}}>{s.value}</div></div></div>)}<div style={{fontSize:11,color:T.ink3,marginTop:4}}>Crecimiento vs {anio-1}: —</div></div>
+    </div>
+  </>:null;
+
+  const renderKpiDetalle=(idx)=>{const gastos=kpiData?.gastos||[];
+    if(idx===0)return<div><div style={{display:"flex",justifyContent:"space-around",marginBottom:12}}><div style={{textAlign:"center"}}><div style={{fontSize:10,color:T.ink3,textTransform:"uppercase",letterSpacing:.5,fontWeight:600}}>Eventos</div><div style={{fontSize:20,fontWeight:700,color:T.terracotta,letterSpacing:-.5}}>{fmtE(kpiData?.fE)}</div><div style={{fontSize:11,color:T.ink3}}>{(kpiData?.reservas||[]).filter(r=>r.estado!=="cancelada").length} reservas</div></div><div style={{textAlign:"center"}}><div style={{fontSize:10,color:T.ink3,textTransform:"uppercase",letterSpacing:.5,fontWeight:600}}>Airbnb</div><div style={{fontSize:20,fontWeight:700,color:T.softBlue,letterSpacing:-.5}}>{fmtE(kpiData?.fA)}</div><div style={{fontSize:11,color:T.ink3}}>{airbnbs.length} reservas</div></div></div><MiniBarChart data={Array.from({length:12},(_,i)=>{const m=[...(kpiData?.reservas||[]),...airbnbs].filter(r=>{const f=new Date((r.fecha||r.fecha_entrada)+"T12:00:00");return f.getFullYear()===anio&&f.getMonth()===i&&r.estado!=="cancelada";});return{l:["E","F","M","A","M","J","J","A","S","O","N","D"][i],v:m.reduce((s,r)=>s+getPrecioReserva(r),0)};})} color={T.olive}/></div>;
+    if(idx===1)return<div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:14}}>{[{l:"Señas cobradas",v:fmtE(reservas.filter(r=>r.seña_cobrada).reduce((s,r)=>s+(parseFloat(r.seña_importe)||0),0)),c:T.gold},{l:"Pagos totales",v:fmtE(reservas.filter(r=>r.estado_pago==="pagado_completo").reduce((s,r)=>s+getPrecioReserva(r),0)),c:T.olive},{l:"Airbnb cobrado",v:fmtE(airbnbs.filter(a=>a.cobrado).reduce((s,a)=>s+getPrecioReserva(a),0)),c:T.softBlue}].map((it,i)=><div key={i} style={{background:T.bg,borderRadius:12,padding:"10px 8px",textAlign:"center"}}><div style={{fontSize:9,color:T.ink3,textTransform:"uppercase",letterSpacing:.5,fontWeight:600,marginBottom:4}}>{it.l}</div><div style={{fontSize:15,fontWeight:700,color:it.c,letterSpacing:-.3}}>{it.v}</div></div>)}</div></div>;
+    if(idx===2)return<div>{reservas.filter(r=>!["cancelada","finalizada"].includes(r.estado)&&r.estado_pago!=="pagado_completo").sort((a,b)=>new Date(a.fecha)-new Date(b.fecha)).slice(0,6).map(r=>{const p=getPrecioReserva(r)-(parseFloat(r.seña_cobrada?r.seña_importe||0:0));const d=Math.ceil((new Date(r.fecha+"T12:00:00")-new Date())/(864e5));const uc=d<30?"#D9443A":d<90?T.gold:T.success;return<div key={r.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderBottom:`1px solid ${T.line}`}}><span style={{width:8,height:8,borderRadius:999,background:uc,flexShrink:0}}/><div style={{flex:1}}><div style={{fontSize:13,fontWeight:600,color:T.ink}}>{r.nombre}</div><div style={{fontSize:11,color:T.ink3}}>{r.seña_cobrada?"Falta saldo":"Sin seña"}</div></div><div style={{fontSize:13,fontWeight:700,color:uc}}>{fmtE(p)}</div></div>;})}</div>;
+    if(idx===3){const porCat={};gastos.forEach(g=>{porCat[g.categoria]=(porCat[g.categoria]||0)+(parseFloat(g.importe)||0);});const totalG=Object.values(porCat).reduce((s,v)=>s+v,0)||1;const cats=Object.entries(porCat).sort((a,b)=>b[1]-a[1]);const catCol={personal:T.lavender,comision:T.terracotta,consumibles:T.olive,suministros:T.softBlue,mantenimiento:T.gold,otros:T.ink4};return<div>{cats.map(([cat,val],i)=><div key={i} style={{marginBottom:10}}><div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span style={{fontSize:12,fontWeight:600,color:T.ink,textTransform:"capitalize"}}>{cat}</span><span style={{fontSize:12,fontWeight:700,color:T.ink}}>{fmtE(val)}</span></div><div style={{height:6,background:T.bg,borderRadius:999}}><div style={{height:6,borderRadius:999,background:catCol[cat]||T.ink3,width:Math.round(val/totalG*100)+"%"}}/></div></div>)}</div>;}
+    if(idx===4){const tC=kpiData?.yaCobrado||0;const tG=kpiData?.gastosReales||0;const ben=tC-tG;const mar=tC>0?Math.round(ben/tC*100):0;return<div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:14}}>{[{l:"Cobrado",v:fmtE(tC),c:T.olive},{l:"Gastos",v:fmtE(tG),c:"#D9443A"},{l:"Beneficio",v:fmtE(ben),c:T.terracotta}].map((it,i)=><div key={i} style={{background:T.bg,borderRadius:12,padding:"10px 8px",textAlign:"center"}}><div style={{fontSize:9,color:T.ink3,textTransform:"uppercase",letterSpacing:.5,fontWeight:600,marginBottom:4}}>{it.l}</div><div style={{fontSize:15,fontWeight:700,color:it.c,letterSpacing:-.3}}>{it.v}</div></div>)}</div><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 14px",background:T.bg,borderRadius:12}}><span style={{fontSize:13,fontWeight:600,color:T.ink}}>Margen</span><span style={{fontSize:16,fontWeight:700,color:mar>50?T.success:mar>30?T.gold:"#D9443A"}}>{mar}%</span></div></div>;}
+    if(idx===5){const comPct=kpiData?.comPct||10;const base=kpiData?.facturacion||0;const comTotal=base*comPct/100;const yaReg=gastos.filter(g=>g.categoria==="comision").reduce((s,g)=>s+(parseFloat(g.importe)||0),0);return<div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>{[{l:"Base cálculo",v:fmtE(base),c:T.ink},{l:`Comisión ${comPct}%`,v:fmtE(comTotal),c:T.terracotta},{l:"Ya registrada",v:fmtE(yaReg),c:T.olive},{l:"Pendiente",v:fmtE(Math.max(0,comTotal-yaReg)),c:T.gold}].map((it,i)=><div key={i} style={{background:T.bg,borderRadius:12,padding:"10px 8px",textAlign:"center"}}><div style={{fontSize:9,color:T.ink3,textTransform:"uppercase",letterSpacing:.5,fontWeight:600,marginBottom:4}}>{it.l}</div><div style={{fontSize:15,fontWeight:700,color:it.c,letterSpacing:-.3}}>{it.v}</div></div>)}</div></div>;}
+    return null;
+  };
+
+  // ─── DESKTOP LAYOUT ─────────────────────────────────────────────
+  if(isDesktop&&kpiData)return <div style={{display:"flex",flexDirection:"column",fontFamily:T.sans,background:T.bg,minHeight:"100%"}}>
+    {/* Topbar */}
+    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"20px 32px",borderBottom:`1px solid ${T.line}`,background:T.bg,position:"sticky",top:0,zIndex:10}}>
+      <div><div style={{fontSize:12,color:T.ink3,fontWeight:500}}>{new Date().toLocaleDateString("es-ES",{weekday:"long",day:"numeric",month:"long",year:"numeric"}).replace(/^\w/,c=>c.toUpperCase())}</div><div style={{fontSize:28,color:T.ink,letterSpacing:-1,fontWeight:700,lineHeight:1,marginTop:2}}>Buenos días, {perfil?.nombre?.split(" ")[0]||"Admin"}.</div></div>
+      <div style={{display:"flex",alignItems:"center",gap:10}}>
+        <button onClick={()=>setPage("notifs")} style={{width:42,height:42,borderRadius:999,background:T.surface,border:`1px solid ${T.line}`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",position:"relative"}}><FmIcon name="bell" size={18} stroke={T.ink2}/></button>
+        <button onClick={()=>setPage("nueva-res")} style={{height:42,padding:"0 20px",borderRadius:999,background:T.ink,color:"#fff",border:0,fontSize:13,fontWeight:700,letterSpacing:-.2,cursor:"pointer",display:"flex",alignItems:"center",gap:6}}><FmIcon name="plus" size={15} stroke="#fff" sw={2.4}/> Nueva reserva</button>
+      </div>
+    </div>
+    {/* Grid */}
+    <div style={{padding:28,display:"flex",flexDirection:"column",gap:20,overflow:"auto",flex:1}}>
+      {/* Row 1: 4 KPIs */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:16}}>
+        {[{label:"Facturación proy.",value:fmtE(kpiData.facturacion),delta:`Ev. ${fmtE(kpiData.fE)} + Ab. ${fmtE(kpiData.fA)}`,mood:"up",color:T.olive,idx:0},{label:"Ya cobrado",value:fmtE(kpiData.yaCobrado),delta:`${Math.round(kpiData.yaCobrado/(kpiData.facturacion||1)*100)}% del total`,color:T.softBlue,idx:1},{label:"Pendiente cobro",value:fmtE(kpiData.pendiente),delta:`${reservas.filter(r=>r.estado_pago!=="pagado_completo"&&r.estado!=="cancelada").length} eventos`,color:T.gold,idx:2},{label:"Beneficio est.",value:fmtE(kpiData.beneficio),delta:`${Math.round(kpiData.beneficio/(kpiData.facturacion||1)*100)}% margen`,mood:kpiData.beneficio>0?"up":"down",color:T.terracotta,idx:4}].map(k=><BigKpi key={k.idx} label={k.label} value={k.value} delta={k.delta} mood={k.mood} color={k.color} onClick={()=>setKpiAbierto(kpiAbierto===k.idx?null:k.idx)}/>)}
+      </div>
+      {/* KPI detalle */}
+      {kpiAbierto!==null&&<div style={{background:T.surface,borderRadius:20,border:`1px solid ${T.line}`,padding:20,boxShadow:"0 8px 28px rgba(40,30,20,.10)"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}><div style={{fontSize:14,fontWeight:700,color:T.ink,textTransform:"uppercase",letterSpacing:-.2}}>{["Facturación proyectada","Ya cobrado","Pendiente de cobro","Gastos reales","Beneficio estimado","Comisión gestor"][kpiAbierto]}</div><button onClick={()=>setKpiAbierto(null)} style={{width:28,height:28,borderRadius:999,background:T.bg,border:0,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}><FmIcon name="x" size={14} stroke={T.ink3}/></button></div>
+        {renderKpiDetalle(kpiAbierto)}
+      </div>}
+      {/* Row 2: Evolución + Donut */}
+      <div style={{display:"grid",gridTemplateColumns:"1.7fr 1fr",gap:16}}>
+        <div style={{background:T.surface,borderRadius:24,padding:24,border:`1px solid ${T.line}`}}>{renderEvolucion()}</div>
+        <div style={{background:T.surface,borderRadius:24,padding:24,border:`1px solid ${T.line}`}}>{renderDonut()}</div>
+      </div>
+      {/* Row 3: Atención + Eventos */}
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1.4fr",gap:16}}>
+        <AttentionPanelDesktop alertasSimples={alertasSimples}/>
+        <EventosBlockDesktop reservas={reservas} setPage={setPage} goToItem={goToItem}/>
+      </div>
+      {/* Row 4: Tareas + Contactos + KPIs secundarios */}
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:16}}>
+        <TareasBlockDesktop tareas={tareasPend} setPage={setPage} goToItem={goToItem} tok={tok}/>
+        <ContactosBlockDesktop contactos={contactosDestacados} setPage={setPage}/>
+        <div style={{display:"flex",flexDirection:"column",gap:12}}>
+          <BigKpi label="Gastos reales" value={fmtE(kpiData.gastosReales)} delta="YTD" color={T.lavender} onClick={()=>setKpiAbierto(3)}/>
+          <BigKpi label="Comisión gestor" value={fmtE(kpiData.comision)} delta={`${kpiData.comPct}% s/fact.`} color="#F2995E" onClick={()=>setKpiAbierto(5)}/>
+        </div>
+      </div>
+    </div>
+  </div>;
 
   return <>
     {/* 1. Greeting */}
@@ -1924,116 +2012,19 @@ function DashA({reservas,jsem,jpunt,cwk,setPage,tok,perfil,rol,goToItem}){
     </div>}
 
     {/* KPI Detalle expandido */}
-    {kpiAbierto!==null&&kpiData&&(()=>{
-      const gastos=kpiData.gastos||[];const kpiLabels=["Facturación proyectada","Ya cobrado","Pendiente de cobro","Gastos reales","Beneficio estimado","Comisión gestor"];
-      const renderDetalle=(idx)=>{
-        if(idx===0)return<div>
-          <div style={{display:"flex",justifyContent:"space-around",marginBottom:12}}>
-            <div style={{textAlign:"center"}}><div style={{fontSize:10,color:T.ink3,textTransform:"uppercase",letterSpacing:.5,fontWeight:600}}>Eventos</div><div style={{fontSize:20,fontWeight:700,color:T.terracotta,letterSpacing:-.5}}>{fmtE(kpiData.fE)}</div><div style={{fontSize:11,color:T.ink3}}>{(kpiData.reservas||[]).filter(r=>r.estado!=="cancelada").length} reservas</div></div>
-            <div style={{textAlign:"center"}}><div style={{fontSize:10,color:T.ink3,textTransform:"uppercase",letterSpacing:.5,fontWeight:600}}>Airbnb</div><div style={{fontSize:20,fontWeight:700,color:T.softBlue,letterSpacing:-.5}}>{fmtE(kpiData.fA)}</div><div style={{fontSize:11,color:T.ink3}}>{airbnbs.length} reservas</div></div>
-          </div>
-          <MiniBarChart data={Array.from({length:12},(_,i)=>{const m=[...(kpiData.reservas||[]),...airbnbs].filter(r=>{const f=new Date((r.fecha||r.fecha_entrada)+"T12:00:00");return f.getFullYear()===anio&&f.getMonth()===i&&r.estado!=="cancelada";});return{l:["E","F","M","A","M","J","J","A","S","O","N","D"][i],v:m.reduce((s,r)=>s+getPrecioReserva(r),0)};})} color={T.olive}/>
-        </div>;
-        if(idx===1)return<div>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:14}}>
-            {[{l:"Señas cobradas",v:fmtE(reservas.filter(r=>r.seña_cobrada).reduce((s,r)=>s+(parseFloat(r.seña_importe)||0),0)),c:T.gold},{l:"Pagos totales",v:fmtE(reservas.filter(r=>r.estado_pago==="pagado_completo").reduce((s,r)=>s+getPrecioReserva(r),0)),c:T.olive},{l:"Airbnb cobrado",v:fmtE(airbnbs.filter(a=>a.cobrado).reduce((s,a)=>s+getPrecioReserva(a),0)),c:T.softBlue}].map((it,i)=><div key={i} style={{background:T.bg,borderRadius:12,padding:"10px 8px",textAlign:"center"}}><div style={{fontSize:9,color:T.ink3,textTransform:"uppercase",letterSpacing:.5,fontWeight:600,marginBottom:4}}>{it.l}</div><div style={{fontSize:15,fontWeight:700,color:it.c,letterSpacing:-.3}}>{it.v}</div></div>)}
-          </div>
-          <div style={{fontSize:11,fontWeight:600,color:T.ink3,textTransform:"uppercase",letterSpacing:.5,marginBottom:8}}>Pendientes de cobro</div>
-          {reservas.filter(r=>!["cancelada","finalizada"].includes(r.estado)&&r.estado_pago!=="pagado_completo").slice(0,4).map(r=>{const p=getPrecioReserva(r)-(parseFloat(r.seña_cobrada?r.seña_importe||0:0));const d=Math.ceil((new Date(r.fecha+"T12:00:00")-new Date())/(864e5));const uc=d<30?"#D9443A":d<90?T.gold:T.success;
-            return<div key={r.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderBottom:`1px solid ${T.line}`}}><div><div style={{fontSize:13,fontWeight:600,color:T.ink}}>{r.nombre}</div><div style={{fontSize:11,color:T.ink3}}>{new Date(r.fecha+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"})}</div></div><div style={{textAlign:"right"}}><div style={{fontSize:13,fontWeight:700,color:uc}}>{fmtE(p)}</div><div style={{fontSize:10,color:uc}}>{d<0?"Vencido":d===0?"Hoy":d<30?"<30d":"OK"}</div></div></div>;})}
-        </div>;
-        if(idx===2)return<div>
-          {reservas.filter(r=>!["cancelada","finalizada"].includes(r.estado)&&r.estado_pago!=="pagado_completo").length===0?<div style={{color:T.ink3,fontSize:13,textAlign:"center",padding:"12px 0"}}>✅ Sin cobros pendientes</div>
-          :reservas.filter(r=>!["cancelada","finalizada"].includes(r.estado)&&r.estado_pago!=="pagado_completo").sort((a,b)=>new Date(a.fecha)-new Date(b.fecha)).map(r=>{const p=getPrecioReserva(r)-(parseFloat(r.seña_cobrada?r.seña_importe||0:0));const d=Math.ceil((new Date(r.fecha+"T12:00:00")-new Date())/(864e5));const uc=d<30?"#D9443A":d<90?T.gold:T.success;
-            return<div key={r.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderBottom:`1px solid ${T.line}`}}><span style={{width:8,height:8,borderRadius:999,background:uc,flexShrink:0}}/><div style={{flex:1}}><div style={{fontSize:13,fontWeight:600,color:T.ink}}>{r.nombre}</div><div style={{fontSize:11,color:T.ink3}}>{r.seña_cobrada?"Falta saldo":"Sin seña"} · {new Date(r.fecha+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"})}</div></div><div style={{fontSize:13,fontWeight:700,color:uc}}>{fmtE(p)}</div></div>;})}
-        </div>;
-        if(idx===3){const porCat={};gastos.forEach(g=>{porCat[g.categoria]=(porCat[g.categoria]||0)+(parseFloat(g.importe)||0);});const totalG=Object.values(porCat).reduce((s,v)=>s+v,0)||1;const cats=Object.entries(porCat).sort((a,b)=>b[1]-a[1]);const catCol={personal:T.lavender,comision:T.terracotta,consumibles:T.olive,suministros:T.softBlue,mantenimiento:T.gold,otros:T.ink4};
-          return<div>{cats.map(([cat,val],i)=><div key={i} style={{marginBottom:10}}><div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span style={{fontSize:12,fontWeight:600,color:T.ink,textTransform:"capitalize"}}>{cat}</span><span style={{fontSize:12,fontWeight:700,color:T.ink}}>{fmtE(val)}</span></div><div style={{height:6,background:T.bg,borderRadius:999}}><div style={{height:6,borderRadius:999,background:catCol[cat]||T.ink3,width:Math.round(val/totalG*100)+"%"}}/></div></div>)}
-            <div style={{marginTop:12,paddingTop:12,borderTop:`1px solid ${T.line}`}}><div style={{fontSize:11,fontWeight:600,color:T.ink3,textTransform:"uppercase",letterSpacing:.5,marginBottom:8}}>Últimos gastos</div>
-              {[...gastos].sort((a,b)=>new Date(b.fecha)-new Date(a.fecha)).slice(0,4).map(g=><div key={g.id} style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:`1px solid ${T.line}`}}><div><div style={{fontSize:12,fontWeight:600,color:T.ink}}>{g.concepto}</div><div style={{fontSize:10,color:T.ink3}}>{new Date(g.fecha+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"})}</div></div><div style={{fontSize:12,fontWeight:700,color:T.ink}}>{fmtE(g.importe)}</div></div>)}
-            </div></div>;}
-        if(idx===4){const tC=kpiData.yaCobrado;const tG=kpiData.gastosReales;const ben=tC-tG;const mar=tC>0?Math.round(ben/tC*100):0;
-          return<div>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:14}}>{[{l:"Cobrado",v:fmtE(tC),c:T.olive},{l:"Gastos",v:fmtE(tG),c:"#D9443A"},{l:"Beneficio",v:fmtE(ben),c:T.terracotta}].map((it,i)=><div key={i} style={{background:T.bg,borderRadius:12,padding:"10px 8px",textAlign:"center"}}><div style={{fontSize:9,color:T.ink3,textTransform:"uppercase",letterSpacing:.5,fontWeight:600,marginBottom:4}}>{it.l}</div><div style={{fontSize:15,fontWeight:700,color:it.c,letterSpacing:-.3}}>{it.v}</div></div>)}</div>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 14px",background:T.bg,borderRadius:12,marginBottom:10}}><span style={{fontSize:13,fontWeight:600,color:T.ink}}>Margen actual</span><span style={{fontSize:16,fontWeight:700,color:mar>50?T.success:mar>30?T.gold:"#D9443A"}}>{mar}%</span></div>
-            <MiniBarChart data={Array.from({length:12},(_,i)=>{const m=(kpiData.reservas||[]).filter(r=>{const f=new Date(r.fecha+"T12:00:00");return f.getFullYear()===anio&&f.getMonth()===i&&r.estado!=="cancelada";});const gm=gastos.filter(g=>{const f=new Date(g.fecha+"T12:00:00");return f.getFullYear()===anio&&f.getMonth()===i;});return{l:["E","F","M","A","M","J","J","A","S","O","N","D"][i],v:Math.max(0,m.reduce((s,r)=>s+getPrecioReserva(r),0)-gm.reduce((s,g)=>s+(parseFloat(g.importe)||0),0))};})} color={T.lavender}/>
-          </div>;}
-        if(idx===5){const comPct=kpiData.comPct;const base=kpiData.facturacion;const comTotal=base*comPct/100;const yaReg=gastos.filter(g=>g.categoria==="comision").reduce((s,g)=>s+(parseFloat(g.importe)||0),0);
-          return<div>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>{[{l:"Base cálculo",v:fmtE(base),c:T.ink},{l:`Comisión ${comPct}%`,v:fmtE(comTotal),c:T.terracotta},{l:"Ya registrada",v:fmtE(yaReg),c:T.olive},{l:"Pendiente",v:fmtE(Math.max(0,comTotal-yaReg)),c:T.gold}].map((it,i)=><div key={i} style={{background:T.bg,borderRadius:12,padding:"10px 8px",textAlign:"center"}}><div style={{fontSize:9,color:T.ink3,textTransform:"uppercase",letterSpacing:.5,fontWeight:600,marginBottom:4}}>{it.l}</div><div style={{fontSize:15,fontWeight:700,color:it.c,letterSpacing:-.3}}>{it.v}</div></div>)}</div>
-            <div style={{fontSize:11,fontWeight:600,color:T.ink3,textTransform:"uppercase",letterSpacing:.5,marginBottom:8}}>Por reserva</div>
-            {reservas.filter(r=>r.estado!=="cancelada").slice(0,5).map(r=><div key={r.id} style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:`1px solid ${T.line}`}}><div style={{fontSize:12,fontWeight:600,color:T.ink}}>{r.nombre}</div><div style={{fontSize:12,fontWeight:700,color:T.terracotta}}>{fmtE(getPrecioReserva(r)*comPct/100)}</div></div>)}
-          </div>;}
-        return null;
-      };
-      return<div style={{margin:"0 20px 16px",background:T.surface,borderRadius:20,border:`1px solid ${T.line}`,padding:16,boxShadow:"0 8px 28px rgba(40,30,20,.10)"}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
-          <div style={{fontSize:13,fontWeight:700,color:T.ink,letterSpacing:-.2,textTransform:"uppercase"}}>{kpiLabels[kpiAbierto]}</div>
-          <button onClick={()=>setKpiAbierto(null)} style={{width:28,height:28,borderRadius:999,background:T.bg,border:0,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}><FmIcon name="x" size={14} stroke={T.ink3}/></button>
-        </div>
-        {renderDetalle(kpiAbierto)}
-      </div>;
-    })()}
-
-    {/* 5. Evolución chart con línea beneficio */}
-    {kpiData&&mesesData.length>0&&<div style={{padding:"0 20px 18px"}}>
-      <FmCard pad={16} radius={20}>
-        <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:14}}>
-          <div>
-            <div style={{fontSize:11,color:T.ink3,letterSpacing:.8,textTransform:"uppercase",fontWeight:700}}>Evolución {new Date().getFullYear()}</div>
-            <div style={{fontSize:22,fontWeight:700,color:T.ink,letterSpacing:-.5,marginTop:4}}>{fmtE(kpiData.yaCobrado)}</div>
-          </div>
-          <div style={{display:"flex",background:T.bg,borderRadius:999,padding:3,gap:2}}>
-            {["mensual","semanal"].map(k=><button key={k} onClick={()=>setRangeEvol(k)} style={{padding:"7px 12px",borderRadius:999,border:0,background:rangeEvol===k?T.ink:"transparent",color:rangeEvol===k?"#fff":T.ink3,fontSize:11,fontWeight:700,cursor:"pointer",textTransform:"capitalize",fontFamily:T.sans}}>{k}</button>)}
-          </div>
-        </div>
-        <div style={{position:"relative",height:150}}>
-          <div style={{display:"flex",alignItems:"flex-end",gap:4,height:150,padding:"0 2px"}}>
-            {mesesData.map((d,i)=>{const rh=Math.max(2,(d.facturacion/maxBar)*150);const ph=Math.max(2,(d.proj/maxBar)*150);const esActual=d.esActual;
-              return <div key={i} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"flex-end",height:150}}>
-                <div style={{position:"relative",width:"100%",height:ph,display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
-                  {d.fut&&<div style={{position:"absolute",left:"50%",transform:"translateX(-50%)",bottom:0,width:"70%",height:ph,border:`1.5px dashed ${T.ink3}`,borderRadius:6,background:"transparent"}}/>}
-                  {!d.fut&&<div style={{position:"relative",zIndex:1,width:"70%",height:rh,background:esActual?T.terracotta:T.olive,borderRadius:6}}/>}
-                </div>
-              </div>;})}
-          </div>
-          {/* Benefit line overlay */}
-          <svg style={{position:"absolute",top:0,left:0,width:"100%",height:150,pointerEvents:"none"}} viewBox={`0 0 ${mesesData.length*100} 150`} preserveAspectRatio="none">
-            <polyline fill="none" stroke={T.lavender} strokeWidth="3" strokeLinejoin="round" strokeLinecap="round"
-              points={mesesData.map((d,i)=>`${i*100+50},${150-Math.max(2,(d.ben/maxBar)*150)}`).join(" ")}/>
-          </svg>
-        </div>
-        <div style={{display:"flex",gap:4,marginTop:6}}>{mesesData.map((d,i)=><div key={i} style={{flex:1,textAlign:"center",fontSize:9,color:T.ink3,fontWeight:600}}>{d.l}</div>)}</div>
-        <div style={{display:"flex",gap:14,marginTop:14,paddingTop:12,borderTop:`1px solid ${T.line}`,flexWrap:"wrap"}}>
-          {[{color:T.olive,label:"Real"},{color:"transparent",border:T.ink3,label:"Proyectado"},{color:T.terracotta,label:"Mes actual"},{color:T.lavender,label:"Beneficio"}].map((l,i)=><div key={i} style={{display:"flex",alignItems:"center",gap:6}}><div style={{width:10,height:10,borderRadius:3,background:l.color,border:l.border?`1.5px dashed ${l.border}`:"0"}}/><span style={{fontSize:11,color:T.ink2,fontWeight:500}}>{l.label}</span></div>)}
-        </div>
-      </FmCard>
+    {kpiAbierto!==null&&kpiData&&<div style={{margin:"0 20px 16px",background:T.surface,borderRadius:20,border:`1px solid ${T.line}`,padding:16,boxShadow:"0 8px 28px rgba(40,30,20,.10)"}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+        <div style={{fontSize:13,fontWeight:700,color:T.ink,letterSpacing:-.2,textTransform:"uppercase"}}>{["Facturación proyectada","Ya cobrado","Pendiente de cobro","Gastos reales","Beneficio estimado","Comisión gestor"][kpiAbierto]}</div>
+        <button onClick={()=>setKpiAbierto(null)} style={{width:28,height:28,borderRadius:999,background:T.bg,border:0,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}><FmIcon name="x" size={14} stroke={T.ink3}/></button>
+      </div>
+      {renderKpiDetalle(kpiAbierto)}
     </div>}
+
+    {/* 5. Evolución chart */}
+    {kpiData&&mesesData.length>0&&<div style={{padding:"0 20px 18px"}}><FmCard pad={16} radius={20}>{renderEvolucion()}</FmCard></div>}
 
     {/* 6. Donut ingresos */}
-    {kpiData&&<div style={{padding:"0 20px 18px"}}>
-      <FmCard pad={16} radius={20}>
-        <FmSH title="Ingresos por fuente"/>
-        <div style={{display:"flex",alignItems:"center",gap:20}}>
-          <svg width={120} height={120} viewBox="0 0 120 120">
-            <circle cx={cx} cy={cy} r={donutR} fill="none" stroke={T.softBlue} strokeWidth={16}/>
-            {pctEv>0&&<circle cx={cx} cy={cy} r={donutR} fill="none" stroke={T.terracotta} strokeWidth={16}
-              strokeDasharray={`${pctEv/100*2*Math.PI*donutR} ${2*Math.PI*donutR}`}
-              strokeDashoffset={2*Math.PI*donutR*0.25} strokeLinecap="round"/>}
-            <circle cx={cx} cy={cy} r={donutR2} fill={T.surface}/>
-            <text x={cx} y={cy-4} textAnchor="middle" style={{fontSize:18,fontWeight:700,fill:T.ink}}>—</text>
-            <text x={cx} y={cy+12} textAnchor="middle" style={{fontSize:9,fill:T.ink3,fontWeight:500}}>vs 2025</text>
-          </svg>
-          <div style={{flex:1}}>
-            {[{color:T.terracotta,label:"Eventos",value:fmtE(totalEv),pct:pctEv},{color:T.softBlue,label:"Airbnb",value:fmtE(totalAb),pct:pctAb}].map((s,i)=><div key={i} style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
-              <div style={{width:10,height:10,borderRadius:3,background:s.color,flexShrink:0}}/>
-              <div style={{flex:1}}><div style={{fontSize:12,fontWeight:600,color:T.ink}}>{s.label} <span style={{color:T.ink3,fontWeight:500}}>{s.pct}%</span></div><div style={{fontSize:14,fontWeight:700,color:T.ink,marginTop:2}}>{s.value}</div></div>
-            </div>)}
-            <div style={{fontSize:11,color:T.ink3,marginTop:4}}>Crecimiento vs {new Date().getFullYear()-1}: —</div>
-          </div>
-        </div>
-      </FmCard>
-    </div>}
+    {kpiData&&<div style={{padding:"0 20px 18px"}}><FmCard pad={16} radius={20}>{renderDonut()}</FmCard></div>}
 
     {/* 7. Tareas pendientes */}
     {tareasPend.length>0&&<div style={{padding:"0 20px 18px"}}>
