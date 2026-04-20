@@ -1772,6 +1772,44 @@ function TareasBlockDesktop({tareas,setPage,goToItem,tok}){const hoy=new Date().
 function ContactosBlockDesktop({contactos,setPage}){const colors=[T.lavender,T.olive,T.softBlue,T.coral];return<div><div style={{display:"flex",alignItems:"baseline",justifyContent:"space-between",marginBottom:14}}><div style={{fontSize:13,fontWeight:700,color:T.ink,textTransform:"uppercase",letterSpacing:.4}}>Contactos destacados</div><div onClick={()=>setPage("contactos")} style={{fontSize:12,color:T.ink3,fontWeight:600,cursor:"pointer"}}>Todos →</div></div><div style={{background:T.surface,borderRadius:20,border:`1px solid ${T.line}`,overflow:"hidden"}}>{contactos.map((c,i)=>{const color=colors[i%colors.length];const ini=c.nombre?.split(" ").map(p=>p[0]).slice(0,2).join("").toUpperCase()||"??";return<div key={c.id} onClick={()=>setPage("contactos")} style={{display:"flex",alignItems:"center",gap:14,padding:"14px 16px",borderBottom:i<contactos.length-1?`1px solid ${T.line}`:"none",cursor:"pointer"}}><div style={{width:44,height:44,borderRadius:12,background:color,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:14,color:T.ink,flexShrink:0}}>{ini}</div><div style={{flex:1,minWidth:0}}><div style={{fontSize:14,fontWeight:700,color:T.ink,letterSpacing:-.2}}>{c.nombre}</div><div style={{fontSize:11,color:T.ink3,fontWeight:500,marginTop:1}}>{c.tipo_evento||"Contacto"} · {c.estado}</div></div>{c.telefono&&<button onClick={e=>{e.stopPropagation();window.open("tel:"+c.telefono);}} style={{width:34,height:34,borderRadius:999,background:T.bg,border:0,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}><FmIcon name="phone" size={14} stroke={T.ink} sw={2}/></button>}<button style={{width:34,height:34,borderRadius:999,background:T.ink,border:0,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}><FmIcon name="chevR" size={14} stroke="#fff" sw={2.2}/></button></div>;})}
     {contactos.length===0&&<div style={{padding:"16px",color:T.ink3,fontSize:13,textAlign:"center"}}>Sin contactos</div>}</div></div>;}
 
+// ─── RESERVAS HELPERS ─────────────────────────────────────────────────────────
+function RvKpiBlock({bg,title,sub}){return<div style={{background:bg,borderRadius:16,padding:"12px 12px 14px",color:T.ink}}><div style={{fontSize:22,fontWeight:700,letterSpacing:-.6,lineHeight:1}}>{title}</div><div style={{fontSize:10.5,fontWeight:600,marginTop:4,opacity:.8}}>{sub}</div></div>;}
+function RvDesgloseRow({label,value,color}){return<div style={{display:"flex",alignItems:"center",gap:10,padding:"5px 0"}}><div style={{width:4,height:14,borderRadius:2,background:color,flexShrink:0}}/><div style={{flex:1,fontSize:13,color:T.ink}}>{label}</div><div style={{fontSize:14,fontWeight:700,color:T.ink}}>{typeof value==="number"?(Math.round(value)).toLocaleString("es-ES")+"€":value}</div></div>;}
+function RvTag({bg,ink,children}){return<span style={{fontSize:9,padding:"2px 7px",borderRadius:999,background:bg,color:ink,fontWeight:700,letterSpacing:.3,textTransform:"uppercase",fontFamily:T.sans}}>{children}</span>;}
+const rvStatusMeta=label=>({"Pagado":{bg:"#DCE8BC",ink:"#4D6B1F",dot:"#7E9B3E"},"Seña OK":{bg:"#F8DCC4",ink:"#8F4A1C",dot:"#EC683E"},"Cancelada":{bg:"#F5E0DE",ink:"#9B3C33",dot:"#D9443A"},"Finalizada":{bg:"#EEEAE3",ink:"#7A766F",dot:"#BFB9AE"},"Confirmada":{bg:"#FBF3C7",ink:"#7A6B15",dot:"#ECD227"},"Visita":{bg:"#E9F0FC",ink:"#2B4B80",dot:"#7FB2FF"},"Cobrado":{bg:"#DCE8BC",ink:"#4D6B1F",dot:"#7E9B3E"},"Pendiente":{bg:"#FBDCDC",ink:"#9B3C33",dot:"#F35757"}}[label]||{bg:"#E9F0FC",ink:"#2B4B80",dot:"#7FB2FF"});
+const rvStatusLabel=r=>r.estado_pago==="pagado_completo"?"Pagado":r.seña_cobrada?"Seña OK":r.estado==="cancelada"?"Cancelada":r.estado==="finalizada"?"Finalizada":r.estado==="confirmada"?"Confirmada":"Visita";
+function RvStatusPill({r,size}){const l=r.cobrado!==undefined?(r.cobrado?"Cobrado":"Pendiente"):rvStatusLabel(r);const m=rvStatusMeta(l);const h=size==="md"?26:22;return<span style={{display:"inline-flex",alignItems:"center",gap:5,height:h,padding:"0 9px",borderRadius:999,background:m.bg,color:m.ink,fontSize:size==="md"?11.5:10.5,fontWeight:700,fontFamily:T.sans,whiteSpace:"nowrap"}}><span style={{width:5,height:5,borderRadius:999,background:m.dot}}/>{l}</span>;}
+
+function RvEventRow({r,onOpen,faded,cancel}){const total=getPrecioReserva(r);const pagado=parseFloat(r.seña_cobrada?r.seña_importe||0:0);const pct=total>0?Math.round(pagado/total*100):0;const fecha=r.fecha?new Date(r.fecha+"T12:00:00"):null;const dia=fecha?fecha.getDate():"—";const mes=fecha?fecha.toLocaleDateString("es-ES",{month:"short"}).toUpperCase():"—";const hasHouse=r.incluye_casa;const fE=v=>(Math.round(parseFloat(v)||0)).toLocaleString("es-ES")+"€";
+  return<div onClick={onOpen} style={{background:T.surface,border:`1px solid ${T.line}`,borderRadius:18,padding:14,marginBottom:10,cursor:"pointer",opacity:faded?.7:1}}>
+    <div style={{display:"flex",gap:12}}>
+      <div style={{width:54,minWidth:54,textAlign:"center",padding:"8px 0",background:hasHouse?T.terracotta:T.gold,borderRadius:13,color:T.ink}}><div style={{fontSize:9,fontWeight:700,letterSpacing:.6,opacity:.85}}>{mes}</div><div style={{fontSize:22,fontWeight:700,letterSpacing:-.7,lineHeight:1}}>{dia}</div></div>
+      <div style={{flex:1,minWidth:0}}>
+        <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4,flexWrap:"wrap"}}><span style={{fontSize:10,color:T.ink3,fontWeight:700,letterSpacing:.3}}>#{r.id?.slice(-6)}</span>{hasHouse&&<RvTag bg={T.terracotta+"30"} ink={T.ink}>+ Casa</RvTag>}</div>
+        <div style={{fontSize:15.5,fontWeight:700,color:T.ink,letterSpacing:-.35,lineHeight:1.2,marginBottom:6,textDecoration:cancel?"line-through":"none"}}>{r.nombre}</div>
+        <div style={{display:"flex",gap:10,fontSize:11,color:T.ink3,fontWeight:500,marginBottom:cancel?0:8}}><span>Finca {fE(r.precio_finca||r.precio||0)}</span>{parseFloat(r.precio_casa||0)>0&&<span>Casa {fE(r.precio_casa)}</span>}</div>
+        {!cancel&&total>0&&<div style={{display:"flex",alignItems:"center",gap:8}}><div style={{flex:1,height:6,background:T.bg,borderRadius:999,overflow:"hidden"}}><div style={{width:pct+"%",height:"100%",background:pct===100?T.olive:pct>0?T.gold:T.coral}}/></div><div style={{fontSize:11,fontWeight:700,color:T.ink,letterSpacing:-.2}}>{fE(pagado)}<span style={{color:T.ink3,fontWeight:500}}>/{fE(total)}</span></div></div>}
+        <div style={{marginTop:6}}><RvStatusPill r={r}/></div>
+      </div>
+    </div>
+  </div>;}
+
+function RvBnbRow({r,onOpen}){const dias=r.fecha_entrada&&r.fecha_salida?Math.ceil((new Date(r.fecha_salida+"T12:00:00")-new Date(r.fecha_entrada+"T12:00:00"))/(864e5)):0;const fE=v=>(Math.round(parseFloat(v)||0)).toLocaleString("es-ES")+"€";
+  return<div onClick={onOpen} style={{background:T.surface,border:`1px solid ${T.line}`,borderRadius:18,padding:14,marginBottom:10,cursor:"pointer"}}>
+    <div style={{display:"flex",gap:12}}>
+      <div style={{width:54,minWidth:54,padding:"10px 6px",background:T.softBlue,borderRadius:13,color:T.ink,display:"flex",flexDirection:"column",alignItems:"center"}}><FmIcon name="home" size={17} stroke={T.ink} sw={2}/><div style={{fontSize:11,fontWeight:700,marginTop:4,letterSpacing:-.2}}>{dias}n</div></div>
+      <div style={{flex:1,minWidth:0}}>
+        <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}><span style={{fontSize:10,color:T.ink3,fontWeight:700,letterSpacing:.3}}>Airbnb</span></div>
+        <div style={{fontSize:15.5,fontWeight:700,color:T.ink,letterSpacing:-.35,lineHeight:1.2,marginBottom:4}}>{r.huesped}</div>
+        <div style={{fontSize:11,color:T.ink3,fontWeight:500,marginBottom:8}}>{r.fecha_entrada?new Date(r.fecha_entrada+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"}):"—"} → {r.fecha_salida?new Date(r.fecha_salida+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"}):"—"} · {dias} noche{dias!==1?"s":""}</div>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}><div style={{fontSize:15.5,fontWeight:700,color:T.ink,letterSpacing:-.35}}>{fE(getPrecioReserva(r))}</div><RvStatusPill r={r}/></div>
+      </div>
+    </div>
+  </div>;}
+
+function buildRvCalCells(year,month){const dias=new Date(year,month,0).getDate();const pD=(new Date(year,month-1,1).getDay()+6)%7;const c=[];for(let i=0;i<pD;i++)c.push(null);for(let d=1;d<=dias;d++)c.push(d);while(c.length%7!==0)c.push(null);return c;}
+function buildRvCalMap(reservas,airbnbs,year,month){const map={};reservas.filter(r=>r.estado!=="cancelada"&&r.fecha).forEach(r=>{const f=new Date(r.fecha+"T12:00:00");if(f.getFullYear()===year&&f.getMonth()===month){const d=f.getDate();map[d]={kind:"event",color:r.incluye_casa?T.terracotta:T.gold,label:r.nombre,ref:r};if(r.incluye_casa){if(d>1&&!map[d-1])map[d-1]={kind:"block",color:T.terracotta+"60"};if(d<31&&!map[d+1])map[d+1]={kind:"block",color:T.terracotta+"60"};}}});airbnbs.forEach(a=>{if(!a.fecha_entrada||!a.fecha_salida)return;const d=new Date(a.fecha_entrada+"T12:00:00");const fin=new Date(a.fecha_salida+"T12:00:00");while(d<fin){if(d.getFullYear()===year&&d.getMonth()===month){const dia=d.getDate();if(!map[dia])map[dia]={kind:"bnb",color:T.softBlue,label:a.huesped?.split(" ")[0],ref:a};}d.setDate(d.getDate()+1);}});return map;}
+
 function MiniBarChart({data,color}){const max=Math.max(...data.map(d=>d.v),1);const h=60;return<div><div style={{display:"flex",alignItems:"flex-end",gap:3,height:h}}>{data.map((d,i)=><div key={i} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"flex-end",height:h}}><div style={{width:"100%",height:Math.max(2,d.v/max*h),background:d.v>0?color:T.line,borderRadius:3}}/></div>)}</div><div style={{display:"flex",gap:3,marginTop:4}}>{data.map((d,i)=><div key={i} style={{flex:1,textAlign:"center",fontSize:8,color:T.ink3,fontWeight:600}}>{d.l}</div>)}</div></div>;}
 
 function DashA({reservas,jsem,jpunt,cwk,setPage,tok,perfil,rol,goToItem}){
@@ -6101,69 +6139,28 @@ function Reservas({tok,rol,perfil,navTarget,setNavTarget,setPage}){
   return <>
     {/* Header */}
     <div style={{padding:"54px 20px 16px",display:"flex",alignItems:"flex-end",justifyContent:"space-between",gap:10}}>
-      <div><div style={{fontSize:12,color:T.ink3,fontWeight:500,marginBottom:2}}>Eventos · {new Date().getFullYear()}</div><div style={{fontSize:30,fontWeight:700,color:T.ink,letterSpacing:-1,lineHeight:1.02}}>Reservas</div></div>
+      <div><div style={{fontSize:12,color:T.ink3,fontWeight:500}}>Eventos & Airbnb · {new Date().getFullYear()}</div><div style={{fontSize:30,fontWeight:700,color:T.ink,letterSpacing:-1,lineHeight:1.02}}>Reservas</div></div>
       <div style={{display:"flex",gap:6}}>
-        <button onClick={()=>setPage?.("calendario")} style={{width:40,height:40,borderRadius:999,background:T.surface,border:`1px solid ${T.line}`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}><FmIcon name="calendar" size={17} stroke={T.ink2}/></button>
-        {isA&&<button onClick={()=>setShowTipoRes(true)} style={{width:40,height:40,borderRadius:999,background:T.terracotta,border:0,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",boxShadow:"0 6px 14px rgba(236,104,62,.3)"}}><FmIcon name="plus" size={18} stroke="white"/></button>}
+        <button onClick={()=>setPage?.("calendario")} style={{width:40,height:40,borderRadius:999,background:T.surface,border:`1px solid ${T.line}`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}><FmIcon name="calendar" size={17} stroke={T.ink}/></button>
+        {isA&&<button onClick={()=>setShowTipoRes(true)} style={{width:40,height:40,borderRadius:999,background:T.ink,border:0,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}><FmIcon name="plus" size={17} stroke="#fff" sw={2.4}/></button>}
       </div>
     </div>
-    {/* Summary */}
-    <div style={{padding:"0 20px 14px",display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
-      {[{l:"Total año",v:reservas.filter(r=>r.estado!=="cancelada").length+airbnbs.length,c:T.ink},{l:"Confirmadas",v:activas.length,c:T.olive},{l:"Facturación",v:fmtE([...reservas,...airbnbs].reduce((s,r)=>s+getPrecioReserva(r),0)),c:T.terracotta}].map((s,i)=><div key={i} style={{background:T.surface,borderRadius:16,padding:10,border:`1px solid ${T.line}`}}><div style={{fontSize:9,color:T.ink3,letterSpacing:.5,textTransform:"uppercase",fontWeight:500}}>{s.l}</div><div style={{fontSize:s.l==="Facturación"?16:20,color:s.c,fontWeight:700,lineHeight:1.1,marginTop:2}}>{s.v}</div></div>)}
+    {/* KPI strip */}
+    <div style={{padding:"0 20px 18px",display:"grid",gridTemplateColumns:"1.1fr 1fr 1fr",gap:8}}>
+      <RvKpiBlock bg={T.olive} title={activas.length+airbnbs.length} sub="Reservas activas"/>
+      <RvKpiBlock bg={T.gold} title={`${reservas.filter(r=>!["cancelada","finalizada","visita"].includes(r.estado)).length}/${activas.length}`} sub="Confirmadas"/>
+      <RvKpiBlock bg={T.terracotta} title={fmtE([...reservas,...airbnbs].reduce((s,r)=>s+getPrecioReserva(r),0))} sub="Facturación"/>
     </div>
     {/* Tabs */}
-    <div style={{padding:"0 20px 12px",display:"flex",gap:6}}>
-      {[{k:"activas",l:"Eventos",n:activas.length},{k:"airbnb",l:"Airbnb",n:airbnbs.length},{k:"finalizadas",l:"Final.",n:finalizadas.length},{k:"canceladas",l:"Cancel.",n:canceladas.length}].map(t=>{const on=tabR===t.k;return<button key={t.k} onClick={()=>{setTabR(t.k);setSel(null);setSelAb(null);}} style={{flex:1,height:34,borderRadius:12,border:`1px solid ${on?T.ink:T.line}`,background:on?T.ink:T.surface,color:on?"white":T.ink2,fontFamily:T.sans,fontSize:11,fontWeight:600,cursor:"pointer"}}>{t.l} <span style={{opacity:.6}}>({t.n})</span></button>;})}
-    </div>
-    <div className="pb" style={{paddingTop:0}}>
-      {/* Eventos list */}
-      {tabR!=="airbnb"&&<div style={{display:"flex",flexDirection:"column",gap:10}}>
-        {lista.length===0?<div style={{textAlign:"center",padding:"40px 20px",color:T.ink3,fontSize:13}}>Sin reservas en esta categoría</div>
-        :lista.map(r=>{const epago=r.estado_pago==="pagado_completo"?{l:"Pagada",c:T.olive}:r.seña_cobrada?{l:"Seña OK",c:T.olive}:{l:"Saldo pdte",c:T.gold};
-          return<div key={r.id} onClick={()=>abrirReserva(r)} style={{background:T.surface,borderRadius:20,padding:14,border:`1px solid ${T.line}`,cursor:"pointer"}}>
-            <div style={{display:"flex",alignItems:"flex-start",gap:12}}>
-              <div style={{width:4,borderRadius:2,background:tabR==="canceladas"?T.ink3:tabR==="finalizadas"?T.olive:T.terracotta,alignSelf:"stretch",flexShrink:0}}/>
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",gap:8}}>
-                  <span style={{fontSize:10,color:T.ink3,letterSpacing:.5,fontWeight:500}}>#{r.id?.slice(-6)}</span>
-                  <span style={{display:"inline-flex",alignItems:"center",gap:4,height:22,padding:"0 9px",borderRadius:999,background:epago.c+"22",color:epago.c,fontSize:11,fontWeight:600,whiteSpace:"nowrap"}}><span style={{width:5,height:5,borderRadius:999,background:epago.c}}/>{epago.l}</span>
-                </div>
-                <div style={{fontSize:17,color:T.ink,letterSpacing:-.3,marginTop:2,fontWeight:700,lineHeight:1.2}}>{r.nombre}</div>
-                <div style={{display:"flex",alignItems:"center",gap:8,marginTop:6,fontSize:11,color:T.ink3}}>
-                  <FmIcon name="calendar" size={12} stroke={T.ink3}/><span style={{color:T.ink2,fontWeight:500}}>{new Date(r.fecha+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"long"})}</span>
-                  {r.incluye_casa&&<><span style={{color:T.ink4}}>·</span><span>Finca + casa</span></>}
-                </div>
-                <div style={{height:1,background:T.line,margin:"10px 0"}}/>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline"}}>
-                  <div style={{fontSize:10,color:T.ink3}}><span>Finca {fmtE(r.precio_finca||r.precio||0)}</span>{parseFloat(r.precio_casa||0)>0&&<span style={{color:T.ink4}}> · Casa {fmtE(r.precio_casa)}</span>}</div>
-                  <span style={{fontSize:18,fontWeight:700,color:T.ink,letterSpacing:-.4}}>{fmtE(getPrecioReserva(r))}</span>
-                </div>
-              </div>
-            </div>
-          </div>;})}
-      </div>}
-      {/* Airbnb list */}
-      {tabR==="airbnb"&&<div style={{display:"flex",flexDirection:"column",gap:10}}>
-        {airbnbs.length===0?<div style={{textAlign:"center",padding:"40px 20px",color:T.ink3,fontSize:13}}>Sin reservas Airbnb</div>
-        :airbnbs.map(a=>{const dias=Math.ceil((new Date(a.fecha_salida+"T12:00:00")-new Date(a.fecha_entrada+"T12:00:00"))/(864e5));
-          return<div key={a.id} onClick={()=>setSelAb(a)} style={{background:T.surface,borderRadius:20,padding:14,border:`1px solid ${T.line}`,cursor:"pointer"}}>
-            <div style={{display:"flex",alignItems:"flex-start",gap:12}}>
-              <div style={{width:4,borderRadius:2,background:"#D9443A",alignSelf:"stretch",flexShrink:0}}/>
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",gap:8}}>
-                  <span style={{fontSize:10,color:T.ink3,letterSpacing:.5,fontWeight:500}}>Airbnb</span>
-                  <span style={{display:"inline-flex",alignItems:"center",gap:4,height:22,padding:"0 9px",borderRadius:999,background:a.cobrado?T.olive+"22":T.gold+"22",color:a.cobrado?"#5A8A3E":"#9B8324",fontSize:11,fontWeight:600}}><span style={{width:5,height:5,borderRadius:999,background:a.cobrado?T.olive:T.gold}}/>{a.cobrado?"Cobrado":"Pendiente"}</span>
-                </div>
-                <div style={{fontSize:17,color:T.ink,letterSpacing:-.3,marginTop:2,fontWeight:700}}>{a.huesped}</div>
-                <div style={{display:"flex",alignItems:"center",gap:8,marginTop:6,fontSize:11,color:T.ink3}}>
-                  <FmIcon name="calendar" size={12} stroke={T.ink3}/><span style={{color:T.ink2,fontWeight:500}}>{new Date(a.fecha_entrada+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"})} → {new Date(a.fecha_salida+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"})}</span><span style={{color:T.ink4}}>·</span><span>{dias} noche{dias!==1?"s":""}</span>
-                </div>
-                <div style={{height:1,background:T.line,margin:"10px 0"}}/>
-                <div style={{display:"flex",justifyContent:"flex-end"}}><span style={{fontSize:18,fontWeight:700,color:T.ink,letterSpacing:-.4}}>{fmtE(getPrecioReserva(a))}</span></div>
-              </div>
-            </div>
-          </div>;})}
-      </div>}
+    <div style={{padding:"0 20px 14px"}}><div style={{display:"flex",background:T.surface,borderRadius:999,padding:4,border:`1px solid ${T.line}`,gap:2}}>
+      {[{k:"activas",l:"Eventos",c:activas.length},{k:"airbnb",l:"Airbnb",c:airbnbs.length},{k:"finalizadas",l:"Final.",c:finalizadas.length},{k:"canceladas",l:"Cancel.",c:canceladas.length}].map(t=><button key={t.k} onClick={()=>{setTabR(t.k);setSel(null);setSelAb(null);}} style={{flex:1,whiteSpace:"nowrap",padding:"9px 8px",borderRadius:999,border:0,background:tabR===t.k?T.ink:"transparent",color:tabR===t.k?"#fff":T.ink2,fontFamily:T.sans,fontSize:11,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5}}>{t.l}<span style={{fontSize:9.5,padding:"1px 5px",borderRadius:999,background:tabR===t.k?"rgba(255,255,255,.22)":T.bg,color:tabR===t.k?"#fff":T.ink3}}>{t.c}</span></button>)}
+    </div></div>
+    {/* Lista */}
+    <div style={{padding:"0 20px"}}>
+      {tabR==="activas"&&(lista.length===0?<div style={{textAlign:"center",padding:"40px 0",color:T.ink3}}>Sin reservas activas</div>:lista.map(r=><RvEventRow key={r.id} r={r} onOpen={()=>abrirReserva(r)}/>))}
+      {tabR==="airbnb"&&(airbnbs.length===0?<div style={{textAlign:"center",padding:"40px 0",color:T.ink3}}>Sin reservas Airbnb</div>:airbnbs.map(a=><RvBnbRow key={a.id} r={a} onOpen={()=>setSelAb(a)}/>))}
+      {tabR==="finalizadas"&&finalizadas.map(r=><RvEventRow key={r.id} r={r} faded onOpen={()=>abrirReserva(r)}/>)}
+      {tabR==="canceladas"&&canceladas.map(r=><RvEventRow key={r.id} r={r} cancel onOpen={()=>abrirReserva(r)}/>)}
       {/* Detail panel — keep existing */}
       <div className="g2" style={{alignItems:"flex-start",display:sel&&tabR!=="airbnb"?"grid":"none"}}>
         <div style={{display:"none"}}></div>
