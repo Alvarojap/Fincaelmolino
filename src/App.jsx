@@ -4022,39 +4022,42 @@ function Limpieza({perfil,tok,rol}){
       {srvFilt.length===0&&<div style={{textAlign:"center",padding:"40px 0",color:T.ink3,fontSize:13}}>Sin servicios en esta categoría</div>}
     </div>
 
-    <div className="pb" style={{paddingTop:16}}>
-      <div className="g2" style={{alignItems:"flex-start"}}>
-        <div style={{display:"none"}}></div>
-
-        {/* DETALLE SERVICIO */}
-        {srv&&<div>
-          {/* Banner verificado */}
-          {yaVerif&&<div style={{background:srv.verificado_ok?T.olive+"14":T.gold+"14",border:`1px solid ${srv.verificado_ok?T.olive+"44":T.gold+"44"}`,borderRadius:16,padding:"12px 16px",marginBottom:14,display:"flex",alignItems:"center",gap:10}}>
-            <div style={{width:28,height:28,borderRadius:999,background:srv.verificado_ok?T.olive:T.gold,display:"flex",alignItems:"center",justifyContent:"center"}}><FmIcon name={srv.verificado_ok?"check":"warn"} size={14} stroke="white" sw={2.5}/></div>
-            <div>
-              <div style={{fontSize:13,fontWeight:700,color:srv.verificado_ok?"#4A7A2E":"#8A6B0F"}}>{srv.verificado_ok?"Servicio verificado":"Cerrado con incidencias"}</div>
-              {srv.verificado_nota&&<div style={{fontSize:11,color:T.ink3,marginTop:2}}>{srv.verificado_nota}</div>}
-            </div>
-          </div>}
-
-          {/* Cabecera servicio */}
-          <div style={{background:T.surface,border:`1px solid ${T.line}`,borderRadius:16,padding:14,marginBottom:12}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8}}>
-              <div style={{minWidth:0}}>
-                <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}>
-                  <OpsStatePill estado={srv.estado||(srv.verificado?"completado":"en_curso")}/>
-                  {srv.limpiadora_nombre&&<div style={{display:"flex",alignItems:"center",gap:4}}><OpsAvatar name={srv.limpiadora_nombre} size={18}/><span style={{fontSize:11,color:T.ink3,fontWeight:600}}>{srv.limpiadora_nombre}</span></div>}
-                </div>
-                <div style={{fontSize:18,fontWeight:700,color:T.ink,letterSpacing:-.3}}>{srv.nombre}</div>
-                <div style={{fontSize:11,color:T.ink3,marginTop:4,display:"flex",alignItems:"center",gap:4}}><FmIcon name="calendar" size={11} stroke={T.ink3}/>{new Date(srv.fecha).toLocaleDateString("es-ES",{day:"numeric",month:"long"})} · {comp}/{tot} tareas</div>
-                {parseFloat(srv.coste_calculado)>0&&<div style={{fontSize:14,fontWeight:700,color:T.terracotta,marginTop:6}}>{parseFloat(srv.coste_calculado).toLocaleString("es-ES")}€</div>}
-              </div>
-              {isA&&<div style={{display:"flex",gap:6,flexShrink:0}}>
-                <button onClick={()=>setShowEx(true)} style={{height:32,padding:"0 12px",borderRadius:999,background:T.ink,color:"#fff",border:0,fontFamily:T.sans,fontSize:11,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:4}}><FmIcon name="plus" size={12} stroke="#fff"/>Extra</button>
-                <button onClick={async()=>{if(!window.confirm(`¿Eliminar "${srv.nombre}"?`))return;await sbDelete("servicio_tareas",`servicio_id=eq.${srv.id}`,tok);await sbDelete("servicios",`id=eq.${srv.id}`,tok);setActId(null);setTareas([]);await loadSrvs();}} style={{width:32,height:32,borderRadius:999,background:"#FEF2F2",border:"1px solid #FECACA",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}><FmIcon name="x" size={14} stroke="#D9443A"/></button>
-              </div>}
-            </div>
+    {/* DETALLE SERVICIO — pantalla completa */}
+    {srv&&<div style={{position:"fixed",inset:0,background:T.bg,zIndex:30,overflow:"auto",paddingBottom:40,fontFamily:T.sans}}>
+      {/* Header nav */}
+      <div style={{padding:"54px 20px 14px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <button onClick={()=>setActId(null)} style={{width:36,height:36,borderRadius:999,background:T.surface,border:`1px solid ${T.line}`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}><FmIcon name="chevL" size={16} stroke={T.ink}/></button>
+        <div style={{fontSize:11,color:T.ink3,letterSpacing:1,textTransform:"uppercase",fontWeight:600}}>{srv.id?.toString().slice(-6)||srv.id}</div>
+        <div style={{display:"flex",gap:6}}>
+          {isA&&<button onClick={()=>setShowEx(true)} style={{height:32,padding:"0 12px",borderRadius:999,background:T.ink,color:"#fff",border:0,fontFamily:T.sans,fontSize:11,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:4}}><FmIcon name="plus" size={12} stroke="#fff"/>Extra</button>}
+          {isA&&<button onClick={async()=>{if(!window.confirm(`¿Eliminar "${srv.nombre}"?`))return;await sbDelete("servicio_tareas",`servicio_id=eq.${srv.id}`,tok);await sbDelete("servicios",`id=eq.${srv.id}`,tok);setActId(null);setTareas([]);await loadSrvs();}} style={{width:32,height:32,borderRadius:999,background:"#FEF2F2",border:"1px solid #FECACA",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}><FmIcon name="x" size={14} stroke="#D9443A"/></button>}
+        </div>
+      </div>
+      {/* Título + estado */}
+      <div style={{padding:"0 20px 14px"}}>
+        <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8,flexWrap:"wrap"}}>
+          <OpsStatePill estado={srv.estado||(srv.verificado?"completado":"en_curso")}/>
+          {srv.limpiadora_nombre&&<div style={{display:"flex",alignItems:"center",gap:4}}><OpsAvatar name={srv.limpiadora_nombre} size={18}/><span style={{fontSize:11,color:T.ink3,fontWeight:600}}>{srv.limpiadora_nombre}</span></div>}
+        </div>
+        <div style={{fontSize:28,fontWeight:700,color:T.ink,letterSpacing:-.8,lineHeight:1.05}}>{srv.nombre}</div>
+        <div style={{fontSize:11,color:T.ink3,marginTop:4,display:"flex",alignItems:"center",gap:4}}><FmIcon name="calendar" size={11} stroke={T.ink3}/>{new Date(srv.fecha).toLocaleDateString("es-ES",{day:"numeric",month:"long"})} · {comp}/{tot} tareas</div>
+      </div>
+      {/* Coste — bloque terracotta */}
+      {parseFloat(srv.coste_calculado)>0&&<div style={{padding:"0 20px 14px"}}>
+        <div style={{background:T.terracotta,borderRadius:20,padding:16,color:T.ink}}>
+          <div style={{display:"flex",alignItems:"flex-end",justifyContent:"space-between",gap:10}}>
+            <div><div style={{fontSize:10,color:"rgba(30,20,10,.65)",letterSpacing:1,textTransform:"uppercase",fontWeight:700}}>Total calculado</div><div style={{fontSize:40,fontWeight:700,letterSpacing:-1.5,lineHeight:1,marginTop:6}}>{parseFloat(srv.coste_calculado).toLocaleString("es-ES")}€</div></div>
+            <div style={{textAlign:"right",fontSize:11,color:"rgba(30,20,10,.75)",lineHeight:1.6}}>{srv.modalidad_pago==="horas"?<><div><b>{srv.horas_trabajadas||0}h</b> × {srv.tarifa_hora||0}€</div><div style={{opacity:.7}}>por horas</div></>:<div>Precio fijo</div>}</div>
           </div>
+        </div>
+      </div>}
+      {/* Banner verificado */}
+      {yaVerif&&<div style={{padding:"0 20px 14px"}}><div style={{background:srv.verificado_ok?T.olive+"14":T.gold+"14",border:`1px solid ${srv.verificado_ok?T.olive+"44":T.gold+"44"}`,borderRadius:16,padding:"12px 16px",display:"flex",alignItems:"center",gap:10}}>
+        <div style={{width:28,height:28,borderRadius:999,background:srv.verificado_ok?T.olive:T.gold,display:"flex",alignItems:"center",justifyContent:"center"}}><FmIcon name={srv.verificado_ok?"check":"warn"} size={14} stroke="white" sw={2.5}/></div>
+        <div><div style={{fontSize:13,fontWeight:700,color:srv.verificado_ok?"#4A7A2E":"#8A6B0F"}}>{srv.verificado_ok?"Servicio verificado":"Cerrado con incidencias"}</div>{srv.verificado_nota&&<div style={{fontSize:11,color:T.ink3,marginTop:2}}>{srv.verificado_nota}</div>}</div>
+      </div></div>}
+      {/* Contenido del checklist — mantener toda la lógica existente */}
+      <div style={{padding:"0 20px"}}>
 
           {/* Hora inicio — limpiadora */}
           {isL&&!yaVerif&&<>
@@ -4180,9 +4183,8 @@ function Limpieza({perfil,tok,rol}){
               </div>
             ))}
           </>}
-        </div>}
-      </div>
-    </div>
+        </div>
+    </div>}
 
     {/* MODAL NUEVO SERVICIO */}
     {showNew&&<div className="ov" onClick={()=>setShowNew(false)}>
