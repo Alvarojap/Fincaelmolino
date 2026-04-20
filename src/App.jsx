@@ -1793,15 +1793,19 @@ function DashA({reservas,jsem,jpunt,cwk,setPage,tok,perfil,rol}){
   const angEv=pctEv/100*360;const rad=Math.PI/180;
   const arcEv=angEv>0?`M${cx+donutR} ${cy} A${donutR} ${donutR} 0 ${angEv>180?1:0} 1 ${cx+donutR*Math.cos((angEv-90)*rad)} ${cy+donutR*Math.sin((angEv-90)*rad)}`:"";
 
-  // Evolution data with benefit line
-  const mesesData=kpiData?Array.from({length:12},(_,i)=>{
-    const mr=[...(kpiData.reservas||[]),...(kpiData.airbnbs||[])].filter(r=>{const f=new Date((r.fecha||r.fecha_entrada)+"T12:00:00");return f.getMonth()===i;});
-    const real=mr.reduce((s,r)=>s+getPrecioReserva(r),0);
-    const gm=(kpiData.gastos||[]).filter(g=>new Date(g.fecha+"T12:00:00").getMonth()===i).reduce((s,g)=>s+(parseFloat(g.importe)||0),0);
-    const ben=i>new Date().getMonth()?0:real-(gm||real*.35);
-    return{l:["E","F","M","A","M","J","J","A","S","O","N","D"][i],real:i>new Date().getMonth()?0:real,proj:real||0,fut:i>new Date().getMonth(),ben:Math.max(0,ben)};
+  // Evolution data with benefit line — datos reales agrupados por mes
+  const anio=new Date().getFullYear();const mesActual=new Date().getMonth();
+  const mesesData=kpiData?Array.from({length:12},(_,mes)=>{
+    const reservasMes=(kpiData.reservas||[]).filter(r=>{const f=new Date(r.fecha+"T12:00:00");return f.getFullYear()===anio&&f.getMonth()===mes&&r.estado!=="cancelada";});
+    const airbnbMes=(kpiData.airbnbs||[]).filter(a=>{const f=new Date(a.fecha_entrada+"T12:00:00");return f.getFullYear()===anio&&f.getMonth()===mes;});
+    const gastosMes=(kpiData.gastos||[]).filter(g=>{const f=new Date(g.fecha+"T12:00:00");return f.getFullYear()===anio&&f.getMonth()===mes;});
+    const facturacion=[...reservasMes,...airbnbMes].reduce((s,r)=>s+getPrecioReserva(r),0);
+    const gastosTotal=gastosMes.reduce((s,g)=>s+(parseFloat(g.importe)||0),0);
+    const beneficio=facturacion-gastosTotal;
+    const esFuturo=mes>mesActual;
+    return{l:["E","F","M","A","M","J","J","A","S","O","N","D"][mes],facturacion:esFuturo?0:facturacion,proj:facturacion,gastos:esFuturo?0:gastosTotal,ben:esFuturo?0:Math.max(0,beneficio),fut:esFuturo,esActual:mes===mesActual};
   }):[];
-  const maxBar=Math.max(...mesesData.map(x=>Math.max(x.real,x.proj)),1)*1.1;
+  const maxBar=Math.max(...mesesData.map(x=>Math.max(x.facturacion,x.proj)),1)*1.1;
 
   // Próximo evento (solo 1)
   const proximoEvento=reservas.filter(r=>r.estado!=="cancelada"&&r.fecha>=hoyS).sort((a,b)=>a.fecha.localeCompare(b.fecha))[0];
@@ -1880,7 +1884,7 @@ function DashA({reservas,jsem,jpunt,cwk,setPage,tok,perfil,rol}){
         </div>
         <div style={{position:"relative",height:150}}>
           <div style={{display:"flex",alignItems:"flex-end",gap:4,height:150,padding:"0 2px"}}>
-            {mesesData.map((d,i)=>{const rh=Math.max(2,(d.real/maxBar)*150);const ph=Math.max(2,(d.proj/maxBar)*150);const esActual=i===new Date().getMonth();
+            {mesesData.map((d,i)=>{const rh=Math.max(2,(d.facturacion/maxBar)*150);const ph=Math.max(2,(d.proj/maxBar)*150);const esActual=d.esActual;
               return <div key={i} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"flex-end",height:150}}>
                 <div style={{position:"relative",width:"100%",height:ph,display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
                   {d.fut&&<div style={{position:"absolute",left:"50%",transform:"translateX(-50%)",bottom:0,width:"70%",height:ph,border:`1.5px dashed ${T.ink3}`,borderRadius:6,background:"transparent"}}/>}
