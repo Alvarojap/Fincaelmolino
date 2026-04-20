@@ -2817,50 +2817,77 @@ function DashL({perfil,setPage,tok}){
     const adms=await sbGet("usuarios","?rol=eq.admin&select=id",tok).catch(()=>[]);
     for(const a of adms)await sbPost("notificaciones",{para:a.id,txt:`🔑 ${perfil.nombre} solicita limpiar el día del checkin (${c.fecha_checkin_siguiente})`},tok).catch(()=>{});
     setCoordP(prev=>prev.filter(x=>x.id!==c.id));}catch(_){}setSavingC(false);};
-  return <>
-    <div style={{padding:"28px 32px 16px"}}><div style={{fontSize:12,color:T.ink3,fontWeight:500}}>{new Date().toLocaleDateString("es-ES",{weekday:"long",day:"numeric",month:"long"})}</div><div style={{fontSize:28,fontWeight:700,color:T.ink,letterSpacing:-.8,lineHeight:1.02,marginTop:2}}>Hola, {perfil.nombre.split(" ")[0]} 🧹</div></div>
-    <div className="pb">
-      {coordP.map(c=>{
-        const t=perfil?.es_operario?SB_KEY:tok;
-        const fechaFmt=c.fecha_checkin_siguiente?new Date(c.fecha_checkin_siguiente+"T12:00:00").toLocaleDateString("es-ES",{weekday:"long",day:"numeric",month:"long"}):"—";
-        const diasH=c.fecha_checkin_siguiente?Math.ceil((new Date(c.fecha_checkin_siguiente+"T12:00:00")-new Date())/(86400000)):0;
-        // preguntando_si_lista → ask if ready
-        if(c.estado==="preguntando_si_lista") return <div key={c.id} className="card" style={{marginBottom:16,border:"2px solid #EC683E",background:"rgba(236,104,62,.04)"}}>
-          <div style={{fontSize:14,fontWeight:800,color:"#EC683E",marginBottom:8}}>🏠 ¿Está la casa lista?</div>
-          <div style={{fontSize:13,color:"#1A1A1A",marginBottom:12}}>Reserva el {fechaFmt} — en {diasH} día{diasH!==1?"s":""}</div>
-          <div style={{display:"flex",gap:8}}>
-            <button className="btn bp" style={{flex:1,justifyContent:"center"}} disabled={savingC} onClick={async()=>{setSavingC(true);try{await sbPatch("coordinacion_servicios",`id=eq.${c.id}`,{estado:"casa_lista_confirmada",respondido_por:perfil.nombre},t);const adms=await sbGet("usuarios","?rol=eq.admin&select=id",t).catch(()=>[]);for(const a of adms)await sbPost("notificaciones",{para:a.id,txt:`✅ ${perfil.nombre} confirma: casa lista para el ${fechaFmt}`},t).catch(()=>{});setCoordP(prev=>prev.filter(x=>x.id!==c.id));}catch(_){}setSavingC(false);}}>{savingC?<div className="spin" style={{width:16,height:16,borderWidth:2}}/>:"✅ Sí, está lista"}</button>
-            <button className="btn br" style={{flex:1,justifyContent:"center"}} disabled={savingC} onClick={async()=>{setSavingC(true);try{const[srv]=await sbPost("servicios",{nombre:`Limpieza pre-reserva — ${fechaFmt}`,fecha:new Date().toISOString().split("T")[0],creado_por:perfil.nombre},t);for(const zona of LIMP_ZONAS){const ts=[...(zona.tareas||[]),...(zona.subzonas?zona.subzonas.flatMap(s=>s.tareas):[])];for(const ta of ts)await sbPost("servicio_tareas",{servicio_id:srv.id,tarea_id:ta.id,zona:zona.nombre,es_extra:false,done:false},t).catch(()=>{});}await sbPatch("coordinacion_servicios",`id=eq.${c.id}`,{estado:"servicio_creado_pendiente_fecha",servicio_id:srv.id},t);setCoordP(prev=>prev.map(x=>x.id===c.id?{...x,estado:"servicio_creado_pendiente_fecha",servicio_id:srv.id}:x));}catch(_){}setSavingC(false);}}>❌ No, necesita limpieza</button>
-          </div>
-        </div>;
-        // servicio_creado_pendiente_fecha → pick day
-        const dias=getDias(c.ventana_inicio||new Date().toISOString(),c.ventana_fin||new Date(Date.now()+3*86400000).toISOString());
-        return <div key={c.id} className="card" style={{marginBottom:16,border:"2px solid #EC683E",background:"rgba(236,104,62,.04)"}}>
-          <div style={{fontSize:14,fontWeight:800,color:"#EC683E",marginBottom:8}}>⚠️ Elige día de limpieza</div>
-          <div style={{fontSize:13,color:"#1A1A1A",marginBottom:4}}>Reserva el {fechaFmt}</div>
-          <div style={{fontSize:12,color:"#8A8580",marginBottom:10}}>📅 Ventana: {c.ventana_inicio?new Date(c.ventana_inicio).toLocaleDateString("es-ES",{day:"numeric",month:"short"}):"hoy"} — {c.ventana_fin?new Date(c.ventana_fin).toLocaleDateString("es-ES",{day:"numeric",month:"short"}):"—"}</div>
-          <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:12}}>
-            {dias.map(d=><button key={d.toISOString()} className="btn bg" style={{padding:"10px 14px",fontSize:13,fontWeight:600}} onClick={()=>confirmarFecha(c,d)} disabled={savingC}>{d.toLocaleDateString("es-ES",{weekday:"short",day:"numeric"})}</button>)}
-          </div>
-          <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-            <button className="btn bg sm" onClick={()=>{setShowDatePick(c);setCustomDate("");}}>📅 Otra fecha</button>
-            {c.fecha_checkin_siguiente&&<button className="btn bg sm" onClick={()=>pedirPermiso(c)} disabled={savingC}>🔑 Pedir permiso día checkin</button>}
-          </div>
-        </div>;
-      })}
-      {showDatePick&&<div className="ov" onClick={()=>setShowDatePick(null)}><div className="modal" style={{maxWidth:360}} onClick={e=>e.stopPropagation()}>
-        <h3>📅 Elegir fecha</h3>
-        <div className="fg"><label>Fecha</label><input type="date" className="fi" value={customDate} onChange={e=>setCustomDate(e.target.value)}/></div>
-        <div className="mft"><button className="btn bg" onClick={()=>setShowDatePick(null)}>Cancelar</button><button className="btn bp" disabled={!customDate||savingC} onClick={()=>{confirmarFecha(showDatePick,new Date(customDate+"T12:00:00"));setShowDatePick(null);}}>{savingC?"…":"Confirmar"}</button></div>
-      </div></div>}
-      <div className="g2">
-        {[{ico:"🧹",t:"Mi servicio",s:"Checklist limpieza",id:"limpieza"},{ico:"📅",t:"Calendario",s:"Próximos eventos",id:"cal-limp"}].map(it=>(
-          <button key={it.id} className="card" style={{cursor:"pointer",textAlign:"left"}} onClick={()=>setPage(it.id)}>
-            <div style={{fontSize:28,marginBottom:8}}>{it.ico}</div><div style={{fontSize:14,fontWeight:600,color:"#1A1A1A"}}>{it.t}</div><div style={{fontSize:12,color:"#8A8580",marginTop:3}}>{it.s}</div>
-          </button>))}
-      </div>
+  return <div style={{background:T.bg,fontFamily:T.sans,paddingBottom:80,minHeight:"100%"}}>
+    {/* Greeting */}
+    <div style={{padding:"54px 20px 16px"}}>
+      <div style={{fontSize:12,color:T.ink3,fontWeight:500}}>{new Date().toLocaleDateString("es-ES",{weekday:"long",day:"numeric",month:"long"}).replace(/^\w/,c=>c.toUpperCase())}</div>
+      <div style={{fontSize:28,fontWeight:700,color:T.ink,letterSpacing:-.8,lineHeight:1.02,marginTop:2}}>Hola, {perfil.nombre.split(" ")[0]} 👋</div>
     </div>
-  </>;
+
+    {/* Coordinaciones */}
+    {coordP.map(c=>{
+      const t=perfil?.es_operario?SB_KEY:tok;
+      const fechaFmt=c.fecha_checkin_siguiente?new Date(c.fecha_checkin_siguiente+"T12:00:00").toLocaleDateString("es-ES",{weekday:"long",day:"numeric",month:"long"}):"—";
+      const diasH=c.fecha_checkin_siguiente?Math.ceil((new Date(c.fecha_checkin_siguiente+"T12:00:00")-new Date())/(86400000)):0;
+
+      if(c.estado==="preguntando_si_lista")return<div key={c.id} style={{padding:"0 20px 10px"}}>
+        <div style={{background:T.terracotta,borderRadius:20,padding:16,color:T.ink}}>
+          <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8}}><div style={{width:8,height:8,borderRadius:999,background:T.ink}}/><span style={{fontSize:10,fontWeight:700,letterSpacing:1,textTransform:"uppercase"}}>Acción requerida</span></div>
+          <div style={{fontSize:18,fontWeight:700,letterSpacing:-.4,lineHeight:1.2}}>¿Está la casa lista?</div>
+          <div style={{fontSize:12,color:"rgba(20,10,5,.7)",marginTop:4}}>Reserva el {fechaFmt} — en {diasH} día{diasH!==1?"s":""}</div>
+          <div style={{display:"flex",gap:8,marginTop:12}}>
+            <button disabled={savingC} onClick={async()=>{setSavingC(true);try{await sbPatch("coordinacion_servicios",`id=eq.${c.id}`,{estado:"casa_lista_confirmada",respondido_por:perfil.nombre},t);const adms=await sbGet("usuarios","?rol=eq.admin&select=id",t).catch(()=>[]);for(const a of adms)await sbPost("notificaciones",{para:a.id,txt:`✅ ${perfil.nombre} confirma: casa lista para el ${fechaFmt}`},t).catch(()=>{});setCoordP(prev=>prev.filter(x=>x.id!==c.id));}catch(_){}setSavingC(false);}} style={{flex:1,padding:"12px 0",borderRadius:14,background:T.ink,color:"white",border:0,fontFamily:T.sans,fontSize:13,fontWeight:700,cursor:"pointer"}}>{savingC?"…":"✓ Sí, está lista"}</button>
+            <button disabled={savingC} onClick={async()=>{setSavingC(true);try{const[srv]=await sbPost("servicios",{nombre:`Limpieza pre-reserva — ${fechaFmt}`,fecha:new Date().toISOString().split("T")[0],creado_por:perfil.nombre},t);for(const zona of LIMP_ZONAS){const ts=[...(zona.tareas||[]),...(zona.subzonas?zona.subzonas.flatMap(s=>s.tareas):[])];for(const ta of ts)await sbPost("servicio_tareas",{servicio_id:srv.id,tarea_id:ta.id,zona:zona.nombre,es_extra:false,done:false},t).catch(()=>{});}await sbPatch("coordinacion_servicios",`id=eq.${c.id}`,{estado:"servicio_creado_pendiente_fecha",servicio_id:srv.id},t);setCoordP(prev=>prev.map(x=>x.id===c.id?{...x,estado:"servicio_creado_pendiente_fecha",servicio_id:srv.id}:x));}catch(_){}setSavingC(false);}} style={{flex:1,padding:"12px 0",borderRadius:14,background:"white",color:T.ink,border:0,fontFamily:T.sans,fontSize:13,fontWeight:700,cursor:"pointer"}}>✗ Falta limpiar</button>
+          </div>
+        </div>
+      </div>;
+
+      const dias=getDias(c.ventana_inicio||new Date().toISOString(),c.ventana_fin||new Date(Date.now()+3*86400000).toISOString());
+      return<div key={c.id} style={{padding:"0 20px 10px"}}>
+        <div style={{background:T.gold,borderRadius:20,padding:16,color:T.ink}}>
+          <div style={{fontSize:10,fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginBottom:6}}>Elige día</div>
+          <div style={{fontSize:16,fontWeight:700,letterSpacing:-.3,lineHeight:1.25}}>Limpieza antes de reserva</div>
+          <div style={{fontSize:12,color:"rgba(30,25,5,.72)",marginTop:4}}>Reserva el {fechaFmt}</div>
+          <div style={{display:"grid",gridTemplateColumns:`repeat(${Math.min(dias.length,3)},1fr)`,gap:6,marginTop:12}}>
+            {dias.slice(0,3).map((d,i)=><button key={d.toISOString()} onClick={()=>confirmarFecha(c,d)} disabled={savingC} style={{padding:"10px 0",borderRadius:14,background:i===0?T.ink:"rgba(255,255,255,.6)",color:i===0?"white":T.ink,border:0,cursor:"pointer",fontFamily:T.sans}}>
+              <div style={{fontSize:10,fontWeight:600,opacity:.7}}>{d.toLocaleDateString("es-ES",{weekday:"short"})}</div>
+              <div style={{fontSize:20,fontWeight:700,letterSpacing:-.5,marginTop:2}}>{d.getDate()}</div>
+              {i===0&&<div style={{fontSize:9,marginTop:2,opacity:.8}}>recomendado</div>}
+            </button>)}
+          </div>
+          <div style={{display:"flex",gap:8,marginTop:10,flexWrap:"wrap"}}>
+            <button onClick={()=>{setShowDatePick(c);setCustomDate("");}} style={{background:"transparent",border:0,color:T.ink,fontFamily:T.sans,fontSize:12,fontWeight:600,cursor:"pointer",textDecoration:"underline",padding:4}}>📅 Otra fecha</button>
+            {c.fecha_checkin_siguiente&&<button onClick={()=>pedirPermiso(c)} disabled={savingC} style={{background:"transparent",border:0,color:T.ink,fontFamily:T.sans,fontSize:12,fontWeight:600,cursor:"pointer",textDecoration:"underline",padding:4}}>🔑 Pedir permiso día checkin</button>}
+          </div>
+        </div>
+      </div>;
+    })}
+
+    {/* Modal fecha custom */}
+    {showDatePick&&<div className="ov" onClick={()=>setShowDatePick(null)}><div className="modal" style={{maxWidth:360}} onClick={e=>e.stopPropagation()}>
+      <h3>📅 Elegir fecha</h3>
+      <div className="fg"><label>Fecha</label><input type="date" className="fi" value={customDate} onChange={e=>setCustomDate(e.target.value)}/></div>
+      <div className="mft"><button className="btn bg" onClick={()=>setShowDatePick(null)}>Cancelar</button><button className="btn bp" disabled={!customDate||savingC} onClick={()=>{confirmarFecha(showDatePick,new Date(customDate+"T12:00:00"));setShowDatePick(null);}}>{savingC?"…":"Confirmar"}</button></div>
+    </div></div>}
+
+    {/* Sin pendientes */}
+    {coordP.length===0&&<div style={{padding:"0 20px 14px"}}>
+      <div style={{background:T.surface,borderRadius:20,padding:20,border:`1px solid ${T.line}`,textAlign:"center"}}>
+        <div style={{fontSize:32,marginBottom:8}}>✅</div>
+        <div style={{fontSize:16,fontWeight:700,color:T.ink}}>Todo al día</div>
+        <div style={{fontSize:13,color:T.ink3,marginTop:4}}>No tienes coordinaciones pendientes</div>
+      </div>
+    </div>}
+
+    {/* Accesos rápidos */}
+    <div style={{padding:"0 20px 14px",display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+      {[{icon:"broom",t:"Mi servicio",s:"Checklist limpieza",id:"limpieza"},{icon:"calendar",t:"Calendario",s:"Próximos eventos",id:"cal-limp"}].map(it=><button key={it.id} onClick={()=>setPage(it.id)} style={{background:T.surface,border:`1px solid ${T.line}`,borderRadius:16,padding:16,cursor:"pointer",textAlign:"left",fontFamily:T.sans}}>
+        <div style={{width:36,height:36,borderRadius:10,background:T.lavender+"30",display:"flex",alignItems:"center",justifyContent:"center",marginBottom:8}}><FmIcon name={it.icon} size={18} stroke={T.ink}/></div>
+        <div style={{fontSize:14,fontWeight:700,color:T.ink}}>{it.t}</div>
+        <div style={{fontSize:11,color:T.ink3,marginTop:3}}>{it.s}</div>
+      </button>)}
+    </div>
+  </div>;
 }
 function DashC({perfil,reservas,setPage}){
   const pend=reservas.filter(r=>r.estado==="visita"||r.estado==="pendiente_contrato").length;
