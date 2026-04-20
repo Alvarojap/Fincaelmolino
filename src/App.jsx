@@ -1772,6 +1772,13 @@ function TareasBlockDesktop({tareas,setPage,goToItem,tok}){const hoy=new Date().
 function ContactosBlockDesktop({contactos,setPage}){const colors=[T.lavender,T.olive,T.softBlue,T.coral];return<div><div style={{display:"flex",alignItems:"baseline",justifyContent:"space-between",marginBottom:14}}><div style={{fontSize:13,fontWeight:700,color:T.ink,textTransform:"uppercase",letterSpacing:.4}}>Contactos destacados</div><div onClick={()=>setPage("contactos")} style={{fontSize:12,color:T.ink3,fontWeight:600,cursor:"pointer"}}>Todos →</div></div><div style={{background:T.surface,borderRadius:20,border:`1px solid ${T.line}`,overflow:"hidden"}}>{contactos.map((c,i)=>{const color=colors[i%colors.length];const ini=c.nombre?.split(" ").map(p=>p[0]).slice(0,2).join("").toUpperCase()||"??";return<div key={c.id} onClick={()=>setPage("contactos")} style={{display:"flex",alignItems:"center",gap:14,padding:"14px 16px",borderBottom:i<contactos.length-1?`1px solid ${T.line}`:"none",cursor:"pointer"}}><div style={{width:44,height:44,borderRadius:12,background:color,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:14,color:T.ink,flexShrink:0}}>{ini}</div><div style={{flex:1,minWidth:0}}><div style={{fontSize:14,fontWeight:700,color:T.ink,letterSpacing:-.2}}>{c.nombre}</div><div style={{fontSize:11,color:T.ink3,fontWeight:500,marginTop:1}}>{c.tipo_evento||"Contacto"} · {c.estado}</div></div>{c.telefono&&<button onClick={e=>{e.stopPropagation();window.open("tel:"+c.telefono);}} style={{width:34,height:34,borderRadius:999,background:T.bg,border:0,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}><FmIcon name="phone" size={14} stroke={T.ink} sw={2}/></button>}<button style={{width:34,height:34,borderRadius:999,background:T.ink,border:0,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}><FmIcon name="chevR" size={14} stroke="#fff" sw={2.2}/></button></div>;})}
     {contactos.length===0&&<div style={{padding:"16px",color:T.ink3,fontSize:13,textAlign:"center"}}>Sin contactos</div>}</div></div>;}
 
+// ─── OPS HELPERS (Limpieza + Jardinería) ──────────────────────────────────────
+const OPS_SM={pendiente_fecha:{label:"Sin fecha",color:T.gold,bg:T.gold+"22",ink:"#8A6B0F"},fecha_ok:{label:"Fecha OK",color:T.softBlue,bg:T.softBlue+"22",ink:"#2A5BA0"},en_curso:{label:"En curso",color:T.olive,bg:T.olive+"22",ink:"#4A7A2E"},finalizado:{label:"Finalizado",color:T.ink4,bg:T.bg,ink:T.ink3},conflicto:{label:"Conflicto",color:T.danger,bg:T.danger+"18",ink:"#9A2A22"},pendiente:{label:"Sin fecha",color:T.gold,bg:T.gold+"22",ink:"#8A6B0F"},programado:{label:"Fecha OK",color:T.softBlue,bg:T.softBlue+"22",ink:"#2A5BA0"},completado:{label:"Finalizado",color:T.ink4,bg:T.bg,ink:T.ink3},activo:{label:"Activo",color:T.olive,bg:T.olive+"22",ink:"#4A7A2E"}};
+function getOpsMeta(estado){return OPS_SM[estado]||OPS_SM.pendiente;}
+function OpsAvatar({name,size=28,color:c}){const colors=[T.lavender,T.olive,T.softBlue,T.gold,T.terracotta];const cl=c||colors[((name||"X").charCodeAt(0))%colors.length];return<div style={{width:size,height:size,borderRadius:999,background:cl,display:"flex",alignItems:"center",justifyContent:"center",fontSize:size*.4,fontWeight:700,color:T.ink,fontFamily:T.sans,flexShrink:0}}>{(name||"?")[0].toUpperCase()}</div>;}
+function OpsMiniKpi({value,label,color}){return<div style={{background:T.surface,borderRadius:16,padding:"10px 12px",border:`1px solid ${T.line}`}}><div style={{width:22,height:3,background:color,borderRadius:2,marginBottom:6}}/><div style={{fontSize:20,fontWeight:700,color:T.ink,letterSpacing:-.6,lineHeight:1}}>{value}</div><div style={{fontSize:10,color:T.ink3,fontWeight:500,textTransform:"uppercase",letterSpacing:.4,marginTop:4}}>{label}</div></div>;}
+function OpsStatePill({estado}){const m=getOpsMeta(estado);return<span style={{display:"inline-flex",alignItems:"center",gap:4,height:20,padding:"0 8px",borderRadius:999,background:m.bg,color:m.ink,fontSize:10,fontWeight:700}}><span style={{width:5,height:5,borderRadius:999,background:m.color}}/>{m.label}</span>;}
+
 // ─── RESERVAS HELPERS ─────────────────────────────────────────────────────────
 function RvKpiBlock({bg,title,sub}){return<div style={{background:bg,borderRadius:16,padding:"12px 12px 14px",color:T.ink}}><div style={{fontSize:22,fontWeight:700,letterSpacing:-.6,lineHeight:1}}>{title}</div><div style={{fontSize:10.5,fontWeight:600,marginTop:4,opacity:.8}}>{sub}</div></div>;}
 function RvDesgloseRow({label,value,color}){return<div style={{display:"flex",alignItems:"center",gap:10,padding:"5px 0"}}><div style={{width:4,height:14,borderRadius:2,background:color,flexShrink:0}}/><div style={{flex:1,fontSize:13,color:T.ink}}>{label}</div><div style={{fontSize:14,fontWeight:700,color:T.ink}}>{typeof value==="number"?(Math.round(value)).toLocaleString("es-ES")+"€":value}</div></div>;}
@@ -2583,7 +2590,7 @@ function DashJ({perfil,jsem,jpunt,cwk,setPage,tok}){
   const totalAcum=parseFloat(srvActivo?.horas_totales||0);
 
   return <>
-    <div className="ph"><h2>Hola, {perfil.nombre.split(" ")[0]} 👋</h2><p>{new Date().toLocaleDateString("es-ES",{weekday:"long",year:"numeric",month:"long",day:"numeric"})}</p></div>
+    <div style={{padding:"28px 32px 16px"}}><div style={{fontSize:12,color:T.ink3,fontWeight:500}}>{new Date().toLocaleDateString("es-ES",{weekday:"long",day:"numeric",month:"long"})}</div><div style={{fontSize:28,fontWeight:700,color:T.ink,letterSpacing:-.8,lineHeight:1.02,marginTop:2}}>Hola, {perfil.nombre.split(" ")[0]} 🌿</div></div>
     <div className="pb">
       {meteoJ&&<div style={{background:"rgba(127,178,255,.08)",borderRadius:14,padding:"10px 14px",marginBottom:14,fontSize:13,color:"#5A8AD4",fontWeight:500}}>{meteoJ.rain>10?`💧 Lluvia abundante prevista ${meteoJ.day} (${meteoJ.rain}mm) — el riego puede ser innecesario`:`🌧️ Lluvia prevista ${meteoJ.day} (${meteoJ.rain}mm) — considera posponer el riego`}</div>}
       {coordPJ.map(c=>{
@@ -2781,7 +2788,7 @@ function DashL({perfil,setPage,tok}){
     for(const a of adms)await sbPost("notificaciones",{para:a.id,txt:`🔑 ${perfil.nombre} solicita limpiar el día del checkin (${c.fecha_checkin_siguiente})`},tok).catch(()=>{});
     setCoordP(prev=>prev.filter(x=>x.id!==c.id));}catch(_){}setSavingC(false);};
   return <>
-    <div className="ph"><h2>Hola, {perfil.nombre.split(" ")[0]} 🧹</h2><p>{new Date().toLocaleDateString("es-ES",{weekday:"long",year:"numeric",month:"long",day:"numeric"})}</p></div>
+    <div style={{padding:"28px 32px 16px"}}><div style={{fontSize:12,color:T.ink3,fontWeight:500}}>{new Date().toLocaleDateString("es-ES",{weekday:"long",day:"numeric",month:"long"})}</div><div style={{fontSize:28,fontWeight:700,color:T.ink,letterSpacing:-.8,lineHeight:1.02,marginTop:2}}>Hola, {perfil.nombre.split(" ")[0]} 🧹</div></div>
     <div className="pb">
       {coordP.map(c=>{
         const t=perfil?.es_operario?SB_KEY:tok;
@@ -3040,7 +3047,7 @@ function JardinCheck({perfil,tok,rol}){
   })():null;
 
   return <>
-    <div className="ph"><h2>{isA?"Checklist jardín":"Mi checklist"}</h2><p>{TEMPORADA_LBL[temp]} · {comp}/{tot} tareas</p></div>
+    <div style={{padding:"28px 32px 16px"}}><div style={{fontSize:12,color:T.ink3,fontWeight:500}}>{TEMPORADA_LBL[temp]} · {comp}/{tot} tareas</div><div style={{fontSize:28,fontWeight:700,color:T.ink,letterSpacing:-.8,lineHeight:1.02,marginTop:2}}>{isA?"Checklist jardín":"Mi checklist"}</div></div>
     <div className="pb">
       <div className="prog" style={{marginBottom:14,height:7}}><div className="pfill" style={{width:`${tot?(comp/tot)*100:0}%`}}/></div>
       {bannerVerifJsx}
@@ -3264,7 +3271,7 @@ function JardinAdmin({perfil,tok}){
   const srvsHist=srvs.filter(s=>s.estado!=="activo");
 
   return <>
-    <div className="ph"><h2>Gestión Jardín</h2><p>Seguimiento y planificación</p></div>
+    <div style={{padding:"28px 32px 16px"}}><div style={{fontSize:12,color:T.ink3,fontWeight:500}}>Servicios · Planificación</div><div style={{fontSize:28,fontWeight:700,color:T.ink,letterSpacing:-.8,lineHeight:1.02,marginTop:2}}>Jardinería</div></div>
     <div className="pb">
       <div className="tabs">
         <button className={`tab${tab==="semana"?" on":""}`} onClick={()=>setTab("semana")}>Esta semana</button>
@@ -3784,22 +3791,38 @@ function Limpieza({perfil,tok,rol}){
   const yaVerif=srv?.verificado;
 
   return <>
-    <div className="ph"><h2>{isA?"Gestión limpieza":"Mi servicio"}</h2></div>
+    <div style={{padding:"28px 32px 16px"}}><div style={{fontSize:12,color:T.ink3,fontWeight:500}}>Servicios</div><div style={{fontSize:28,fontWeight:700,color:T.ink,letterSpacing:-.8,lineHeight:1.02,marginTop:2}}>{isA?"Limpieza":"Mi servicio"}</div></div>
     <div className="pb">
+      {isA&&<div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:16}}>
+        <OpsMiniKpi value={servicios.length} label="Total" color={T.ink}/>
+        <OpsMiniKpi value={servicios.filter(s=>!["finalizado","completado"].includes(s.estado)).length||servicios.filter(s=>!s.verificado).length} label="Abiertos" color={T.olive}/>
+        <OpsMiniKpi value={(servicios.reduce((t,s)=>t+(parseFloat(s.coste_calculado)||0),0)).toLocaleString("es-ES")+"€"} label="Coste total" color={T.terracotta}/>
+      </div>}
       <div className="g2" style={{alignItems:"flex-start"}}>
         {/* LISTA SERVICIOS */}
         <div>
-          <div className="chdr" style={{marginBottom:12}}>
-            <span className="ctit">Servicios</span>
-            {isA&&<button className="btn bp sm" onClick={()=>setShowNew(true)}>+ Nuevo</button>}
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+            <span style={{fontSize:13,fontWeight:700,color:T.ink}}>Servicios</span>
+            {isA&&<button onClick={()=>setShowNew(true)} style={{height:32,padding:"0 14px",borderRadius:999,background:T.ink,color:"#fff",border:0,fontFamily:T.sans,fontSize:12,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:4}}><FmIcon name="plus" size={13} stroke="#fff"/> Nuevo</button>}
           </div>
           {servicios.map(s=>{
-            const vOk=s.verificado&&s.verificado_ok;
-            const vInc=s.verificado&&!s.verificado_ok;
-            return <div key={s.id} className="card" style={{marginBottom:8,cursor:"pointer",borderColor:actId===s.id?"rgba(201,168,76,.35)":undefined}} onClick={()=>setActId(s.id)}>
-              <div style={{fontSize:13,fontWeight:600,color:"#EC683E",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>🧹 {s.nombre}</div>
-              <div style={{fontSize:11,color:"#8A8580",marginTop:3}}>📅 {new Date(s.fecha).toLocaleDateString("es-ES")}</div>
-              {s.verificado&&<div style={{marginTop:5,fontSize:11,color:vOk?"#10b981":"#f59e0b",fontWeight:600}}>{vOk?"✅ Verificado":"⚠️ Con incidencias"}</div>}
+            const vOk=s.verificado&&s.verificado_ok;const vInc=s.verificado&&!s.verificado_ok;const isOn=actId===s.id;
+            const m=getOpsMeta(s.estado||(s.verificado?"completado":"en_curso"));
+            return <div key={s.id} style={{background:T.surface,border:`1px solid ${isOn?T.ink:T.line}`,borderRadius:16,padding:12,marginBottom:8,cursor:"pointer",display:"flex",gap:10,boxShadow:isOn?"0 4px 12px rgba(40,30,20,.06)":"none"}} onClick={()=>setActId(s.id)}>
+              <div style={{width:4,borderRadius:999,background:m.color,flexShrink:0,alignSelf:"stretch"}}/>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}>
+                  <OpsStatePill estado={s.estado||(s.verificado?"completado":"en_curso")}/>
+                  {vOk&&<span style={{fontSize:10,color:T.olive,fontWeight:700}}>✓ Verificado</span>}
+                  {vInc&&<span style={{fontSize:10,color:T.gold,fontWeight:700}}>⚠ Incidencias</span>}
+                </div>
+                <div style={{fontSize:14,fontWeight:700,color:T.ink,letterSpacing:-.2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{s.nombre}</div>
+                <div style={{display:"flex",alignItems:"center",gap:8,marginTop:4,fontSize:11,color:T.ink3}}>
+                  <FmIcon name="calendar" size={11} stroke={T.ink3}/>{new Date(s.fecha).toLocaleDateString("es-ES",{day:"numeric",month:"short"})}
+                  {s.limpiadora_nombre&&<><span style={{color:T.ink4}}>·</span><OpsAvatar name={s.limpiadora_nombre} size={16}/><span>{s.limpiadora_nombre}</span></>}
+                </div>
+                {parseFloat(s.coste_calculado)>0&&<div style={{fontSize:12,fontWeight:700,color:T.ink,marginTop:4}}>{parseFloat(s.coste_calculado).toLocaleString("es-ES")}€</div>}
+              </div>
             </div>;
           })}
         </div>
@@ -4567,7 +4590,7 @@ function Jardineros({tok,rol}){
 
   if(load)return <div className="loading"><div className="spin"/><span>Cargando…</span></div>;
   return <>
-    <div className="ph"><h2>👷 Jardineros</h2><p>Gestión de jardineros y condiciones</p></div>
+    <div style={{padding:"28px 32px 16px"}}><div style={{fontSize:12,color:T.ink3,fontWeight:500}}>Gestión de jardineros y condiciones</div><div style={{fontSize:28,fontWeight:700,color:T.ink,letterSpacing:-.8,lineHeight:1.02,marginTop:2}}>Jardineros</div></div>
     <div className="pb">
       <div style={{marginBottom:14}}><button className="btn bp" onClick={()=>{setJForm({nombre:"",modalidad:"Fijo mensual",tarifa_mensual:"",tarifa_hora:"",notas:"",pin:"",pinConfirm:""});setShowJForm(true);}}>➕ Nuevo jardinero</button></div>
       {jardineros.length===0?<div className="empty"><span className="ico">🌿</span><p>Sin jardineros registrados</p></div>
