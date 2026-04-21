@@ -9863,7 +9863,7 @@ function Visitas({perfil,tok,rol,setPage,navTarget,setNavTarget}){
           </div>
 
           {/* Fecha */}
-          <div style={{padding:'0 20px 14px'}}>
+          <div style={{padding:'0 20px 10px'}}>
             <div style={{background:T.surface,border:'1px solid '+T.line,borderRadius:20,padding:16,display:'flex',gap:14,alignItems:'center'}}>
               <span style={{width:4,height:48,borderRadius:4,background:T.terracotta,flexShrink:0}}/>
               <span style={{width:44,height:44,borderRadius:14,background:T.terracotta,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
@@ -9878,6 +9878,24 @@ function Visitas({perfil,tok,rol,setPage,navTarget,setNavTarget}){
               </div>
             </div>
           </div>
+
+          {/* Fecha prevista del evento */}
+          {selVisita.fecha_evento_prevista&&(
+            <div style={{padding:'0 20px 14px'}}>
+              <div style={{background:T.surface,border:'1px solid '+T.softBlue+'55',borderRadius:18,padding:12,display:'flex',gap:12,alignItems:'center'}}>
+                <span style={{width:3,height:36,borderRadius:4,background:T.softBlue,flexShrink:0}}/>
+                <span style={{width:36,height:36,borderRadius:12,background:T.softBlue,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                  <FmIcon name="calendar" size={16} stroke={T.ink}/>
+                </span>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:10,color:T.ink3,fontWeight:700,letterSpacing:0.8,textTransform:'uppercase'}}>Fecha prevista del evento</div>
+                  <div style={{fontSize:14.5,fontWeight:800,color:T.ink,letterSpacing:-0.3,marginTop:2}}>
+                    {new Date(selVisita.fecha_evento_prevista+'T12:00:00').toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Notas con autosave */}
           <div style={{padding:'0 20px 14px'}}>
@@ -10053,6 +10071,16 @@ function Visitas({perfil,tok,rol,setPage,navTarget,setNavTarget}){
                     <input type="time" value={formVisita?.hora||'17:00'} onChange={e=>setFormVisita&&setFormVisita(v=>({...v,hora:e.target.value}))} style={{border:0,background:'transparent',outline:'none',fontFamily:T.sans,fontSize:13,color:T.ink,fontWeight:700,flex:1,minWidth:0}}/>
                   </div>
                 </div>
+              </div>
+
+              {/* Fecha prevista del evento */}
+              <div>
+                <div style={{fontSize:10.5,color:T.ink3,fontWeight:700,letterSpacing:0.8,textTransform:'uppercase',padding:'0 2px 8px'}}>Fecha prevista del evento</div>
+                <div style={{display:'flex',alignItems:'center',gap:10,padding:'13px 14px',borderRadius:14,background:T.surface,border:'1px solid '+T.softBlue+'55'}}>
+                  <FmIcon name="calendar" size={15} stroke={T.softBlue}/>
+                  <input type="date" value={formVisita?.fecha_evento_prevista||''} onChange={e=>setFormVisita&&setFormVisita(v=>({...v,fecha_evento_prevista:e.target.value}))} style={{border:0,background:'transparent',outline:'none',fontFamily:T.sans,fontSize:13,color:T.ink,fontWeight:700,flex:1,minWidth:0}}/>
+                </div>
+                <div style={{fontSize:11,color:T.ink3,marginTop:4,padding:'0 2px'}}>Opcional — si la pareja ya tiene fecha fija</div>
               </div>
 
               {/* Notas */}
