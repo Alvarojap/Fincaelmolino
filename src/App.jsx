@@ -7284,7 +7284,7 @@ const CONFIG_FIELDS=[
   {clave:"facturacion_2025",label:"Facturación total 2025 (€)",desc:"Dato histórico para comparativa anual",type:"number",placeholder:"Ej: 50000"},
 ];
 
-function Ajustes({tok,rol}){
+function Ajustes({tok,rol,perfil,setPage}){
   const [valores,setValores]=useState({});
   const [load,setLoad]=useState(true);
   const [savingKey,setSavingKey]=useState(null);
@@ -7331,44 +7331,167 @@ function Ajustes({tok,rol}){
 
   if(load)return <div className="loading"><div className="spin"/><span>Cargando…</span></div>;
 
-  return <>
-    <div style={{padding:"54px 20px 16px"}}><div style={{fontSize:12,color:T.ink3,fontWeight:500}}>Sistema</div><div style={{fontSize:30,fontWeight:700,color:T.ink,letterSpacing:-1,lineHeight:1.02}}>Ajustes</div></div>
-    <div className="pb" style={{maxWidth:600}}>
-      {/* CONFIGURACIÓN FINANCIERA */}
-      <div className="card" style={{marginBottom:16}}>
-        <div className="chdr"><span className="ctit">💰 Configuración financiera</span></div>
-        {CONFIG_FIELDS.map(f=>(
-          <div key={f.clave} style={{marginBottom:16,paddingBottom:16,borderBottom:"1px solid rgba(255,255,255,.06)"}}>
-            <div className="fg" style={{marginBottom:8}}>
-              <label>{f.label}</label>
-              <div style={{fontSize:11,color:"#8A8580",marginBottom:6}}>{f.desc}</div>
-              <div style={{display:"flex",gap:8,alignItems:"center"}}>
-                <input type={f.type} inputMode={f.type==="number"?"decimal":"text"} className="fi" value={valores[f.clave]||""} onChange={e=>setValores(prev=>({...prev,[f.clave]:e.target.value}))} placeholder={f.placeholder} style={{flex:1}}/>
-                <button className="btn bp sm" style={{flexShrink:0}} onClick={()=>guardar(f.clave)} disabled={savingKey===f.clave}>
-                  {savingKey===f.clave?"…":"Guardar"}
-                </button>
-              </div>
-            </div>
-            {feedback[f.clave]==="ok"&&<div style={{fontSize:12,color:"#A6BE59",marginTop:4}}>✅ Guardado</div>}
-            {feedback[f.clave]==="error"&&<div style={{fontSize:12,color:"#F35757",marginTop:4}}>❌ Error al guardar</div>}
-          </div>
-        ))}
+  // Aliases para el template rediseñado
+  const cfg=valores;
+  const setCfg=u=>setValores(typeof u==='function'?u:u);
+  const guardarCfg=()=>{Object.keys(valores).forEach(k=>guardar(k));};
+  const logout=undefined; // no está en scope en este componente; el botón queda como no-op
+
+  return (
+    <div style={{paddingBottom:100,background:T.bg,minHeight:'100%',fontFamily:T.sans}}>
+
+      {/* Header */}
+      <div style={{padding:'54px 20px 16px'}}>
+        <div style={{fontSize:12,color:T.ink3,fontWeight:500}}>Configuración</div>
+        <div style={{fontSize:30,fontWeight:700,color:T.ink,letterSpacing:-1,lineHeight:1.02}}>Ajustes</div>
       </div>
 
-      {/* NOTIFICACIONES */}
-      <div className="card">
-        <div className="chdr"><span className="ctit">🔔 Notificaciones</span></div>
-        <div style={{display:"flex",alignItems:"center",gap:12,padding:"12px 0"}}>
-          <span style={{fontSize:24}}>{notifPerm==="granted"?"✅":"⚠️"}</span>
-          <div style={{flex:1}}>
-            <div style={{fontSize:14,fontWeight:500,color:notifPerm==="granted"?"#10b981":"#f59e0b"}}>{notifPerm==="granted"?"Notificaciones activas":"Notificaciones desactivadas"}</div>
-            <div style={{fontSize:12,color:"#8A8580",marginTop:2}}>{notifPerm==="granted"?"Recibirás avisos en este dispositivo":"Activa las notificaciones para recibir avisos de la finca"}</div>
-          </div>
-          {notifPerm!=="granted"&&<button className="btn bp" onClick={activarNotifs}>Activar</button>}
+      {/* Datos de la finca */}
+      <div style={{padding:'0 20px 16px'}}>
+        <div style={{fontSize:11,color:T.ink3,letterSpacing:1,textTransform:'uppercase',fontWeight:700,marginBottom:10}}>Datos de la finca</div>
+        <div style={{background:T.surface,borderRadius:18,border:'1px solid '+T.line,overflow:'hidden'}}>
+          {[
+            {l:'Nombre',k:'nombre_finca',v:cfg.nombre_finca||'Finca El Molino',type:'text'},
+            {l:'Municipio AEMET',k:'municipio_aemet',v:cfg.municipio_aemet||'30027',type:'text'},
+            {l:'Teléfono',k:'telefono',v:cfg.telefono||'',type:'tel'},
+          ].map((row,i,arr)=>(
+            <div key={row.k} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'14px 16px',borderBottom:i<arr.length-1?'1px solid '+T.line:'none'}}>
+              <div style={{fontSize:13,color:T.ink3,fontWeight:500}}>{row.l}</div>
+              <input
+                value={row.v}
+                onChange={e=>setCfg&&setCfg(c=>({...c,[row.k]:e.target.value}))}
+                style={{textAlign:'right',background:'transparent',border:0,outline:'none',fontFamily:T.sans,fontSize:13,fontWeight:600,color:T.ink,maxWidth:180}}
+              />
+            </div>
+          ))}
         </div>
       </div>
+
+      {/* Financiero */}
+      <div style={{padding:'0 20px 16px'}}>
+        <div style={{fontSize:11,color:T.ink3,letterSpacing:1,textTransform:'uppercase',fontWeight:700,marginBottom:10}}>Financiero</div>
+        <div style={{background:T.surface,borderRadius:18,border:'1px solid '+T.line,overflow:'hidden'}}>
+          {[
+            {l:'Comisión gestor %',k:'comision_pct',v:cfg.comision_pct||10},
+            {l:'Precio base finca',k:'precio_base_finca',v:cfg.precio_base_finca||0},
+            {l:'Precio base casa',k:'precio_base_casa',v:cfg.precio_base_casa||0},
+          ].map((row,i,arr)=>(
+            <div key={row.k} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'14px 16px',borderBottom:i<arr.length-1?'1px solid '+T.line:'none'}}>
+              <div style={{fontSize:13,color:T.ink3,fontWeight:500}}>{row.l}</div>
+              <div style={{display:'flex',alignItems:'center',gap:4}}>
+                <input
+                  type="number"
+                  value={row.v}
+                  onChange={e=>setCfg&&setCfg(c=>({...c,[row.k]:parseFloat(e.target.value)||0}))}
+                  style={{textAlign:'right',background:'transparent',border:0,outline:'none',fontFamily:T.sans,fontSize:13,fontWeight:600,color:T.ink,width:80}}
+                />
+                <span style={{fontSize:13,color:T.ink3}}>{row.k==='comision_pct'?'%':'€'}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Automatizaciones */}
+      <div style={{padding:'0 20px 16px'}}>
+        <div style={{fontSize:11,color:T.ink3,letterSpacing:1,textTransform:'uppercase',fontWeight:700,marginBottom:10}}>Automatizaciones</div>
+        <div style={{background:T.surface,borderRadius:18,border:'1px solid '+T.line,overflow:'hidden'}}>
+          {[
+            {l:'Limpieza automática post-checkout',k:'auto_limpieza_checkout',desc:'Crea servicio al añadir reserva Airbnb'},
+            {l:'Preguntar si está lista (3 días antes)',k:'auto_pregunta_lista',desc:'Notifica a la limpiadora antes del evento'},
+            {l:'Bloqueo automático disponibilidad',k:'auto_bloqueo_dias',desc:'Bloquea días de evento en el calendario'},
+            {l:'Comisión gestor automática',k:'auto_comision',desc:'Genera gasto al cobrar señal'},
+          ].map((row,i,arr)=>{
+            const on=cfg[row.k]!==false&&cfg[row.k]!=='false';
+            return(
+              <div key={row.k} style={{display:'flex',alignItems:'center',gap:12,padding:'14px 16px',borderBottom:i<arr.length-1?'1px solid '+T.line:'none'}}>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:13,fontWeight:600,color:T.ink}}>{row.l}</div>
+                  <div style={{fontSize:11,color:T.ink3,marginTop:2}}>{row.desc}</div>
+                </div>
+                <button onClick={()=>setCfg&&setCfg(c=>({...c,[row.k]:!on}))} style={{
+                  width:44,height:26,borderRadius:999,
+                  background:on?T.ink:T.line,
+                  border:0,cursor:'pointer',position:'relative',transition:'background 0.2s',flexShrink:0,
+                }}>
+                  <div style={{
+                    position:'absolute',top:3,
+                    left:on?'calc(100% - 23px)':3,
+                    width:20,height:20,borderRadius:999,
+                    background:'white',transition:'left 0.2s',
+                  }}/>
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Botón guardar */}
+      <div style={{padding:'0 20px 16px'}}>
+        <button onClick={()=>guardarCfg&&guardarCfg()} style={{width:'100%',padding:'15px 0',borderRadius:999,border:0,background:T.ink,color:'white',fontFamily:T.sans,fontWeight:700,fontSize:15,cursor:'pointer'}}>
+          Guardar cambios
+        </button>
+      </div>
+
+      {/* Notificaciones (permiso navegador) — conservado */}
+      <div style={{padding:'0 20px 16px'}}>
+        <div style={{fontSize:11,color:T.ink3,letterSpacing:1,textTransform:'uppercase',fontWeight:700,marginBottom:10}}>Notificaciones</div>
+        <div style={{background:T.surface,borderRadius:18,border:'1px solid '+T.line,overflow:'hidden',padding:'14px 16px',display:'flex',alignItems:'center',gap:12}}>
+          <span style={{fontSize:22}}>{notifPerm==='granted'?'✅':'⚠️'}</span>
+          <div style={{flex:1}}>
+            <div style={{fontSize:13,fontWeight:700,color:notifPerm==='granted'?T.olive:T.gold}}>{notifPerm==='granted'?'Notificaciones activas':'Notificaciones desactivadas'}</div>
+            <div style={{fontSize:11,color:T.ink3,marginTop:2}}>{notifPerm==='granted'?'Recibirás avisos en este dispositivo':'Activa los avisos del navegador'}</div>
+          </div>
+          {notifPerm!=='granted'&&<button onClick={activarNotifs} style={{height:32,padding:'0 14px',borderRadius:999,background:T.ink,color:'white',border:0,fontFamily:T.sans,fontWeight:700,fontSize:12,cursor:'pointer'}}>Activar</button>}
+        </div>
+      </div>
+
+      {/* Exportación */}
+      <div style={{padding:'0 20px 16px'}}>
+        <div style={{fontSize:11,color:T.ink3,letterSpacing:1,textTransform:'uppercase',fontWeight:700,marginBottom:10}}>Exportación</div>
+        <div style={{background:T.surface,borderRadius:18,border:'1px solid '+T.line,overflow:'hidden'}}>
+          {[
+            {l:'Exportar reservas CSV',fn:'exportarReservas'},
+            {l:'Exportar gastos CSV',fn:'exportarGastos'},
+            {l:'Informe anual PDF',fn:'exportarInforme'},
+          ].map((row,i,arr)=>(
+            <button key={row.fn} onClick={()=>window[row.fn]&&window[row.fn]()} style={{width:'100%',textAlign:'left',display:'flex',alignItems:'center',justifyContent:'space-between',padding:'14px 16px',borderBottom:i<arr.length-1?'1px solid '+T.line:'none',background:'transparent',border:0,cursor:'pointer',fontFamily:T.sans}}>
+              <span style={{fontSize:13,fontWeight:600,color:T.ink}}>{row.l}</span>
+              <FmIcon name="arrow" size={14} stroke={T.ink3}/>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Cuenta */}
+      <div style={{padding:'0 20px 16px'}}>
+        <div style={{fontSize:11,color:T.ink3,letterSpacing:1,textTransform:'uppercase',fontWeight:700,marginBottom:10}}>Cuenta</div>
+        <div style={{background:T.surface,borderRadius:18,border:'1px solid '+T.line,overflow:'hidden'}}>
+          <div style={{padding:'14px 16px',display:'flex',alignItems:'center',gap:12,borderBottom:'1px solid '+T.line}}>
+            <div style={{width:44,height:44,borderRadius:999,background:T.terracotta+'22',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+              <span style={{fontSize:18,fontWeight:700,color:T.terracotta}}>{(perfil?.nombre||perfil?.email||'A')[0].toUpperCase()}</span>
+            </div>
+            <div style={{flex:1}}>
+              <div style={{fontSize:14,fontWeight:700,color:T.ink}}>{perfil?.nombre||'Admin'}</div>
+              <div style={{fontSize:12,color:T.ink3}}>{perfil?.email||''}</div>
+            </div>
+            <span style={{fontSize:10,padding:'3px 8px',borderRadius:999,background:T.terracotta+'22',color:T.terracotta,fontWeight:700}}>admin</span>
+          </div>
+          <button onClick={()=>logout&&logout()} style={{width:'100%',textAlign:'left',display:'flex',alignItems:'center',justifyContent:'space-between',padding:'14px 16px',background:'transparent',border:0,cursor:'pointer',fontFamily:T.sans}}>
+            <span style={{fontSize:13,fontWeight:600,color:T.danger||'#E53E3E'}}>Cerrar sesión</span>
+            <FmIcon name="chevR" size={14} stroke={T.danger||'#E53E3E'}/>
+          </button>
+        </div>
+      </div>
+
+      {/* Version */}
+      <div style={{textAlign:'center',padding:'8px 0 20px',fontSize:11,color:T.ink4||T.ink3}}>
+        Finca El Molino · v2.0
+      </div>
+
     </div>
-  </>;
+  );
 }
 
 // ─── CALENDARIO ──────────────────────────────────────────────────────────────
