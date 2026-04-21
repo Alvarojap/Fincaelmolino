@@ -6616,28 +6616,71 @@ function Gastos({tok}){
         </div>;})}
     </div>
 
-    {/* MODAL NUEVO GASTO */}
-    {showForm&&<div className="ov" onClick={()=>setShowForm(false)}>
-      <div className="modal" onClick={e=>e.stopPropagation()}>
-        <h3 style={{fontSize:22,fontWeight:700,color:T.ink,letterSpacing:-.6}}>Nuevo gasto</h3>
-        <div className="g2">
-          <div className="fg"><label>Fecha *</label><input type="date" className="fi" value={form.fecha} onChange={e=>setForm(v=>({...v,fecha:e.target.value}))}/></div>
-          <div className="fg"><label>Categoría</label><select className="fi" value={form.categoria} onChange={e=>setForm(v=>({...v,categoria:e.target.value}))}>{GASTO_CATS.map(c=><option key={c}>{c}</option>)}</select></div>
-        </div>
-        <div className="fg"><label>Concepto *</label><input className="fi" value={form.concepto} onChange={e=>setForm(v=>({...v,concepto:e.target.value}))} placeholder="Ej: Compra de cloro para piscina"/></div>
-        <div className="fg"><label>Importe (€) *</label><input type="number" inputMode="decimal" className="fi" value={form.importe} onChange={e=>setForm(v=>({...v,importe:e.target.value}))} placeholder="0"/></div>
-        <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
-          <div onClick={()=>setForm(v=>({...v,recurrente:!v.recurrente}))} style={{width:22,height:22,borderRadius:6,flexShrink:0,border:`2px solid ${form.recurrente?T.olive:T.line}`,background:form.recurrente?T.olive:"transparent",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}>{form.recurrente&&<FmIcon name="check" size={12} stroke="white" sw={2.5}/>}</div>
-          <span style={{fontSize:13,color:T.ink}}>¿Es recurrente?</span>
-          {form.recurrente&&<select className="fi" value={form.frecuencia} onChange={e=>setForm(v=>({...v,frecuencia:e.target.value}))} style={{width:"auto",flex:"none",padding:"6px 30px 6px 10px"}}><option value="mensual">Mensual</option><option value="anual">Anual</option></select>}
-        </div>
-        <div className="fg"><label>Notas (opcional)</label><textarea className="fi" rows={2} value={form.notas} onChange={e=>setForm(v=>({...v,notas:e.target.value}))} placeholder="Detalles…"/></div>
-        <div className="mft">
-          <button className="btn bg" onClick={()=>setShowForm(false)}>Cancelar</button>
-          <button className="btn bp" onClick={crear} disabled={saving||!form.concepto||!form.importe}>{saving?"Guardando…":"Guardar gasto"}</button>
+    {/* MODAL NUEVO GASTO — bottom sheet */}
+    {showForm&&(
+      <div style={{position:"fixed",inset:0,background:"rgba(20,15,10,0.6)",zIndex:999,display:"flex",alignItems:"flex-end",fontFamily:T.sans}} onClick={()=>setShowForm(false)}>
+        <div style={{width:"100%",background:T.bg,borderTopLeftRadius:24,borderTopRightRadius:24,maxHeight:"92vh",overflow:"auto",paddingBottom:34}} onClick={e=>e.stopPropagation()}>
+          <div style={{padding:"14px 0 0",display:"flex",justifyContent:"center"}}><div style={{width:44,height:4,borderRadius:999,background:T.line}}/></div>
+          <div style={{padding:"14px 20px 16px",display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:"1px solid "+T.line}}>
+            <div style={{fontSize:22,fontWeight:700,color:T.ink,letterSpacing:-.6}}>Nuevo gasto</div>
+            <button onClick={()=>setShowForm(false)} style={{width:32,height:32,borderRadius:999,background:T.surface,border:"1px solid "+T.line,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}><FmIcon name="x" size={15} stroke={T.ink}/></button>
+          </div>
+          <div style={{padding:"16px 20px",display:"flex",flexDirection:"column",gap:16}}>
+            {/* Concepto */}
+            <div>
+              <div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase",marginBottom:8}}>Concepto *</div>
+              <div style={{background:T.surface,border:"1px solid "+T.line,borderRadius:14,padding:"13px 14px"}}>
+                <input value={form.concepto} onChange={e=>setForm(v=>({...v,concepto:e.target.value}))} placeholder="Ej: Compra de cloro para piscina" style={{width:"100%",background:"transparent",border:0,outline:"none",fontFamily:T.sans,fontSize:14,color:T.ink}}/>
+              </div>
+            </div>
+            {/* Importe */}
+            <div>
+              <div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase",marginBottom:8}}>Importe *</div>
+              <div style={{display:"flex",alignItems:"center",gap:10,background:T.surface,border:"1px solid "+T.line,borderRadius:14,padding:"13px 16px"}}>
+                <input type="number" inputMode="decimal" value={form.importe} onChange={e=>setForm(v=>({...v,importe:e.target.value}))} placeholder="0" style={{flex:1,background:"transparent",border:0,outline:"none",fontFamily:T.sans,fontSize:24,fontWeight:700,color:T.ink,letterSpacing:-.6}}/>
+                <span style={{fontSize:18,fontWeight:700,color:T.ink3}}>€</span>
+              </div>
+            </div>
+            {/* Categoría + Fecha grid */}
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+              <div>
+                <div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase",marginBottom:8}}>Categoría</div>
+                <div style={{background:T.surface,border:"1px solid "+T.line,borderRadius:14,overflow:"hidden"}}>
+                  <select value={form.categoria} onChange={e=>setForm(v=>({...v,categoria:e.target.value}))} style={{width:"100%",padding:"13px 14px",background:"transparent",border:0,outline:"none",fontFamily:T.sans,fontSize:13,color:T.ink,cursor:"pointer"}}>
+                    {GASTO_CATS.map(c=><option key={c}>{c}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div>
+                <div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase",marginBottom:8}}>Fecha *</div>
+                <div style={{display:"flex",alignItems:"center",gap:8,background:T.surface,border:"1px solid "+T.line,borderRadius:14,padding:"12px 14px"}}>
+                  <FmIcon name="calendar" size={14} stroke={T.ink3}/>
+                  <input type="date" value={form.fecha} onChange={e=>setForm(v=>({...v,fecha:e.target.value}))} style={{flex:1,background:"transparent",border:0,outline:"none",fontFamily:T.sans,fontSize:13,color:T.ink}}/>
+                </div>
+              </div>
+            </div>
+            {/* Recurrente */}
+            <div style={{display:"flex",alignItems:"center",gap:10}}>
+              <div onClick={()=>setForm(v=>({...v,recurrente:!v.recurrente}))} style={{width:22,height:22,borderRadius:6,flexShrink:0,border:"2px solid "+(form.recurrente?T.olive:T.line),background:form.recurrente?T.olive:"transparent",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}>{form.recurrente&&<FmIcon name="check" size={12} stroke="white" sw={2.5}/>}</div>
+              <span style={{fontSize:13,color:T.ink}}>¿Es recurrente?</span>
+              {form.recurrente&&<div style={{background:T.surface,border:"1px solid "+T.line,borderRadius:10,overflow:"hidden",marginLeft:"auto"}}>
+                <select value={form.frecuencia} onChange={e=>setForm(v=>({...v,frecuencia:e.target.value}))} style={{padding:"6px 24px 6px 10px",background:"transparent",border:0,fontFamily:T.sans,fontSize:12,color:T.ink,cursor:"pointer"}}><option value="mensual">Mensual</option><option value="anual">Anual</option></select>
+              </div>}
+            </div>
+            {/* Notas */}
+            <div>
+              <div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase",marginBottom:8}}>Notas (opcional)</div>
+              <textarea value={form.notas} onChange={e=>setForm(v=>({...v,notas:e.target.value}))} placeholder="Detalles adicionales…" rows={2} style={{width:"100%",background:T.surface,border:"1px solid "+T.line,borderRadius:14,padding:"12px 14px",fontFamily:T.sans,fontSize:13,color:T.ink,resize:"none",outline:"none",boxSizing:"border-box"}}/>
+            </div>
+            {/* Botones */}
+            <div style={{display:"flex",gap:8,paddingTop:4}}>
+              <button onClick={()=>setShowForm(false)} style={{flex:1,padding:"14px 0",borderRadius:999,border:"1px solid "+T.line,background:T.surface,color:T.ink,fontFamily:T.sans,fontWeight:600,fontSize:14,cursor:"pointer"}}>Cancelar</button>
+              <button onClick={crear} disabled={saving||!form.concepto||!form.importe} style={{flex:2,padding:"14px 0",borderRadius:999,border:0,background:saving||!form.concepto||!form.importe?T.ink+"55":T.ink,color:"white",fontFamily:T.sans,fontWeight:700,fontSize:14,cursor:saving||!form.concepto||!form.importe?"not-allowed":"pointer"}}>{saving?"Guardando…":"Guardar gasto"}</button>
+            </div>
+          </div>
         </div>
       </div>
-    </div>}
+    )}
   </>;
 }
 
