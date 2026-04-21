@@ -3784,9 +3784,9 @@ function JardinAdmin({perfil,tok,setPage}){
         {srvsActivos.map(s=>{const tareas=s.jardin_servicio_tareas||[];const hechas=tareas.filter(t=>t.done).length;
           const fi=new Date(s.fecha_inicio+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"});
           const ff=new Date(s.fecha_fin+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"});
-          const abierto=selSrv===s.id;const m=getOpsMeta(s.estado||"activo");
-          return <div key={s.id} style={{background:T.surface,border:`1px solid ${abierto?T.ink:T.line}`,borderRadius:16,padding:14,marginBottom:10,boxShadow:abierto?"0 4px 12px rgba(40,30,20,.06)":"none"}}>
-            <div onClick={()=>setSelSrv(abierto?null:s.id)} style={{cursor:"pointer",display:"flex",gap:10}}>
+          const m=getOpsMeta(s.estado||"activo");
+          return <div key={s.id} onClick={()=>setSelSrv(s.id)} style={{background:T.surface,border:`1px solid ${T.line}`,borderRadius:16,padding:14,marginBottom:10,cursor:"pointer"}}>
+            <div style={{display:"flex",gap:10}}>
               <div style={{width:4,borderRadius:999,background:m.color,flexShrink:0,alignSelf:"stretch"}}/>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}><OpsStatePill estado={s.estado||"activo"}/><span style={{fontSize:11,color:T.ink3,fontWeight:600}}>{hechas}/{tareas.length} tareas</span></div>
@@ -3794,28 +3794,6 @@ function JardinAdmin({perfil,tok,setPage}){
                 <div style={{display:"flex",alignItems:"center",gap:8,marginTop:4,fontSize:11,color:T.ink3}}><FmIcon name="calendar" size={11} stroke={T.ink3}/>{fi} – {ff}<span style={{color:T.ink4}}>·</span><OpsAvatar name={s.jardinero_nombre||"?"} size={16}/>{s.jardinero_nombre}</div>
               </div>
             </div>
-            {abierto&&<>
-              <div style={{marginTop:10}}>
-                {tareas.map(t=><div key={t.id} className={`cli${t.done?" done":""}`} style={{padding:"8px 0"}}>
-                  <span style={{fontSize:17,flexShrink:0}}>{t.done?"✅":"⬜"}</span>
-                  <div style={{flex:1,minWidth:0}}>
-                    {t.añadida_por_jardinero&&<span className="badge" style={{background:"rgba(201,168,76,.12)",color:"#EC683E",fontSize:10,marginBottom:3,display:"inline-block"}}>👷 Añadida por jardinero</span>}
-                    {t.es_extra&&!t.añadida_por_jardinero&&<span className="badge" style={{background:"rgba(201,168,76,.12)",color:"#EC683E",fontSize:10,marginBottom:3,display:"inline-block"}}>➕ Extra</span>}
-                    <div className="tl">{t.txt}</div>
-                    {t.zona&&<div className="tm" style={{color:"#EC683E"}}>{t.zona}</div>}
-                    {t.done?<div className="tm">✓ {t.completado_por} · {fmtDT(t.completado_ts)}</div>:<div className="tm" style={{color:"#F35757"}}>⏳ Pendiente</div>}
-                    {t.nota&&<div className="nbox">📝 {t.nota}</div>}
-                    {t.foto_url&&<img src={t.foto_url} alt="" className="pthumb"/>}
-                    {t.resp_admin&&<div className="rbox">✅ Admin: {t.resp_admin}</div>}
-                  </div>
-                </div>)}
-              </div>
-              {s.notas&&<div className="nbox" style={{marginTop:8}}>📝 {s.notas}</div>}
-              <div style={{display:"flex",gap:8,marginTop:12}}>
-                {hechas===tareas.length&&tareas.length>0&&<button className="btn bp sm" onClick={()=>finalizarServicio(s.id)}>✅ Finalizar</button>}
-                <button className="btn br sm" onClick={()=>cancelarServicio(s.id)}>Cancelar servicio</button>
-              </div>
-            </>}
           </div>;
         })}
         {srvsHist.length>0&&<>
@@ -3851,6 +3829,140 @@ function JardinAdmin({perfil,tok,setPage}){
         })}
       </div>}
     </div>
+
+    {/* DETALLE SERVICIO — pantalla completa */}
+    {srvSel&&(
+      <div style={{position:"fixed",inset:0,background:T.bg,zIndex:30,overflow:"auto",paddingBottom:40,fontFamily:T.sans}}>
+
+        {/* Header */}
+        <div style={{padding:"54px 20px 14px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <button onClick={()=>setSelSrv(null)} style={{width:36,height:36,borderRadius:999,background:T.surface,border:"1px solid "+T.line,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}>
+            <FmIcon name="chevL" size={16} stroke={T.ink}/>
+          </button>
+          <div style={{fontSize:11,color:T.ink3,letterSpacing:1,textTransform:"uppercase",fontWeight:600}}>
+            {String(srvSel.id).slice(-6)}
+          </div>
+          <button style={{width:36,height:36,borderRadius:999,background:T.surface,border:"1px solid "+T.line,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}>
+            <FmIcon name="more" size={16} stroke={T.ink}/>
+          </button>
+        </div>
+
+        {/* Título + estado */}
+        <div style={{padding:"0 20px 14px"}}>
+          {(()=>{const m=getOpsMeta(srvSel.estado||"activo");return(
+            <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8,flexWrap:"wrap"}}>
+              <span style={{display:"inline-flex",alignItems:"center",gap:4,height:22,padding:"0 9px",borderRadius:999,background:m.bg,color:m.ink,fontSize:10.5,fontWeight:700}}>
+                <span style={{width:5,height:5,borderRadius:999,background:m.color}}/>{m.label}
+              </span>
+              {srvSel.jardinero_nombre&&<span style={{display:"inline-flex",alignItems:"center",gap:4,height:22,padding:"0 9px",borderRadius:999,background:T.olive+"22",color:"#4A7A2E",fontSize:10.5,fontWeight:700}}>
+                <OpsAvatar name={srvSel.jardinero_nombre} size={14}/>{srvSel.jardinero_nombre}
+              </span>}
+            </div>
+          );})()}
+          <div style={{fontSize:28,fontWeight:700,color:T.ink,letterSpacing:-.8,lineHeight:1.05}}>{srvSel.nombre}</div>
+          <div style={{fontSize:11,color:T.ink3,marginTop:4,display:"flex",alignItems:"center",gap:4}}>
+            <FmIcon name="calendar" size={11} stroke={T.ink3}/>
+            {new Date(srvSel.fecha_inicio+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"long"})} – {new Date(srvSel.fecha_fin+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"long"})}
+          </div>
+        </div>
+
+        {/* Asignación */}
+        <div style={{padding:"0 20px 14px"}}>
+          <div style={{fontSize:11,color:T.ink3,letterSpacing:1,textTransform:"uppercase",fontWeight:700,marginBottom:8}}>Asignación</div>
+          <div style={{background:T.surface,borderRadius:16,padding:14,border:"1px solid "+T.line}}>
+            <div style={{display:"flex",gap:12,alignItems:"center",marginBottom:12}}>
+              <OpsAvatar name={srvSel.jardinero_nombre||"?"} size={38}/>
+              <div style={{flex:1}}>
+                <div style={{fontSize:13,fontWeight:700,color:T.ink}}>{srvSel.jardinero_nombre||"Sin asignar"}</div>
+                <div style={{fontSize:11,color:T.ink3}}>Jardinero</div>
+              </div>
+            </div>
+            <div style={{height:1,background:T.line,margin:"0 0 12px"}}/>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <div>
+                <div style={{fontSize:10,color:T.ink3,textTransform:"uppercase",letterSpacing:.5,fontWeight:600}}>Período</div>
+                <div style={{fontSize:14,fontWeight:700,color:T.ink,marginTop:3}}>
+                  {new Date(srvSel.fecha_inicio+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"})} – {new Date(srvSel.fecha_fin+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"})}
+                </div>
+              </div>
+              <FmIcon name="calendar" size={16} stroke={T.ink3}/>
+            </div>
+          </div>
+        </div>
+
+        {/* Progreso olive */}
+        {(()=>{
+          const tareas=srvSel.jardin_servicio_tareas||[];
+          const hechas=tareas.filter(t=>t.done).length;
+          const pct=tareas.length>0?Math.round(hechas/tareas.length*100):0;
+          return <div style={{padding:"0 20px 14px"}}>
+            <div style={{fontSize:11,color:T.ink3,letterSpacing:1,textTransform:"uppercase",fontWeight:700,marginBottom:8}}>Progreso</div>
+            <div style={{background:T.olive,borderRadius:20,padding:18,color:T.ink}}>
+              <div style={{display:"flex",alignItems:"flex-end",justifyContent:"space-between",gap:10}}>
+                <div>
+                  <div style={{fontSize:10,color:"rgba(20,30,5,0.65)",letterSpacing:1,textTransform:"uppercase",fontWeight:700}}>Completado</div>
+                  <div style={{fontSize:44,fontWeight:700,letterSpacing:-1.5,lineHeight:1,marginTop:6}}>{pct}%</div>
+                </div>
+                <div style={{textAlign:"right",fontSize:11,color:"rgba(20,30,5,0.75)",lineHeight:1.6}}>
+                  <div><b>{hechas}</b> de <b>{tareas.length}</b> tareas</div>
+                  <div style={{opacity:.7}}>{srvSel.estado==="activo"?"En curso":srvSel.estado}</div>
+                </div>
+              </div>
+            </div>
+          </div>;
+        })()}
+
+        {/* Notas */}
+        {srvSel.notas&&<div style={{padding:"0 20px 14px"}}>
+          <div style={{background:T.surface,borderRadius:14,padding:"12px 14px",border:"1px solid "+T.line,fontSize:13,color:T.ink,display:"flex",alignItems:"flex-start",gap:10}}>
+            <span style={{fontSize:16,flexShrink:0}}>📝</span><div>{srvSel.notas}</div>
+          </div>
+        </div>}
+
+        {/* Tareas */}
+        <div style={{padding:"0 20px 14px"}}>
+          {(()=>{
+            const tareas=srvSel.jardin_servicio_tareas||[];
+            const hechas=tareas.filter(t=>t.done).length;
+            return <>
+              <div style={{fontSize:11,color:T.ink3,letterSpacing:1,textTransform:"uppercase",fontWeight:700,marginBottom:8}}>
+                Tareas · {hechas}/{tareas.length}
+              </div>
+              <div style={{background:T.surface,borderRadius:16,border:"1px solid "+T.line,overflow:"hidden"}}>
+                {tareas.length===0&&<div style={{padding:"16px 14px",color:T.ink3,fontSize:13,textAlign:"center"}}>Sin tareas registradas</div>}
+                {tareas.map((t,i)=>(
+                  <div key={t.id} style={{padding:"12px 14px",display:"flex",alignItems:"flex-start",gap:12,borderBottom:i<tareas.length-1?"1px solid "+T.line:"none"}}>
+                    <div style={{width:22,height:22,borderRadius:6,background:t.done?T.olive:"transparent",border:"1.5px solid "+(t.done?T.olive:T.line),display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,marginTop:1}}>
+                      {t.done&&<FmIcon name="check" size={12} stroke="white" sw={2.5}/>}
+                    </div>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:13,color:t.done?T.ink3:T.ink,textDecoration:t.done?"line-through":"none",fontWeight:t.done?400:600}}>{t.txt}</div>
+                      {t.añadida_por_jardinero&&<span style={{fontSize:10,color:T.terracotta,fontWeight:600,display:"inline-block",marginTop:3}}>👷 Añadida por jardinero</span>}
+                      {t.es_extra&&!t.añadida_por_jardinero&&<span style={{fontSize:10,color:T.terracotta,fontWeight:600,display:"inline-block",marginTop:3}}>➕ Extra</span>}
+                      {t.zona&&<div style={{fontSize:11,color:T.ink3,marginTop:2}}>{t.zona}</div>}
+                      {t.done&&<div style={{fontSize:11,color:T.ink3,marginTop:2}}>✓ {t.completado_por} · {fmtDT(t.completado_ts)}</div>}
+                      {t.nota&&<div style={{fontSize:11,color:T.ink2,marginTop:4,background:T.bg,borderRadius:8,padding:"6px 10px"}}>📝 {t.nota}</div>}
+                      {t.foto_url&&<img src={t.foto_url} alt="" style={{marginTop:6,borderRadius:10,maxWidth:"100%",maxHeight:140}}/>}
+                      {t.resp_admin&&<div style={{fontSize:11,color:T.olive,marginTop:4,fontWeight:600}}>✅ Admin: {t.resp_admin}</div>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>;
+          })()}
+        </div>
+
+        {/* Botones acción */}
+        {srvSel.estado==="activo"&&<div style={{padding:"0 20px 14px",display:"flex",gap:8}}>
+          {(()=>{const tareas=srvSel.jardin_servicio_tareas||[];const hechas=tareas.filter(t=>t.done).length;
+            return hechas===tareas.length&&tareas.length>0?<button onClick={()=>{finalizarServicio(srvSel.id);setSelSrv(null);}} style={{flex:1,padding:"13px 0",borderRadius:999,border:0,background:T.olive,color:"white",fontFamily:T.sans,fontWeight:700,fontSize:13,cursor:"pointer"}}>✅ Finalizar servicio</button>:null;
+          })()}
+          <button onClick={()=>{cancelarServicio(srvSel.id);setSelSrv(null);}} style={{flex:1,padding:"13px 0",borderRadius:999,border:"1px solid #FECACA",background:"#FEF2F2",color:"#D9443A",fontFamily:T.sans,fontWeight:600,fontSize:13,cursor:"pointer"}}>Cancelar servicio</button>
+        </div>}
+
+      </div>
+    )}
+
     {showM&&<div className="ov" onClick={()=>setShowM(false)}><div className="modal" onClick={e=>e.stopPropagation()}>
       <h3>📌 Asignar tarea puntual</h3>
       <div className="fg"><label>Descripción *</label><input className="fi" value={form.txt} onChange={e=>setForm(v=>({...v,txt:e.target.value}))} placeholder="Ej: Limpiar la piscina"/></div>
