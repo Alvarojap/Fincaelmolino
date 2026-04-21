@@ -6567,6 +6567,8 @@ function AlmacenPage({perfil,tok,rol}){
   const [catFiltro,setCatFiltro]=useState("todos");
   const [showNew,setShowNew]=useState(false);const [showMov,setShowMov]=useState(null);const [showHist,setShowHist]=useState(false);
   const [showRecuento,setShowRecuento]=useState(false);const [recuentoItems,setRecuentoItems]=useState([]);const [recSaving,setRecSaving]=useState(false);
+  const [recuentoIndex,setRecuentoIndex]=useState(0);
+  const [recuentoCounts,setRecuentoCounts]=useState({});
   const [busqueda,setBusqueda]=useState("");const [showEdit,setShowEdit]=useState(null);const [editForm,setEditForm]=useState({});
   const newVacio={nombre:"",categoria:"limpieza",unidad:"unidad",es_liquido:false,tiene_lavanderia:false,stock_minimo:"1",codigo_barras:"",stock_casa:"0",stock_almacen:"0",etiquetas:""};
   const [newForm,setNewForm]=useState(newVacio);
@@ -6657,6 +6659,18 @@ function AlmacenPage({perfil,tok,rol}){
     if(n>0&&typeof setToast==="function"){}// toast handled below
   };
 
+  // Recuento wizard (nuevo flow per-artículo)
+  const guardarRecuento=async(articuloId,counts)=>{
+    try{
+      await sbPatch("almacen_articulos",`id=eq.${articuloId}`,{
+        stock_casa:parseFloat(counts.casa)||0,
+        stock_almacen:parseFloat(counts.almacen)||0,
+        stock_lavanderia:parseFloat(counts.lavanderia)||0,
+      },tok);
+      setArticulos(prev=>prev.map(a=>a.id===articuloId?{...a,stock_casa:counts.casa||0,stock_almacen:counts.almacen||0,stock_lavanderia:counts.lavanderia||0}:a));
+    }catch(e){console.error("Error guardando recuento:",e);}
+  };
+
   const bajos=articulos.filter(a=>(parseFloat(a.stock_casa)||0)+(parseFloat(a.stock_almacen)||0)<=(parseFloat(a.stock_minimo)||0));
   const filtered=(catFiltro==="todos"?articulos:articulos.filter(a=>a.categoria===catFiltro)).filter(a=>!busqueda||a.nombre.toLowerCase().includes(busqueda.toLowerCase())||(a.etiquetas||"").toLowerCase().includes(busqueda.toLowerCase()));
 
@@ -6684,9 +6698,14 @@ function AlmacenPage({perfil,tok,rol}){
           <div style={{fontSize:12,color:T.ink3,fontWeight:500}}>Inventario</div>
           <div style={{fontSize:30,fontWeight:700,color:T.ink,letterSpacing:-1,lineHeight:1.02}}>Almacén</div>
         </div>
-        <button onClick={()=>{setNewForm(newVacio);setShowNuevo(true);}} style={{width:38,height:38,borderRadius:999,background:T.ink,border:0,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}>
-          <FmIcon name="plus" size={18} stroke="white"/>
-        </button>
+        <div style={{display:'flex',gap:8}}>
+          <button onClick={()=>{setRecuentoIndex(0);setRecuentoCounts({});setShowRecuento(true);}} style={{height:38,padding:'0 14px',borderRadius:999,background:T.surface,border:'1px solid '+T.line,fontFamily:T.sans,fontSize:12,fontWeight:700,color:T.ink,cursor:'pointer',display:'flex',alignItems:'center',gap:6}}>
+            <FmIcon name="box" size={14} stroke={T.ink}/>Recuento
+          </button>
+          <button onClick={()=>{setNewForm(newVacio);setShowNuevo&&setShowNuevo(true);}} style={{width:38,height:38,borderRadius:999,background:T.ink,border:0,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}>
+            <FmIcon name="plus" size={18} stroke="white"/>
+          </button>
+        </div>
       </div>
 
       {/* KPIs (usan stock total = casa+almacén) */}
@@ -6737,11 +6756,6 @@ function AlmacenPage({perfil,tok,rol}){
             </button>
           );
         })}
-      </div>
-
-      {/* Botón recuento */}
-      <div style={{padding:'0 20px 14px'}}>
-        <button onClick={abrirRecuento} style={{width:'100%',padding:'12px 0',borderRadius:999,border:'1px solid '+T.line,background:T.surface,color:T.ink,fontFamily:T.sans,fontWeight:600,fontSize:13,cursor:'pointer'}}>📦 Recuento de stock</button>
       </div>
 
       {/* Lista artículos */}
@@ -6935,33 +6949,98 @@ function AlmacenPage({perfil,tok,rol}){
       <div className="mft"><button className="btn bg" onClick={()=>{setShowMov(null);setStockErr("");}}>Cancelar</button><button className="btn bp" onClick={ejecutarMov} disabled={saving}>{saving?"Guardando…":"✅ Confirmar"}</button></div>
     </div></div>}
 
-    {/* Modal Recuento */}
-    {showRecuento&&<div className="ov" onClick={()=>setShowRecuento(false)}>
-      <div className="modal" style={{maxWidth:540,maxHeight:"92vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
-        <h3>📦 Recuento de stock</h3>
-        <div style={{fontSize:12,color:"#8A8580",marginBottom:16}}>Actualiza solo los artículos que hayas contado. Deja en blanco los que no has revisado.</div>
-        {ALMACEN_CATS.filter(c=>c.id!=="todos").map(cat=>{
-          const catItems=recuentoItems.filter(a=>a.categoria===cat.id);
-          if(catItems.length===0)return null;
-          return <div key={cat.id} style={{marginBottom:16}}>
-            <div style={{fontSize:12,fontWeight:700,color:"#EC683E",textTransform:"uppercase",letterSpacing:.5,marginBottom:8}}>{cat.lbl}</div>
-            {catItems.map((it,idx)=>{
-              const globalIdx=recuentoItems.findIndex(r=>r.id===it.id);
-              const sistema=(parseFloat(it.stock_casa)||0)+(parseFloat(it.stock_almacen)||0);
-              return <div key={it.id} style={{display:"flex",alignItems:"center",gap:10,padding:"6px 0",borderBottom:"1px solid rgba(0,0,0,.04)"}}>
-                <div style={{flex:1,fontSize:13,color:"#1A1A1A"}}>{it.nombre}</div>
-                <div style={{fontSize:11,color:"#8A8580",minWidth:60,textAlign:"right"}}>Sist: {sistema}</div>
-                <input type="number" min="0" step={it.es_liquido?"0.25":"1"} value={recuentoItems[globalIdx]?.real??""} onChange={e=>setRecuentoItems(prev=>prev.map((p,i)=>i===globalIdx?{...p,real:e.target.value}:p))} placeholder="—" style={{width:70,textAlign:"center",fontSize:16,fontWeight:700,padding:"6px",borderRadius:10,border:"1.5px solid transparent",background:"#F5F3F0",fontFamily:"'Inter Tight',sans-serif",outline:"none"}}/>
-              </div>;
-            })}
-          </div>;
-        })}
-        <div className="mft">
-          <button className="btn bg" onClick={()=>setShowRecuento(false)}>Cancelar</button>
-          <button className="btn bp" onClick={aplicarRecuento} disabled={recSaving}>{recSaving?"Aplicando…":"📦 Aplicar recuento"}</button>
+    {/* Wizard recuento fullscreen */}
+    {showRecuento&&articulosFiltrados.length>0&&(
+      <div style={{position:'fixed',inset:0,background:T.ink,zIndex:50,color:'white',display:'flex',flexDirection:'column',fontFamily:T.sans}}>
+
+        {/* Header recuento */}
+        <div style={{padding:'54px 20px 14px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+          <button onClick={()=>setShowRecuento(false)} style={{width:36,height:36,borderRadius:999,background:'rgba(255,255,255,0.14)',border:0,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}>
+            <FmIcon name="x" size={16} stroke="white"/>
+          </button>
+          <div style={{textAlign:'center'}}>
+            <div style={{fontSize:10,color:'rgba(255,255,255,0.6)',letterSpacing:1,textTransform:'uppercase'}}>
+              Recuento · {articulosFiltrados[recuentoIndex]?.categoria||'almacén'}
+            </div>
+            <div style={{fontSize:16,fontWeight:700}}>{recuentoIndex+1}/{articulosFiltrados.length}</div>
+          </div>
+          <div style={{width:36}}/>
+        </div>
+
+        {/* Barra progreso */}
+        <div style={{padding:'0 20px 12px'}}>
+          <div style={{height:4,background:'rgba(255,255,255,0.14)',borderRadius:999,overflow:'hidden'}}>
+            <div style={{width:((recuentoIndex+1)/articulosFiltrados.length*100)+'%',height:'100%',background:T.olive,transition:'width 0.3s'}}/>
+          </div>
+        </div>
+
+        {/* Artículo actual */}
+        {(()=>{
+          const art=articulosFiltrados[recuentoIndex];
+          const counts=recuentoCounts[art?.id]||{casa:0,almacen:0,lavanderia:0};
+          const setCounts=(fn)=>setRecuentoCounts(prev=>({...prev,[art.id]:fn(prev[art.id]||{casa:0,almacen:0,lavanderia:0})}));
+          return(
+            <div style={{flex:1,padding:'20px 20px 0',display:'flex',flexDirection:'column',justifyContent:'center'}}>
+              <div style={{textAlign:'center',marginBottom:26}}>
+                <div style={{fontSize:11,color:'rgba(255,255,255,0.6)',letterSpacing:1,textTransform:'uppercase',fontWeight:500,marginBottom:6}}>
+                  Artículo {recuentoIndex+1}
+                </div>
+                <div style={{fontSize:28,color:'white',letterSpacing:-0.6,fontWeight:700,lineHeight:1.15}}>
+                  {art?.nombre||'Artículo'}
+                </div>
+                <div style={{fontSize:12,color:'rgba(255,255,255,0.55)',marginTop:8}}>
+                  Stock mínimo: {art?.stock_minimo||0} {art?.unidad||'uds'}
+                </div>
+              </div>
+
+              <div style={{display:'flex',flexDirection:'column',gap:12,marginBottom:20}}>
+                {[
+                  {k:'casa',emoji:'🏠',label:'Casa'},
+                  {k:'almacen',emoji:'📦',label:'Almacén'},
+                  {k:'lavanderia',emoji:'🧺',label:'Lavandería'},
+                ].map(loc=>(
+                  <div key={loc.k} style={{display:'flex',alignItems:'center',gap:14,padding:14,borderRadius:16,background:'rgba(255,255,255,0.08)',border:'1px solid rgba(255,255,255,0.12)'}}>
+                    <div style={{fontSize:22}}>{loc.emoji}</div>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:11,color:'rgba(255,255,255,0.6)',textTransform:'uppercase',letterSpacing:0.5,fontWeight:500}}>{loc.label}</div>
+                      <div style={{fontSize:24,fontWeight:700,letterSpacing:-0.5}}>{counts[loc.k]}</div>
+                    </div>
+                    <div style={{display:'flex',gap:8}}>
+                      <button onClick={()=>setCounts(c=>({...c,[loc.k]:Math.max(0,c[loc.k]-1)}))} style={{width:40,height:40,borderRadius:999,background:'rgba(255,255,255,0.14)',border:0,color:'white',fontSize:20,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>−</button>
+                      <button onClick={()=>setCounts(c=>({...c,[loc.k]:c[loc.k]+1}))} style={{width:40,height:40,borderRadius:999,background:T.terracotta,border:0,color:'white',fontSize:20,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>+</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* Botones navegación */}
+        <div style={{padding:'0 20px 40px',display:'flex',gap:8}}>
+          <button onClick={()=>{
+            if(recuentoIndex>0) setRecuentoIndex(i=>i-1);
+            else setShowRecuento(false);
+          }} style={{flex:1,padding:14,borderRadius:16,background:'rgba(255,255,255,0.14)',color:'white',border:0,fontFamily:T.sans,fontSize:13,fontWeight:600,cursor:'pointer'}}>
+            {recuentoIndex===0?'Cancelar':'← Anterior'}
+          </button>
+          <button onClick={async()=>{
+            const art=articulosFiltrados[recuentoIndex];
+            const counts=recuentoCounts[art?.id]||{casa:0,almacen:0,lavanderia:0};
+            const totalStock=counts.casa+counts.almacen+counts.lavanderia;
+            if(guardarRecuento) await guardarRecuento(art.id,{stock_actual:totalStock,...counts});
+            if(recuentoIndex<articulosFiltrados.length-1){
+              setRecuentoIndex(i=>i+1);
+            } else {
+              setShowRecuento(false);
+              setRecuentoIndex(0);
+            }
+          }} style={{flex:2,padding:14,borderRadius:16,background:T.olive,color:'white',border:0,fontFamily:T.sans,fontSize:13,fontWeight:700,cursor:'pointer'}}>
+            {recuentoIndex<articulosFiltrados.length-1?'Guardar y siguiente →':'✓ Finalizar recuento'}
+          </button>
         </div>
       </div>
-    </div>}
+    )}
 
     </div>
   );
