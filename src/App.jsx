@@ -6660,96 +6660,243 @@ function AlmacenPage({perfil,tok,rol}){
   const bajos=articulos.filter(a=>(parseFloat(a.stock_casa)||0)+(parseFloat(a.stock_almacen)||0)<=(parseFloat(a.stock_minimo)||0));
   const filtered=(catFiltro==="todos"?articulos:articulos.filter(a=>a.categoria===catFiltro)).filter(a=>!busqueda||a.nombre.toLowerCase().includes(busqueda.toLowerCase())||(a.etiquetas||"").toLowerCase().includes(busqueda.toLowerCase()));
 
+  // Aliases para el template rediseñado (mapean a los nombres reales del componente)
+  const [selArticulo,setSelArticulo]=useState(null);
+  const articulosFiltrados=filtered;
+  const showNuevo=showNew;
+  const setShowNuevo=setShowNew;
+  const formArticulo=newForm;
+  const setFormArticulo=updater=>setNewForm(prev=>{
+    const next=typeof updater==='function'?updater(prev):{...prev,...updater};
+    // Template escribe stock_actual; reflejar en stock_almacen (campo real usado al crear)
+    if(next.stock_actual!==undefined&&next.stock_actual!==prev.stock_actual){next.stock_almacen=String(next.stock_actual||0);}
+    return next;
+  });
+  const guardarArticulo=crearArticulo;
+
   if(load)return <div className="loading"><div className="spin"/><span>Cargando…</span></div>;
-  return <>
-    <div style={{padding:"54px 32px 16px"}}><div style={{fontSize:12,color:T.ink3,fontWeight:500}}>{articulos.length} artículos · {bajos.length} con stock bajo</div><div style={{fontSize:28,fontWeight:700,color:T.ink,letterSpacing:-.8,lineHeight:1.02,marginTop:2}}>Almacén</div></div>
-    <div className="pb">
-      {bajos.length>0&&<div style={{background:"#FEE8E8",borderRadius:14,padding:"12px 16px",marginBottom:16,fontSize:13,color:"#F35757",fontWeight:600}}>⚠️ {bajos.length} artículo{bajos.length>1?"s":""} con stock bajo: {bajos.slice(0,5).map(a=>a.nombre).join(", ")}</div>}
+  return (
+    <div style={{paddingBottom:100,background:T.bg,minHeight:'100%',fontFamily:T.sans}}>
 
-      <div style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap"}}>
-        {isA&&<button className="btn bp" onClick={()=>{setNewForm(newVacio);setShowNew(true);}}>➕ Nuevo artículo</button>}
-        <button className="btn bg" onClick={abrirRecuento}>📦 Recuento</button>
-      </div>
-      <input className="fi" value={busqueda} onChange={e=>setBusqueda(e.target.value)} placeholder="Buscar por nombre o etiqueta..." style={{marginBottom:14}}/>
-
-      <div style={{display:"flex",gap:4,overflowX:"auto",marginBottom:16,scrollbarWidth:"none"}}>
-        {ALMACEN_CATS.map(c=><button key={c.id} className={`btn sm${catFiltro===c.id?" bp":" bg"}`} onClick={()=>setCatFiltro(c.id)} style={{flexShrink:0}}>{c.lbl}</button>)}
-      </div>
-
-      {filtered.length===0?<div className="empty"><span className="ico">📦</span><p>Sin artículos en esta categoría</p></div>
-      :filtered.map(a=>{
-        const sC=parseFloat(a.stock_casa)||0;const sA=parseFloat(a.stock_almacen)||0;const sL=parseFloat(a.stock_lavanderia)||0;const sMin=parseFloat(a.stock_minimo)||0;
-        const total=sC+sA;const estado=total<=sMin?"🔴":total<=sMin*2?"🟡":"🟢";
-        return <div key={a.id} className="card" style={{marginBottom:8}}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8,marginBottom:8}}>
-            <div style={{fontSize:14,fontWeight:600,color:"#1A1A1A"}}>{a.nombre}</div>
-            <span style={{fontSize:12,fontWeight:700,color:estado==="🔴"?"#F35757":estado==="🟡"?"#D4A017":"#A6BE59"}}>{estado} {estado==="🔴"?"BAJO":estado==="🟡"?"JUSTO":"OK"}</span>
-          </div>
-          <div style={{display:"flex",gap:12,fontSize:12,color:"#8A8580",marginBottom:10}}>
-            <span>🏠 Casa: <strong style={{color:"#1A1A1A"}}>{sC} {a.unidad||""}</strong></span>
-            <span>📦 Almacén: <strong style={{color:"#1A1A1A"}}>{sA}</strong></span>
-            {a.tiene_lavanderia&&<span>🧺 Lavand: <strong style={{color:"#1A1A1A"}}>{sL}</strong></span>}
-          </div>
-          <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-            <button className="btn bg sm" onClick={()=>{setMovForm({tipo:"entrada",cantidad:"1",ubicacion:"casa",concepto:""});setShowMov(a);}}>+ Entrada</button>
-            <button className="btn bg sm" onClick={()=>{setMovForm({tipo:"salida",cantidad:"1",ubicacion:"casa",concepto:""});setShowMov(a);}}>− Uso</button>
-            {sA>0&&<button className="btn bg sm" onClick={()=>{setMovForm({tipo:"traslado_a_casa",cantidad:"1",ubicacion:"",concepto:""});setShowMov(a);}}>📦→🏠</button>}
-            {sC>0&&<button className="btn bg sm" onClick={()=>{setMovForm({tipo:"traslado_a_almacen",cantidad:"1",ubicacion:"",concepto:""});setShowMov(a);}}>🏠→📦</button>}
-            {isA&&<button className="btn bg sm" onClick={()=>abrirEdit(a)}>✏️</button>}
-            {isA&&<button className="btn br sm" onClick={()=>eliminarArticulo(a)}>🗑</button>}
-          </div>
-        </div>;
-      })}
-
-      {/* Historial */}
-      <div style={{marginTop:20}}>
-        <button onClick={()=>setShowHist(!showHist)} style={{background:"none",border:"none",cursor:"pointer",color:"#8A8580",fontSize:13,fontFamily:"'Inter Tight',sans-serif",fontWeight:600,display:"flex",alignItems:"center",gap:6,padding:0}}>
-          <span>📋 Historial de movimientos</span><span style={{transition:"transform .2s",transform:showHist?"rotate(90deg)":"none",fontSize:16}}>›</span>
+      {/* Header */}
+      <div style={{padding:'54px 20px 16px',display:'flex',alignItems:'flex-end',justifyContent:'space-between'}}>
+        <div>
+          <div style={{fontSize:12,color:T.ink3,fontWeight:500}}>Inventario</div>
+          <div style={{fontSize:30,fontWeight:700,color:T.ink,letterSpacing:-1,lineHeight:1.02}}>Almacén</div>
+        </div>
+        <button onClick={()=>{setNewForm(newVacio);setShowNuevo(true);}} style={{width:38,height:38,borderRadius:999,background:T.ink,border:0,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}>
+          <FmIcon name="plus" size={18} stroke="white"/>
         </button>
-        {showHist&&<div style={{marginTop:10}}>
-          {movimientos.length===0?<div style={{color:"#BFBAB4",fontSize:13}}>Sin movimientos</div>
-          :movimientos.map(m=>{const artN=articulos.find(a=>a.id===m.articulo_id)?.nombre||"—";return <div key={m.id} style={{display:"flex",gap:8,padding:"6px 0",borderBottom:"1px solid rgba(0,0,0,.04)",fontSize:12}}>
-            <span style={{color:"#8A8580"}}>{fmtDT(m.created_at)}</span>
-            <span style={{fontWeight:600}}>{artN}</span>
-            <span className="badge" style={{background:m.tipo==="entrada"?"rgba(166,190,89,.1)":m.tipo==="salida"?"rgba(243,87,87,.1)":"rgba(127,178,255,.1)",color:m.tipo==="entrada"?"#A6BE59":m.tipo==="salida"?"#F35757":"#7FB2FF",fontSize:10}}>{m.tipo}</span>
-            <span>{m.cantidad} {m.ubicacion_origen?`${m.ubicacion_origen}→${m.ubicacion_destino}`:m.ubicacion_destino||""}</span>
+      </div>
+
+      {/* KPIs (usan stock total = casa+almacén) */}
+      <div style={{padding:'0 20px 16px',display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8}}>
+        <div style={{background:T.surface,borderRadius:16,padding:10,border:'1px solid '+T.line}}>
+          <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:4}}>
+            <span style={{width:8,height:8,borderRadius:999,background:T.olive}}/>
+            <span style={{fontSize:10,color:T.ink3,fontWeight:500}}>En stock</span>
+          </div>
+          <div style={{fontSize:22,fontWeight:700,color:T.ink,letterSpacing:-0.5}}>{articulos.length}</div>
+        </div>
+        <div style={{background:T.surface,borderRadius:16,padding:10,border:'1px solid '+T.line}}>
+          <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:4}}>
+            <span style={{width:8,height:8,borderRadius:999,background:T.gold}}/>
+            <span style={{fontSize:10,color:T.ink3,fontWeight:500}}>Stock bajo</span>
+          </div>
+          <div style={{fontSize:22,fontWeight:700,color:T.gold,letterSpacing:-0.5}}>
+            {articulos.filter(a=>{const t=(parseFloat(a.stock_casa)||0)+(parseFloat(a.stock_almacen)||0);const m=parseFloat(a.stock_minimo)||0;return t<m&&t>0;}).length}
+          </div>
+        </div>
+        <div style={{background:T.surface,borderRadius:16,padding:10,border:'1px solid '+T.line}}>
+          <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:4}}>
+            <span style={{width:8,height:8,borderRadius:999,background:T.danger||'#E53E3E'}}/>
+            <span style={{fontSize:10,color:T.ink3,fontWeight:500}}>Crítico</span>
+          </div>
+          <div style={{fontSize:22,fontWeight:700,color:T.danger||'#E53E3E',letterSpacing:-0.5}}>
+            {articulos.filter(a=>((parseFloat(a.stock_casa)||0)+(parseFloat(a.stock_almacen)||0))===0).length}
+          </div>
+        </div>
+      </div>
+
+      {/* Buscador */}
+      <div style={{padding:'0 20px 10px'}}>
+        <div style={{background:T.surface,borderRadius:14,border:'1px solid '+T.line,padding:'10px 14px',display:'flex',alignItems:'center',gap:8}}>
+          <FmIcon name="search" size={14} stroke={T.ink3}/>
+          <input value={busqueda} onChange={e=>setBusqueda(e.target.value)} placeholder="Buscar por nombre o etiqueta..." style={{flex:1,background:'transparent',border:0,outline:'none',fontFamily:T.sans,fontSize:14,color:T.ink}}/>
+        </div>
+      </div>
+
+      {/* Pills categoría */}
+      <div style={{padding:'0 20px 14px',display:'flex',gap:6,overflowX:'auto'}}>
+        {['todos','limpieza','reposicion','ropa_cama','toallas','jardin'].map(c=>{
+          const on=(catFiltro||'todos')===c;
+          const labels={todos:'Todos',limpieza:'Limpieza',reposicion:'Reposición',ropa_cama:'Ropa cama',toallas:'Toallas',jardin:'Jardín'};
+          return(
+            <button key={c} onClick={()=>setCatFiltro&&setCatFiltro(c)} style={{flexShrink:0,height:30,padding:'0 14px',borderRadius:999,border:'1px solid '+(on?T.ink:T.line),background:on?T.ink:T.surface,color:on?'white':T.ink2,fontFamily:T.sans,fontSize:12,fontWeight:700,cursor:'pointer'}}>
+              {labels[c]}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Botón recuento */}
+      <div style={{padding:'0 20px 14px'}}>
+        <button onClick={abrirRecuento} style={{width:'100%',padding:'12px 0',borderRadius:999,border:'1px solid '+T.line,background:T.surface,color:T.ink,fontFamily:T.sans,fontWeight:600,fontSize:13,cursor:'pointer'}}>📦 Recuento de stock</button>
+      </div>
+
+      {/* Lista artículos */}
+      <div style={{padding:'0 20px',display:'flex',flexDirection:'column',gap:8}}>
+        {articulosFiltrados.map((a,i)=>{
+          const sC=parseFloat(a.stock_casa)||0;
+          const sA=parseFloat(a.stock_almacen)||0;
+          const sL=parseFloat(a.stock_lavanderia)||0;
+          const stock=sC+sA;
+          const minimo=parseFloat(a.stock_minimo||0);
+          const nivel=stock===0?'crit':stock<minimo?'low':'ok';
+          const nivelColor={ok:T.olive,low:T.gold,crit:T.danger||'#E53E3E'};
+          const nivelLabel={ok:'OK',low:'Bajo',crit:'Crítico'};
+          const color=nivelColor[nivel];
+          return(
+            <div key={a.id} onClick={()=>setSelArticulo&&setSelArticulo(a)} style={{background:T.surface,borderRadius:16,padding:14,border:'1px solid '+T.line,cursor:'pointer'}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:10}}>
+                <div style={{fontSize:14,fontWeight:700,color:T.ink,letterSpacing:-0.2,flex:1,minWidth:0}}>{a.nombre}</div>
+                <span style={{display:'inline-flex',height:20,padding:'0 8px',borderRadius:999,background:color+'22',color,fontSize:10,fontWeight:700,alignItems:'center',flexShrink:0,marginLeft:8}}>
+                  {nivelLabel[nivel]}
+                </span>
+              </div>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8}}>
+                {[
+                  {emoji:'🏠',label:'Casa',value:sC},
+                  {emoji:'📦',label:'Almacén',value:sA},
+                  {emoji:'🧺',label:'Lavandería',value:sL},
+                ].map((loc,j)=>(
+                  <div key={j} style={{padding:'8px',borderRadius:10,background:T.bg,border:'1px solid transparent',textAlign:'center'}}>
+                    <div style={{fontSize:16}}>{loc.emoji}</div>
+                    <div style={{fontSize:11,color:T.ink3,fontWeight:500,marginTop:2}}>{loc.label}</div>
+                    <div style={{fontSize:18,fontWeight:700,color:T.ink,letterSpacing:-0.5,marginTop:2}}>{loc.value}</div>
+                    <div style={{fontSize:10,color:T.ink3}}>{a.unidad||'uds'}</div>
+                  </div>
+                ))}
+              </div>
+              {/* Barra stock */}
+              {minimo>0&&(
+                <div style={{marginTop:10}}>
+                  <div style={{height:4,background:T.bg,borderRadius:999,overflow:'hidden'}}>
+                    <div style={{width:Math.min(100,(stock/Math.max(minimo*2,1))*100)+'%',height:'100%',background:color}}/>
+                  </div>
+                  <div style={{fontSize:10,color:T.ink3,marginTop:3}}>Mínimo: {minimo} {a.unidad||'uds'}</div>
+                </div>
+              )}
+              {/* Acciones rápidas (conservadas: movimientos, editar, eliminar) */}
+              <div style={{display:'flex',gap:6,flexWrap:'wrap',marginTop:10}} onClick={e=>e.stopPropagation()}>
+                <button className="btn bg sm" onClick={()=>{setMovForm({tipo:"entrada",cantidad:"1",ubicacion:"casa",concepto:""});setShowMov(a);}}>+ Entrada</button>
+                <button className="btn bg sm" onClick={()=>{setMovForm({tipo:"salida",cantidad:"1",ubicacion:"casa",concepto:""});setShowMov(a);}}>− Uso</button>
+                {sA>0&&<button className="btn bg sm" onClick={()=>{setMovForm({tipo:"traslado_a_casa",cantidad:"1",ubicacion:"",concepto:""});setShowMov(a);}}>📦→🏠</button>}
+                {sC>0&&<button className="btn bg sm" onClick={()=>{setMovForm({tipo:"traslado_a_almacen",cantidad:"1",ubicacion:"",concepto:""});setShowMov(a);}}>🏠→📦</button>}
+                {isA&&<button className="btn bg sm" onClick={()=>abrirEdit(a)}>✏️</button>}
+                {isA&&<button className="btn br sm" onClick={()=>eliminarArticulo(a)}>🗑</button>}
+              </div>
+            </div>
+          );
+        })}
+        {articulosFiltrados.length===0&&(
+          <div style={{textAlign:'center',padding:'40px 0',color:T.ink3,fontSize:13}}>Sin artículos en esta categoría</div>
+        )}
+      </div>
+
+      {/* Historial de movimientos (conservado) */}
+      <div style={{padding:'20px 20px 0'}}>
+        <button onClick={()=>setShowHist(!showHist)} style={{background:'none',border:0,cursor:'pointer',color:T.ink3,fontSize:13,fontFamily:T.sans,fontWeight:600,display:'flex',alignItems:'center',gap:6,padding:0}}>
+          <span>📋 Historial de movimientos</span><span style={{transition:'transform .2s',transform:showHist?'rotate(90deg)':'none',fontSize:16}}>›</span>
+        </button>
+        {showHist&&<div style={{marginTop:10,background:T.surface,borderRadius:16,border:'1px solid '+T.line,padding:12}}>
+          {movimientos.length===0?<div style={{color:T.ink3,fontSize:13}}>Sin movimientos</div>
+          :movimientos.map(m=>{const artN=articulos.find(a=>a.id===m.articulo_id)?.nombre||"—";return <div key={m.id} style={{display:'flex',gap:8,padding:'6px 0',borderBottom:'1px solid '+T.line,fontSize:12}}>
+            <span style={{color:T.ink3}}>{fmtDT(m.created_at)}</span>
+            <span style={{fontWeight:600,color:T.ink}}>{artN}</span>
+            <span style={{background:m.tipo==="entrada"?T.olive+'22':m.tipo==="salida"?T.coral+'22':T.softBlue+'22',color:m.tipo==="entrada"?T.olive:m.tipo==="salida"?T.coral:T.softBlue,fontSize:10,padding:'2px 6px',borderRadius:999,fontWeight:700}}>{m.tipo}</span>
+            <span style={{color:T.ink}}>{m.cantidad} {m.ubicacion_origen?`${m.ubicacion_origen}→${m.ubicacion_destino}`:m.ubicacion_destino||""}</span>
           </div>;})}
         </div>}
       </div>
-    </div>
 
-    {/* Modal nuevo artículo */}
-    {showNew&&<div className="ov" onClick={()=>setShowNew(false)}><div className="modal" style={{maxHeight:"90vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
-      <h3>➕ Nuevo artículo</h3>
-      <div className="fg"><label>Nombre *</label><input className="fi" value={newForm.nombre} onChange={e=>setNewForm(v=>({...v,nombre:e.target.value}))} placeholder="Ej: Lejía"/></div>
-      <div className="g2">
-        <div className="fg"><label>Categoría</label><select className="fi" value={newForm.categoria} onChange={e=>setNewForm(v=>({...v,categoria:e.target.value}))}>{ALMACEN_CATS.filter(c=>c.id!=="todos").map(c=><option key={c.id} value={c.id}>{c.lbl}</option>)}</select></div>
-        <div className="fg"><label>Unidad</label><input className="fi" value={newForm.unidad} onChange={e=>setNewForm(v=>({...v,unidad:e.target.value}))} placeholder="bote, paquete, unidad"/></div>
-      </div>
-      <div style={{display:"flex",gap:16,marginBottom:14}}>
-        <div onClick={()=>setNewForm(v=>({...v,es_liquido:!v.es_liquido}))} style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer",fontSize:13}}>
-          <div style={{width:22,height:22,borderRadius:6,border:`2px solid ${newForm.es_liquido?"#EC683E":"#BFBAB4"}`,background:newForm.es_liquido?"#EC683E":"transparent",display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:12,fontWeight:700}}>{newForm.es_liquido?"✓":""}</div>
-          Es líquido
+      {/* Sheet nuevo artículo (diseño rediseñado) */}
+      {showNuevo&&(
+        <div style={{position:'fixed',inset:0,background:'rgba(20,15,10,0.6)',zIndex:999,display:'flex',alignItems:'flex-end',fontFamily:T.sans}} onClick={()=>setShowNuevo(false)}>
+          <div style={{width:'100%',background:T.bg,borderTopLeftRadius:24,borderTopRightRadius:24,maxHeight:'85vh',overflow:'auto',paddingBottom:34}} onClick={e=>e.stopPropagation()}>
+            <div style={{padding:'14px 0 0',display:'flex',justifyContent:'center'}}>
+              <div style={{width:44,height:4,borderRadius:999,background:T.line}}/>
+            </div>
+            <div style={{padding:'14px 20px 16px',display:'flex',justifyContent:'space-between',alignItems:'center',borderBottom:'1px solid '+T.line}}>
+              <div style={{fontSize:22,fontWeight:700,color:T.ink,letterSpacing:-0.6}}>Nuevo artículo</div>
+              <button onClick={()=>setShowNuevo(false)} style={{width:30,height:30,borderRadius:999,background:T.surface,border:'1px solid '+T.line,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}>
+                <FmIcon name="x" size={14} stroke={T.ink}/>
+              </button>
+            </div>
+            <div style={{padding:'16px 20px',display:'flex',flexDirection:'column',gap:14}}>
+              {/* Nombre */}
+              <div>
+                <div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:0.5,textTransform:'uppercase',marginBottom:8}}>Nombre</div>
+                <div style={{background:T.surface,border:'1px solid '+T.line,borderRadius:14,padding:'12px 14px'}}>
+                  <input value={formArticulo?.nombre||''} onChange={e=>setFormArticulo&&setFormArticulo(v=>({...v,nombre:e.target.value}))} placeholder="Ej. Detergente suelos 5L" style={{width:'100%',background:'transparent',border:0,outline:'none',fontFamily:T.sans,fontSize:14,color:T.ink}}/>
+                </div>
+              </div>
+              {/* Categoría */}
+              <div>
+                <div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:0.5,textTransform:'uppercase',marginBottom:8}}>Categoría</div>
+                <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+                  {['limpieza','reposicion','ropa_cama','toallas','jardin','otros'].map(c=>{
+                    const on=(formArticulo?.categoria||'')===c;
+                    const labels={limpieza:'Limpieza',reposicion:'Reposición',ropa_cama:'Ropa cama',toallas:'Toallas',jardin:'Jardín',otros:'Otros'};
+                    return(
+                      <button key={c} onClick={()=>setFormArticulo&&setFormArticulo(v=>({...v,categoria:c}))} style={{padding:'7px 12px',borderRadius:999,border:'1px solid '+(on?T.ink:T.line),background:on?T.ink:T.surface,color:on?'white':T.ink2,fontFamily:T.sans,fontSize:12,fontWeight:700,cursor:'pointer'}}>
+                        {labels[c]}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              {/* Stock y mínimo */}
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+                <div>
+                  <div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:0.5,textTransform:'uppercase',marginBottom:8}}>Stock actual</div>
+                  <div style={{background:T.surface,border:'1px solid '+T.line,borderRadius:14,padding:'12px 14px'}}>
+                    <input type="number" value={formArticulo?.stock_actual||''} onChange={e=>setFormArticulo&&setFormArticulo(v=>({...v,stock_actual:e.target.value}))} placeholder="0" style={{width:'100%',background:'transparent',border:0,outline:'none',fontFamily:T.sans,fontSize:20,fontWeight:700,color:T.ink}}/>
+                  </div>
+                </div>
+                <div>
+                  <div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:0.5,textTransform:'uppercase',marginBottom:8}}>Stock mínimo</div>
+                  <div style={{background:T.surface,border:'1px solid '+T.line,borderRadius:14,padding:'12px 14px'}}>
+                    <input type="number" value={formArticulo?.stock_minimo||''} onChange={e=>setFormArticulo&&setFormArticulo(v=>({...v,stock_minimo:e.target.value}))} placeholder="0" style={{width:'100%',background:'transparent',border:0,outline:'none',fontFamily:T.sans,fontSize:20,fontWeight:700,color:T.ink}}/>
+                  </div>
+                </div>
+              </div>
+              {/* Unidad */}
+              <div>
+                <div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:0.5,textTransform:'uppercase',marginBottom:8}}>Unidad</div>
+                <div style={{display:'flex',gap:6}}>
+                  {['uds','L','kg','m','pack'].map(u=>{
+                    const on=(formArticulo?.unidad||'uds')===u;
+                    return(
+                      <button key={u} onClick={()=>setFormArticulo&&setFormArticulo(v=>({...v,unidad:u}))} style={{flex:1,padding:'10px 0',borderRadius:12,border:'1px solid '+(on?T.ink:T.line),background:on?T.ink:T.surface,color:on?'white':T.ink2,fontFamily:T.sans,fontSize:13,fontWeight:700,cursor:'pointer'}}>
+                        {u}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              {/* Botones */}
+              <div style={{display:'flex',gap:8,paddingTop:4}}>
+                <button onClick={()=>setShowNuevo(false)} style={{flex:1,padding:'14px 0',borderRadius:999,border:'1px solid '+T.line,background:T.surface,color:T.ink,fontFamily:T.sans,fontWeight:600,fontSize:14,cursor:'pointer'}}>Cancelar</button>
+                <button onClick={()=>guardarArticulo&&guardarArticulo()} disabled={saving||!formArticulo?.nombre} style={{flex:2,padding:'14px 0',borderRadius:999,border:0,background:T.ink,color:'white',fontFamily:T.sans,fontWeight:700,fontSize:14,cursor:saving?'default':'pointer',opacity:saving||!formArticulo?.nombre?0.5:1}}>{saving?'Guardando…':'Guardar artículo'}</button>
+              </div>
+            </div>
+          </div>
         </div>
-        <div onClick={()=>setNewForm(v=>({...v,tiene_lavanderia:!v.tiene_lavanderia}))} style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer",fontSize:13}}>
-          <div style={{width:22,height:22,borderRadius:6,border:`2px solid ${newForm.tiene_lavanderia?"#EC683E":"#BFBAB4"}`,background:newForm.tiene_lavanderia?"#EC683E":"transparent",display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:12,fontWeight:700}}>{newForm.tiene_lavanderia?"✓":""}</div>
-          Va a lavandería
-        </div>
-      </div>
-      <div className="g2">
-        <div className="fg"><label>Stock mínimo</label><input type="number" className="fi" value={newForm.stock_minimo} onChange={e=>setNewForm(v=>({...v,stock_minimo:e.target.value}))}/></div>
-        <div className="fg"><label>Código barras</label><input className="fi" value={newForm.codigo_barras} onChange={e=>setNewForm(v=>({...v,codigo_barras:e.target.value}))} placeholder="Opcional"/></div>
-      </div>
-      <div className="g2">
-        <div className="fg"><label>Stock inicial casa</label><input type="number" className="fi" value={newForm.stock_casa} onChange={e=>setNewForm(v=>({...v,stock_casa:e.target.value}))}/></div>
-        <div className="fg"><label>Stock inicial almacén</label><input type="number" className="fi" value={newForm.stock_almacen} onChange={e=>setNewForm(v=>({...v,stock_almacen:e.target.value}))}/></div>
-      </div>
-      <div className="fg"><label>Etiquetas (para búsqueda)</label><input className="fi" value={newForm.etiquetas||""} onChange={e=>setNewForm(v=>({...v,etiquetas:e.target.value}))} placeholder="#kh7 #desengrasante"/><div style={{fontSize:11,color:"#8A8580",marginTop:3}}>💡 No visibles, solo para buscar</div></div>
-      <div className="mft"><button className="btn bg" onClick={()=>setShowNew(false)}>Cancelar</button><button className="btn bp" onClick={crearArticulo} disabled={saving||!newForm.nombre}>{saving?"Creando…":"➕ Crear"}</button></div>
-    </div></div>}
+      )}
 
-    {/* Modal editar artículo */}
-    {showEdit&&<div className="ov" onClick={()=>setShowEdit(null)}><div className="modal" style={{maxHeight:"90vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
+      {/* Modal editar artículo (conservado) */}
+      {showEdit&&<div className="ov" onClick={()=>setShowEdit(null)}><div className="modal" style={{maxHeight:"90vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
       <h3>✏️ Editar artículo</h3>
       <div className="fg"><label>Nombre</label><input className="fi" value={editForm.nombre} onChange={e=>setEditForm(v=>({...v,nombre:e.target.value}))}/></div>
       <div className="g2">
@@ -6815,7 +6962,9 @@ function AlmacenPage({perfil,tok,rol}){
         </div>
       </div>
     </div>}
-  </>;
+
+    </div>
+  );
 }
 
 // ─── GASTOS ─────────────────────────────────────────────────────────────────
