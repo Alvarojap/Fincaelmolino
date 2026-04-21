@@ -9546,7 +9546,7 @@ function Visitas({perfil,tok,rol,setPage,navTarget,setNavTarget}){
   const [form,setForm]=useState(formVacio);
   const [formRes,setFormRes]=useState({fecha_evento:"",precio:"",contacto:"",obs:"",estado:"visita"});
   // Estados del rediseño
-  const [tabVisitas,setTabVisitas]=useState("todas");
+  const [tabVisitas,setTabVisitas]=useState("pendiente");
   const [notasVisita,setNotasVisita]=useState("");
   const [notasDebounce,setNotasDebounce]=useState(null);
   const [queryVisita,setQueryVisita]=useState("");
@@ -9728,18 +9728,18 @@ function Visitas({perfil,tok,rol,setPage,navTarget,setNavTarget}){
   const guardarNotasVisita=async(id,nota)=>{await guardarNota({id},nota);};
   const convertirVisita=()=>{abrirConvertir();};
   // Filtrado con mapeo de estados template → BD
+  const esConvertida=v=>v.estado==='convertida'||!!v.reserva_id;
+  const esArchivada=v=>!esConvertida(v)&&(v.estado==='realizada'||v.estado==='no_presentado'||v.estado==='reserva_cancelada');
   const visitasFiltradas=visitas.filter(v=>{
-    const tab=tabVisitas||'todas';
-    if(tab==='todas')return true;
+    const tab=tabVisitas||'pendiente';
     if(tab==='pendiente')return v.estado==='pendiente';
-    if(tab==='confirmada')return v.estado==='realizada'||v.estado==='convertida';
-    if(tab==='pasadas')return v.estado==='no_presentado'||v.estado==='reserva_cancelada';
-    return v.estado===tab;
+    if(tab==='archivadas')return esArchivada(v);
+    if(tab==='convertidas')return esConvertida(v);
+    return true;
   });
   const cntPendientes=visitas.filter(v=>v.estado==='pendiente').length;
-  const cntConfirmadas=visitas.filter(v=>v.estado==='realizada'||v.estado==='convertida').length;
-  const cntPasadas=visitas.filter(v=>v.estado==='no_presentado'||v.estado==='reserva_cancelada').length;
-  const cntConvertidas=visitas.filter(v=>v.estado==='convertida'||v.reserva_id).length;
+  const cntArchivadas=visitas.filter(esArchivada).length;
+  const cntConvertidas=visitas.filter(esConvertida).length;
 
   return (
     <div style={{background:T.bg,minHeight:'100%',paddingBottom:100,fontFamily:T.sans}}>
@@ -9773,12 +9773,11 @@ function Visitas({perfil,tok,rol,setPage,navTarget,setNavTarget}){
       <div style={{padding:'0 20px 14px'}}>
         <div style={{display:'flex',gap:6,overflowX:'auto'}}>
           {[
-            {k:'todas',      l:'Todas',       n:visitas.length},
-            {k:'pendiente',  l:'Pendientes',  n:cntPendientes},
-            {k:'confirmada', l:'Confirmadas', n:cntConfirmadas},
-            {k:'pasadas',    l:'Pasadas',     n:cntPasadas},
+            {k:'pendiente',   l:'Pendientes',   n:cntPendientes},
+            {k:'archivadas',  l:'Archivadas',   n:cntArchivadas},
+            {k:'convertidas', l:'Convertidas',  n:cntConvertidas},
           ].map(t=>{
-            const on=(tabVisitas||'todas')===t.k;
+            const on=(tabVisitas||'pendiente')===t.k;
             return(
               <button key={t.k} onClick={()=>setTabVisitas&&setTabVisitas(t.k)} style={{padding:'8px 14px',borderRadius:999,background:on?T.ink:T.surface,color:on?'#fff':T.ink2,border:'1px solid '+(on?T.ink:T.line),fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:T.sans,flexShrink:0,display:'inline-flex',alignItems:'center',gap:6}}>
                 {t.l}
@@ -9798,9 +9797,10 @@ function Visitas({perfil,tok,rol,setPage,navTarget,setNavTarget}){
           const evento=v.tipo_evento||'Evento';
           const fecha=v.fecha?new Date(v.fecha+'T12:00:00').toLocaleDateString('es-ES',{day:'numeric',month:'short',year:'numeric'}):'Sin fecha';
           const convertida=v.estado==='convertida'||!!v.reserva_id;
+          const esCoord=!!v.es_coordinacion;
           return(
             <div key={v.id} onClick={()=>setSelVisita&&setSelVisita(v)} style={{background:T.surface,border:'1px solid '+T.line,borderRadius:18,padding:14,display:'flex',gap:12,alignItems:'center',cursor:'pointer'}}>
-              <span style={{width:4,height:48,borderRadius:4,background:color,flexShrink:0}}/>
+              <span style={{width:4,height:48,borderRadius:4,background:esCoord?T.lavender:color,flexShrink:0}}/>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontSize:14.5,fontWeight:800,color:T.ink,letterSpacing:-0.3,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{nombre}</div>
                 <div style={{fontSize:12,color:T.ink3,fontWeight:600,marginTop:3,display:'flex',alignItems:'center',gap:6}}>
@@ -9808,8 +9808,13 @@ function Visitas({perfil,tok,rol,setPage,navTarget,setNavTarget}){
                   <span style={{color:T.ink4||T.ink3}}>·</span>
                   <span>{fecha}</span>
                 </div>
-                <div style={{marginTop:8,display:'flex',alignItems:'center',gap:6}}>
+                <div style={{marginTop:8,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
                   <span style={{padding:'3px 9px',borderRadius:999,background:color,color:T.ink,fontSize:10,fontWeight:700}}>{label}</span>
+                  {esCoord&&(
+                    <span style={{padding:'3px 9px',borderRadius:999,background:T.lavender,color:T.ink,fontSize:10,fontWeight:700,display:'inline-flex',alignItems:'center',gap:4}}>
+                      <FmIcon name="calendar" size={9} stroke={T.ink} sw={3}/> Coordinación
+                    </span>
+                  )}
                   {convertida&&(
                     <span style={{padding:'3px 9px',borderRadius:999,background:T.ink,color:'#fff',fontSize:10,fontWeight:700,display:'inline-flex',alignItems:'center',gap:4}}>
                       <FmIcon name="check" size={9} stroke="#fff" sw={3}/> Reserva
@@ -9845,20 +9850,31 @@ function Visitas({perfil,tok,rol,setPage,navTarget,setNavTarget}){
 
           {/* Título */}
           <div style={{padding:'14px 20px 18px'}}>
-            {(()=>{
-              const color=VISITA_STATE_COLOR[selVisita.estado||'pendiente']||T.gold;
-              const label=VISITA_STATE_LABEL[selVisita.estado||'pendiente']||'Pendiente';
-              return(
-                <div style={{display:'inline-flex',alignItems:'center',gap:6,padding:'4px 10px',borderRadius:999,background:color,color:T.ink,fontSize:10.5,fontWeight:700,letterSpacing:0.4,textTransform:'uppercase',marginBottom:10}}>
-                  <span style={{width:5,height:5,borderRadius:999,background:T.ink}}/>{label}
+            <div style={{display:'flex',flexWrap:'wrap',gap:6,marginBottom:10}}>
+              {(()=>{
+                const color=VISITA_STATE_COLOR[selVisita.estado||'pendiente']||T.gold;
+                const label=VISITA_STATE_LABEL[selVisita.estado||'pendiente']||'Pendiente';
+                return(
+                  <div style={{display:'inline-flex',alignItems:'center',gap:6,padding:'4px 10px',borderRadius:999,background:color,color:T.ink,fontSize:10.5,fontWeight:700,letterSpacing:0.4,textTransform:'uppercase'}}>
+                    <span style={{width:5,height:5,borderRadius:999,background:T.ink}}/>{label}
+                  </div>
+                );
+              })()}
+              {selVisita.es_coordinacion&&(
+                <div style={{display:'inline-flex',alignItems:'center',gap:6,padding:'4px 10px',borderRadius:999,background:T.lavender,color:T.ink,fontSize:10.5,fontWeight:700,letterSpacing:0.4,textTransform:'uppercase'}}>
+                  <FmIcon name="calendar" size={11} stroke={T.ink} sw={2.5}/>
+                  Visita de coordinación
                 </div>
-              );
-            })()}
+              )}
+            </div>
             <div style={{fontSize:28,fontWeight:800,color:T.ink,letterSpacing:-1,lineHeight:1.05,display:'block'}}>
               {selVisita.nombre||'Visita'}
             </div>
             <div style={{fontSize:13,color:T.ink2,fontWeight:600,marginTop:4}}>
               {selVisita.tipo_evento||'Evento'} · {selVisita.invitados||0} personas
+              {selVisita.es_coordinacion&&selVisita.reserva_id&&reservasMap[selVisita.reserva_id]&&(
+                <span style={{color:T.ink3}}> · Reserva: <strong style={{color:T.ink,fontWeight:700}}>{reservasMap[selVisita.reserva_id]}</strong></span>
+              )}
             </div>
           </div>
 
