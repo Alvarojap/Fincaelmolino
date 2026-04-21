@@ -2756,12 +2756,23 @@ function DashJ({perfil,jsem,jpunt,cwk,setPage,tok}){
   const tareasAdminOk=srvTareas.length>0&&srvTareas.every(t=>t.done);
   const totalAcum=parseFloat(srvActivo?.horas_totales||0);
 
-  return <>
+  return <div style={{paddingBottom:100,background:T.bg,minHeight:"100%",fontFamily:T.sans}}>
     {/* Greeting */}
-    <div style={{padding:"54px 20px 16px"}}><div style={{fontSize:12,color:T.ink3,fontWeight:500}}>{new Date().toLocaleDateString("es-ES",{weekday:"long",day:"numeric",month:"long"}).replace(/^\w/,c=>c.toUpperCase())}</div><div style={{fontSize:28,fontWeight:700,color:T.ink,letterSpacing:-.8,lineHeight:1.02,marginTop:2}}>Hola, {perfil.nombre.split(" ")[0]} 🌿</div></div>
-    <div className="pb">
-      {meteoJ&&<div style={{background:T.softBlue+"14",borderRadius:16,padding:"10px 14px",marginBottom:14,fontSize:13,color:"#2A5BA0",fontWeight:500,display:"flex",alignItems:"center",gap:8}}><FmIcon name="cloud" size={16} stroke="#2A5BA0"/>{meteoJ.rain>10?`Lluvia abundante prevista ${meteoJ.day} (${meteoJ.rain}mm) — el riego puede ser innecesario`:`Lluvia prevista ${meteoJ.day} (${meteoJ.rain}mm) — considera posponer el riego`}</div>}
-      {coordPJ.map(c=>{
+    <div style={{padding:"54px 20px 16px"}}>
+      <div style={{fontSize:12,color:T.ink3,fontWeight:500}}>{new Date().toLocaleDateString("es-ES",{weekday:"long",day:"numeric",month:"long"}).replace(/^\w/,c=>c.toUpperCase())}</div>
+      <div style={{fontSize:28,fontWeight:700,color:T.ink,letterSpacing:-.8,lineHeight:1.02,marginTop:2}}>Hola, {perfil.nombre.split(" ")[0]} 🌿</div>
+    </div>
+
+    {/* Alerta meteorológica */}
+    {meteoJ&&<div style={{padding:"0 20px 12px"}}>
+      <div style={{background:T.softBlue+"22",borderRadius:14,padding:"10px 14px",border:"1px solid "+T.softBlue+"44",display:"flex",alignItems:"center",gap:10}}>
+        <FmIcon name="cloud" size={16} stroke="#2A5BA0"/>
+        <div style={{fontSize:12,color:"#2A5BA0",fontWeight:600}}>{meteoJ.rain>10?`Lluvia abundante prevista ${meteoJ.day} (${meteoJ.rain}mm) — el riego puede ser innecesario`:`Lluvia prevista ${meteoJ.day} (${meteoJ.rain}mm) — considera posponer el riego`}</div>
+      </div>
+    </div>}
+
+    {/* Cards de coordinación */}
+    {coordPJ.map(c=>{
         const tQ=perfil?.es_operario?SB_KEY:tok;
         const fechaFmt=c.fecha_checkin_siguiente?new Date(c.fecha_checkin_siguiente+"T12:00:00").toLocaleDateString("es-ES",{weekday:"long",day:"numeric",month:"long"}):"—";
         const diasH=c.fecha_checkin_siguiente?Math.ceil((new Date(c.fecha_checkin_siguiente+"T12:00:00")-new Date())/(86400000)):0;
@@ -2802,33 +2813,44 @@ function DashJ({perfil,jsem,jpunt,cwk,setPage,tok}){
       })}
 
       {/* SERVICIO ACTIVO */}
-      {srvActivo&&<div style={{background:T.surface,border:`1px solid ${T.line}`,borderRadius:20,padding:16,marginBottom:16}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}><span style={{fontSize:13,fontWeight:700,color:T.ink}}>🌿 Servicio activo</span><OpsStatePill estado="en_curso"/></div>
-        <div style={{fontSize:16,fontWeight:700,color:T.ink,letterSpacing:-.3,marginBottom:4}}>{srvActivo.nombre}</div>
-        {(srvActivo.fecha_inicio||srvActivo.fecha_fin)&&<div style={{fontSize:11,color:T.ink3,marginBottom:4,display:"flex",alignItems:"center",gap:4}}><FmIcon name="calendar" size={11} stroke={T.ink3}/>{srvActivo.fecha_inicio?new Date(srvActivo.fecha_inicio+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"}):""}{srvActivo.fecha_fin?` → ${new Date(srvActivo.fecha_fin+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"})}`:""}</div>}
+      {srvActivo&&<div style={{padding:"0 20px 14px"}}><div style={{background:T.surface,borderRadius:20,padding:16,border:"1px solid "+T.line}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+          <div style={{fontSize:11,color:T.ink3,letterSpacing:1,textTransform:"uppercase",fontWeight:700}}>Servicio activo</div>
+          <OpsStatePill estado="en_curso"/>
+        </div>
+        <div style={{fontSize:18,fontWeight:700,color:T.ink,letterSpacing:-.3,marginBottom:4}}>{srvActivo.nombre}</div>
+        {(srvActivo.fecha_inicio||srvActivo.fecha_fin)&&<div style={{fontSize:11,color:T.ink3,marginBottom:6,display:"flex",alignItems:"center",gap:4}}><FmIcon name="calendar" size={11} stroke={T.ink3}/>{srvActivo.fecha_inicio?new Date(srvActivo.fecha_inicio+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"}):""}{srvActivo.fecha_fin?` → ${new Date(srvActivo.fecha_fin+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"})}`:""}</div>}
         <div style={{fontSize:12,color:T.ink3,marginBottom:6}}>Tareas: {srvTareas.filter(t=>t.done).length}/{srvTareas.length}{srvExtras.length>0?` + ${srvExtras.length} extra`:""}</div>
         <div style={{height:6,background:T.bg,borderRadius:999,overflow:"hidden",marginBottom:14}}><div style={{height:"100%",background:T.olive,width:`${srvTareas.length?(srvTareas.filter(t=>t.done).length/srvTareas.length)*100:0}%`}}/></div>
 
         {/* Cronómetro */}
         {jornadaId&&!jornadaFin&&<>
-          <div style={{background:"linear-gradient(150deg,#1A1A1A 0%,#2A2722 100%)",borderRadius:16,padding:16,color:"white",marginBottom:12,position:"relative",overflow:"hidden"}}>
-            <div style={{position:"absolute",top:-20,right:-20,width:100,height:100,borderRadius:999,background:T.olive+"24"}}/>
-            <div style={{position:"relative"}}>
-              <div style={{fontSize:10,color:"rgba(255,255,255,.7)",letterSpacing:1,textTransform:"uppercase",fontWeight:700,marginBottom:4}}>{pausado?"⏸ En pausa":"⏱ Esta jornada"}</div>
-              <div style={{fontSize:42,fontWeight:300,fontFamily:"monospace",letterSpacing:-2,lineHeight:1,fontVariantNumeric:"tabular-nums"}}>{fmtEl(tiempoJornada)}</div>
-              {totalAcum>0&&<div style={{fontSize:11,color:"rgba(255,255,255,.6)",marginTop:6}}>Acumulado: <b style={{color:"white"}}>{fmtHM(totalAcum*60)}</b></div>}
+          <div style={{background:"linear-gradient(150deg,#1A1A1A 0%,#2A2722 100%)",borderRadius:20,padding:20,color:"white",marginBottom:12,position:"relative",overflow:"hidden"}}>
+            <div style={{position:"absolute",top:-30,right:-30,width:140,height:140,borderRadius:999,background:T.olive+"24"}}/>
+            <div style={{position:"absolute",bottom:-50,left:-30,width:180,height:180,borderRadius:999,background:T.olive+"14"}}/>
+            <div style={{position:"relative",display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6}}>
+              <div>
+                <div style={{fontSize:10,color:"rgba(255,255,255,.7)",letterSpacing:1,textTransform:"uppercase",fontWeight:700}}>Cronómetro · {pausado?"pausado":"activo"}</div>
+                <div style={{fontSize:14,fontWeight:700,marginTop:3}}>{srvActivo.nombre}</div>
+              </div>
+              <div style={{width:10,height:10,borderRadius:999,background:pausado?"rgba(255,255,255,.3)":"#FF5555",boxShadow:pausado?"none":"0 0 10px #FF5555"}}/>
+            </div>
+            <div style={{position:"relative",fontFamily:"monospace",fontSize:52,fontWeight:300,letterSpacing:-2,lineHeight:1,marginTop:10,fontVariantNumeric:"tabular-nums"}}>{fmtEl(tiempoJornada)}</div>
+            {totalAcum>0&&<div style={{position:"relative",fontSize:11,color:"rgba(255,255,255,.6)",marginTop:6}}>Acumulado: <b style={{color:"white"}}>{fmtHM(totalAcum*60)}</b></div>}
+            <div style={{position:"relative",display:"flex",gap:8,marginTop:14}}>
+              <button onClick={togglePausa} disabled={saving2} style={{flex:1,padding:12,borderRadius:12,border:0,background:"rgba(255,255,255,.15)",color:"white",fontFamily:T.sans,fontSize:13,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>{pausado?"▶️ Reanudar":"⏸️ Pausar"}</button>
+              <button onClick={()=>setShowFinJornada(true)} style={{flex:1,padding:12,borderRadius:12,border:0,background:T.olive,color:T.ink,fontFamily:T.sans,fontSize:13,fontWeight:700,cursor:"pointer"}}>Terminar jornada</button>
             </div>
           </div>
-          <div style={{display:"flex",gap:8,marginBottom:14}}>
-            <button onClick={togglePausa} disabled={saving2} style={{flex:1,padding:12,borderRadius:12,border:0,background:pausado?T.ink:T.bg,color:pausado?"white":T.ink,fontFamily:T.sans,fontSize:13,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>{pausado?"▶️ Reanudar":"⏸️ Pausar"}</button>
-            <button onClick={()=>setShowFinJornada(true)} style={{flex:1,padding:12,borderRadius:12,border:0,background:T.olive,color:T.ink,fontFamily:T.sans,fontSize:13,fontWeight:700,cursor:"pointer"}}>Terminar jornada</button>
-          </div>
         </>}
-        {jornadaFin&&<div style={{background:T.olive+"14",borderRadius:12,padding:"10px 14px",marginBottom:12,fontSize:13,color:"#4A7A2E",textAlign:"center",fontWeight:600}}>✅ Jornada completada — {fmtHM(jornadaDurMin||0)}</div>}
-        {!jornadaId&&!jornadaFin&&!showNuevaJornada&&<button onClick={iniciarJornada} disabled={saving2} style={{width:"100%",padding:"14px 0",borderRadius:999,border:0,background:T.ink,color:"white",fontFamily:T.sans,fontSize:15,fontWeight:700,cursor:"pointer",marginBottom:14}}>▶️ Iniciar jornada</button>}
+        {jornadaFin&&<div style={{background:T.olive+"22",borderRadius:16,padding:14,border:"1px solid "+T.olive+"44",display:"flex",alignItems:"center",gap:12,marginBottom:12}}>
+          <div style={{width:36,height:36,borderRadius:999,background:T.olive,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><FmIcon name="check" size={18} stroke="white" sw={3}/></div>
+          <div><div style={{fontSize:13,fontWeight:700,color:T.ink}}>Jornada completada</div><div style={{fontSize:11,color:T.ink3,marginTop:2}}>{fmtHM(jornadaDurMin||0)}</div></div>
+        </div>}
+        {!jornadaId&&!jornadaFin&&!showNuevaJornada&&<button onClick={iniciarJornada} disabled={saving2} style={{width:"100%",padding:"14px 0",borderRadius:999,border:0,background:T.ink,color:"white",fontFamily:T.sans,fontSize:15,fontWeight:700,cursor:"pointer",marginBottom:14,display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>▶️ Iniciar jornada</button>}
 
         {/* Checklist tareas asignadas */}
-        <div style={{fontSize:11,color:"#EC683E",fontWeight:600,textTransform:"uppercase",letterSpacing:1,marginBottom:6,marginTop:8}}>Tareas asignadas</div>
+        <div style={{fontSize:11,color:T.terracotta,fontWeight:700,textTransform:"uppercase",letterSpacing:1,marginBottom:6,marginTop:8}}>Tareas asignadas</div>
         {srvTareas.map(t=><div key={t.id} className={`cli${t.done?" done":""}`} style={{marginBottom:4}}>
           <div className={`chk${t.done?" on":""}`} onClick={()=>toggleTarea(t.id,t.done)} style={{cursor:"pointer"}}/>
           <div style={{flex:1,minWidth:0}}>
@@ -2866,35 +2888,61 @@ function DashJ({perfil,jsem,jpunt,cwk,setPage,tok}){
 
         {/* Completar servicio */}
         {tareasAdminOk&&(!jornadaId||jornadaFin)&&<button className="btn bp" style={{width:"100%",justifyContent:"center",padding:"14px",fontSize:15,marginTop:12,background:"#A6BE59"}} onClick={()=>setShowFinSrv(true)}>✅ Marcar servicio completado</button>}
-      </div>}
+      </div></div>}
 
       {/* Servicios de jardín activos (from coordinación) */}
-      {srvJardinActivos.map(s=>{const tareas=s._tareas||[];const hechas=tareas.filter(t=>t.done).length;const tQ=perfil?.es_operario?SB_KEY:tok;
-        return <div key={s.id} className="card" style={{marginBottom:14,border:"1px solid rgba(166,190,89,.3)",background:"rgba(166,190,89,.04)"}}>
-          <div className="chdr"><span className="ctit">🌿 {s.nombre}</span><span className="badge" style={{background:"rgba(166,190,89,.1)",color:"#A6BE59"}}>{hechas}/{tareas.length}</span></div>
-          {s.fecha_inicio&&<div style={{fontSize:11,color:"#8A8580",marginBottom:8}}>📅 {new Date(s.fecha_inicio+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"})}</div>}
-          <div className="prog" style={{marginBottom:10,height:6}}><div className="pfill" style={{width:`${tareas.length?(hechas/tareas.length)*100:0}%`}}/></div>
-          {tareas.map(t=><div key={t.id} className={`cli${t.done?" done":""}`} style={{marginBottom:4}}>
-            <div className={`chk${t.done?" on":""}`} onClick={async()=>{try{await sbPatch("jardin_servicio_tareas",`id=eq.${t.id}`,{done:!t.done,completado_por:!t.done?perfil.nombre:null,completado_ts:!t.done?new Date().toISOString():null},tQ);await loadCoordYServicios();}catch(_){}}} style={{cursor:"pointer"}}/>
-            <div style={{flex:1,minWidth:0}}>
-              <div className={`tl${t.done?" done":""}`}>{t.txt}</div>
-              {t.done&&<div className="tm">✓ {t.completado_por}</div>}
+      {srvJardinActivos.length>0&&<div style={{padding:"0 20px 14px"}}>
+        <div style={{fontSize:11,color:T.ink3,letterSpacing:1,textTransform:"uppercase",fontWeight:700,marginBottom:8}}>Otros servicios activos</div>
+        {srvJardinActivos.map(s=>{const tareas=s._tareas||[];const hechas=tareas.filter(t=>t.done).length;const tQ=perfil?.es_operario?SB_KEY:tok;
+          return <div key={s.id} style={{background:T.surface,borderRadius:16,border:"1px solid "+T.olive+"33",padding:14,marginBottom:8}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+              <div style={{fontSize:14,fontWeight:700,color:T.ink}}>{s.nombre}</div>
+              <span style={{fontSize:10,padding:"2px 8px",borderRadius:999,background:T.olive+"22",color:"#4A7A2E",fontWeight:700}}>{hechas}/{tareas.length}</span>
             </div>
-          </div>)}
-          {hechas===tareas.length&&tareas.length>0&&<button className="btn bp" style={{width:"100%",justifyContent:"center",marginTop:8,background:"#A6BE59"}} onClick={async()=>{try{await sbPatch("jardin_servicios",`id=eq.${s.id}`,{estado:"completado"},tQ);const adms=await sbGet("usuarios","?rol=eq.admin&select=id",tQ).catch(()=>[]);for(const a of adms)await sbPost("notificaciones",{para:a.id,txt:`✅ ${perfil.nombre} ha completado "${s.nombre}"`},tQ).catch(()=>{});await loadCoordYServicios();}catch(_){}}}>✅ Marcar como completado</button>}
-        </div>;
-      })}
+            {s.fecha_inicio&&<div style={{fontSize:11,color:T.ink3,marginBottom:8,display:"flex",alignItems:"center",gap:4}}><FmIcon name="calendar" size={11} stroke={T.ink3}/>{new Date(s.fecha_inicio+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"})}</div>}
+            <div style={{height:5,background:T.bg,borderRadius:999,overflow:"hidden",marginBottom:10}}><div style={{width:`${tareas.length?(hechas/tareas.length)*100:0}%`,height:"100%",background:T.olive}}/></div>
+            {tareas.map(t=><div key={t.id} className={`cli${t.done?" done":""}`} style={{marginBottom:4}}>
+              <div className={`chk${t.done?" on":""}`} onClick={async()=>{try{await sbPatch("jardin_servicio_tareas",`id=eq.${t.id}`,{done:!t.done,completado_por:!t.done?perfil.nombre:null,completado_ts:!t.done?new Date().toISOString():null},tQ);await loadCoordYServicios();}catch(_){}}} style={{cursor:"pointer"}}/>
+              <div style={{flex:1,minWidth:0}}>
+                <div className={`tl${t.done?" done":""}`}>{t.txt}</div>
+                {t.done&&<div className="tm">✓ {t.completado_por}</div>}
+              </div>
+            </div>)}
+            {hechas===tareas.length&&tareas.length>0&&<button style={{width:"100%",padding:"10px 0",borderRadius:999,border:0,background:T.olive,color:"white",fontFamily:T.sans,fontSize:13,fontWeight:700,cursor:"pointer",marginTop:8}} onClick={async()=>{try{await sbPatch("jardin_servicios",`id=eq.${s.id}`,{estado:"completado"},tQ);const adms=await sbGet("usuarios","?rol=eq.admin&select=id",tQ).catch(()=>[]);for(const a of adms)await sbPost("notificaciones",{para:a.id,txt:`✅ ${perfil.nombre} ha completado "${s.nombre}"`},tQ).catch(()=>{});await loadCoordYServicios();}catch(_){}}}>✅ Marcar como completado</button>}
+          </div>;
+        })}
+      </div>}
+
+      {/* Stats rápidas */}
+      <div style={{padding:"0 20px 14px",display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+        <OpsMiniKpi value={`${comp}/${tot}`} label="Tareas semana" color={T.olive}/>
+        <OpsMiniKpi value={fmtEl(tiempoJornada)} label="Tiempo hoy" color={T.ink}/>
+      </div>
 
       {/* Checklist semanal solo si NO hay servicio activo */}
-      {!srvActivo&&<>
-        <div className="sg"><SC lbl="Tareas esta semana" val={tot}/><SC lbl="Completadas" val={comp} prog={tot?comp/tot:0} valC="#10b981" sub={comp===tot&&tot>0?"¡Al día! ✓":undefined}/><SC lbl="Pendientes" val={tot-comp} valC={tot-comp>0?"#f59e0b":"#10b981"}/></div>
-        <div className="card"><div className="chdr"><span className="ctit">📋 Mis tareas</span><button className="btn bp sm" onClick={()=>setPage("jcheck")}>Ir al checklist →</button></div>
-          {actv.slice(0,6).map(t=><MTask key={t.id} lbl={t.txt} sub={t.zona} done={sj[t.id]?.done}/>)}
-          {jpunt.map(t=><MTask key={t.id} lbl={t.txt} sub="📌 Puntual" done={t.done}/>)}
-          {tot===0&&<div className="empty"><span className="ico">✅</span><p>Sin tareas esta semana</p></div>}
+      {!srvActivo&&<div style={{padding:"0 20px 14px"}}>
+        <div style={{fontSize:11,color:T.ink3,letterSpacing:1,textTransform:"uppercase",fontWeight:700,marginBottom:8}}>Tareas pendientes</div>
+        <div style={{background:T.surface,borderRadius:16,border:"1px solid "+T.line,overflow:"hidden"}}>
+          {actv.slice(0,6).map((t,i,arr)=><div key={t.id} style={{display:"flex",alignItems:"center",gap:10,padding:"12px 14px",borderBottom:i<arr.length-1?"1px solid "+T.line:"none"}}>
+            <div style={{width:20,height:20,borderRadius:6,border:"1.5px solid "+(sj[t.id]?.done?T.olive:T.line),background:sj[t.id]?.done?T.olive:"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{sj[t.id]?.done&&<FmIcon name="check" size={11} stroke="white" sw={2.5}/>}</div>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:13,color:sj[t.id]?.done?T.ink3:T.ink,fontWeight:sj[t.id]?.done?400:500,textDecoration:sj[t.id]?.done?"line-through":"none"}}>{t.txt}</div>
+              {t.zona&&<div style={{fontSize:10,color:T.ink3,marginTop:2}}>{t.zona}</div>}
+            </div>
+          </div>)}
+          {jpunt.map((t,i)=><div key={t.id} style={{display:"flex",alignItems:"center",gap:10,padding:"12px 14px",borderBottom:"none"}}>
+            <div style={{width:20,height:20,borderRadius:6,border:"1.5px solid "+(t.done?T.olive:T.line),background:t.done?T.olive:"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{t.done&&<FmIcon name="check" size={11} stroke="white" sw={2.5}/>}</div>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:13,color:t.done?T.ink3:T.ink,fontWeight:t.done?400:500,textDecoration:t.done?"line-through":"none"}}>{t.txt}</div>
+              <div style={{fontSize:10,color:T.terracotta,marginTop:2}}>📌 Puntual</div>
+            </div>
+          </div>)}
+          {tot===0&&<div style={{padding:"20px 14px",textAlign:"center",color:T.ink3,fontSize:13}}>Sin tareas esta semana</div>}
         </div>
-      </>}
-    </div>
+        <button onClick={()=>setPage("jcheck")} style={{width:"100%",padding:"12px 0",borderRadius:999,border:"1px solid "+T.line,background:T.surface,color:T.ink,fontFamily:T.sans,fontSize:13,fontWeight:600,cursor:"pointer",marginTop:10,display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+          <FmIcon name="check" size={14} stroke={T.ink}/>Ir al checklist completo
+        </button>
+      </div>}
 
     {/* Modal nueva jornada */}
     {showNuevaJornada&&<div className="ov"><div className="modal" style={{maxWidth:400,textAlign:"center"}}>
@@ -2945,7 +2993,7 @@ function DashJ({perfil,jsem,jpunt,cwk,setPage,tok}){
 
     {/* Modal editar extra */}
     {editExtraId&&<NotaModal nota={editExtraNota} setNota={setEditExtraNota} foto={editExtraFoto} setFoto={setEditExtraFoto} onSave={saveEditExtra} onClose={()=>setEditExtraId(null)} tok={tok}/>}
-  </>;
+  </div>;
 }
 function DashL({perfil,setPage,tok}){
   const [coordP,setCoordP]=useState([]);const [savingC,setSavingC]=useState(false);const [showDatePick,setShowDatePick]=useState(null);const [customDate,setCustomDate]=useState("");
