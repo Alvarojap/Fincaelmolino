@@ -1916,7 +1916,7 @@ function RvEventDetail({reserva,tok,perfil,rol,isA,onClose,onChanged,isDesktopPa
   };
 
   return(
-    <div style={{position:isDesktopPanel?"relative":"fixed",inset:isDesktopPanel?"auto":0,background:T.bg,zIndex:isDesktopPanel?"auto":200,overflow:"auto",paddingBottom:40}}>
+    <div style={{position:isDesktopPanel?"relative":"fixed",inset:isDesktopPanel?"auto":0,background:T.bg,zIndex:isDesktopPanel?"auto":200,overflow:"auto",paddingBottom:100}}>
       {/* Hero oscuro — solo móvil */}
       {!isDesktopPanel&&<div style={{background:"linear-gradient(165deg,#2A2015 0%,#0E0E0E 100%)",paddingTop:54,paddingBottom:22,paddingLeft:20,paddingRight:20,color:"#fff",position:"relative",overflow:"hidden"}}>
         <div style={{position:"absolute",right:-30,top:-40,width:220,height:220,borderRadius:999,background:T.terracotta+"35",filter:"blur(45px)"}}/>
@@ -2150,7 +2150,7 @@ function RvBnbDetail({reserva,tok,perfil,onClose,onChanged}){
   };
 
   return(
-    <div style={{position:"fixed",inset:0,background:T.bg,zIndex:200,overflow:"auto",paddingBottom:40}}>
+    <div style={{position:"fixed",inset:0,background:T.bg,zIndex:200,overflow:"auto",paddingBottom:100}}>
       {/* Hero azul */}
       <div style={{background:"linear-gradient(165deg,#1E3A5F 0%,#0E0E0E 100%)",paddingTop:54,paddingBottom:22,paddingLeft:20,paddingRight:20,color:"#fff",position:"relative",overflow:"hidden"}}>
         <div style={{position:"absolute",right:-30,top:-40,width:220,height:220,borderRadius:999,background:T.softBlue+"55",filter:"blur(45px)"}}/>
@@ -2375,7 +2375,7 @@ function DashA({reservas,jsem,jpunt,cwk,setPage,tok,perfil,rol,goToItem}){
   };
 
   // ─── DESKTOP LAYOUT ─────────────────────────────────────────────
-  if(isDesktop&&kpiData)return <div style={{display:"flex",flexDirection:"column",fontFamily:T.sans,background:T.bg,minHeight:"100%"}}>
+  if(isDesktop&&kpiData)return <div style={{display:"flex",flexDirection:"column",fontFamily:T.sans,background:T.bg,minHeight:"100%",paddingBottom:100}}>
     {/* Topbar */}
     <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"20px 32px",borderBottom:`1px solid ${T.line}`,background:T.bg,position:"sticky",top:0,zIndex:10}}>
       <div><div style={{fontSize:12,color:T.ink3,fontWeight:500}}>{new Date().toLocaleDateString("es-ES",{weekday:"long",day:"numeric",month:"long",year:"numeric"}).replace(/^\w/,c=>c.toUpperCase())}</div><div style={{fontSize:28,color:T.ink,letterSpacing:-1,fontWeight:700,lineHeight:1,marginTop:2}}>Buenos días, {perfil?.nombre?.split(" ")[0]||"Admin"}.</div></div>
@@ -2385,7 +2385,7 @@ function DashA({reservas,jsem,jpunt,cwk,setPage,tok,perfil,rol,goToItem}){
       </div>
     </div>
     {/* Grid */}
-    <div style={{padding:28,display:"flex",flexDirection:"column",gap:20,overflow:"auto",flex:1}}>
+    <div style={{padding:28,display:"flex",flexDirection:"column",gap:20,overflow:"auto",flex:1,paddingBottom:100}}>
       {/* Row 1: 4 KPIs */}
       <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:16}}>
         {[{label:"Facturación proy.",value:fmtE(kpiData.facturacion),delta:`Ev. ${fmtE(kpiData.fE)} + Ab. ${fmtE(kpiData.fA)}`,mood:"up",color:T.olive,idx:0},{label:"Ya cobrado",value:fmtE(kpiData.yaCobrado),delta:`${Math.round(kpiData.yaCobrado/(kpiData.facturacion||1)*100)}% del total`,color:T.softBlue,idx:1},{label:"Pendiente cobro",value:fmtE(kpiData.pendiente),delta:`${reservas.filter(r=>r.estado_pago!=="pagado_completo"&&r.estado!=="cancelada").length} eventos`,color:T.gold,idx:2},{label:"Beneficio est.",value:fmtE(kpiData.beneficio),delta:`${Math.round(kpiData.beneficio/(kpiData.facturacion||1)*100)}% margen`,mood:kpiData.beneficio>0?"up":"down",color:T.terracotta,idx:4}].map(k=><BigKpi key={k.idx} label={k.label} value={k.value} delta={k.delta} mood={k.mood} color={k.color} onClick={()=>setKpiAbierto(kpiAbierto===k.idx?null:k.idx)}/>)}
@@ -2417,7 +2417,7 @@ function DashA({reservas,jsem,jpunt,cwk,setPage,tok,perfil,rol,goToItem}){
     </div>
   </div>;
 
-  return <>
+  return <div style={{paddingBottom:100}}>
     {/* 1. Greeting */}
     <div style={{padding:"54px 20px 16px"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:2}}>
@@ -2552,7 +2552,7 @@ function DashA({reservas,jsem,jpunt,cwk,setPage,tok,perfil,rol,goToItem}){
           </div>;})}
       </FmCard>
     </div>
-  </>;
+  </div>;
 }
 function DashJ({perfil,jsem,jpunt,cwk,setPage,tok}){
   const [meteoJ,setMeteoJ]=useState(null);
@@ -4044,7 +4044,7 @@ function JardinAdmin({perfil,tok,setPage}){
 
     {/* DETALLE SERVICIO — pantalla completa */}
     {srvSel&&(
-      <div style={{position:"fixed",inset:0,background:T.bg,zIndex:30,overflow:"auto",paddingBottom:40,fontFamily:T.sans}}>
+      <div style={{position:"fixed",inset:0,background:T.bg,zIndex:30,overflow:"auto",paddingBottom:100,fontFamily:T.sans}}>
 
         {/* Header */}
         <div style={{padding:"54px 20px 14px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
@@ -4993,7 +4993,7 @@ function Limpieza({perfil,tok,rol,setPage}){
 
     {/* DETALLE SERVICIO — pantalla completa */}
     {srv&&(
-      <div style={{position:"fixed",inset:0,background:T.bg,zIndex:30,overflow:"auto",paddingBottom:40,fontFamily:T.sans}}>
+      <div style={{position:"fixed",inset:0,background:T.bg,zIndex:30,overflow:"auto",paddingBottom:100,fontFamily:T.sans}}>
 
         {/* Header */}
         <div style={{padding:"54px 20px 14px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
@@ -5435,7 +5435,7 @@ function Chat({perfil,tok,rol}){
   const miId=myId;
 
   return (
-    <div style={{height:'100vh',display:'flex',flexDirection:'column',background:T.bg,fontFamily:T.sans,position:'fixed',inset:0,zIndex:1}}>
+    <div style={{height:'100vh',display:'flex',flexDirection:'column',background:T.bg,fontFamily:T.sans,position:'fixed',inset:0,zIndex:1,paddingBottom:0}}>
 
       {/* Header */}
       <div style={{padding:'54px 20px 14px',borderBottom:'1px solid '+T.line,background:T.bg,flexShrink:0}}>
@@ -5534,7 +5534,16 @@ function Chat({perfil,tok,rol}){
           </div>
 
           {/* Input mensaje */}
-          <div style={{padding:'12px 20px',paddingBottom:'calc(12px + env(safe-area-inset-bottom,0px))',borderTop:'1px solid '+T.line,background:T.bg,display:'flex',gap:8,alignItems:'flex-end',flexShrink:0}}>
+          <div style={{
+            padding:'12px 20px',
+            paddingBottom:'calc(72px + env(safe-area-inset-bottom, 0px))',
+            borderTop:'1px solid '+T.line,
+            background:T.bg,
+            display:'flex',
+            gap:8,
+            alignItems:'flex-end',
+            flexShrink:0,
+          }}>
             <div style={{flex:1,background:T.surface,borderRadius:24,border:'1px solid '+T.line,padding:'10px 16px',display:'flex',alignItems:'center'}}>
               <input
                 ref={inputRef}
@@ -5969,7 +5978,7 @@ function Usuarios({tok}){
 
       {/* Detalle usuario email */}
       {selUsuario&&(
-        <div style={{position:'fixed',inset:0,background:T.bg,zIndex:30,overflow:'auto',paddingBottom:40,fontFamily:T.sans}}>
+        <div style={{position:'fixed',inset:0,background:T.bg,zIndex:30,overflow:'auto',paddingBottom:100,fontFamily:T.sans}}>
           <div style={{padding:'54px 20px 14px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
             <button onClick={()=>setSelUsuario(null)} style={{width:36,height:36,borderRadius:999,background:T.surface,border:'1px solid '+T.line,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}>
               <FmIcon name="chevL" size={16} stroke={T.ink}/>
@@ -6016,7 +6025,7 @@ function Usuarios({tok}){
 
       {/* Detalle operario PIN */}
       {selOperario&&(
-        <div style={{position:'fixed',inset:0,background:T.bg,zIndex:30,overflow:'auto',paddingBottom:40,fontFamily:T.sans}}>
+        <div style={{position:'fixed',inset:0,background:T.bg,zIndex:30,overflow:'auto',paddingBottom:100,fontFamily:T.sans}}>
           <div style={{padding:'54px 20px 14px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
             <button onClick={()=>{setSelOperario(null);setShowPin(false);}} style={{width:36,height:36,borderRadius:999,background:T.surface,border:'1px solid '+T.line,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}>
               <FmIcon name="chevL" size={16} stroke={T.ink}/>
@@ -7778,7 +7787,7 @@ function CalLimpieza({tok,perfil}){
   const getDias=(ini,fin)=>{const ds=[];const f=new Date(fin);let d=new Date(Math.max(new Date(ini),Date.now()));while(d<=f&&ds.length<5){ds.push(new Date(d));d=new Date(d.getTime()+86400000);}return ds;};
   if(load)return <div className="loading"><div className="spin"/></div>;
   return(
-    <div style={{paddingBottom:80}}>
+    <div style={{paddingBottom:100}}>
       <div style={{padding:"54px 20px 14px"}}>
         <div style={{fontSize:11,color:T.ink3,letterSpacing:.6,fontWeight:600,textTransform:"uppercase"}}>Servicio activo</div>
         <div style={{fontFamily:T.sans,fontSize:28,fontWeight:700,color:T.ink,letterSpacing:-1,lineHeight:1.05}}>Limpieza</div>
@@ -7966,7 +7975,7 @@ function CalJardin({tok,perfil}){
   const doneT=srvTareas.filter(x=>x.done).length;const totalT=srvTareas.length;
   if(load)return <div className="loading"><div className="spin"/></div>;
   return(
-    <div style={{paddingBottom:80}}>
+    <div style={{paddingBottom:100}}>
       <div style={{padding:"54px 20px 14px"}}>
         <div style={{fontSize:11,color:T.ink3,letterSpacing:.6,fontWeight:600,textTransform:"uppercase"}}>Dashboard</div>
         <div style={{fontFamily:T.sans,fontSize:28,fontWeight:700,color:T.ink,letterSpacing:-1,lineHeight:1.05}}>Jardinería</div>
@@ -9171,7 +9180,7 @@ function Contactos({perfil,tok,rol,setPage}){
 
   // ─── LISTA ──
   const conteo=estado=>contactos.filter(c=>c.estado===estado).length;
-  return <div style={{background:T.bg,minHeight:"100%",paddingBottom:80}}>
+  return <div style={{background:T.bg,minHeight:"100%",paddingBottom:100}}>
     {/* Header */}
     <div style={{padding:"54px 20px 16px",display:"flex",alignItems:"flex-end",justifyContent:"space-between",gap:10}}>
       <div style={{flex:1}}><div style={{fontSize:12,color:T.ink3,fontWeight:500,marginBottom:2}}>CRM · Clientes y leads</div><div style={{fontSize:30,fontWeight:700,color:T.ink,letterSpacing:-1,lineHeight:1.02}}>Contactos</div></div>
