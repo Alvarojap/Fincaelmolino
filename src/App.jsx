@@ -9545,6 +9545,11 @@ function Visitas({perfil,tok,rol,setPage,navTarget,setNavTarget}){
   const formVacio={nombre:"",fecha:hoy,hora:"10:00",tipo_evento:"Boda",invitados:"",telefono:"",email:"",nota:"",fecha_evento_prevista:""};
   const [form,setForm]=useState(formVacio);
   const [formRes,setFormRes]=useState({fecha_evento:"",precio:"",contacto:"",obs:"",estado:"visita"});
+  // Estados del rediseño
+  const [tabVisitas,setTabVisitas]=useState("todas");
+  const [notasVisita,setNotasVisita]=useState("");
+  const [notasDebounce,setNotasDebounce]=useState(null);
+  const [queryVisita,setQueryVisita]=useState("");
 
   const load_=async()=>{
     try{
@@ -9695,153 +9700,376 @@ function Visitas({perfil,tok,rol,setPage,navTarget,setNavTarget}){
   };
 
   if(load)return <div className="loading"><div className="spin"/><span>Cargando…</span></div>;
-  const lista=tab==="proximas"?proximas:anteriores;
 
-  return <>
-    <div className="ph">
-      <h2>👁 Visitas</h2>
-      <p>{proximas.length} próximas · {anteriores.length} anteriores</p>
-    </div>
-    <div className="pb">
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12,gap:12,flexWrap:"wrap"}}>
-        <div className="tabs" style={{marginBottom:0}}>
-          <button className={`tab${tab==="proximas"?" on":""}`} onClick={()=>setTab("proximas")}>📅 Próximas ({proximas.length})</button>
-          <button className={`tab${tab==="anteriores"?" on":""}`} onClick={()=>setTab("anteriores")}>📁 Anteriores ({anteriores.length})</button>
+  // Tokens de estado para el rediseño (incluyen keys del template y los reales de BD)
+  const VISITA_STATE_COLOR={pendiente:T.gold,confirmada:T.olive,realizada:T.olive,convertida:T.olive,cancelada:T.ink4||'#B8B0A0',reserva_cancelada:T.ink4||'#B8B0A0',no_presentado:T.ink4||'#B8B0A0',pasada:T.lavender};
+  const VISITA_STATE_LABEL={pendiente:'Pendiente',confirmada:'Confirmada',realizada:'Realizada',convertida:'Convertida',cancelada:'Cancelada',reserva_cancelada:'Cancelada',no_presentado:'No presentado',pasada:'Pasada'};
+
+  // Aliases template → reales del componente
+  const selVisita=sel?{...sel,notas:sel.nota||'',convertida:sel.estado==='convertida'||!!sel.reserva_id}:null;
+  const setSelVisita=setSel;
+  const showNueva=showForm;
+  const setShowNueva=setShowForm;
+  const contactos=contactosList;
+  // Splitter de form: traduce contacto_nombre→nombre, notas→nota, query→queryVisita
+  const formVisita={...form,contacto_nombre:form.nombre||'',notas:form.nota||'',query:queryVisita,contacto_id:form.contacto_id||null};
+  const setFormVisita=updater=>{
+    const prev={...form,contacto_nombre:form.nombre||'',notas:form.nota||'',query:queryVisita,contacto_id:form.contacto_id||null};
+    const next=typeof updater==='function'?updater(prev):{...prev,...updater};
+    const {query,contacto_nombre,notas,...rest}=next;
+    if(query!==undefined&&query!==queryVisita)setQueryVisita(query);
+    setForm(f=>({
+      ...f,
+      ...rest,
+      ...(contacto_nombre!==undefined?{nombre:contacto_nombre}:{}),
+      ...(notas!==undefined?{nota:notas}:{}),
+    }));
+  };
+  const guardarNotasVisita=async(id,nota)=>{await guardarNota({id},nota);};
+  const convertirVisita=()=>{abrirConvertir();};
+  // Filtrado con mapeo de estados template → BD
+  const visitasFiltradas=visitas.filter(v=>{
+    const tab=tabVisitas||'todas';
+    if(tab==='todas')return true;
+    if(tab==='pendiente')return v.estado==='pendiente';
+    if(tab==='confirmada')return v.estado==='realizada'||v.estado==='convertida';
+    if(tab==='pasadas')return v.estado==='no_presentado'||v.estado==='reserva_cancelada';
+    return v.estado===tab;
+  });
+  const cntPendientes=visitas.filter(v=>v.estado==='pendiente').length;
+  const cntConfirmadas=visitas.filter(v=>v.estado==='realizada'||v.estado==='convertida').length;
+  const cntPasadas=visitas.filter(v=>v.estado==='no_presentado'||v.estado==='reserva_cancelada').length;
+  const cntConvertidas=visitas.filter(v=>v.estado==='convertida'||v.reserva_id).length;
+
+  return (
+    <div style={{background:T.bg,minHeight:'100%',paddingBottom:100,fontFamily:T.sans}}>
+
+      {/* Header */}
+      <div style={{padding:'54px 20px 6px',display:'flex',justifyContent:'space-between',alignItems:'flex-end'}}>
+        <div>
+          <div style={{fontSize:10.5,color:T.ink3,fontWeight:700,letterSpacing:0.8,textTransform:'uppercase'}}>Captación</div>
+          <div style={{fontSize:28,fontWeight:800,color:T.ink,letterSpacing:-0.9,lineHeight:1.05,marginTop:2}}>Visitas</div>
         </div>
-        {puedeEditar&&<button className="btn bp" onClick={()=>{setForm(formVacio);setShowForm(true);}}>➕ Nueva visita</button>}
+        <button onClick={()=>{setForm(formVacio);setQueryVisita('');setShowNueva&&setShowNueva(true);}} style={{width:40,height:40,borderRadius:999,background:T.ink,color:'#fff',border:0,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}>
+          <FmIcon name="plus" size={16} stroke="#fff"/>
+        </button>
       </div>
-      <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:14}}>
-        {[{id:"todas",lbl:"Todas"},{id:"captacion",lbl:"🔍 Captación"},{id:"coordinacion",lbl:"📋 Coordinación"}].map(f=>(
-          <button key={f.id} className={`btn sm${filtroTipo===f.id?" bp":" bg"}`} onClick={()=>setFiltroTipo(f.id)}>{f.lbl}</button>
+
+      {/* KPIs */}
+      <div style={{padding:'18px 20px 14px',display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8}}>
+        {[
+          {bg:T.ink,   fg:'#fff', value:visitas.length,  label:'Visitas'},
+          {bg:T.gold,  fg:T.ink,  value:cntPendientes,   label:'Pendientes'},
+          {bg:T.olive, fg:T.ink,  value:cntConvertidas,  label:'Convertidas'},
+        ].map((k,i)=>(
+          <div key={i} style={{background:k.bg,color:k.fg,borderRadius:16,padding:'14px 14px 16px',minHeight:86,display:'flex',flexDirection:'column',justifyContent:'space-between'}}>
+            <div style={{fontSize:9.5,fontWeight:700,letterSpacing:0.8,textTransform:'uppercase',opacity:0.8}}>{k.label}</div>
+            <div style={{fontSize:30,fontWeight:800,letterSpacing:-1.2,lineHeight:1}}>{k.value}</div>
+          </div>
         ))}
       </div>
 
-      {lista.length===0&&<div className="empty"><span className="ico">{tab==="proximas"?"📅":"📁"}</span><p>{tab==="proximas"?"No hay visitas programadas":"No hay visitas anteriores"}</p></div>}
+      {/* Tabs */}
+      <div style={{padding:'0 20px 14px'}}>
+        <div style={{display:'flex',gap:6,overflowX:'auto'}}>
+          {[
+            {k:'todas',      l:'Todas',       n:visitas.length},
+            {k:'pendiente',  l:'Pendientes',  n:cntPendientes},
+            {k:'confirmada', l:'Confirmadas', n:cntConfirmadas},
+            {k:'pasadas',    l:'Pasadas',     n:cntPasadas},
+          ].map(t=>{
+            const on=(tabVisitas||'todas')===t.k;
+            return(
+              <button key={t.k} onClick={()=>setTabVisitas&&setTabVisitas(t.k)} style={{padding:'8px 14px',borderRadius:999,background:on?T.ink:T.surface,color:on?'#fff':T.ink2,border:'1px solid '+(on?T.ink:T.line),fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:T.sans,flexShrink:0,display:'inline-flex',alignItems:'center',gap:6}}>
+                {t.l}
+                <span style={{fontSize:10,fontWeight:800,padding:'1px 6px',borderRadius:999,background:on?'rgba(255,255,255,0.2)':T.bg,color:on?'#fff':T.ink3}}>{t.n}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
 
-      {lista.map(v=>{
-        const est=ESTADOS_VISITA[v.estado]||ESTADOS_VISITA.pendiente;
-        const fechaFmt=new Date(v.fecha+"T12:00:00").toLocaleDateString("es-ES",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
-        return <div key={v.id} className="card" style={{marginBottom:10,borderLeft:`3px solid ${est.col}`,cursor:"pointer"}} onClick={()=>setSel(v)}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:12}}>
-            <div style={{minWidth:0}}>
-              <div style={{fontSize:15,fontWeight:600,color:"#1A1A1A",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{v.nombre}</div>
-              <div style={{fontSize:12,color:"#8A8580",marginTop:4}}>📅 {fechaFmt} · 🕐 {v.hora?.slice(0,5)||"—"}</div>
-              <div style={{display:"flex",gap:6,marginTop:6,flexWrap:"wrap"}}>
-                <span className="badge" style={{background:`${est.col}18`,color:est.col,border:`1px solid ${est.col}30`}}>{est.lbl}</span>
-                {v.es_coordinacion?<span className="badge" style={{background:"rgba(99,102,241,.1)",color:"#a5b4fc",border:"1px solid rgba(99,102,241,.25)"}}>📋 {reservasMap[v.reserva_id]||"Coordinación"}</span>
-                :<span className="badge" style={{background:"rgba(245,158,11,.1)",color:"#D4A017",border:"1px solid rgba(245,158,11,.25)"}}>🔍 Captación</span>}
-                {v.tipo_evento&&<span className="badge" style={{background:"rgba(201,168,76,.1)",color:"#EC683E"}}>🎉 {v.tipo_evento}</span>}
-                {v.invitados&&<span className="badge" style={{background:"rgba(255,255,255,.06)",color:"#8A8580"}}>👥 {v.invitados} inv.</span>}
-                {v.contacto_id&&<span className="badge" style={{background:"rgba(236,104,62,.1)",color:"#EC683E",cursor:"pointer"}} onClick={e=>{e.stopPropagation();setPage("contactos");}}>👤 Ficha</span>}
+      {/* Lista */}
+      <div style={{padding:'0 20px',display:'flex',flexDirection:'column',gap:8}}>
+        {visitasFiltradas.map(v=>{
+          const color=VISITA_STATE_COLOR[v.estado]||T.gold;
+          const label=VISITA_STATE_LABEL[v.estado]||'Pendiente';
+          const nombre=v.contacto_nombre||v.nombre||'Visita';
+          const evento=v.tipo_evento||'Evento';
+          const fecha=v.fecha?new Date(v.fecha+'T12:00:00').toLocaleDateString('es-ES',{day:'numeric',month:'short',year:'numeric'}):'Sin fecha';
+          const convertida=v.estado==='convertida'||!!v.reserva_id;
+          return(
+            <div key={v.id} onClick={()=>setSelVisita&&setSelVisita(v)} style={{background:T.surface,border:'1px solid '+T.line,borderRadius:18,padding:14,display:'flex',gap:12,alignItems:'center',cursor:'pointer'}}>
+              <span style={{width:4,height:48,borderRadius:4,background:color,flexShrink:0}}/>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:14.5,fontWeight:800,color:T.ink,letterSpacing:-0.3,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{nombre}</div>
+                <div style={{fontSize:12,color:T.ink3,fontWeight:600,marginTop:3,display:'flex',alignItems:'center',gap:6}}>
+                  <span>{evento}</span>
+                  <span style={{color:T.ink4||T.ink3}}>·</span>
+                  <span>{fecha}</span>
+                </div>
+                <div style={{marginTop:8,display:'flex',alignItems:'center',gap:6}}>
+                  <span style={{padding:'3px 9px',borderRadius:999,background:color,color:T.ink,fontSize:10,fontWeight:700}}>{label}</span>
+                  {convertida&&(
+                    <span style={{padding:'3px 9px',borderRadius:999,background:T.ink,color:'#fff',fontSize:10,fontWeight:700,display:'inline-flex',alignItems:'center',gap:4}}>
+                      <FmIcon name="check" size={9} stroke="#fff" sw={3}/> Reserva
+                    </span>
+                  )}
+                </div>
+              </div>
+              <FmIcon name="chevR" size={15} stroke={T.ink3}/>
+            </div>
+          );
+        })}
+        {visitasFiltradas.length===0&&(
+          <div style={{textAlign:'center',padding:'40px 0',color:T.ink3,fontSize:13}}>Sin visitas en esta categoría</div>
+        )}
+      </div>
+
+      {/* Detalle fullscreen */}
+      {selVisita&&!showConvertir&&!showNoPresentado&&!showRevertir&&!showVincular&&!showCrearContacto&&(
+        <div style={{position:'fixed',inset:0,background:T.bg,zIndex:30,overflow:'auto',paddingBottom:100,fontFamily:T.sans}}>
+
+          {/* Topbar */}
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'54px 20px 8px'}}>
+            <button onClick={()=>setSelVisita(null)} style={{width:38,height:38,borderRadius:999,background:T.surface,border:'1px solid '+T.line,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}>
+              <FmIcon name="chevL" size={16} stroke={T.ink}/>
+            </button>
+            <div style={{fontFamily:T.mono||'monospace',fontSize:11,color:T.ink3,fontWeight:600,letterSpacing:0.8}}>
+              {String(selVisita.id).slice(-8).toUpperCase()}
+            </div>
+            <button style={{width:38,height:38,borderRadius:999,background:T.surface,border:'1px solid '+T.line,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}>
+              <FmIcon name="more" size={17} stroke={T.ink}/>
+            </button>
+          </div>
+
+          {/* Título */}
+          <div style={{padding:'14px 20px 18px'}}>
+            {(()=>{
+              const color=VISITA_STATE_COLOR[selVisita.estado||'pendiente']||T.gold;
+              const label=VISITA_STATE_LABEL[selVisita.estado||'pendiente']||'Pendiente';
+              return(
+                <div style={{display:'inline-flex',alignItems:'center',gap:6,padding:'4px 10px',borderRadius:999,background:color,color:T.ink,fontSize:10.5,fontWeight:700,letterSpacing:0.4,textTransform:'uppercase',marginBottom:10}}>
+                  <span style={{width:5,height:5,borderRadius:999,background:T.ink}}/>{label}
+                </div>
+              );
+            })()}
+            <div style={{fontSize:28,fontWeight:800,color:T.ink,letterSpacing:-1,lineHeight:1.05,display:'block'}}>
+              {selVisita.nombre||'Visita'}
+            </div>
+            <div style={{fontSize:13,color:T.ink2,fontWeight:600,marginTop:4}}>
+              {selVisita.tipo_evento||'Evento'} · {selVisita.invitados||0} personas
+            </div>
+          </div>
+
+          {/* Fecha */}
+          <div style={{padding:'0 20px 14px'}}>
+            <div style={{background:T.surface,border:'1px solid '+T.line,borderRadius:20,padding:16,display:'flex',gap:14,alignItems:'center'}}>
+              <span style={{width:4,height:48,borderRadius:4,background:T.terracotta,flexShrink:0}}/>
+              <span style={{width:44,height:44,borderRadius:14,background:T.terracotta,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                <FmIcon name="calendar" size={20} stroke={T.ink}/>
+              </span>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:10,color:T.ink3,fontWeight:700,letterSpacing:0.8,textTransform:'uppercase'}}>Fecha de visita</div>
+                <div style={{fontSize:17,fontWeight:800,color:T.ink,letterSpacing:-0.5,marginTop:2}}>
+                  {selVisita.fecha?new Date(selVisita.fecha+'T12:00:00').toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'}):'Sin fecha'}
+                  {selVisita.hora&&<span style={{color:T.ink3,fontWeight:600,marginLeft:6}}>· {selVisita.hora.slice(0,5)}</span>}
+                </div>
               </div>
             </div>
-            <span style={{color:"#8A8580",fontSize:22,flexShrink:0}}>›</span>
           </div>
-          {v.nota&&<div className="nbox" style={{marginTop:10}}>💬 {v.nota}</div>}
-          {v.nota_cancelacion&&<div style={{marginTop:8,fontSize:12,color:"#F35757",background:"rgba(232,85,85,.06)",border:"1px solid rgba(232,85,85,.15)",borderRadius:7,padding:"6px 10px"}}>❌ {v.nota_cancelacion}</div>}
-        </div>;
-      })}
-    </div>
 
-    {/* MODAL NUEVA VISITA */}
-    {showForm&&<div className="ov" onClick={()=>setShowForm(false)}>
-      <div className="modal" onClick={e=>e.stopPropagation()}>
-        <h3>📅 Nueva visita</h3>
-        <div className="fg"><label>Nombre pareja / cliente *</label><input className="fi" value={form.nombre} onChange={e=>setForm(v=>({...v,nombre:e.target.value}))} placeholder="Ej: Laura y Antonio García"/></div>
-        <div className="g2">
-          <div className="fg"><label>Fecha visita *</label><input type="date" className="fi" value={form.fecha} onChange={e=>setForm(v=>({...v,fecha:e.target.value}))}/></div>
-          <div className="fg"><label>Hora *</label><input type="time" className="fi" value={form.hora} onChange={e=>setForm(v=>({...v,hora:e.target.value}))}/></div>
-        </div>
-        <div className="g2">
-          <div className="fg"><label>Tipo de evento</label><select className="fi" value={form.tipo_evento} onChange={e=>setForm(v=>({...v,tipo_evento:e.target.value}))}>{TIPOS_EVENTO.map(t=><option key={t}>{t}</option>)}</select></div>
-          <div className="fg"><label>Invitados estimados</label><input type="number" inputMode="numeric" className="fi" value={form.invitados} onChange={e=>setForm(v=>({...v,invitados:e.target.value}))} placeholder="Ej: 120"/></div>
-        </div>
-        <div className="fg">
-          <label>Fecha prevista del evento (opcional)</label>
-          <input type="date" className="fi" value={form.fecha_evento_prevista} onChange={e=>setForm(v=>({...v,fecha_evento_prevista:e.target.value}))}/>
-          <div style={{fontSize:11,color:"#8A8580",marginTop:4}}>💡 Si no hay fecha fija, déjalo en blanco</div>
-        </div>
-        <div className="g2">
-          <div className="fg"><label>Teléfono</label><input className="fi" type="tel" value={form.telefono} onChange={e=>setForm(v=>({...v,telefono:e.target.value}))} placeholder="600 000 000"/></div>
-          <div className="fg"><label>Email</label><input className="fi" type="email" value={form.email} onChange={e=>setForm(v=>({...v,email:e.target.value}))} placeholder="correo@email.com"/></div>
-        </div>
-        <div className="fg"><label>Observaciones iniciales</label><textarea className="fi" rows={3} value={form.nota} onChange={e=>setForm(v=>({...v,nota:e.target.value}))} placeholder="Notas previas a la visita…"/></div>
-        <div className="mft"><button className="btn bg" onClick={()=>setShowForm(false)}>Cancelar</button><button className="btn bp" onClick={crearVisita} disabled={saving}>{saving?"Guardando…":"✓ Crear visita"}</button></div>
-      </div>
-    </div>}
-
-    {/* MODAL DETALLE VISITA */}
-    {sel&&!showConvertir&&!showNoPresentado&&!showRevertir&&<div className="ov" onClick={()=>setSel(null)}>
-      <div className="modal" style={{maxWidth:560,maxHeight:"92vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:16,gap:8}}>
-          <div style={{minWidth:0}}>
-            <h3 style={{marginBottom:6}}>{sel.nombre}</h3>
-            {(()=>{const est=ESTADOS_VISITA[sel.estado]||ESTADOS_VISITA.pendiente;return <span className="badge" style={{background:`${est.col}18`,color:est.col,border:`1px solid ${est.col}30`}}>{est.lbl}</span>;})()}
-          </div>
-          <button className="btn bg sm" style={{flexShrink:0}} onClick={()=>setSel(null)}>✕</button>
-        </div>
-
-        <div className="g2" style={{marginBottom:14}}>
-          {[
-            {l:"FECHA VISITA",v:new Date(sel.fecha+"T12:00:00").toLocaleDateString("es-ES",{weekday:"long",day:"numeric",month:"long",year:"numeric"})},
-            {l:"HORA",v:sel.hora?.slice(0,5)},
-            {l:"TIPO",v:sel.tipo_evento},
-            {l:"INVITADOS",v:sel.invitados?`${sel.invitados} personas`:null},
-            {l:"FECHA EVENTO",v:sel.fecha_evento_prevista?new Date(sel.fecha_evento_prevista+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"long",year:"numeric"}):null},
-            {l:"TELÉFONO",v:sel.telefono},
-            {l:"EMAIL",v:sel.email},
-          ].filter(x=>x.v).map(x=><div key={x.l} style={{background:"#F5F3F0",borderRadius:8,padding:"10px 12px"}}>
-            <div style={{fontSize:10,color:"#8A8580",marginBottom:3}}>{x.l}</div>
-            <div style={{fontSize:13,color:"#1A1A1A"}}>{x.v}</div>
-          </div>)}
-        </div>
-
-        {sel.nota_cancelacion&&<div style={{marginBottom:14,padding:"10px 12px",background:"rgba(232,85,85,.06)",border:"1px solid rgba(232,85,85,.2)",borderRadius:8,fontSize:13,color:"#F35757"}}>❌ Motivo cancelación: {sel.nota_cancelacion}</div>}
-
-        <NotaVisita sel={sel} onGuardar={guardarNota} puedeEditar={puedeEditar}/>
-
-        {/* ACCIONES */}
-        {puedeEditar&&sel.estado==="pendiente"&&(
-          <div style={{display:"flex",flexDirection:"column",gap:8,marginTop:16,paddingTop:14,borderTop:"1px solid rgba(255,255,255,.06)"}}>
-            <div style={{display:"flex",gap:8}}>
-              <button className="btn bg" style={{flex:1,justifyContent:"center"}} onClick={marcarRealizada}>✅ Realizada</button>
-              <button className="btn bp" style={{flex:1,justifyContent:"center"}} onClick={abrirConvertir}>🔄 Convertir en reserva</button>
+          {/* Notas con autosave */}
+          <div style={{padding:'0 20px 14px'}}>
+            <div style={{fontSize:10.5,color:T.ink3,fontWeight:700,letterSpacing:0.8,textTransform:'uppercase',padding:'0 4px 8px'}}>Notas</div>
+            <div style={{background:T.surface,border:'1px solid '+T.line,borderRadius:20,padding:14}}>
+              <textarea
+                value={notasVisita||selVisita.notas||''}
+                onChange={e=>{
+                  setNotasVisita&&setNotasVisita(e.target.value);
+                  if(notasDebounce) clearTimeout(notasDebounce);
+                  const t=setTimeout(()=>guardarNotasVisita&&guardarNotasVisita(selVisita.id,e.target.value),800);
+                  setNotasDebounce&&setNotasDebounce(t);
+                }}
+                rows={5}
+                placeholder="Añade comentarios tras la visita…"
+                style={{width:'100%',border:0,background:'transparent',resize:'none',outline:'none',fontFamily:T.sans,fontSize:13.5,color:T.ink,lineHeight:1.5,fontWeight:500,boxSizing:'border-box'}}
+              />
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:8,paddingTop:10,borderTop:'1px solid '+T.line,fontSize:11,color:T.ink3,fontWeight:600}}>
+                <span>Notas de la visita</span>
+                <span style={{color:T.olive,fontWeight:700}}>✓ Guardado</span>
+              </div>
             </div>
-            <button className="btn br" style={{width:"100%",justifyContent:"center"}} onClick={()=>setShowNoPresentado(true)}>❌ No se ha presentado</button>
           </div>
-        )}
-        {puedeEditar&&sel.estado==="realizada"&&(
-          <div style={{marginTop:16,paddingTop:14,borderTop:"1px solid rgba(255,255,255,.06)"}}>
-            <button className="btn bp" style={{width:"100%",justifyContent:"center"}} onClick={abrirConvertir}>🔄 Convertir en reserva</button>
-          </div>
-        )}
-        {puedeEditar&&sel.estado==="convertida"&&(
-          <div style={{marginTop:16,paddingTop:14,borderTop:"1px solid rgba(255,255,255,.06)"}}>
-            <div style={{padding:"10px 12px",background:"rgba(99,102,241,.08)",border:"1px solid rgba(99,102,241,.2)",borderRadius:8,fontSize:13,color:"#a5b4fc",marginBottom:10,textAlign:"center"}}>
-              ✅ Reserva formalizada en el calendario
+
+          {/* Convertir a reserva */}
+          {!(selVisita.convertida||selVisita.reserva_id) ? (
+            <div style={{padding:'0 20px 14px'}}>
+              <button onClick={()=>convertirVisita&&convertirVisita(selVisita.id)} style={{width:'100%',padding:'16px 18px',borderRadius:20,background:T.ink,color:'#fff',border:0,display:'flex',alignItems:'center',gap:12,cursor:'pointer',fontFamily:T.sans,textAlign:'left'}}>
+                <span style={{width:40,height:40,borderRadius:12,background:T.terracotta,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                  <FmIcon name="arrow" size={18} stroke={T.ink}/>
+                </span>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:14.5,fontWeight:800,letterSpacing:-0.3}}>Convertir a reserva</div>
+                  <div style={{fontSize:11.5,color:'rgba(255,255,255,0.65)',fontWeight:600,marginTop:2}}>Genera contrato y bloquea fecha</div>
+                </div>
+                <span style={{fontSize:18,opacity:0.7}}>→</span>
+              </button>
             </div>
-            <button className="btn br" style={{width:"100%",justifyContent:"center"}} onClick={()=>{setNotaCancelacion("");setShowRevertir(true);}}>↩️ Cancelar esta reserva</button>
-          </div>
-        )}
-        {sel.estado==="no_presentado"&&<div style={{marginTop:16,padding:"10px 12px",background:"rgba(232,85,85,.08)",border:"1px solid rgba(232,85,85,.2)",borderRadius:8,fontSize:13,color:"#F35757",textAlign:"center"}}>❌ El cliente no se presentó a esta visita</div>}
-        {sel.estado==="reserva_cancelada"&&<div style={{marginTop:16,padding:"10px 12px",background:"rgba(107,114,128,.08)",border:"1px solid rgba(107,114,128,.2)",borderRadius:8,fontSize:13,color:"#9ca3af",textAlign:"center"}}>↩️ Reserva cancelada</div>}
+          ) : (
+            <div style={{padding:'0 20px 14px'}}>
+              <div style={{padding:'14px 16px',borderRadius:20,background:T.olive,display:'flex',alignItems:'center',gap:12}}>
+                <span style={{width:36,height:36,borderRadius:12,background:T.ink,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                  <FmIcon name="check" size={15} stroke="#fff" sw={3}/>
+                </span>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:13.5,fontWeight:800,color:T.ink,letterSpacing:-0.2}}>Convertida a reserva</div>
+                  <div style={{fontSize:11,color:T.ink2,fontWeight:600,marginTop:1}}>Ver reserva →</div>
+                </div>
+              </div>
+            </div>
+          )}
 
-        {sel.creado_por&&<div style={{marginTop:12,fontSize:11,color:"#BFBAB4",textAlign:"right"}}>Creada por {sel.creado_por}</div>}
+          {/* Acciones legacy conservadas (realizada, no presentado, vincular, crear contacto) */}
+          {puedeEditar&&selVisita.estado==='pendiente'&&(
+            <div style={{padding:'0 20px 14px',display:'flex',flexDirection:'column',gap:8}}>
+              <div style={{display:'flex',gap:8}}>
+                <button onClick={marcarRealizada} style={{flex:1,padding:'13px 0',borderRadius:999,border:'1px solid '+T.line,background:T.surface,color:T.ink,fontFamily:T.sans,fontWeight:600,fontSize:13,cursor:'pointer'}}>✅ Marcar realizada</button>
+                <button onClick={()=>setShowNoPresentado(true)} style={{flex:1,padding:'13px 0',borderRadius:999,border:'1px solid '+T.line,background:T.surface,color:T.ink2,fontFamily:T.sans,fontWeight:600,fontSize:13,cursor:'pointer'}}>❌ No presentado</button>
+              </div>
+            </div>
+          )}
+          {puedeEditar&&selVisita.estado==='convertida'&&(
+            <div style={{padding:'0 20px 14px'}}>
+              <button onClick={()=>{setNotaCancelacion('');setShowRevertir(true);}} style={{width:'100%',padding:'13px 0',borderRadius:999,border:'1px solid '+T.line,background:T.surface,color:T.ink2,fontFamily:T.sans,fontWeight:600,fontSize:13,cursor:'pointer'}}>↩️ Cancelar esta reserva</button>
+            </div>
+          )}
+          {isA&&!selVisita.contacto_id&&(
+            <div style={{padding:'0 20px 14px'}}>
+              <div style={{background:T.surface,border:'1px solid '+T.line,borderRadius:16,padding:14}}>
+                <div style={{fontSize:13,fontWeight:700,color:T.ink2,marginBottom:10}}>Sin contacto vinculado</div>
+                <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+                  <button className="btn bg sm" onClick={abrirVincular}>👤 Vincular</button>
+                  <button className="btn bp sm" onClick={abrirCrearContacto}>➕ Crear contacto</button>
+                </div>
+              </div>
+            </div>
+          )}
+          {selVisita.contacto_id&&(
+            <div style={{padding:'0 20px 14px'}}>
+              <div onClick={()=>setPage('contactos')} style={{padding:'12px 14px',borderRadius:14,background:T.surface,border:'1px solid '+T.line,color:T.terracotta,fontSize:13,fontWeight:700,cursor:'pointer'}}>👤 Ver ficha del cliente →</div>
+            </div>
+          )}
 
-        {isA&&!sel.contacto_id&&<div style={{marginTop:16,padding:"12px 14px",background:"rgba(212,160,23,.06)",border:"1px solid rgba(212,160,23,.2)",borderRadius:10}}>
-          <div style={{fontSize:13,fontWeight:600,color:"#D4A017",marginBottom:6}}>⚠️ Sin contacto vinculado</div>
-          <div style={{fontSize:12,color:"#8A8580",marginBottom:10}}>Esta visita no está vinculada a ningún contacto</div>
-          <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-            <button className="btn bg sm" onClick={abrirVincular}>👤 Vincular a contacto existente</button>
-            <button className="btn bp sm" onClick={abrirCrearContacto}>➕ Crear nuevo contacto</button>
+          {/* Tareas / Historial / Documentos */}
+          <div style={{padding:'0 20px'}}>
+            <TareasComerciales entidad_tipo="visita" entidad_id={selVisita.id} entidad_nombre={selVisita.nombre} tok={tok} perfil={perfil} rol={rol}/>
+            <Historial entidad_tipo="visita" entidad_id={selVisita.id} tok={tok} perfil={perfil}/>
+            <Documentos entidad_tipo="visita" entidad_id={selVisita.id} tok={tok} perfil={perfil}/>
           </div>
-        </div>}
-        {sel.contacto_id&&<div style={{marginTop:12,cursor:"pointer",color:"#EC683E",fontSize:13,fontWeight:600}} onClick={()=>setPage("contactos")}>👤 Ver ficha del cliente →</div>}
-        <TareasComerciales entidad_tipo="visita" entidad_id={sel.id} entidad_nombre={sel.nombre} tok={tok} perfil={perfil} rol={rol}/>
-        <Historial entidad_tipo="visita" entidad_id={sel.id} tok={tok} perfil={perfil}/>
-        <Documentos entidad_tipo="visita" entidad_id={sel.id} tok={tok} perfil={perfil}/>
-      </div>
-    </div>}
+
+        </div>
+      )}
+
+      {/* Sheet nueva visita */}
+      {showNueva&&(
+        <div onClick={()=>setShowNueva(false)} style={{position:'fixed',inset:0,background:'rgba(20,20,15,0.5)',display:'flex',alignItems:'flex-end',zIndex:100,fontFamily:T.sans}}>
+          <div onClick={e=>e.stopPropagation()} style={{width:'100%',maxHeight:'94%',background:T.bg,borderTopLeftRadius:24,borderTopRightRadius:24,display:'flex',flexDirection:'column',overflow:'hidden'}}>
+
+            {/* Grabber */}
+            <div style={{padding:'10px 0 6px',display:'flex',justifyContent:'center'}}>
+              <span style={{width:38,height:4,borderRadius:999,background:T.line}}/>
+            </div>
+
+            {/* Header */}
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'6px 20px 16px'}}>
+              <div style={{fontSize:20,fontWeight:800,color:T.ink,letterSpacing:-0.6}}>Nueva visita</div>
+              <button onClick={()=>setShowNueva(false)} style={{width:34,height:34,borderRadius:999,background:T.surface,border:'1px solid '+T.line,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}>
+                <FmIcon name="x" size={14} stroke={T.ink}/>
+              </button>
+            </div>
+
+            {/* Body */}
+            <div style={{flex:1,overflowY:'auto',padding:'0 20px 18px',display:'flex',flexDirection:'column',gap:16}}>
+
+              {/* Contacto buscador */}
+              <div>
+                <div style={{fontSize:10.5,color:T.ink3,fontWeight:700,letterSpacing:0.8,textTransform:'uppercase',padding:'0 2px 8px'}}>Contacto</div>
+                <div style={{position:'relative'}}>
+                  <span style={{position:'absolute',left:14,top:'50%',transform:'translateY(-50%)',display:'inline-flex',pointerEvents:'none'}}>
+                    <FmIcon name="search" size={15} stroke={T.ink3}/>
+                  </span>
+                  <input
+                    type="text"
+                    value={formVisita?.contacto_nombre||formVisita?.query||''}
+                    onChange={e=>setFormVisita&&setFormVisita(v=>({...v,query:e.target.value,contacto_nombre:e.target.value}))}
+                    placeholder="Buscar por nombre o teléfono…"
+                    style={{width:'100%',padding:'13px 14px 13px 38px',borderRadius:14,border:'1px solid '+T.line,background:T.surface,fontFamily:T.sans,fontSize:13.5,color:T.ink,fontWeight:600,outline:'none',boxSizing:'border-box'}}
+                  />
+                </div>
+                {(formVisita?.query?.length>1)&&(
+                  <div style={{marginTop:6,background:T.surface,border:'1px solid '+T.line,borderRadius:14,overflow:'hidden'}}>
+                    {contactos.filter(c=>(c.nombre||'').toLowerCase().includes((formVisita?.query||'').toLowerCase())).slice(0,3).map((c,i)=>(
+                      <div key={c.id} onClick={()=>setFormVisita&&setFormVisita(v=>({...v,contacto_id:c.id,contacto_nombre:c.nombre,query:''}))}
+                        style={{padding:'11px 14px',fontSize:13,color:T.ink,fontWeight:600,borderTop:i===0?0:'1px solid '+T.line,cursor:'pointer',display:'flex',alignItems:'center',gap:8}}>
+                        <span style={{width:26,height:26,borderRadius:999,background:T.olive+'33',display:'flex',alignItems:'center',justifyContent:'center',fontSize:10.5,fontWeight:800,color:T.ink}}>
+                          {(c.nombre||'?')[0].toUpperCase()}
+                        </span>
+                        {c.nombre}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Tipo evento */}
+              <div>
+                <div style={{fontSize:10.5,color:T.ink3,fontWeight:700,letterSpacing:0.8,textTransform:'uppercase',padding:'0 2px 8px'}}>Tipo de evento</div>
+                <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
+                  {['Boda','Comunión','Cumpleaños','Bautizo','Otro'].map(t=>{
+                    const sel2=(formVisita?.tipo_evento||'Boda')===t;
+                    return(
+                      <button key={t} onClick={()=>setFormVisita&&setFormVisita(v=>({...v,tipo_evento:t}))} style={{padding:'9px 14px',borderRadius:999,background:sel2?T.ink:T.surface,color:sel2?'#fff':T.ink,border:'1px solid '+(sel2?T.ink:T.line),fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:T.sans}}>
+                        {t}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Fecha y hora */}
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+                <div>
+                  <div style={{fontSize:10.5,color:T.ink3,fontWeight:700,letterSpacing:0.8,textTransform:'uppercase',padding:'0 2px 8px'}}>Fecha</div>
+                  <div style={{display:'flex',alignItems:'center',gap:10,padding:'13px 14px',borderRadius:14,background:T.surface,border:'1px solid '+T.line}}>
+                    <FmIcon name="calendar" size={15} stroke={T.ink3}/>
+                    <input type="date" value={formVisita?.fecha||''} onChange={e=>setFormVisita&&setFormVisita(v=>({...v,fecha:e.target.value}))} style={{border:0,background:'transparent',outline:'none',fontFamily:T.sans,fontSize:13,color:T.ink,fontWeight:700,flex:1,minWidth:0}}/>
+                  </div>
+                </div>
+                <div>
+                  <div style={{fontSize:10.5,color:T.ink3,fontWeight:700,letterSpacing:0.8,textTransform:'uppercase',padding:'0 2px 8px'}}>Hora</div>
+                  <div style={{display:'flex',alignItems:'center',gap:10,padding:'13px 14px',borderRadius:14,background:T.surface,border:'1px solid '+T.line}}>
+                    <FmIcon name="clock" size={15} stroke={T.ink3}/>
+                    <input type="time" value={formVisita?.hora||'17:00'} onChange={e=>setFormVisita&&setFormVisita(v=>({...v,hora:e.target.value}))} style={{border:0,background:'transparent',outline:'none',fontFamily:T.sans,fontSize:13,color:T.ink,fontWeight:700,flex:1,minWidth:0}}/>
+                  </div>
+                </div>
+              </div>
+
+              {/* Notas */}
+              <div>
+                <div style={{fontSize:10.5,color:T.ink3,fontWeight:700,letterSpacing:0.8,textTransform:'uppercase',padding:'0 2px 8px'}}>Notas</div>
+                <textarea rows={3} value={formVisita?.notas||''} onChange={e=>setFormVisita&&setFormVisita(v=>({...v,notas:e.target.value}))} placeholder="Menú, invitados estimados, preferencias…" style={{width:'100%',padding:'12px 14px',boxSizing:'border-box',borderRadius:14,border:'1px solid '+T.line,background:T.surface,fontFamily:T.sans,fontSize:13,color:T.ink,fontWeight:500,resize:'none',outline:'none',lineHeight:1.5}}/>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div style={{padding:'12px 20px 24px',borderTop:'1px solid '+T.line,display:'flex',gap:10,background:T.bg}}>
+              <button onClick={()=>setShowNueva(false)} style={{flex:1,padding:'14px 0',borderRadius:999,background:T.surface,border:'1px solid '+T.line,color:T.ink,fontSize:13.5,fontWeight:700,cursor:'pointer',fontFamily:T.sans}}>Cancelar</button>
+              <button onClick={()=>crearVisita&&crearVisita(formVisita)} disabled={saving||!form.nombre||!form.fecha||!form.hora} style={{flex:1.4,padding:'14px 0',borderRadius:999,background:T.ink,border:0,color:'#fff',fontSize:13.5,fontWeight:700,cursor:'pointer',fontFamily:T.sans,opacity:(saving||!form.nombre||!form.fecha||!form.hora)?0.5:1}}>{saving?'Guardando…':'Agendar visita'}</button>
+            </div>
+          </div>
+        </div>
+      )}
 
     {/* MODAL NO SE PRESENTÓ */}
     {sel&&showNoPresentado&&<div className="ov" onClick={()=>setShowNoPresentado(false)}>
@@ -9948,7 +10176,9 @@ function Visitas({perfil,tok,rol,setPage,navTarget,setNavTarget}){
       <div className="fg"><label>Notas</label><textarea className="fi" rows={2} value={formContacto.notas} onChange={e=>setFormContacto(v=>({...v,notas:e.target.value}))}/></div>
       <div className="mft"><button className="btn bg" onClick={()=>setShowCrearContacto(false)}>Cancelar</button><button className="btn bp" onClick={crearYvincular} disabled={saving||!formContacto.nombre}>{saving?"Creando…":"✓ Crear y vincular"}</button></div>
     </div></div>}
-  </>;
+
+    </div>
+  );
 }
 
 function NotaVisita({sel,onGuardar,puedeEditar}){
