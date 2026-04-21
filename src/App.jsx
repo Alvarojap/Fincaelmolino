@@ -450,19 +450,19 @@ input,select,textarea{font-family:inherit}
 .urole{font-size:11px;color:rgba(255,255,255,.4);text-transform:capitalize;margin-top:1px}
 .logout-btn{background:none;border:none;cursor:pointer;color:rgba(255,255,255,.3);font-size:18px;padding:6px;transition:all .15s ease;flex-shrink:0;line-height:1;border-radius:8px}
 .logout-btn:hover{color:#F35757;background:rgba(243,87,87,.12)}
-.mob-top{display:none;position:sticky;top:0;z-index:150;background:#FFFFFF;border-bottom:1px solid #E5E0D6;padding:0 16px;height:56px;align-items:center;justify-content:space-between}
+.mob-top{height:56px;position:sticky;top:0;z-index:80;background:#FAFAF7;border-bottom:1px solid #E8E4DC;display:flex;align-items:center;justify-content:space-between;padding:0 20px;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
 .mob-top-title{font-family:'Inter Tight',sans-serif;font-size:16px;color:#EC683E;font-weight:800}
 .mob-menu-btn{background:none;border:none;color:#1A1A1A;font-size:24px;cursor:pointer;padding:8px;display:flex;align-items:center;justify-content:center;border-radius:10px;line-height:1;transition:background .15s}
 .mob-menu-btn:active{background:#F0EEE9}
 .drawer-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:300;backdrop-filter:blur(12px)}
 .drawer{position:fixed;left:0;top:0;bottom:0;width:min(300px,85vw);background:#1A1A1A;z-index:400;display:flex;flex-direction:column;overflow-y:auto;transform:translateX(-100%);transition:transform .28s cubic-bezier(.4,0,.2,1);box-shadow:8px 0 40px rgba(0,0,0,.2)}
 .drawer.open{transform:translateX(0)}
-.mob-bar{display:none;position:fixed;bottom:0;left:0;right:0;z-index:90;background:rgba(255,255,255,.96);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-top:1px solid #E5E0D6;padding:6px 8px;padding-bottom:max(22px,env(safe-area-inset-bottom))}
-.mob-bar-inner{display:flex;justify-content:space-around;align-items:center}
-.mob-btn{display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 10px;border:none;background:none;cursor:pointer;color:#7A766F;font-size:10px;font-family:inherit;font-weight:500;border-radius:14px;transition:all .15s ease;min-width:52px;position:relative;-webkit-tap-highlight-color:transparent}
-.mob-btn.on{color:#1A1A1A;font-weight:700}
-.mob-btn.on .mico{background:#EC683E;color:#fff;border-radius:100px;padding:4px 14px;box-shadow:0 2px 8px rgba(236,104,62,.3)}
-.mico{font-size:24px;line-height:1;transition:all .2s ease;display:inline-block;position:relative;padding:4px 8px;border-radius:100px}
+.mob-bar{position:fixed;bottom:0;left:0;right:0;z-index:90;background:rgba(250,250,247,0.92);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-top:1px solid #E8E4DC;padding-bottom:env(safe-area-inset-bottom, 0px)}
+.mob-bar-inner{display:flex;height:60px;align-items:stretch}
+.mob-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;background:none;border:0;cursor:pointer;font-size:10px;font-weight:600;color:#BFBAB4;font-family:var(--sans, system-ui);padding:0;transition:color 0.15s}
+.mob-btn.on{color:#1A1714}
+.mob-btn.on .mico svg{stroke:#1A1714}
+.mico{position:relative;display:flex;align-items:center;justify-content:center;width:28px;height:28px}
 .ph{padding:28px 32px 22px;flex-shrink:0}
 .ph h2{font-family:'Inter Tight',sans-serif;font-size:22px;color:#1A1A1A;font-weight:800;letter-spacing:-.5px}
 .ph p{color:#8A8580;font-size:13px;margin-top:5px;font-weight:500}
@@ -768,11 +768,18 @@ export default function App() {
     <div className="app">
       <Sidebar perfil={perfil} page={page} setPage={setPage} onLogout={logout}/>
       <div className="mob-top">
-        <div style={{display:"flex",alignItems:"center",gap:8}}>
-          <MolinoLogo size={22}/>
-          <span className="mob-top-title">Finca El Molino</span>
+        <div style={{display:'flex',alignItems:'center',gap:8}}>
+          <MolinoLogo size={24}/>
+          <span style={{fontSize:15,fontWeight:700,color:T.ink,letterSpacing:-0.3}}>Finca El Molino</span>
         </div>
-        <button className="mob-menu-btn" onClick={()=>setDrawerOpen(true)}><Icon name="menu" size={22}/></button>
+        <div style={{display:'flex',alignItems:'center',gap:8}}>
+          {noVistos>0&&(
+            <div style={{width:8,height:8,borderRadius:999,background:'#F35757'}}/>
+          )}
+          <button className="mob-menu-btn" onClick={()=>setDrawerOpen(true)} style={{width:36,height:36,borderRadius:999,background:T.surface,border:'1px solid '+T.line,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}>
+            <FmIcon name="menu" size={18} stroke={T.ink}/>
+          </button>
+        </div>
       </div>
       {drawerOpen&&<div className="drawer-overlay" onClick={()=>setDrawerOpen(false)}/>}
       <div className={`drawer${drawerOpen?" open":""}`}>
@@ -3106,7 +3113,7 @@ function DashL({perfil,setPage,tok}){
 function DashC({perfil,reservas,setPage}){
   const pend=reservas.filter(r=>r.estado==="visita"||r.estado==="pendiente_contrato").length;
   return <>
-    <div style={{padding:"28px 32px 16px"}}><div style={{fontSize:12,color:T.ink3,fontWeight:500}}>{new Date().toLocaleDateString("es-ES",{weekday:"long",day:"numeric",month:"long"})}</div><div style={{fontSize:28,fontWeight:700,color:T.ink,letterSpacing:-.8,lineHeight:1.02,marginTop:2}}>Hola, {perfil.nombre.split(" ")[0]} 👋</div></div>
+    <div style={{padding:"54px 32px 16px"}}><div style={{fontSize:12,color:T.ink3,fontWeight:500}}>{new Date().toLocaleDateString("es-ES",{weekday:"long",day:"numeric",month:"long"})}</div><div style={{fontSize:28,fontWeight:700,color:T.ink,letterSpacing:-.8,lineHeight:1.02,marginTop:2}}>Hola, {perfil.nombre.split(" ")[0]} 👋</div></div>
     <div className="pb">
       <div className="sg"><SC lbl="Reservas activas" val={reservas.filter(r=>["visita","pendiente_contrato","contrato_firmado","reserva_pagada","precio_total"].includes(r.estado)).length} sub="en curso"/><SC lbl="Pendientes de firma" val={pend} valC={pend>0?"#f59e0b":undefined}/></div>
       <div className="g2">{[{ico:"📋",t:"Reservas",s:"Listado completo",id:"reservas"},{ico:"📅",t:"Calendario",s:"Disponibilidad",id:"calendario"}].map(it=>(
@@ -5688,7 +5695,7 @@ function Notifs({perfil,tok,rol}){
   if(load)return <div className="loading"><div className="spin"/><span>Cargando…</span></div>;
   const RL={jardinero:"Jardinero",limpieza:"Limpieza",comercial:"Comercial"};
   return <>
-    <div style={{padding:"28px 32px 16px"}}><div style={{fontSize:12,color:T.ink3,fontWeight:500}}>{isA?"Envía avisos al equipo":`${notifs.filter(n=>!n.leida).length} sin leer`}</div><div style={{fontSize:28,fontWeight:700,color:T.ink,letterSpacing:-.8,lineHeight:1.02,marginTop:2}}>Notificaciones</div></div>
+    <div style={{padding:"54px 32px 16px"}}><div style={{fontSize:12,color:T.ink3,fontWeight:500}}>{isA?"Envía avisos al equipo":`${notifs.filter(n=>!n.leida).length} sin leer`}</div><div style={{fontSize:28,fontWeight:700,color:T.ink,letterSpacing:-.8,lineHeight:1.02,marginTop:2}}>Notificaciones</div></div>
     <div className="pb">
       {isA&&<PanelSolicitudes tok={tok} perfil={perfil}/>}
       {isA&&<div className="card" style={{marginBottom:20}}>
@@ -5713,6 +5720,11 @@ function Usuarios({tok}){
   const [usuarios,setUsuarios]=useState([]);const [operarios,setOperarios]=useState([]);const [load,setLoad]=useState(true);const [showAdd,setShowAdd]=useState(false);
   const [form,setForm]=useState({email:"",password:"",nombre:"",rol:"jardinero"});const [saving,setSaving]=useState(false);const [err,setErr]=useState("");
   const [showPinModal,setShowPinModal]=useState(null);const [newPin,setNewPin]=useState("");const [newPinConfirm,setNewPinConfirm]=useState("");
+  const [selUsuario,setSelUsuario]=useState(null);
+  const [selOperario,setSelOperario]=useState(null);
+  const [showPin,setShowPin]=useState(false);
+  const [showNuevo,setShowNuevo]=useState(false);
+  const [editTarifa,setEditTarifa]=useState(false);
   const loadAll=async()=>{
     const [u,o]=await Promise.all([sbGet("usuarios","?select=*&order=rol.asc",tok).catch(()=>[]),sbGet("operarios","?select=*&order=nombre.asc",tok).catch(()=>[])]);
     setUsuarios(u);setOperarios(o);setLoad(false);
@@ -5724,77 +5736,253 @@ function Usuarios({tok}){
       const r=await fetch(`${SB_URL}/auth/v1/admin/users`,{method:"POST",headers:{...HDR,"Authorization":`Bearer ${tok}`},body:JSON.stringify({email:form.email,password:form.password,email_confirm:true})});
       const d=await r.json();if(!r.ok)throw new Error(d.message||"Error al crear usuario");
       await sbPost("usuarios",{id:d.id,nombre:form.nombre,rol:form.rol,avatar:form.nombre.slice(0,2).toUpperCase()},tok);
-      setShowAdd(false);setForm({email:"",password:"",nombre:"",rol:"jardinero"});
+      setShowAdd(false);setShowNuevo(false);setForm({email:"",password:"",nombre:"",rol:"jardinero"});
       await loadAll();
     }catch(e){setErr(e.message||"Error");}setSaving(false);
   };
+  const formatEur=v=>`${(Math.round(parseFloat(v)||0)).toLocaleString("es-ES")}€`;
+  const toggleActivoUsuario=async(u)=>{try{await sbPatch("usuarios",`id=eq.${u.id}`,{activo:u.activo===false},tok);}catch(_){}await loadAll();setSelUsuario(null);};
+  const toggleActivoOperario=async(o)=>{try{await sbPatch("operarios",`id=eq.${o.id}`,{activo:!o.activo},tok);}catch(_){}await loadAll();setSelOperario(null);};
   const RL={admin:"Administrador",jardinero:"Jardinero",limpieza:"Limpieza",comercial:"Comercial"};
   const RC={admin:"#c9a84c",jardinero:"#10b981",limpieza:"#6366f1",comercial:"#f59e0b"};
   if(load)return <div className="loading"><div className="spin"/><span>Cargando…</span></div>;
-  return <>
-    <div style={{padding:"54px 20px 16px"}}><div style={{fontSize:12,color:T.ink3,fontWeight:500}}>Accesos y roles</div><div style={{fontSize:30,fontWeight:700,color:T.ink,letterSpacing:-1,lineHeight:1.02}}>Usuarios</div></div>
-    <div className="pb">
-      <div style={{marginBottom:20}}><button className="btn bp" onClick={()=>setShowAdd(true)}>➕ Añadir usuario</button></div>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(250px,1fr))",gap:14}}>
-        {usuarios.map(u=><div key={u.id} className="card">
-          <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:14}}>
-            <div style={{width:44,height:44,borderRadius:"50%",background:`${RC[u.rol]||"#c9a84c"}20`,border:`2px solid ${RC[u.rol]||"#c9a84c"}40`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:700,color:RC[u.rol]||"#c9a84c",flexShrink:0}}>{u.avatar||u.nombre.slice(0,2).toUpperCase()}</div>
-            <div style={{minWidth:0}}><div style={{fontSize:14,fontWeight:600,color:"#1A1A1A",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{u.nombre}</div><span className="badge" style={{background:`${RC[u.rol]||"#c9a84c"}15`,color:RC[u.rol]||"#c9a84c",border:`1px solid ${RC[u.rol]||"#c9a84c"}30`,marginTop:3,display:"inline-block"}}>{RL[u.rol]||u.rol}</span></div>
-          </div>
-          <div style={{fontSize:11,color:"#BFBAB4"}}>🔑 {u.id.slice(0,8)}…</div>
-        </div>)}
-      </div>
-    </div>
-    {showAdd&&<div className="ov" onClick={()=>setShowAdd(false)}><div className="modal" onClick={e=>e.stopPropagation()}>
-      <h3>➕ Nuevo usuario</h3>{err&&<div className="alert">{err}</div>}
-      <div className="fg"><label>Nombre completo</label><input className="fi" value={form.nombre} onChange={e=>setForm(v=>({...v,nombre:e.target.value}))} placeholder="Ej: Carlos García"/></div>
-      <div className="fg"><label>Email</label><input className="fi" type="email" value={form.email} onChange={e=>setForm(v=>({...v,email:e.target.value}))} placeholder="carlos@elmolino.es"/></div>
-      <div className="fg"><label>Contraseña inicial</label><input className="fi" type="text" value={form.password} onChange={e=>setForm(v=>({...v,password:e.target.value}))} placeholder="min. 6 caracteres"/></div>
-      <div className="fg"><label>Rol</label><select className="fi" value={form.rol} onChange={e=>setForm(v=>({...v,rol:e.target.value}))}><option value="jardinero">Jardinero</option><option value="limpieza">Limpieza</option><option value="comercial">Comercial</option><option value="admin">Administrador</option></select></div>
-      <div className="mft"><button className="btn bg" onClick={()=>setShowAdd(false)}>Cancelar</button><button className="btn bp" onClick={crearUsuario} disabled={saving}>{saving?"Creando…":"Crear usuario"}</button></div>
-    </div></div>}
+  return (
+    <div style={{paddingBottom:100,background:T.bg,minHeight:'100%',fontFamily:T.sans}}>
 
-    {/* OPERARIOS */}
-    {operarios.length>0&&<>
-      <div style={{fontSize:11,color:"#EC683E",textTransform:"uppercase",letterSpacing:1,fontWeight:700,marginTop:28,marginBottom:14}}>Operarios (acceso por PIN)</div>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(250px,1fr))",gap:14}}>
-        {operarios.map(o=>{
-          const rc=o.rol==="jardinero"?"#A6BE59":"#AFA3FF";
-          return <div key={o.id} className="card">
-            <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:12}}>
-              <div style={{width:44,height:44,borderRadius:"50%",background:`${rc}20`,border:`2px solid ${rc}40`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:700,color:rc,flexShrink:0}}>{o.avatar||o.nombre.slice(0,2).toUpperCase()}</div>
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{fontSize:14,fontWeight:600,color:"#1A1A1A"}}>{o.nombre}</div>
-                <div style={{display:"flex",gap:6,marginTop:3}}>
-                  <span className="badge" style={{background:`${rc}15`,color:rc}}>{o.rol==="jardinero"?"Jardinero":"Limpieza"}</span>
-                  <span className="badge" style={{background:o.activo?"rgba(166,190,89,.1)":"rgba(243,87,87,.1)",color:o.activo?"#A6BE59":"#F35757"}}>{o.activo?"Activo":"Inactivo"}</span>
+      {/* Header */}
+      <div style={{padding:'54px 20px 16px',display:'flex',alignItems:'flex-end',justifyContent:'space-between'}}>
+        <div>
+          <div style={{fontSize:12,color:T.ink3,fontWeight:500}}>Accesos y roles</div>
+          <div style={{fontSize:30,fontWeight:700,color:T.ink,letterSpacing:-1,lineHeight:1.02}}>Usuarios</div>
+        </div>
+        <button onClick={()=>{setShowNuevo(true);setShowAdd(true);}} style={{width:38,height:38,borderRadius:999,background:T.ink,border:0,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}>
+          <FmIcon name="plus" size={18} stroke="white"/>
+        </button>
+      </div>
+
+      {/* Sección email */}
+      <div style={{padding:'0 20px 16px'}}>
+        <div style={{fontSize:11,color:T.ink3,letterSpacing:1,textTransform:'uppercase',fontWeight:700,marginBottom:10}}>
+          Acceso email · {usuarios.filter(u=>['admin','comercial'].includes(u.rol||'')).length} usuarios
+        </div>
+        <div style={{display:'flex',flexDirection:'column',gap:8}}>
+          {usuarios.filter(u=>['admin','comercial'].includes(u.rol||'')).map(u=>{
+            const colores={admin:T.terracotta,comercial:T.softBlue};
+            const color=colores[u.rol]||T.ink3;
+            return(
+              <div key={u.id} onClick={()=>setSelUsuario(u)} style={{background:T.surface,borderRadius:16,padding:14,border:'1px solid '+T.line,cursor:'pointer',display:'flex',alignItems:'center',gap:12}}>
+                <div style={{width:44,height:44,borderRadius:999,background:color+'22',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                  <span style={{fontSize:18,fontWeight:700,color}}>{(u.nombre||u.email||'?')[0].toUpperCase()}</span>
+                </div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:14,fontWeight:700,color:T.ink,letterSpacing:-0.2}}>{u.nombre||u.email}</div>
+                  <div style={{fontSize:11,color:T.ink3,marginTop:2}}>{u.email}</div>
+                </div>
+                <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:4}}>
+                  <span style={{fontSize:10,padding:'3px 8px',borderRadius:999,background:color+'22',color,fontWeight:700,textTransform:'capitalize'}}>{u.rol}</span>
+                  <div style={{width:8,height:8,borderRadius:999,background:u.activo!==false?T.olive:T.ink4}}/>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Sección PIN */}
+      <div style={{padding:'0 20px 16px'}}>
+        <div style={{fontSize:11,color:T.ink3,letterSpacing:1,textTransform:'uppercase',fontWeight:700,marginBottom:10}}>
+          Acceso PIN · {operarios.length} operarios
+        </div>
+        <div style={{display:'flex',flexDirection:'column',gap:8}}>
+          {operarios.map(op=>{
+            const colores={limpieza:T.lavender,jardinero:T.olive};
+            const color=colores[op.rol]||T.ink3;
+            return(
+              <div key={op.id} onClick={()=>{setSelOperario(op);setShowPin(false);}} style={{background:T.surface,borderRadius:16,padding:14,border:'1px solid '+T.line,cursor:'pointer',display:'flex',alignItems:'center',gap:12}}>
+                <div style={{width:44,height:44,borderRadius:999,background:color+'22',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                  <span style={{fontSize:18,fontWeight:700,color}}>{(op.nombre||'?')[0].toUpperCase()}</span>
+                </div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:14,fontWeight:700,color:T.ink,letterSpacing:-0.2}}>{op.nombre}</div>
+                  <div style={{fontSize:11,color:T.ink3,marginTop:2,display:'flex',alignItems:'center',gap:6}}>
+                    <span style={{textTransform:'capitalize'}}>{op.rol}</span>
+                    <span>·</span>
+                    <span>{op.tarifa_hora||0}€/h</span>
+                    <span>·</span>
+                    <span>{op.modalidad_pago||'horas'}</span>
+                  </div>
+                </div>
+                <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:6}}>
+                  <div style={{display:'flex',alignItems:'center',gap:6,background:T.bg,borderRadius:8,padding:'4px 8px',border:'1px solid '+T.line}}>
+                    <FmIcon name="lock" size={11} stroke={T.ink3}/>
+                    <span style={{fontSize:11,fontWeight:700,color:T.ink3,letterSpacing:2}}>••••</span>
+                  </div>
+                  <div style={{width:8,height:8,borderRadius:999,background:op.activo!==false?T.olive:T.ink4}}/>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Detalle usuario email */}
+      {selUsuario&&(
+        <div style={{position:'fixed',inset:0,background:T.bg,zIndex:30,overflow:'auto',paddingBottom:40,fontFamily:T.sans}}>
+          <div style={{padding:'54px 20px 14px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+            <button onClick={()=>setSelUsuario(null)} style={{width:36,height:36,borderRadius:999,background:T.surface,border:'1px solid '+T.line,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}>
+              <FmIcon name="chevL" size={16} stroke={T.ink}/>
+            </button>
+            <div style={{fontSize:11,color:T.ink3,letterSpacing:1,textTransform:'uppercase',fontWeight:600}}>Usuario</div>
+            <div style={{width:36}}/>
+          </div>
+          <div style={{padding:'0 20px 20px',textAlign:'center'}}>
+            {(()=>{const color={admin:T.terracotta,comercial:T.softBlue}[selUsuario.rol]||T.ink3;return(
+              <div style={{width:80,height:80,borderRadius:999,background:color+'22',display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 12px'}}>
+                <span style={{fontSize:32,fontWeight:700,color}}>{(selUsuario.nombre||selUsuario.email||'?')[0].toUpperCase()}</span>
+              </div>
+            );})()}
+            <div style={{fontSize:24,fontWeight:700,color:T.ink,letterSpacing:-0.6}}>{selUsuario.nombre||'Sin nombre'}</div>
+            <div style={{fontSize:14,color:T.ink3,marginTop:4}}>{selUsuario.email}</div>
+            <span style={{display:'inline-flex',marginTop:8,height:24,padding:'0 10px',borderRadius:999,background:({admin:T.terracotta,comercial:T.softBlue}[selUsuario.rol]||T.ink3)+'22',color:{admin:T.terracotta,comercial:T.softBlue}[selUsuario.rol]||T.ink3,fontSize:11,fontWeight:700,alignItems:'center',textTransform:'capitalize'}}>
+              {selUsuario.rol}
+            </span>
+          </div>
+          <div style={{padding:'0 20px 14px'}}>
+            <div style={{background:T.surface,borderRadius:16,border:'1px solid '+T.line,overflow:'hidden'}}>
+              {[
+                {l:'Estado',v:selUsuario.activo!==false?'Activo':'Inactivo'},
+                {l:'Último acceso',v:selUsuario.ultimo_acceso?new Date(selUsuario.ultimo_acceso).toLocaleDateString('es-ES'):'Nunca'},
+                {l:'Miembro desde',v:selUsuario.created_at?new Date(selUsuario.created_at).toLocaleDateString('es-ES'):'—'},
+              ].map((row,i,arr)=>(
+                <div key={i} style={{display:'flex',justifyContent:'space-between',padding:'12px 16px',borderBottom:i<arr.length-1?'1px solid '+T.line:'none'}}>
+                  <span style={{fontSize:13,color:T.ink3}}>{row.l}</span>
+                  <span style={{fontSize:13,fontWeight:600,color:T.ink}}>{row.v}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div style={{padding:'0 20px',display:'flex',gap:8}}>
+            <button onClick={()=>toggleActivoUsuario&&toggleActivoUsuario(selUsuario)} style={{flex:1,padding:'13px 0',borderRadius:999,border:'1px solid '+T.line,background:T.surface,color:T.ink,fontFamily:T.sans,fontWeight:600,fontSize:13,cursor:'pointer'}}>
+              {selUsuario.activo!==false?'Desactivar':'Activar'}
+            </button>
+            <button style={{flex:1,padding:'13px 0',borderRadius:999,border:0,background:T.ink,color:'white',fontFamily:T.sans,fontWeight:700,fontSize:13,cursor:'pointer'}}>
+              Editar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Detalle operario PIN */}
+      {selOperario&&(
+        <div style={{position:'fixed',inset:0,background:T.bg,zIndex:30,overflow:'auto',paddingBottom:40,fontFamily:T.sans}}>
+          <div style={{padding:'54px 20px 14px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+            <button onClick={()=>{setSelOperario(null);setShowPin(false);}} style={{width:36,height:36,borderRadius:999,background:T.surface,border:'1px solid '+T.line,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}>
+              <FmIcon name="chevL" size={16} stroke={T.ink}/>
+            </button>
+            <div style={{fontSize:11,color:T.ink3,letterSpacing:1,textTransform:'uppercase',fontWeight:600}}>Operario</div>
+            <div style={{width:36}}/>
+          </div>
+          <div style={{padding:'0 20px 20px',textAlign:'center'}}>
+            {(()=>{const color={limpieza:T.lavender,jardinero:T.olive}[selOperario.rol]||T.ink3;return(
+              <div style={{width:80,height:80,borderRadius:999,background:color+'22',display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 12px'}}>
+                <span style={{fontSize:32,fontWeight:700,color}}>{(selOperario.nombre||'?')[0].toUpperCase()}</span>
+              </div>
+            );})()}
+            <div style={{fontSize:24,fontWeight:700,color:T.ink,letterSpacing:-0.6}}>{selOperario.nombre}</div>
+            <span style={{display:'inline-flex',marginTop:8,height:24,padding:'0 10px',borderRadius:999,background:({limpieza:T.lavender,jardinero:T.olive}[selOperario.rol]||T.ink3)+'22',color:{limpieza:T.lavender,jardinero:T.olive}[selOperario.rol]||T.ink3,fontSize:11,fontWeight:700,alignItems:'center',textTransform:'capitalize'}}>
+              {selOperario.rol}
+            </span>
+          </div>
+          {/* PIN oculto */}
+          <div style={{padding:'0 20px 14px'}}>
+            <div style={{fontSize:11,color:T.ink3,letterSpacing:1,textTransform:'uppercase',fontWeight:700,marginBottom:8}}>PIN de acceso</div>
+            <div style={{background:T.surface,borderRadius:16,padding:16,border:'1px solid '+T.line,display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+              <div style={{display:'flex',gap:8}}>
+                {[1,2,3,4].map(i=>(
+                  <div key={i} style={{width:14,height:14,borderRadius:999,background:T.ink}}/>
+                ))}
+              </div>
+              <button onClick={()=>setShowPin(p=>!p)} style={{fontSize:12,color:T.ink3,background:'none',border:0,cursor:'pointer',fontFamily:T.sans,fontWeight:600}}>
+                {showPin?'Ocultar':'Ver PIN'}
+              </button>
+            </div>
+            {showPin&&<div style={{marginTop:8,textAlign:'center',fontFamily:(T.mono||'monospace'),fontSize:28,fontWeight:700,letterSpacing:8,color:T.ink}}>{selOperario.pin||'••••'}</div>}
+          </div>
+          {/* Tarifa */}
+          <div style={{padding:'0 20px 14px'}}>
+            <div style={{fontSize:11,color:T.ink3,letterSpacing:1,textTransform:'uppercase',fontWeight:700,marginBottom:8}}>Tarifa y modalidad</div>
+            <div style={{background:T.olive,borderRadius:16,padding:16,color:T.ink}}>
+              <div style={{display:'flex',alignItems:'flex-end',justifyContent:'space-between'}}>
+                <div>
+                  <div style={{fontSize:10,color:'rgba(20,30,5,0.65)',letterSpacing:1,textTransform:'uppercase',fontWeight:700}}>Tarifa hora</div>
+                  <div style={{fontSize:36,fontWeight:700,letterSpacing:-1,lineHeight:1,marginTop:4}}>{selOperario.tarifa_hora||0}€</div>
+                </div>
+                <div style={{textAlign:'right',fontSize:12,color:'rgba(20,30,5,0.75)'}}>
+                  <div style={{fontWeight:700}}>{selOperario.modalidad_pago||'horas'}</div>
+                  <div style={{opacity:0.7,marginTop:2}}>modalidad pago</div>
                 </div>
               </div>
             </div>
-            <div style={{display:"flex",gap:6}}>
-              <button className="btn bg sm" style={{flex:1}} onClick={async()=>{await sbPatch("operarios",`id=eq.${o.id}`,{activo:!o.activo},tok);await loadAll();}}>{o.activo?"Desactivar":"Activar"}</button>
-              <button className="btn bg sm" onClick={()=>{setShowPinModal(o);setNewPin("");setNewPinConfirm("");}}>Cambiar PIN</button>
+          </div>
+          {/* Stats */}
+          <div style={{padding:'0 20px 14px'}}>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+              <OpsMiniKpi value={selOperario.total_servicios||0} label="Servicios" color={T.ink}/>
+              <OpsMiniKpi value={formatEur(selOperario.coste_total||0)} label="Coste total" color={T.terracotta}/>
             </div>
-          </div>;
-        })}
-      </div>
-    </>}
+          </div>
+          {/* Info */}
+          <div style={{padding:'0 20px 14px'}}>
+            <div style={{background:T.surface,borderRadius:16,border:'1px solid '+T.line,overflow:'hidden'}}>
+              {[
+                {l:'Estado',v:selOperario.activo!==false?'Activo':'Inactivo'},
+                {l:'Miembro desde',v:selOperario.created_at?new Date(selOperario.created_at).toLocaleDateString('es-ES'):'—'},
+              ].map((row,i,arr)=>(
+                <div key={i} style={{display:'flex',justifyContent:'space-between',padding:'12px 16px',borderBottom:i<arr.length-1?'1px solid '+T.line:'none'}}>
+                  <span style={{fontSize:13,color:T.ink3}}>{row.l}</span>
+                  <span style={{fontSize:13,fontWeight:600,color:T.ink}}>{row.v}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div style={{padding:'0 20px',display:'flex',gap:8}}>
+            <button onClick={()=>toggleActivoOperario&&toggleActivoOperario(selOperario)} style={{flex:1,padding:'13px 0',borderRadius:999,border:'1px solid '+T.line,background:T.surface,color:T.ink,fontFamily:T.sans,fontWeight:600,fontSize:13,cursor:'pointer'}}>
+              {selOperario.activo!==false?'Desactivar':'Activar'}
+            </button>
+            <button onClick={()=>setEditTarifa(true)} style={{flex:1,padding:'13px 0',borderRadius:999,border:0,background:T.ink,color:'white',fontFamily:T.sans,fontWeight:700,fontSize:13,cursor:'pointer'}}>
+              Editar tarifa
+            </button>
+          </div>
+        </div>
+      )}
 
-    {/* MODAL CAMBIAR PIN */}
-    {showPinModal&&<div className="ov" onClick={()=>setShowPinModal(null)}><div className="modal" style={{maxWidth:360}} onClick={e=>e.stopPropagation()}>
-      <h3>Cambiar PIN</h3>
-      <div style={{fontSize:13,color:"#8A8580",marginBottom:16}}>{showPinModal.nombre}</div>
-      <div className="g2">
-        <div className="fg"><label>Nuevo PIN *</label><input className="fi" type="text" inputMode="numeric" maxLength={4} value={newPin} onChange={e=>setNewPin(e.target.value.replace(/\D/g,"").slice(0,4))} placeholder="0000" style={{textAlign:"center",fontSize:20,letterSpacing:8}}/></div>
-        <div className="fg"><label>Confirmar *</label><input className="fi" type="text" inputMode="numeric" maxLength={4} value={newPinConfirm} onChange={e=>setNewPinConfirm(e.target.value.replace(/\D/g,"").slice(0,4))} placeholder="0000" style={{textAlign:"center",fontSize:20,letterSpacing:8}}/></div>
-      </div>
-      {newPin&&newPinConfirm&&newPin!==newPinConfirm&&<div style={{fontSize:12,color:"#F35757",marginBottom:10}}>No coinciden</div>}
-      <div className="mft">
-        <button className="btn bg" onClick={()=>setShowPinModal(null)}>Cancelar</button>
-        <button className="btn bp" disabled={newPin.length!==4||newPin!==newPinConfirm} onClick={async()=>{await sbPatch("operarios",`id=eq.${showPinModal.id}`,{pin:newPin},tok);setShowPinModal(null);}}>Guardar</button>
-      </div>
-    </div></div>}
-  </>;
+      {/* Modal crear usuario (conservado) */}
+      {showAdd&&<div className="ov" onClick={()=>{setShowAdd(false);setShowNuevo(false);}}><div className="modal" onClick={e=>e.stopPropagation()}>
+        <h3>➕ Nuevo usuario</h3>{err&&<div className="alert">{err}</div>}
+        <div className="fg"><label>Nombre completo</label><input className="fi" value={form.nombre} onChange={e=>setForm(v=>({...v,nombre:e.target.value}))} placeholder="Ej: Carlos García"/></div>
+        <div className="fg"><label>Email</label><input className="fi" type="email" value={form.email} onChange={e=>setForm(v=>({...v,email:e.target.value}))} placeholder="carlos@elmolino.es"/></div>
+        <div className="fg"><label>Contraseña inicial</label><input className="fi" type="text" value={form.password} onChange={e=>setForm(v=>({...v,password:e.target.value}))} placeholder="min. 6 caracteres"/></div>
+        <div className="fg"><label>Rol</label><select className="fi" value={form.rol} onChange={e=>setForm(v=>({...v,rol:e.target.value}))}><option value="jardinero">Jardinero</option><option value="limpieza">Limpieza</option><option value="comercial">Comercial</option><option value="admin">Administrador</option></select></div>
+        <div className="mft"><button className="btn bg" onClick={()=>{setShowAdd(false);setShowNuevo(false);}}>Cancelar</button><button className="btn bp" onClick={crearUsuario} disabled={saving}>{saving?"Creando…":"Crear usuario"}</button></div>
+      </div></div>}
+
+      {/* Modal cambiar PIN (conservado, accesible desde acción futura) */}
+      {showPinModal&&<div className="ov" onClick={()=>setShowPinModal(null)}><div className="modal" style={{maxWidth:360}} onClick={e=>e.stopPropagation()}>
+        <h3>Cambiar PIN</h3>
+        <div style={{fontSize:13,color:"#8A8580",marginBottom:16}}>{showPinModal.nombre}</div>
+        <div className="g2">
+          <div className="fg"><label>Nuevo PIN *</label><input className="fi" type="text" inputMode="numeric" maxLength={4} value={newPin} onChange={e=>setNewPin(e.target.value.replace(/\D/g,"").slice(0,4))} placeholder="0000" style={{textAlign:"center",fontSize:20,letterSpacing:8}}/></div>
+          <div className="fg"><label>Confirmar *</label><input className="fi" type="text" inputMode="numeric" maxLength={4} value={newPinConfirm} onChange={e=>setNewPinConfirm(e.target.value.replace(/\D/g,"").slice(0,4))} placeholder="0000" style={{textAlign:"center",fontSize:20,letterSpacing:8}}/></div>
+        </div>
+        {newPin&&newPinConfirm&&newPin!==newPinConfirm&&<div style={{fontSize:12,color:"#F35757",marginBottom:10}}>No coinciden</div>}
+        <div className="mft">
+          <button className="btn bg" onClick={()=>setShowPinModal(null)}>Cancelar</button>
+          <button className="btn bp" disabled={newPin.length!==4||newPin!==newPinConfirm} onClick={async()=>{await sbPatch("operarios",`id=eq.${showPinModal.id}`,{pin:newPin},tok);setShowPinModal(null);}}>Guardar</button>
+        </div>
+      </div></div>}
+
+    </div>
+  );
 }
 
 // ─── JARDINEROS ─────────────────────────────────────────────────────────────
@@ -6323,7 +6511,7 @@ function AlmacenPage({perfil,tok,rol}){
 
   if(load)return <div className="loading"><div className="spin"/><span>Cargando…</span></div>;
   return <>
-    <div style={{padding:"28px 32px 16px"}}><div style={{fontSize:12,color:T.ink3,fontWeight:500}}>{articulos.length} artículos · {bajos.length} con stock bajo</div><div style={{fontSize:28,fontWeight:700,color:T.ink,letterSpacing:-.8,lineHeight:1.02,marginTop:2}}>Almacén</div></div>
+    <div style={{padding:"54px 32px 16px"}}><div style={{fontSize:12,color:T.ink3,fontWeight:500}}>{articulos.length} artículos · {bajos.length} con stock bajo</div><div style={{fontSize:28,fontWeight:700,color:T.ink,letterSpacing:-.8,lineHeight:1.02,marginTop:2}}>Almacén</div></div>
     <div className="pb">
       {bajos.length>0&&<div style={{background:"#FEE8E8",borderRadius:14,padding:"12px 16px",marginBottom:16,fontSize:13,color:"#F35757",fontWeight:600}}>⚠️ {bajos.length} artículo{bajos.length>1?"s":""} con stock bajo: {bajos.slice(0,5).map(a=>a.nombre).join(", ")}</div>}
 
