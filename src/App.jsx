@@ -3747,88 +3747,174 @@ function JardinAdmin({perfil,tok,setPage}){
   );
 
   /* ═══════ MOBILE LAYOUT ═══════ */
-  return <>
-    <div style={{padding:"28px 32px 16px"}}><div style={{fontSize:12,color:T.ink3,fontWeight:500}}>Servicios · Planificación</div><div style={{fontSize:28,fontWeight:700,color:T.ink,letterSpacing:-.8,lineHeight:1.02,marginTop:2}}>Jardinería</div></div>
-    <div className="pb">
-      <div className="tabs">
-        <button className={`tab${tab==="semana"?" on":""}`} onClick={()=>setTab("semana")}>Esta semana</button>
-        <button className={`tab${tab==="servicios"?" on":""}`} onClick={()=>setTab("servicios")}>Servicios</button>
-        <button className={`tab${tab==="frec"?" on":""}`} onClick={()=>setTab("frec")}>Frecuencias</button>
+  return <div style={{paddingBottom:100,background:T.bg,minHeight:"100%",fontFamily:T.sans}}>
+
+    {/* Header */}
+    <div style={{padding:"54px 20px 16px",display:"flex",alignItems:"flex-end",justifyContent:"space-between"}}>
+      <div>
+        <div style={{fontSize:12,color:T.ink3,fontWeight:500}}>Planificación</div>
+        <div style={{fontSize:30,fontWeight:700,color:T.ink,letterSpacing:-1,lineHeight:1.02}}>Jardinería</div>
       </div>
-      {tab==="semana"&&<>
-        <div className="card" style={{marginBottom:14}}>
-          <div className="chdr"><span className="ctit">📋 Tareas fijas</span></div>
-          {actv.map(t=>{const e=sj[t.id]||{};return <div key={t.id} className={`cli${e.done?" done":""}`}>
-            <span style={{fontSize:17,flexShrink:0}}>{e.done?"✅":"⬜"}</span>
-            <div style={{flex:1,minWidth:0}}><span className="tz">{t.zona}</span><div className="tl">{t.txt}</div><div className="tm" style={{color:"#6366f1"}}>🔁 {FREC_LBL[getFr(t)]}</div>
-              {e.done?<div className="tm">✓ {e.completado_por} · {fmtDT(e.completado_ts)}</div>:<div className="tm" style={{color:"#F35757"}}>⏳ Pendiente</div>}
-              {e.nota&&<div className="nbox">📝 {e.nota}</div>}{e.foto_url&&<img src={e.foto_url} alt="" className="pthumb"/>}
+      <button onClick={()=>{setSrvForm(srvVacio);setSrvTareas([]);setShowSrv(true);}} style={{width:38,height:38,borderRadius:999,background:T.ink,border:0,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}>
+        <FmIcon name="plus" size={18} stroke="white"/>
+      </button>
+    </div>
+
+    {/* Tabs principales */}
+    <div style={{padding:"0 20px 16px"}}>
+      <div style={{display:"flex",background:T.surface,borderRadius:999,padding:4,border:"1px solid "+T.line,gap:2}}>
+        {[
+          {k:"semana",l:"Esta semana"},
+          {k:"servicios",l:"Servicios"},
+          {k:"frec",l:"Frecuencias"},
+        ].map(t=>(
+          <button key={t.k} onClick={()=>setTab(t.k)} style={{flex:1,padding:"9px 6px",borderRadius:999,border:0,background:tab===t.k?T.ink:"transparent",color:tab===t.k?"#fff":T.ink2,fontFamily:T.sans,fontSize:11,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>
+            {t.l}
+          </button>
+        ))}
+      </div>
+    </div>
+
+    {/* ── TAB ESTA SEMANA ── */}
+    {tab==="semana"&&(
+      <div style={{padding:"0 20px",display:"flex",flexDirection:"column",gap:12}}>
+
+        {/* Tareas fijas */}
+        <div style={{background:T.surface,borderRadius:18,border:"1px solid "+T.line,overflow:"hidden"}}>
+          <div style={{padding:"14px 16px",borderBottom:"1px solid "+T.line,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <div>
+              <div style={{fontSize:12,fontWeight:700,color:T.ink,letterSpacing:-.2}}>Tareas fijas</div>
+              <div style={{fontSize:11,color:T.ink3,marginTop:2}}>Recurrentes según frecuencia</div>
             </div>
-          </div>;})}
-        </div>
-        <div className="card">
-          <div className="chdr"><span className="ctit">⭐ Puntuales</span><button className="btn bp sm" onClick={()=>setShowM(true)}>+ Asignar</button></div>
-          {jpunt.length===0?<div className="empty"><span className="ico">📭</span><p>Sin puntuales</p></div>
-            :jpunt.map(t=><div key={t.id} className={`cli${t.done?" done":""}`}>
-              <span style={{fontSize:17,flexShrink:0}}>{t.done?"✅":"⬜"}</span>
-              <div style={{flex:1,minWidth:0}}><span className="tz">{t.zona||"General"}</span><div className="tl">{t.txt}</div>{t.done?<div className="tm">✓ {t.completado_por}</div>:<div className="tm">⏳ Pendiente</div>}{t.nota&&<div className="nbox">📝 {t.nota}</div>}</div>
-              <button className="btn br sm" onClick={()=>delPunt(t.id)}>🗑</button>
-            </div>)}
-        </div>
-      </>}
-      {tab==="servicios"&&<>
-        <div style={{marginBottom:14}}>
-          <button onClick={()=>{setSrvForm(srvVacio);setSrvTareas([]);setShowSrv(true);}} style={{width:"100%",padding:"12px 0",borderRadius:999,border:0,background:T.ink,color:"white",fontFamily:T.sans,fontSize:13,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}><FmIcon name="plus" size={14} stroke="white"/>Crear servicio a medida</button>
-        </div>
-        {srvsActivos.length===0&&srvsHist.length===0&&<div style={{textAlign:"center",padding:"40px 0",color:T.ink3,fontSize:13}}>Sin servicios creados</div>}
-        {srvsActivos.map(s=>{const tareas=s.jardin_servicio_tareas||[];const hechas=tareas.filter(t=>t.done).length;
-          const fi=new Date(s.fecha_inicio+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"});
-          const ff=new Date(s.fecha_fin+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"});
-          const m=getOpsMeta(s.estado||"activo");
-          return <div key={s.id} onClick={()=>setSelSrv(s.id)} style={{background:T.surface,border:`1px solid ${T.line}`,borderRadius:16,padding:14,marginBottom:10,cursor:"pointer"}}>
-            <div style={{display:"flex",gap:10}}>
-              <div style={{width:4,borderRadius:999,background:m.color,flexShrink:0,alignSelf:"stretch"}}/>
+            <div style={{width:28,height:28,borderRadius:8,background:T.olive+"22",display:"flex",alignItems:"center",justifyContent:"center"}}>
+              <FmIcon name="leaf" size={14} stroke={T.olive}/>
+            </div>
+          </div>
+          {actv.length>0?actv.map((t,i)=>{const e=sj[t.id]||{};return(
+            <div key={t.id} style={{display:"flex",alignItems:"flex-start",gap:12,padding:"12px 16px",borderBottom:i<actv.length-1?"1px solid "+T.line:"none"}}>
+              <div style={{width:22,height:22,borderRadius:999,border:"2px solid "+(e.done?T.olive:T.line),background:e.done?T.olive:"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,marginTop:1}}>
+                {e.done&&<FmIcon name="check" size={12} stroke="white" sw={3}/>}
+              </div>
               <div style={{flex:1,minWidth:0}}>
-                <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}><OpsStatePill estado={s.estado||"activo"}/><span style={{fontSize:11,color:T.ink3,fontWeight:600}}>{hechas}/{tareas.length} tareas</span></div>
-                <div style={{fontSize:14,fontWeight:700,color:T.ink,letterSpacing:-.2}}>{s.nombre}</div>
-                <div style={{display:"flex",alignItems:"center",gap:8,marginTop:4,fontSize:11,color:T.ink3}}><FmIcon name="calendar" size={11} stroke={T.ink3}/>{fi} – {ff}<span style={{color:T.ink4}}>·</span><OpsAvatar name={s.jardinero_nombre||"?"} size={16}/>{s.jardinero_nombre}</div>
+                <div style={{fontSize:13,color:e.done?T.ink3:T.ink,fontWeight:e.done?400:600,textDecoration:e.done?"line-through":"none"}}>{t.txt}</div>
+                {t.zona&&<div style={{fontSize:10,color:T.ink3,marginTop:2}}>{t.zona}</div>}
+                {e.done&&<div style={{fontSize:10,color:T.ink3,marginTop:2}}>✓ {e.completado_por} · {fmtDT(e.completado_ts)}</div>}
+                {e.nota&&<div style={{fontSize:11,color:T.ink2,marginTop:4,background:T.bg,borderRadius:8,padding:"5px 8px"}}>📝 {e.nota}</div>}
+                {e.foto_url&&<img src={e.foto_url} alt="" style={{marginTop:6,borderRadius:10,maxWidth:"100%",maxHeight:120}}/>}
               </div>
+              <span style={{fontSize:10,padding:"2px 8px",borderRadius:999,background:T.olive+"22",color:"#4A7A2E",fontWeight:600,flexShrink:0}}>{FREC_LBL[getFr(t)]}</span>
             </div>
-          </div>;
-        })}
-        {srvsHist.length>0&&<>
-          <div style={{fontSize:11,color:T.ink3,textTransform:"uppercase",letterSpacing:1,fontWeight:700,marginTop:20,marginBottom:10}}>Historial</div>
-          {srvsHist.map(s=>{const tareas=s.jardin_servicio_tareas||[];const hechas=tareas.filter(t=>t.done).length;
-            const fi=new Date(s.fecha_inicio+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"});
-            const ff=new Date(s.fecha_fin+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"});
-            return <div key={s.id} style={{background:T.surface,border:`1px solid ${T.line}`,borderRadius:16,padding:12,marginBottom:8,opacity:.7,display:"flex",gap:10}}>
-              <div style={{width:4,borderRadius:999,background:s.estado==="completado"?T.olive:T.danger,flexShrink:0,alignSelf:"stretch"}}/>
-              <div style={{flex:1}}>
-                <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}><OpsStatePill estado={s.estado||"completado"}/></div>
-                <div style={{fontSize:13,fontWeight:700,color:T.ink}}>{s.nombre}</div>
-                <div style={{fontSize:11,color:T.ink3,marginTop:3}}>{fi} – {ff} · {s.jardinero_nombre} · {hechas}/{tareas.length}</div>
+          );}):(<div style={{padding:"20px 16px",textAlign:"center",color:T.ink3,fontSize:13}}>Sin tareas fijas esta semana</div>)}
+        </div>
+
+        {/* Puntuales */}
+        <div style={{background:T.surface,borderRadius:18,border:"1px solid "+T.line,overflow:"hidden"}}>
+          <div style={{padding:"14px 16px",borderBottom:"1px solid "+T.line,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <div>
+              <div style={{fontSize:12,fontWeight:700,color:T.ink,letterSpacing:-.2}}>Puntuales</div>
+              <div style={{fontSize:11,color:T.ink3,marginTop:2}}>Asignadas manualmente</div>
+            </div>
+            <button onClick={()=>setShowM(true)} style={{height:28,padding:"0 12px",borderRadius:999,background:T.ink,color:"white",border:0,fontFamily:T.sans,fontSize:11,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:5}}>
+              <FmIcon name="plus" size={11} stroke="white"/>Asignar
+            </button>
+          </div>
+          {jpunt.length>0?jpunt.map((t,i)=>(
+            <div key={t.id} style={{display:"flex",alignItems:"flex-start",gap:12,padding:"12px 16px",borderBottom:i<jpunt.length-1?"1px solid "+T.line:"none"}}>
+              <div style={{width:22,height:22,borderRadius:999,border:"2px solid "+(t.done?T.olive:T.line),background:t.done?T.olive:"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,marginTop:1}}>
+                {t.done&&<FmIcon name="check" size={12} stroke="white" sw={3}/>}
               </div>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:13,color:t.done?T.ink3:T.ink,fontWeight:t.done?400:600,textDecoration:t.done?"line-through":"none"}}>{t.txt}</div>
+                {t.zona&&<div style={{fontSize:10,color:T.ink3,marginTop:2}}>{t.zona}</div>}
+                {t.done&&<div style={{fontSize:10,color:T.ink3,marginTop:2}}>✓ {t.completado_por}</div>}
+                {t.nota&&<div style={{fontSize:11,color:T.ink2,marginTop:4,background:T.bg,borderRadius:8,padding:"5px 8px"}}>📝 {t.nota}</div>}
+              </div>
+              <button onClick={(e)=>{e.stopPropagation();delPunt(t.id);}} style={{background:"none",border:"none",color:"#F35757",cursor:"pointer",fontSize:13,padding:4,flexShrink:0}}>🗑</button>
+            </div>
+          )):(
+            <div style={{padding:"20px 16px",textAlign:"center",color:T.ink3,fontSize:13}}>Sin tareas puntuales · pulsa Asignar</div>
+          )}
+        </div>
+      </div>
+    )}
+
+    {/* ── TAB SERVICIOS ── */}
+    {tab==="servicios"&&(
+      <div style={{padding:"0 20px",display:"flex",flexDirection:"column",gap:10}}>
+
+        {/* Botón crear servicio */}
+        <button onClick={()=>{setSrvForm(srvVacio);setSrvTareas([]);setShowSrv(true);}} style={{width:"100%",padding:"13px 0",borderRadius:16,border:"1px dashed "+T.line,background:"transparent",color:T.ink,fontFamily:T.sans,fontSize:13,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+          <FmIcon name="plus" size={15} stroke={T.ink}/>Crear servicio a medida
+        </button>
+
+        {/* Servicios activos */}
+        {srvsActivos.length>0&&<>
+          <div style={{fontSize:11,color:T.ink3,letterSpacing:1,textTransform:"uppercase",fontWeight:700,padding:"4px 0"}}>Activos</div>
+          {srvsActivos.map(s=>{const tareas=s.jardin_servicio_tareas||[];const hechas=tareas.filter(t=>t.done).length;
+            return <OpsServiceCard key={s.id} s={{...s,titulo:s.nombre,fecha:s.fecha_inicio,progreso:tareas.length>0?hechas/tareas.length:0,asignado:s.jardinero_nombre}} kind="garden" onClick={()=>setSelSrv(s.id)}/>;
+          })}
+        </>}
+
+        {/* Historial */}
+        {srvsHist.length>0&&<>
+          <div style={{fontSize:11,color:T.ink3,letterSpacing:1,textTransform:"uppercase",fontWeight:700,padding:"4px 0",marginTop:4}}>Historial</div>
+          {srvsHist.map(s=>{const tareas=s.jardin_servicio_tareas||[];const hechas=tareas.filter(t=>t.done).length;
+            return <div key={s.id} style={{opacity:.7}} onClick={()=>setSelSrv(s.id)}>
+              <OpsServiceCard s={{...s,titulo:s.nombre,fecha:s.fecha_inicio,progreso:tareas.length>0?hechas/tareas.length:0,asignado:s.jardinero_nombre}} kind="garden" onClick={()=>setSelSrv(s.id)}/>
             </div>;
           })}
         </>}
-      </>}
-      {tab==="frec"&&<div className="card">
-        <div className="chdr"><span className="ctit">🔁 Frecuencias</span></div>
+
+        {srvsActivos.length===0&&srvsHist.length===0&&(
+          <div style={{textAlign:"center",padding:"40px 0",color:T.ink3,fontSize:13}}>Sin servicios registrados</div>
+        )}
+      </div>
+    )}
+
+    {/* ── TAB FRECUENCIAS ── */}
+    {tab==="frec"&&(
+      <div style={{padding:"0 20px",display:"flex",flexDirection:"column",gap:8}}>
+        <div style={{fontSize:12,color:T.ink3,marginBottom:4}}>
+          Configura con qué frecuencia se realiza cada tarea de jardín
+        </div>
         {JARDIN_T[getTemporada()].map(t=>{
           const f=getFr(t),activa=tocaSemana({...t,frec:f},cwk),ed=editFr===t.id;
-          return <div key={t.id} style={{padding:"11px 0",borderBottom:"1px solid rgba(255,255,255,.05)"}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8}}>
-              <div style={{minWidth:0}}><div style={{fontSize:13,color:activa?"#c9c5b8":"#5a5e6e",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.txt}</div><div style={{fontSize:11,color:"#8A8580"}}>{t.zona}</div></div>
-              <div style={{display:"flex",gap:6,alignItems:"center",flexShrink:0}}>
-                <span className="badge" style={{background:activa?"rgba(16,185,129,.1)":"rgba(255,255,255,.04)",color:activa?"#10b981":"#5a5e6e"}}>{activa?"Esta sem.":"No esta sem."}</span>
-                <button className="btn bg sm" onClick={()=>setEditFr(ed?null:t.id)}>🔁 {FREC_LBL[f]}</button>
+          return <div key={t.id} style={{background:T.surface,borderRadius:16,border:"1px solid "+T.line,overflow:"hidden"}}>
+            {/* Cabecera tarea */}
+            <div onClick={()=>setEditFr(ed?null:t.id)} style={{padding:"13px 14px",display:"flex",alignItems:"center",gap:12,cursor:"pointer"}}>
+              <div style={{width:34,height:34,borderRadius:9,background:activa?T.olive+"22":T.bg,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                <FmIcon name="leaf" size={15} stroke={activa?T.olive:T.ink3}/>
               </div>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:13,fontWeight:600,color:T.ink,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.txt}</div>
+                <div style={{fontSize:11,color:T.ink3,marginTop:2,display:"flex",alignItems:"center",gap:6}}>
+                  {t.zona}
+                  <span style={{fontSize:9,padding:"1px 6px",borderRadius:999,background:activa?T.olive+"22":T.bg,color:activa?"#4A7A2E":T.ink3,fontWeight:700}}>{activa?"Esta sem.":"No esta sem."}</span>
+                </div>
+              </div>
+              <span style={{fontSize:10,padding:"3px 8px",borderRadius:999,border:"1px solid "+T.line,background:T.bg,color:T.ink2,fontWeight:600,flexShrink:0}}>🔁 {FREC_LBL[f]}</span>
+              <FmIcon name={ed?"chevD":"chevR"} size={14} stroke={T.ink3}/>
             </div>
-            {ed&&<div style={{marginTop:10,background:"rgba(201,168,76,.06)",border:"1px solid rgba(201,168,76,.15)",borderRadius:8,padding:"12px"}}><div style={{display:"flex",gap:6,flexWrap:"wrap"}}>{Object.entries(FREC_LBL).map(([v,l])=><button key={v} className={`btn sm${parseInt(v)===f?" bp":" bg"}`} onClick={()=>setFrOv(t.id,v)}>{l}</button>)}</div></div>}
+            {/* Editor frecuencia */}
+            {ed&&(
+              <div style={{padding:"0 14px 14px",borderTop:"1px solid "+T.line,background:T.bg}}>
+                <div style={{fontSize:10,color:T.ink3,letterSpacing:.5,textTransform:"uppercase",fontWeight:700,padding:"12px 0 8px"}}>Frecuencia</div>
+                <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                  {Object.entries(FREC_LBL).map(([v,l])=>{
+                    const on=parseInt(v)===f;
+                    return(
+                      <button key={v} onClick={()=>setFrOv(t.id,v)} style={{padding:"7px 12px",borderRadius:999,border:"1px solid "+(on?T.olive:T.line),background:on?T.olive:T.surface,color:on?"white":T.ink2,fontFamily:T.sans,fontSize:12,fontWeight:700,cursor:"pointer"}}>
+                        {l}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>;
         })}
-      </div>}
-    </div>
+      </div>
+    )}
 
     {/* DETALLE SERVICIO — pantalla completa */}
     {srvSel&&(
@@ -4001,7 +4087,7 @@ function JardinAdmin({perfil,tok,setPage}){
       </div>
       <div className="mft"><button className="btn bg" onClick={()=>setShowSrv(false)}>Cancelar</button><button className="btn bp" onClick={crearServicio} disabled={saving||!srvForm.nombre||!srvForm.jardinero_id||srvTareas.length===0}>{saving?"Creando…":"🌿 Crear y notificar"}</button></div>
     </div></div>}
-  </>;
+  </div>;
 }
 
 // ─── INCIDENCIAS ─────────────────────────────────────────────────────────────
