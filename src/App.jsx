@@ -4157,7 +4157,7 @@ function Limpieza({perfil,tok,rol,setPage}){
             </div>
 
             {/* Progreso zonas */}
-            <div style={{background:T.surface,borderRadius:18,padding:20,border:"1px solid "+T.line,marginBottom:16}}>
+            <div style={{background:T.surface,borderRadius:18,padding:20,border:"1px solid "+T.line,marginBottom:16,overflow:"hidden"}}>
               <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
                 <div>
                   <div style={{fontSize:11,color:T.ink3,letterSpacing:.8,textTransform:"uppercase",fontWeight:700}}>Progreso por zona</div>
@@ -4167,16 +4167,16 @@ function Limpieza({perfil,tok,rol,setPage}){
                 </div>
                 <div style={{fontSize:14,fontWeight:700,color:pctGlobal===100?T.olive:T.ink}}>{pctGlobal}%</div>
               </div>
-              {useZonas&&<div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:8}}>
+              {useZonas&&<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(90px,1fr))",gap:8}}>
                 {LIMP_ZONAS.map((z,i)=>{
                   const done=!!tMap[z.id+"_cerrada"]?.done;
                   const zt2=getZonaTareas(z);
                   const partial=zt2.some(t2=>tMap[t2.id]?.done)&&!done;
                   return(
-                    <div key={i} style={{padding:10,borderRadius:10,background:done?T.olive:partial?T.gold+"44":T.bg,border:"1px solid "+(done?T.olive:partial?T.gold:T.line),color:done?"white":T.ink,minHeight:64,display:"flex",flexDirection:"column",justifyContent:"space-between"}}>
+                    <div key={i} style={{padding:"8px 10px",borderRadius:10,background:done?T.olive:partial?T.gold+"44":T.bg,border:"1px solid "+(done?T.olive:partial?T.gold:T.line),color:done?"white":T.ink,minHeight:64,display:"flex",flexDirection:"column",justifyContent:"space-between",overflow:"hidden"}}>
                       <div style={{fontSize:9,fontWeight:700,opacity:.7,letterSpacing:.5}}>{String(i+1).padStart(2,"0")}</div>
-                      <div style={{fontSize:10,fontWeight:600,marginTop:4,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{z.nombre}</div>
-                      {done&&<FmIcon name="check" size={12} stroke="white" sw={3}/>}
+                      <div style={{fontSize:10,fontWeight:600,letterSpacing:-.1,lineHeight:1.2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",opacity:done?.85:1}}>{z.nombre}</div>
+                      {done&&<FmIcon name="check" size={11} stroke="white" sw={3}/>}
                       {partial&&<div style={{fontSize:9,fontWeight:700,color:"#8A6B0F"}}>EN CURSO</div>}
                     </div>
                   );
