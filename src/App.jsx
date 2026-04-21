@@ -5423,83 +5423,137 @@ function Chat({perfil,tok,rol}){
   const conUser=usuarios.find(u=>String(u.id)===String(conId));
 
   if(load)return <div className="loading"><div className="spin"/><span>Cargando…</span></div>;
-  return <>
-    {/* DESKTOP */}
-    <div className="ph chat-desktop-only"><h2>💬 {isA?"Chat con el equipo":"Chat con administración"}</h2></div>
-    <div style={{display:"flex",height:"calc(100vh - 128px)",minHeight:300,overflow:"hidden"}} className="chat-desktop-only">
-      {isA&&<div className="chat-list-col">
-        <div style={{padding:"12px 14px 8px",fontSize:10,color:"#8A8580",textTransform:"uppercase",letterSpacing:1}}>Conversaciones</div>
-        {usuarios.map(u=><div key={u.id} className={`cu${String(conId)===String(u.id)?" on":""}`} onClick={()=>selectU(u.id)}>
-          <div className="av" style={{width:32,height:32,fontSize:11}}>{u.avatar||u.nombre.slice(0,2).toUpperCase()}</div>
-          <div style={{flex:1,minWidth:0}}><div style={{fontSize:13,color:"#1A1A1A",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{u.nombre}</div><div style={{fontSize:10,color:"#8A8580",textTransform:"capitalize"}}>{u.rol}</div></div>
-          {(unread[String(u.id)]||0)>0&&<span style={{background:"#F35757",color:"#fff",borderRadius:20,padding:"2px 7px",fontSize:11,fontWeight:700,flexShrink:0}}>{unread[String(u.id)]}</span>}
-        </div>)}
-      </div>}
-      {conId?<div className="chat-area">
-        <div className="chdr2">
-          <div className="av" style={{width:32,height:32,fontSize:11}}>{isA?(conUser?.avatar||conUser?.nombre?.slice(0,2).toUpperCase()||"?"):"AD"}</div>
-          <div><div style={{fontSize:13,fontWeight:600,color:"#1A1A1A"}}>{isA?(conUser?.nombre||"…"):"Administración"}</div><div style={{fontSize:10,color:"#8A8580",textTransform:"capitalize"}}>{isA?(conUser?.rol||""):"admin"}</div></div>
-        </div>
-        <div className="msgs">
-          {msgs.length===0&&<div style={{textAlign:"center",color:"#8A8580",fontSize:13,padding:"36px 0"}}>Comienza la conversación…</div>}
-          {msgs.map(m=>{const mine=String(m.de)===myId;return <div key={m.id} className={`bub${mine?" me":" them"}`}>{m.txt&&<div>{m.txt}</div>}{m.foto_url&&<img src={m.foto_url} alt="" style={{maxWidth:200,maxHeight:160,borderRadius:8,marginTop:6,objectFit:"cover",display:"block"}}/>}<div className="bmeta">{fmtDT(m.created_at)}</div></div>;})}
-          <div ref={endRef}/>
-        </div>
-        {/* INPUT DESKTOP */}
-        <div style={{flexShrink:0,borderTop:"1px solid rgba(255,255,255,.08)",padding:"10px 14px",display:"flex",gap:8,alignItems:"flex-end",background:"#FFFFFF"}}>
-          <div style={{flex:1,minWidth:0}}>
-            {fotoMsg&&<div style={{marginBottom:8,position:"relative",display:"inline-block"}}><img src={fotoMsg} alt="" style={{height:50,borderRadius:6,objectFit:"cover"}}/><button onClick={()=>setFotoMsg(null)} style={{position:"absolute",top:-6,right:-6,background:"#F35757",border:"none",borderRadius:"50%",width:18,height:18,cursor:"pointer",color:"#fff",fontSize:10,display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button></div>}
-            <textarea ref={inputRef} className="fi" rows={2} value={txt} onChange={e=>setTxt(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey&&window.innerWidth>768){e.preventDefault();send();}}} placeholder="Escribe un mensaje…" style={{resize:"none",fontSize:15,lineHeight:1.5}}/>
-          </div>
-          <div style={{display:"flex",flexDirection:"column",gap:6,flexShrink:0}}>
-            <label style={{cursor:"pointer",width:44,height:44,background:"rgba(255,255,255,.06)",border:"1px solid rgba(255,255,255,.1)",borderRadius:10,color:"#EC683E",fontSize:20,display:"flex",alignItems:"center",justifyContent:"center"}}>
-              📷<input type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={async e=>{const f=e.target.files[0];if(f){try{const url=await uploadFotoSeguro(f);setFotoMsg(url);}catch(_){const r=new FileReader();r.onload=ev=>setFotoMsg(ev.target.result);r.readAsDataURL(f);}}}}/>
-            </label>
-            <button onClick={send} style={{width:44,height:44,background:"#EC683E",border:"none",borderRadius:10,color:"#0f1117",fontSize:22,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700}}>→</button>
-          </div>
-        </div>
-      </div>:<div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center"}}><div className="empty"><span className="ico">💬</span><p>Selecciona una conversación</p></div></div>}
-    </div>
 
-    {/* MÓVIL */}
-    <div className="chat-mobile-wrap">
-      {isA&&!conId&&<>
-        <div style={{padding:"16px 16px 8px",borderBottom:"1px solid rgba(255,255,255,.06)"}}><div style={{fontFamily:"'Inter Tight',sans-serif",fontSize:18,color:"#1A1A1A"}}>💬 Chat con el equipo</div></div>
-        <div style={{flex:1,overflowY:"auto"}}>
-          {usuarios.map(u=><div key={u.id} className="cu" style={{padding:"14px 16px",borderBottom:"1px solid rgba(255,255,255,.06)"}} onClick={()=>selectU(u.id)}>
-            <div className="av" style={{width:40,height:40,fontSize:13}}>{u.avatar||u.nombre.slice(0,2).toUpperCase()}</div>
-            <div style={{flex:1,minWidth:0,marginLeft:4}}><div style={{fontSize:15,color:"#1A1A1A",fontWeight:500}}>{u.nombre}</div><div style={{fontSize:12,color:"#8A8580",textTransform:"capitalize",marginTop:2}}>{u.rol}</div></div>
-            {(unread[String(u.id)]||0)>0?<span style={{background:"#F35757",color:"#fff",borderRadius:20,padding:"3px 9px",fontSize:12,fontWeight:700}}>{unread[String(u.id)]}</span>:<span style={{color:"#8A8580",fontSize:22}}>›</span>}
-          </div>)}
+  // Aliases para el template rediseñado (mapean a los nombres reales del componente)
+  const canales=isA?usuarios:[];
+  const canalActivo=conId?(conUser||{id:conId,nombre:isA?'Conversación':'Administración',rol:isA?'':'admin'}):null;
+  const setCanalActivo=c=>{ if(isA) setConId(c?(c.id??c):null); };
+  const mensajes=msgs;
+  const textoMensaje=txt;
+  const setTextoMensaje=setTxt;
+  const enviarMensaje=send;
+  const miId=myId;
+
+  return (
+    <div style={{height:'100vh',display:'flex',flexDirection:'column',background:T.bg,fontFamily:T.sans,position:'fixed',inset:0,zIndex:1}}>
+
+      {/* Header */}
+      <div style={{padding:'54px 20px 14px',borderBottom:'1px solid '+T.line,background:T.bg,flexShrink:0}}>
+        <div style={{fontSize:12,color:T.ink3,fontWeight:500}}>Mensajes</div>
+        <div style={{fontSize:26,fontWeight:700,color:T.ink,letterSpacing:-0.8,lineHeight:1.02,marginTop:2}}>Chat</div>
+      </div>
+
+      {/* Lista canales o conversación activa */}
+      {!canalActivo ? (
+        /* Lista de canales */
+        <div style={{flex:1,overflow:'auto',padding:'12px 20px'}}>
+          {canales.length===0&&(
+            <div style={{textAlign:'center',padding:'60px 0',color:T.ink3,fontSize:13}}>
+              <div style={{fontSize:32,marginBottom:8}}>💬</div>
+              Sin conversaciones
+            </div>
+          )}
+          {canales.map((c,i)=>{
+            const noLeidos=unread[String(c.id)]||c.no_leidos||c.unread||0;
+            const ultimo=c.ultimo_mensaje||c.last_message||'';
+            const nombre=c.nombre||c.name||c.id||'Canal';
+            const fecha=c.updated_at?new Date(c.updated_at).toLocaleDateString('es-ES',{day:'numeric',month:'short'}):'—';
+            return(
+              <div key={c.id||i} onClick={()=>setCanalActivo&&setCanalActivo(c)} style={{
+                background:T.surface,borderRadius:16,padding:14,border:'1px solid '+T.line,
+                cursor:'pointer',display:'flex',gap:12,alignItems:'center',marginBottom:8,
+              }}>
+                <div style={{width:46,height:46,borderRadius:999,background:T.lavender+'22',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                  <span style={{fontSize:18,fontWeight:700,color:T.lavender}}>{(nombre||'?')[0].toUpperCase()}</span>
+                </div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:3}}>
+                    <div style={{fontSize:14,fontWeight:700,color:T.ink,letterSpacing:-0.2}}>{nombre}</div>
+                    <div style={{fontSize:10,color:T.ink3}}>{fecha}</div>
+                  </div>
+                  <div style={{fontSize:12,color:T.ink3,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{ultimo||'Sin mensajes'}</div>
+                </div>
+                {noLeidos>0&&(
+                  <div style={{width:20,height:20,borderRadius:999,background:T.terracotta,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                    <span style={{fontSize:10,fontWeight:700,color:'white'}}>{noLeidos>9?'9+':noLeidos}</span>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
-      </>}
-      {conId&&<div style={{display:"flex",flexDirection:"column",height:"100%",overflow:"hidden",position:"relative"}}>
-        <div style={{flexShrink:0,padding:"11px 16px",borderBottom:"1px solid rgba(255,255,255,.07)",display:"flex",alignItems:"center",gap:10,background:"#FFFFFF"}}>
-          {isA&&<button onClick={()=>setConId(null)} style={{background:"none",border:"none",color:"#EC683E",fontSize:26,cursor:"pointer",padding:"0 8px 0 0",lineHeight:1,flexShrink:0}}>‹</button>}
-          <div className="av" style={{width:36,height:36,fontSize:12,flexShrink:0}}>{isA?(conUser?.avatar||conUser?.nombre?.slice(0,2).toUpperCase()||"?"):"AD"}</div>
-          <div><div style={{fontSize:14,fontWeight:600,color:"#1A1A1A"}}>{isA?(conUser?.nombre||"…"):"Administración"}</div><div style={{fontSize:11,color:"#8A8580",textTransform:"capitalize"}}>{isA?(conUser?.rol||""):"admin"}</div></div>
-        </div>
-        <div className="msgs" style={{flex:1,overflowY:"auto",paddingBottom:80}}>
-          {msgs.length===0&&<div style={{textAlign:"center",color:"#8A8580",fontSize:13,padding:"32px 0"}}>Comienza la conversación…</div>}
-          {msgs.map(m=>{const mine=String(m.de)===myId;return <div key={m.id} className={`bub${mine?" me":" them"}`}>{m.txt&&<div>{m.txt}</div>}{m.foto_url&&<img src={m.foto_url} alt="" style={{maxWidth:"70%",borderRadius:8,marginTop:6,objectFit:"cover",display:"block"}}/>}<div className="bmeta">{fmtDT(m.created_at)}</div></div>;})}
-          <div ref={endRef}/>
-        </div>
-        {/* INPUT MÓVIL */}
-        <div style={{position:"absolute",bottom:0,left:0,right:0,zIndex:10,flexShrink:0,borderTop:"1px solid rgba(255,255,255,.08)",padding:"10px 14px",display:"flex",gap:8,alignItems:"flex-end",background:"#FFFFFF"}}>
-          <div style={{flex:1,minWidth:0}}>
-            {fotoMsg&&<div style={{marginBottom:8,position:"relative",display:"inline-block"}}><img src={fotoMsg} alt="" style={{height:50,borderRadius:6,objectFit:"cover"}}/><button onClick={()=>setFotoMsg(null)} style={{position:"absolute",top:-6,right:-6,background:"#F35757",border:"none",borderRadius:"50%",width:18,height:18,cursor:"pointer",color:"#fff",fontSize:10,display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button></div>}
-            <textarea className="fi" rows={2} value={txt} onChange={e=>setTxt(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send();}}} placeholder="Escribe un mensaje…" style={{resize:"none",fontSize:15,lineHeight:1.5}}/>
+      ) : (
+        /* Conversación activa */
+        <>
+          {/* Header conversación */}
+          <div style={{padding:'12px 20px',borderBottom:'1px solid '+T.line,background:T.bg,display:'flex',alignItems:'center',gap:12,flexShrink:0}}>
+            <button onClick={()=>setCanalActivo&&setCanalActivo(null)} style={{width:34,height:34,borderRadius:999,background:T.surface,border:'1px solid '+T.line,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',flexShrink:0}}>
+              <FmIcon name="chevL" size={15} stroke={T.ink}/>
+            </button>
+            <div style={{width:36,height:36,borderRadius:999,background:T.lavender+'22',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+              <span style={{fontSize:15,fontWeight:700,color:T.lavender}}>{(canalActivo.nombre||canalActivo.name||'?')[0].toUpperCase()}</span>
+            </div>
+            <div style={{flex:1}}>
+              <div style={{fontSize:14,fontWeight:700,color:T.ink}}>{canalActivo.nombre||canalActivo.name||'Conversación'}</div>
+              <div style={{fontSize:11,color:T.ink3}}>Canal de mensajes</div>
+            </div>
           </div>
-          <div style={{display:"flex",flexDirection:"column",gap:6,flexShrink:0}}>
-            <label style={{cursor:"pointer",width:44,height:44,background:"rgba(255,255,255,.06)",border:"1px solid rgba(255,255,255,.1)",borderRadius:10,color:"#EC683E",fontSize:20,display:"flex",alignItems:"center",justifyContent:"center"}}>
-              📷<input type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={async e=>{const f=e.target.files[0];if(f){try{const url=await uploadFotoSeguro(f);setFotoMsg(url);}catch(_){const r=new FileReader();r.onload=ev=>setFotoMsg(ev.target.result);r.readAsDataURL(f);}}}}/>
-            </label>
-            <button onClick={send} style={{width:44,height:44,background:"#EC683E",border:"none",borderRadius:10,color:"#0f1117",fontSize:22,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700}}>→</button>
+
+          {/* Mensajes */}
+          <div style={{flex:1,overflow:'auto',padding:'16px 20px',display:'flex',flexDirection:'column',gap:8}}>
+            {mensajes.length===0&&(
+              <div style={{textAlign:'center',padding:'40px 0',color:T.ink3,fontSize:13}}>Sin mensajes aún</div>
+            )}
+            {mensajes.map((m,i)=>{
+              const esMio=String(m.de)===String(miId)||m.remitente_id===miId||m.from===miId||m.es_mio;
+              const nombre=m.remitente_nombre||m.from_name||canalActivo.nombre||'?';
+              const texto=m.contenido||m.content||m.text||m.txt||'';
+              const hora=m.created_at?new Date(m.created_at).toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'}):'—';
+              return(
+                <div key={m.id||i} style={{display:'flex',flexDirection:'column',alignItems:esMio?'flex-end':'flex-start'}}>
+                  {!esMio&&<div style={{fontSize:10,color:T.ink3,marginBottom:3,marginLeft:4,fontWeight:600}}>{nombre}</div>}
+                  <div style={{
+                    maxWidth:'75%',
+                    padding:'10px 14px',
+                    borderRadius:esMio?'18px 18px 4px 18px':'18px 18px 18px 4px',
+                    background:esMio?T.ink:'white',
+                    color:esMio?'white':T.ink,
+                    fontSize:14,
+                    lineHeight:1.4,
+                    border:esMio?'none':'1px solid '+T.line,
+                    boxShadow:'0 1px 3px rgba(0,0,0,0.06)',
+                  }}>
+                    {texto}
+                    {m.foto_url&&<img src={m.foto_url} alt="" style={{display:'block',maxWidth:'100%',marginTop:texto?6:0,borderRadius:10,objectFit:'cover'}}/>}
+                  </div>
+                  <div style={{fontSize:10,color:T.ink3,marginTop:3,marginLeft:4,marginRight:4}}>{hora}</div>
+                </div>
+              );
+            })}
+            <div ref={endRef}/>
           </div>
-        </div>
-      </div>}
+
+          {/* Input mensaje */}
+          <div style={{padding:'12px 20px',paddingBottom:'calc(12px + env(safe-area-inset-bottom,0px))',borderTop:'1px solid '+T.line,background:T.bg,display:'flex',gap:8,alignItems:'flex-end',flexShrink:0}}>
+            <div style={{flex:1,background:T.surface,borderRadius:24,border:'1px solid '+T.line,padding:'10px 16px',display:'flex',alignItems:'center'}}>
+              <input
+                ref={inputRef}
+                value={textoMensaje||''}
+                onChange={e=>setTextoMensaje&&setTextoMensaje(e.target.value)}
+                onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();enviarMensaje&&enviarMensaje();}}}
+                placeholder="Escribe un mensaje..."
+                style={{flex:1,background:'transparent',border:0,outline:'none',fontFamily:T.sans,fontSize:14,color:T.ink,resize:'none'}}
+              />
+            </div>
+            <button onClick={()=>enviarMensaje&&enviarMensaje()} style={{width:44,height:44,borderRadius:999,background:T.ink,border:0,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',flexShrink:0}}>
+              <FmIcon name="arrow" size={18} stroke="white"/>
+            </button>
+          </div>
+        </>
+      )}
+
     </div>
-  </>;
+  );
 }
 
 // ─── NOTIFICACIONES ──────────────────────────────────────────────────────────
@@ -5694,25 +5748,113 @@ function Notifs({perfil,tok,rol}){
   const leer=async id=>{try{await sbPatch("notificaciones",`id=eq.${id}`,{leida:true},tok);setNotifs(prev=>prev.map(n=>n.id===id?{...n,leida:true}:n));}catch(_){}};
   if(load)return <div className="loading"><div className="spin"/><span>Cargando…</span></div>;
   const RL={jardinero:"Jardinero",limpieza:"Limpieza",comercial:"Comercial"};
-  return <>
-    <div style={{padding:"54px 32px 16px"}}><div style={{fontSize:12,color:T.ink3,fontWeight:500}}>{isA?"Envía avisos al equipo":`${notifs.filter(n=>!n.leida).length} sin leer`}</div><div style={{fontSize:28,fontWeight:700,color:T.ink,letterSpacing:-.8,lineHeight:1.02,marginTop:2}}>Notificaciones</div></div>
-    <div className="pb">
-      {isA&&<PanelSolicitudes tok={tok} perfil={perfil}/>}
-      {isA&&<div className="card" style={{marginBottom:20}}>
-        <div className="ctit" style={{marginBottom:14}}>📢 Enviar aviso</div>
-        <div className="fg"><label>Destinatario</label><select className="fi" value={dest} onChange={e=>setDest(e.target.value)}><option value="">Selecciona…</option><option value="todos">📢 Todos los operarios</option>{usuarios.map(u=><option key={u.id} value={String(u.id)}>{u.nombre} ({RL[u.rol]||u.rol})</option>)}</select></div>
-        <div className="fg"><label>Mensaje</label><textarea className="fi" rows={3} value={txt} onChange={e=>setTxt(e.target.value)} placeholder="Ej: Esta semana hay que revisar el riego antes del jueves…"/></div>
-        <button className="btn bp" onClick={enviar} disabled={saving}>📤 Enviar</button>
-      </div>}
-      {notifs.length===0?<div className="empty"><span className="ico">🔔</span><p>Sin notificaciones</p></div>
-        :<div className="card" style={{padding:0,overflow:"hidden"}}>
-          {notifs.map(n=>{const destU=isA?(n.usuarios||null):null;return <div key={n.id} className={`nitem${!n.leida?" unread":""}`}>
-            <div className={`ndot${n.leida?" read":""}`}/><div style={{flex:1,minWidth:0}}>{isA&&destU&&<div style={{fontSize:10,color:"#EC683E",marginBottom:3}}>→ {destU.nombre}</div>}<div style={{fontSize:13,color:n.leida?"#7a7f94":"#c9c5b8",lineHeight:1.4}}>{n.txt}</div><div style={{fontSize:10,color:"#8A8580",marginTop:4}}>{fmtDT(n.created_at)}</div></div>
-            {!n.leida&&!isA&&<button className="btn bg sm" style={{flexShrink:0}} onClick={()=>leer(n.id)}>✓</button>}
-          </div>;})}
-        </div>}
+  const noVistos=notifs.filter(n=>!n.leida).length;
+  const marcarLeida=n=>leer(n.id);
+  const marcarTodasLeidas=()=>notifs.filter(n=>!n.leida).forEach(n=>leer(n.id));
+  return (
+    <div style={{paddingBottom:100,background:T.bg,minHeight:'100%',fontFamily:T.sans}}>
+
+      {/* Header */}
+      <div style={{padding:'54px 20px 16px',display:'flex',alignItems:'flex-end',justifyContent:'space-between'}}>
+        <div>
+          <div style={{fontSize:12,color:T.ink3,fontWeight:500}}>Centro de avisos</div>
+          <div style={{fontSize:30,fontWeight:700,color:T.ink,letterSpacing:-1,lineHeight:1.02}}>Notificaciones</div>
+        </div>
+        {noVistos>0&&(
+          <button onClick={()=>marcarTodasLeidas&&marcarTodasLeidas()} style={{height:32,padding:'0 14px',borderRadius:999,background:T.surface,border:'1px solid '+T.line,fontFamily:T.sans,fontSize:12,fontWeight:600,color:T.ink2,cursor:'pointer'}}>
+            Marcar todas
+          </button>
+        )}
+      </div>
+
+      {/* Badge total no leídas */}
+      {noVistos>0&&(
+        <div style={{padding:'0 20px 14px'}}>
+          <div style={{background:T.terracotta,borderRadius:14,padding:'10px 14px',display:'flex',alignItems:'center',gap:10}}>
+            <div style={{width:28,height:28,borderRadius:999,background:'rgba(30,15,5,0.15)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+              <span style={{fontSize:13,fontWeight:700,color:T.ink}}>{noVistos}</span>
+            </div>
+            <span style={{fontSize:13,fontWeight:600,color:T.ink}}>
+              {noVistos===1?'1 notificación sin leer':`${noVistos} notificaciones sin leer`}
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* Panel solicitudes (admin) + formulario envío (admin) — conservados */}
+      {isA&&(
+        <div style={{padding:'0 20px 14px'}}>
+          <PanelSolicitudes tok={tok} perfil={perfil}/>
+          <div className="card" style={{marginBottom:0}}>
+            <div className="ctit" style={{marginBottom:14}}>📢 Enviar aviso</div>
+            <div className="fg"><label>Destinatario</label><select className="fi" value={dest} onChange={e=>setDest(e.target.value)}><option value="">Selecciona…</option><option value="todos">📢 Todos los operarios</option>{usuarios.map(u=><option key={u.id} value={String(u.id)}>{u.nombre} ({RL[u.rol]||u.rol})</option>)}</select></div>
+            <div className="fg"><label>Mensaje</label><textarea className="fi" rows={3} value={txt} onChange={e=>setTxt(e.target.value)} placeholder="Ej: Esta semana hay que revisar el riego antes del jueves…"/></div>
+            <button className="btn bp" onClick={enviar} disabled={saving}>📤 Enviar</button>
+          </div>
+        </div>
+      )}
+
+      {/* Lista notificaciones */}
+      <div style={{padding:'0 20px',display:'flex',flexDirection:'column',gap:6}}>
+        {notifs.length===0&&(
+          <div style={{textAlign:'center',padding:'60px 0',color:T.ink3,fontSize:13}}>
+            <div style={{fontSize:32,marginBottom:8}}>🔔</div>
+            Sin notificaciones
+          </div>
+        )}
+        {notifs.map((n,i)=>{
+          const colores={
+            cobro:T.olive,
+            servicio:T.softBlue,
+            incidencia:T.terracotta,
+            stock:T.gold,
+            coordinacion:T.lavender,
+            mensaje:T.softBlue,
+            reserva:T.terracotta,
+          };
+          const color=colores[n.tipo||n.type]||T.ink3;
+          const leida=n.leida||n.read||false;
+          const titulo=n.titulo||n.title||'Notificación';
+          const cuerpo=n.cuerpo||n.body||n.message||n.txt||'';
+          const fecha=n.created_at?new Date(n.created_at).toLocaleDateString('es-ES',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'—';
+          return(
+            <div key={n.id||i} onClick={()=>marcarLeida&&marcarLeida(n)} style={{
+              background:leida?T.surface:'white',
+              borderRadius:16,
+              padding:14,
+              border:'1px solid '+(leida?T.line:color+'44'),
+              cursor:'pointer',
+              display:'flex',
+              gap:12,
+              alignItems:'flex-start',
+              opacity:leida?0.7:1,
+              transition:'opacity 0.2s',
+            }}>
+              <div style={{width:38,height:38,borderRadius:12,background:color+'22',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                <FmIcon name={
+                  n.tipo==='cobro'?'euro':
+                  n.tipo==='servicio'?'check':
+                  n.tipo==='incidencia'?'warn':
+                  n.tipo==='stock'?'box':
+                  n.tipo==='coordinacion'?'calendar':
+                  'bell'
+                } size={16} stroke={color}/>
+              </div>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:8,marginBottom:3}}>
+                  <div style={{fontSize:13,fontWeight:leida?500:700,color:T.ink,letterSpacing:-0.2,lineHeight:1.3}}>{titulo}</div>
+                  {!leida&&<div style={{width:8,height:8,borderRadius:999,background:color,flexShrink:0,marginTop:3}}/>}
+                </div>
+                {cuerpo&&<div style={{fontSize:12,color:T.ink3,lineHeight:1.4,marginBottom:4}}>{cuerpo}</div>}
+                <div style={{fontSize:10,color:T.ink4||T.ink3,fontWeight:500}}>{fecha}</div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
     </div>
-  </>;
+  );
 }
 
 // ─── USUARIOS ────────────────────────────────────────────────────────────────
