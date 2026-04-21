@@ -6732,17 +6732,18 @@ function Analisis({tok,rol}){
   const kpiBox=(lbl,val,col)=><div style={{background:"#fff",borderRadius:14,padding:"14px 16px",boxShadow:"0 1px 6px rgba(0,0,0,.04)"}}><div style={{fontSize:10,color:"#8A8580",textTransform:"uppercase",fontWeight:700,letterSpacing:.5}}>{lbl}</div><div style={{fontSize:22,fontWeight:800,color:col||"#1A1A1A",marginTop:4}}>{val}</div></div>;
   const rowS={display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderBottom:"1px solid rgba(0,0,0,.04)",gap:8,fontSize:13};
 
-  return <>
+  return <div style={{paddingBottom:100,background:T.bg,minHeight:"100%",fontFamily:T.sans}}>
     {/* Header */}
     <div style={{padding:"54px 20px 16px"}}><div style={{fontSize:12,color:T.ink3,fontWeight:500}}>Inteligencia financiera</div><div style={{fontSize:30,fontWeight:700,color:T.ink,letterSpacing:-1,lineHeight:1.02}}>Análisis</div></div>
 
     {/* KPIs rápidos */}
     <div style={{padding:"0 20px 18px",display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-      {[{label:"Facturación",value:fmt(factTotal),color:T.olive},{label:"Cobrado",value:fmt(cobTotal),color:T.softBlue},{label:"Gastos",value:fmt(gastTotal),color:T.lavender},{label:"Beneficio",value:fmt(benProy),mood:benProy>0?"up":"down",color:T.terracotta}].map((k,i)=><div key={i} style={{background:T.surface,borderRadius:20,padding:14,border:`1px solid ${T.line}`}}><div style={{width:28,height:3,background:k.color,borderRadius:2,marginBottom:10}}/><div style={{fontSize:10,color:T.ink3,fontWeight:600,letterSpacing:.3,textTransform:"uppercase",marginBottom:4}}>{k.label}</div><div style={{fontSize:22,fontWeight:700,color:T.ink,letterSpacing:-.6,lineHeight:1}}>{k.value}</div></div>)}
+      {[{label:"Facturación",value:fmt(factTotal),color:T.olive},{label:"Cobrado",value:fmt(cobTotal),color:T.softBlue},{label:"Gastos",value:fmt(gastTotal),color:T.lavender},{label:"Beneficio",value:fmt(benProy),color:T.terracotta}].map((k,i)=><div key={i} style={{background:T.surface,borderRadius:20,padding:14,border:"1px solid "+T.line}}><div style={{width:28,height:3,background:k.color,borderRadius:2,marginBottom:10}}/><div style={{fontSize:10,color:T.ink3,fontWeight:600,letterSpacing:.3,textTransform:"uppercase",marginBottom:4}}>{k.label}</div><div style={{fontSize:22,fontWeight:700,color:T.ink,letterSpacing:-.6,lineHeight:1}}>{k.value}</div><div style={{fontSize:10.5,color:T.ink3,marginTop:6,fontWeight:500}}>{k.label==="Cobrado"?Math.round(cobTotal/Math.max(factTotal,1)*100)+"% del total":k.label==="Beneficio"?Math.round(benProy/Math.max(factTotal,1)*100)+"% margen":"YTD "+año}</div></div>)}
     </div>
 
-    <div className="pb" style={{paddingTop:0}}>
-      <div style={{display:"flex",background:T.surface,borderRadius:999,padding:4,border:`1px solid ${T.line}`,gap:2,marginBottom:20,overflowX:"auto",scrollbarWidth:"none"}}>
+    {/* Tabs análisis */}
+    <div style={{padding:"0 20px 18px"}}>
+      <div style={{display:"flex",background:T.surface,borderRadius:999,padding:4,border:"1px solid "+T.line,gap:2,overflowX:"auto",scrollbarWidth:"none"}}>
         {[{id:"proyeccion",lbl:"Proyección"},{id:"cobros",lbl:"Cobros"},{id:"crecimiento",lbl:"Crecimiento"},{id:"gastos_tab",lbl:"Gastos"},{id:"eventos",lbl:"Eventos"},{id:"airbnb_tab",lbl:"Airbnb"}].map(t=><button key={t.id} onClick={()=>setTab(t.id)} style={{flex:"0 0 auto",padding:"9px 14px",borderRadius:999,border:0,background:tab===t.id?T.ink:"transparent",color:tab===t.id?"#fff":T.ink2,fontFamily:T.sans,fontSize:11,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>{t.lbl}</button>)}
       </div>
 
@@ -6942,7 +6943,7 @@ function Analisis({tok,rol}){
         </>;})()}
       </>}
     </div>
-  </>;
+  </div>;
 }
 
 // ─── AJUSTES ────────────────────────────────────────────────────────────────
