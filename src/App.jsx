@@ -3010,22 +3010,25 @@ function DashL({perfil,setPage,tok}){
     const adms=await sbGet("usuarios","?rol=eq.admin&select=id",tok).catch(()=>[]);
     for(const a of adms)await sbPost("notificaciones",{para:a.id,txt:`🔑 ${perfil.nombre} solicita limpiar el día del checkin (${c.fecha_checkin_siguiente})`},tok).catch(()=>{});
     setCoordP(prev=>prev.filter(x=>x.id!==c.id));}catch(_){}setSavingC(false);};
-  return <div style={{background:T.bg,fontFamily:T.sans,paddingBottom:80,minHeight:"100%"}}>
+  return <div style={{paddingBottom:100,background:T.bg,minHeight:"100%",fontFamily:T.sans}}>
+
     {/* Greeting */}
     <div style={{padding:"54px 20px 16px"}}>
       <div style={{fontSize:12,color:T.ink3,fontWeight:500}}>{new Date().toLocaleDateString("es-ES",{weekday:"long",day:"numeric",month:"long"}).replace(/^\w/,c=>c.toUpperCase())}</div>
       <div style={{fontSize:28,fontWeight:700,color:T.ink,letterSpacing:-.8,lineHeight:1.02,marginTop:2}}>Hola, {perfil.nombre.split(" ")[0]} 👋</div>
     </div>
 
-    {/* Coordinaciones */}
-    {coordP.map(c=>{
+    {/* BANNER 1 — ¿Está la casa lista? */}
+    {coordP.filter(c=>c.estado==="preguntando_si_lista").map(c=>{
       const t=perfil?.es_operario?SB_KEY:tok;
       const fechaFmt=c.fecha_checkin_siguiente?new Date(c.fecha_checkin_siguiente+"T12:00:00").toLocaleDateString("es-ES",{weekday:"long",day:"numeric",month:"long"}):"—";
       const diasH=c.fecha_checkin_siguiente?Math.ceil((new Date(c.fecha_checkin_siguiente+"T12:00:00")-new Date())/(86400000)):0;
-
-      if(c.estado==="preguntando_si_lista")return<div key={c.id} style={{padding:"0 20px 10px"}}>
+      return <div key={c.id} style={{padding:"0 20px 12px"}}>
         <div style={{background:T.terracotta,borderRadius:20,padding:16,color:T.ink}}>
-          <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8}}><div style={{width:8,height:8,borderRadius:999,background:T.ink}}/><span style={{fontSize:10,fontWeight:700,letterSpacing:1,textTransform:"uppercase"}}>Acción requerida</span></div>
+          <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8}}>
+            <div style={{width:8,height:8,borderRadius:999,background:T.ink}}/>
+            <span style={{fontSize:10,fontWeight:700,letterSpacing:1,textTransform:"uppercase"}}>Acción requerida</span>
+          </div>
           <div style={{fontSize:18,fontWeight:700,letterSpacing:-.4,lineHeight:1.2}}>¿Está la casa lista?</div>
           <div style={{fontSize:12,color:"rgba(20,10,5,.7)",marginTop:4}}>Reserva el {fechaFmt} — en {diasH} día{diasH!==1?"s":""}</div>
           <div style={{display:"flex",gap:8,marginTop:12}}>
@@ -3034,9 +3037,13 @@ function DashL({perfil,setPage,tok}){
           </div>
         </div>
       </div>;
+    })}
 
+    {/* BANNER 2 — Elegir día de limpieza */}
+    {coordP.filter(c=>c.estado==="servicio_creado_pendiente_fecha").map(c=>{
+      const fechaFmt=c.fecha_checkin_siguiente?new Date(c.fecha_checkin_siguiente+"T12:00:00").toLocaleDateString("es-ES",{weekday:"long",day:"numeric",month:"long"}):"—";
       const dias=getDias(c.ventana_inicio||new Date().toISOString(),c.ventana_fin||new Date(Date.now()+3*86400000).toISOString());
-      return<div key={c.id} style={{padding:"0 20px 10px"}}>
+      return <div key={c.id} style={{padding:"0 20px 12px"}}>
         <div style={{background:T.gold,borderRadius:20,padding:16,color:T.ink}}>
           <div style={{fontSize:10,fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginBottom:6}}>Elige día</div>
           <div style={{fontSize:16,fontWeight:700,letterSpacing:-.3,lineHeight:1.25}}>Limpieza antes de reserva</div>
@@ -3057,15 +3064,29 @@ function DashL({perfil,setPage,tok}){
     })}
 
     {/* Modal fecha custom */}
-    {showDatePick&&<div className="ov" onClick={()=>setShowDatePick(null)}><div className="modal" style={{maxWidth:360}} onClick={e=>e.stopPropagation()}>
-      <h3>📅 Elegir fecha</h3>
-      <div className="fg"><label>Fecha</label><input type="date" className="fi" value={customDate} onChange={e=>setCustomDate(e.target.value)}/></div>
-      <div className="mft"><button className="btn bg" onClick={()=>setShowDatePick(null)}>Cancelar</button><button className="btn bp" disabled={!customDate||savingC} onClick={()=>{confirmarFecha(showDatePick,new Date(customDate+"T12:00:00"));setShowDatePick(null);}}>{savingC?"…":"Confirmar"}</button></div>
-    </div></div>}
+    {showDatePick&&(
+      <div style={{position:"fixed",inset:0,background:"rgba(20,15,10,0.6)",zIndex:999,display:"flex",alignItems:"flex-end",fontFamily:T.sans}} onClick={()=>setShowDatePick(null)}>
+        <div style={{width:"100%",background:T.bg,borderTopLeftRadius:24,borderTopRightRadius:24,padding:"20px 20px 34px"}} onClick={e=>e.stopPropagation()}>
+          <div style={{display:"flex",justifyContent:"center",marginBottom:14}}><div style={{width:44,height:4,borderRadius:999,background:T.line}}/></div>
+          <div style={{fontSize:22,fontWeight:700,color:T.ink,letterSpacing:-.6,marginBottom:16}}>Elegir fecha</div>
+          <div style={{marginBottom:16}}>
+            <div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase",marginBottom:8}}>Fecha</div>
+            <div style={{display:"flex",alignItems:"center",gap:8,background:T.surface,border:"1px solid "+T.line,borderRadius:14,padding:"12px 14px"}}>
+              <FmIcon name="calendar" size={14} stroke={T.ink3}/>
+              <input type="date" value={customDate} onChange={e=>setCustomDate(e.target.value)} style={{flex:1,background:"transparent",border:0,outline:"none",fontFamily:T.sans,fontSize:14,color:T.ink}}/>
+            </div>
+          </div>
+          <div style={{display:"flex",gap:8}}>
+            <button onClick={()=>setShowDatePick(null)} style={{flex:1,padding:"14px 0",borderRadius:999,border:"1px solid "+T.line,background:T.surface,color:T.ink,fontFamily:T.sans,fontWeight:600,fontSize:14,cursor:"pointer"}}>Cancelar</button>
+            <button disabled={!customDate||savingC} onClick={()=>{confirmarFecha(showDatePick,new Date(customDate+"T12:00:00"));setShowDatePick(null);}} style={{flex:2,padding:"14px 0",borderRadius:999,border:0,background:!customDate?T.ink+"55":T.ink,color:"white",fontFamily:T.sans,fontWeight:700,fontSize:14,cursor:!customDate?"not-allowed":"pointer"}}>{savingC?"…":"Confirmar"}</button>
+          </div>
+        </div>
+      </div>
+    )}
 
     {/* Sin pendientes */}
     {coordP.length===0&&<div style={{padding:"0 20px 14px"}}>
-      <div style={{background:T.surface,borderRadius:20,padding:20,border:`1px solid ${T.line}`,textAlign:"center"}}>
+      <div style={{background:T.surface,borderRadius:20,padding:20,border:"1px solid "+T.line,textAlign:"center"}}>
         <div style={{fontSize:32,marginBottom:8}}>✅</div>
         <div style={{fontSize:16,fontWeight:700,color:T.ink}}>Todo al día</div>
         <div style={{fontSize:13,color:T.ink3,marginTop:4}}>No tienes coordinaciones pendientes</div>
@@ -3074,8 +3095,8 @@ function DashL({perfil,setPage,tok}){
 
     {/* Accesos rápidos */}
     <div style={{padding:"0 20px 14px",display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-      {[{icon:"broom",t:"Mi servicio",s:"Checklist limpieza",id:"limpieza"},{icon:"calendar",t:"Calendario",s:"Próximos eventos",id:"cal-limp"}].map(it=><button key={it.id} onClick={()=>setPage(it.id)} style={{background:T.surface,border:`1px solid ${T.line}`,borderRadius:16,padding:16,cursor:"pointer",textAlign:"left",fontFamily:T.sans}}>
-        <div style={{width:36,height:36,borderRadius:10,background:T.lavender+"30",display:"flex",alignItems:"center",justifyContent:"center",marginBottom:8}}><FmIcon name={it.icon} size={18} stroke={T.ink}/></div>
+      {[{icon:"settings",t:"Mi servicio",s:"Checklist limpieza",id:"limpieza",bg:T.terracotta+"22",stroke:T.terracotta},{icon:"calendar",t:"Calendario",s:"Próximos eventos",id:"cal-limp",bg:T.lavender+"22",stroke:"#4A3A8A"}].map(it=><button key={it.id} onClick={()=>setPage(it.id)} style={{background:T.surface,border:"1px solid "+T.line,borderRadius:16,padding:16,cursor:"pointer",textAlign:"left",fontFamily:T.sans}}>
+        <div style={{width:36,height:36,borderRadius:10,background:it.bg,display:"flex",alignItems:"center",justifyContent:"center",marginBottom:8}}><FmIcon name={it.icon} size={18} stroke={it.stroke}/></div>
         <div style={{fontSize:14,fontWeight:700,color:T.ink}}>{it.t}</div>
         <div style={{fontSize:11,color:T.ink3,marginTop:3}}>{it.s}</div>
       </button>)}
