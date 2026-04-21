@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, createContext, useContext, useMemo } from 
 import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, ComposedChart, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 
 // ─── DESIGN TOKENS ──────────────────────────────────────────────────────────
-const T={terracotta:"#EC683E",terracottaSoft:"#F2895E",olive:"#A6BE59",oliveSoft:"#BCCE7E",lavender:"#AFA3FF",softBlue:"#7FB2FF",gold:"#ECD227",coral:"#F35757",stone:"#BFB4A4",peach:"#F2995E",bg:"#F5F3F0",surface:"#FFFFFF",surfaceAlt:"#EEEAE3",ink:"#1A1A1A",ink2:"#3A3733",ink3:"#7A766F",ink4:"#BFB9AE",line:"#E5E0D6",lineStrong:"#D0CABD",danger:"#D9443A",warning:"#E8A93A",success:"#5A9A4E",r:{sm:12,md:16,lg:20,xl:26,pill:999},sans:'"Inter Tight",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif',mono:'"Geist Mono", "SF Mono", monospace'};
+const T={terracotta:"#EC683E",terracottaSoft:"#F2895E",olive:"#A6BE59",oliveSoft:"#BCCE7E",lavender:"#AFA3FF",softBlue:"#7FB2FF",gold:"#ECD227",coral:"#F35757",stone:"#BFB4A4",peach:"#F2995E",bg:"#FAFAF7",surface:"#FFFFFF",surfaceAlt:"#EEEAE3",ink:"#1A1A1A",ink2:"#3A3733",ink3:"#7A766F",ink4:"#BFB9AE",line:"#E5E0D6",lineStrong:"#D0CABD",danger:"#D9443A",warning:"#E8A93A",success:"#5A9A4E",r:{sm:12,md:16,lg:20,xl:26,pill:999},sans:'"Inter Tight",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif',mono:'"Geist Mono", "SF Mono", monospace'};
 
 // ─── SUPABASE ────────────────────────────────────────────────────────────────
 const SB_URL = "https://bqubxkuuyohuatdothwx.supabase.co";
@@ -474,8 +474,8 @@ input,select,textarea{font-family:inherit}
 .ctit{font-size:15px;font-weight:700;color:#1A1A1A}
 .btn{padding:14px 24px;border-radius:999px;border:none;cursor:pointer;font-size:13px;font-weight:700;letter-spacing:-.2px;font-family:inherit;transition:all .15s ease;display:inline-flex;align-items:center;justify-content:center;gap:8px;white-space:nowrap}
 .btn:active{transform:scale(.97)}
-.bp{background:#1A1A1A;color:#FFFFFF}.bp:hover{background:#333}
-.bg{background:transparent;color:#1A1A1A;border:1px solid #E5E0D6}.bg:hover{background:#F5F3F0;border-color:#D0CABD}
+.bp{background:#1A1714;color:#fff;border-radius:999px;border:0;font-weight:700;cursor:pointer;font-family:inherit}.bp:hover{background:#333}
+.bg{background:#F5F3F0;color:#1A1714;border:1px solid #E8E4DC;border-radius:999px;font-weight:600;cursor:pointer;font-family:inherit}.bg:hover{background:#EFECE6;border-color:#D0CABD}
 .br{background:#D9443A;color:#FFFFFF;border:none}.br:hover{background:#c33c33}
 .sm{padding:7px 14px;font-size:12px}
 .fg{display:flex;flex-direction:column;gap:6px;margin-bottom:12px}
