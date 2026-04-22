@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, createContext, useContext, useMemo } from "react";
+import { useState, useEffect, useRef, createContext, useContext, useMemo, Fragment } from "react";
 import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, ComposedChart, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 
 // ─── DESIGN TOKENS ──────────────────────────────────────────────────────────
@@ -6174,6 +6174,27 @@ function Usuarios({tok}){
   const [showPin,setShowPin]=useState(false);
   const [showNuevo,setShowNuevo]=useState(false);
   const [editTarifa,setEditTarifa]=useState(false);
+  const [serviciosOp,setServiciosOp]=useState([]);
+  const [periodoOperario,setPeriodoOperario]=useState("mes");
+  // Cargar servicios reales del operario seleccionado (jardin_servicios o servicios según rol)
+  useEffect(()=>{
+    if(!selOperario){setServiciosOp([]);return;}
+    const targetId=selOperario.referencia_id||selOperario.id;
+    const opId=selOperario.id;
+    (async()=>{
+      try{
+        let arr=[];
+        if(selOperario.rol==='jardinero'){
+          const j=await sbGet("jardin_servicios",`?jardinero_id=eq.${targetId}&select=*&order=fecha_inicio.desc.nullslast,created_at.desc`,tok).catch(()=>[]);
+          arr=j.map(s=>({...s,operario_id:opId,jardinero_id:targetId,titulo:s.nombre||s.titulo||'Servicio jardín',horas_trabajadas:parseFloat(s.horas_totales||s.horas||0),coste_calculado:parseFloat(s.coste_total||s.coste||0),fecha:s.fecha_inicio||s.fecha||s.created_at?.slice(0,10)}));
+        }else if(selOperario.rol==='limpieza'){
+          const l=await sbGet("servicios",`?limpiadora_id=eq.${targetId}&select=*&order=fecha.desc`,tok).catch(()=>[]);
+          arr=l.map(s=>({...s,operario_id:opId,limpiadora_id:targetId,titulo:s.nombre||'Servicio limpieza',horas_trabajadas:parseFloat(s.horas_calculadas||s.horas||0),coste_calculado:parseFloat(s.coste_calculado||0)}));
+        }
+        setServiciosOp(arr);
+      }catch(e){console.error("Error cargando servicios operario:",e);setServiciosOp([]);}
+    })();
+  },[selOperario?.id]);
   const loadAll=async()=>{
     const [u,o]=await Promise.all([sbGet("usuarios","?select=*&order=rol.asc",tok).catch(()=>[]),sbGet("operarios","?select=*&order=nombre.asc",tok).catch(()=>[])]);
     setUsuarios(u);setOperarios(o);setLoad(false);
@@ -6373,6 +6394,103 @@ function Usuarios({tok}){
               </div>
             </div>
           </div>
+
+          {/* KPIs grandes 2x2 */}
+          {(()=>{const servicios=serviciosOp;return(
+          <div style={{padding:'0 20px 14px',display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+            {[
+              {bg:T.ink,        fg:'#fff', value:(servicios||[]).filter(s=>s.operario_id===selOperario.id||s.jardinero_id===selOperario.id||s.limpiadora_id===selOperario.id).reduce((sum,s)=>sum+parseFloat(s.horas_trabajadas||0),0).toFixed(1)+'h', label:'Horas totales'},
+              {bg:T.terracotta, fg:T.ink,  value:formatEur((servicios||[]).filter(s=>s.operario_id===selOperario.id||s.jardinero_id===selOperario.id||s.limpiadora_id===selOperario.id).reduce((sum,s)=>sum+parseFloat(s.coste_calculado||0),0)),                label:'Coste total'},
+              {bg:T.olive,      fg:T.ink,  value:(servicios||[]).filter(s=>(s.operario_id===selOperario.id||s.jardinero_id===selOperario.id||s.limpiadora_id===selOperario.id)&&['completado','finalizado'].includes(s.estado)).length, label:'Servicios'},
+              {bg:T.gold,       fg:T.ink,  value:(selOperario.tarifa_hora||0)+'€/h',                                                                                                                                                       label:'Tarifa'},
+            ].map((k,i)=>(
+              <div key={i} style={{background:k.bg,color:k.fg,borderRadius:18,padding:'16px 16px 18px',minHeight:96,display:'flex',flexDirection:'column',justifyContent:'space-between'}}>
+                <div style={{fontSize:9.5,fontWeight:700,letterSpacing:0.8,textTransform:'uppercase',opacity:0.8}}>{k.label}</div>
+                <div style={{fontSize:26,fontWeight:800,letterSpacing:-1,lineHeight:1}}>{k.value}</div>
+              </div>
+            ))}
+          </div>
+          );})()}
+
+          {/* Filtro periodo (decorativo — los KPIs y la gráfica no se filtran por ahora) */}
+          <div style={{padding:'0 20px 12px'}}>
+            <div style={{display:'flex',background:T.surface,borderRadius:999,padding:4,border:'1px solid '+T.line,gap:2}}>
+              {[{k:'mes',l:'Este mes'},{k:'trimestre',l:'Trimestre'},{k:'ano',l:'Año completo'}].map(p=>{
+                const on=(periodoOperario||'mes')===p.k;
+                return(
+                  <button key={p.k} onClick={()=>setPeriodoOperario&&setPeriodoOperario(p.k)} style={{flex:1,padding:'8px 6px',borderRadius:999,border:0,background:on?T.ink:'transparent',color:on?'#fff':T.ink2,fontFamily:T.sans,fontSize:11,fontWeight:700,cursor:'pointer'}}>
+                    {p.l}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Gráfica horas por mes (12 meses, año actual) */}
+          {(()=>{const servicios=serviciosOp;const opMatch=s=>s.operario_id===selOperario.id||s.jardinero_id===selOperario.id||s.limpiadora_id===selOperario.id;
+          const horasPorMes=Array.from({length:12},(_,m)=>{
+            return (servicios||[]).filter(s=>{
+              if(!opMatch(s)||!s.fecha)return false;
+              const d=new Date(s.fecha+'T12:00:00');
+              return d.getMonth()===m&&d.getFullYear()===new Date().getFullYear();
+            }).reduce((sum,s)=>sum+parseFloat(s.horas_trabajadas||0),0);
+          });
+          const maxVal=Math.max(...horasPorMes,1)*1.1;
+          const totalHoras=(servicios||[]).filter(opMatch).reduce((sum,s)=>sum+parseFloat(s.horas_trabajadas||0),0);
+          return(
+          <div style={{padding:'0 20px 14px'}}>
+            <div style={{background:T.surface,borderRadius:18,padding:16,border:'1px solid '+T.line}}>
+              <div style={{fontSize:11,color:T.ink3,letterSpacing:0.8,textTransform:'uppercase',fontWeight:700,marginBottom:4}}>Horas trabajadas</div>
+              <div style={{fontSize:22,fontWeight:800,color:T.ink,letterSpacing:-0.6,marginBottom:14}}>
+                {totalHoras.toFixed(1)}h
+              </div>
+              <div style={{display:'flex',alignItems:'flex-end',gap:3,height:80,padding:'0 2px'}}>
+                {horasPorMes.map((horasMes,m)=>{
+                  const h=Math.max((horasMes/maxVal)*100,2);
+                  const esActual=m===new Date().getMonth();
+                  return(
+                    <div key={m} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:4}}>
+                      <div style={{width:'70%',height:h+'%',background:esActual?T.terracotta:T.olive,borderRadius:'4px 4px 0 0',minHeight:2}}/>
+                    </div>
+                  );
+                })}
+              </div>
+              <div style={{display:'flex',gap:3,marginTop:6}}>
+                {['E','F','M','A','M','J','J','A','S','O','N','D'].map((m,i)=>(
+                  <div key={i} style={{flex:1,textAlign:'center',fontSize:9,color:i===new Date().getMonth()?T.terracotta:T.ink3,fontWeight:i===new Date().getMonth()?700:400}}>{m}</div>
+                ))}
+              </div>
+            </div>
+          </div>
+          );})()}
+
+          {/* Últimos servicios */}
+          {(()=>{const servicios=serviciosOp;const opMatch=s=>s.operario_id===selOperario.id||s.jardinero_id===selOperario.id||s.limpiadora_id===selOperario.id;const lista=(servicios||[]).filter(opMatch);return(
+          <div style={{padding:'0 20px 14px'}}>
+            <div style={{fontSize:11,color:T.ink3,letterSpacing:0.8,textTransform:'uppercase',fontWeight:700,marginBottom:8}}>Últimos servicios</div>
+            <div style={{background:T.surface,borderRadius:18,border:'1px solid '+T.line,overflow:'hidden'}}>
+              {lista.slice(0,5).map((s,i,arr)=>{
+                const meta={completado:T.olive,finalizado:T.olive,en_curso:T.softBlue,programado:T.softBlue,activo:T.softBlue,pendiente_fecha:T.gold,pendiente:T.gold}[s.estado]||T.ink3;
+                return(
+                  <div key={s.id} style={{padding:'12px 14px',borderBottom:i<arr.length-1?'1px solid '+T.line:'none',display:'flex',gap:10,alignItems:'center'}}>
+                    <div style={{width:4,height:36,borderRadius:999,background:meta,flexShrink:0}}/>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:13,fontWeight:700,color:T.ink,letterSpacing:-0.2,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{s.titulo}</div>
+                      <div style={{fontSize:11,color:T.ink3,marginTop:2}}>{s.fecha||'Sin fecha'} · {(s.horas_trabajadas||0).toFixed?(s.horas_trabajadas||0).toFixed(1):s.horas_trabajadas}h</div>
+                    </div>
+                    <div style={{textAlign:'right',flexShrink:0}}>
+                      <div style={{fontSize:13,fontWeight:700,color:T.ink}}>{formatEur(s.coste_calculado||0)}</div>
+                    </div>
+                  </div>
+                );
+              })}
+              {lista.length===0&&(
+                <div style={{padding:'20px',color:T.ink3,fontSize:13,textAlign:'center'}}>Sin servicios registrados</div>
+              )}
+            </div>
+          </div>
+          );})()}
+
           {/* Stats */}
           <div style={{padding:'0 20px 14px'}}>
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
@@ -6752,50 +6870,244 @@ function Lavanderia({perfil,tok,rol}){
   const enLav=envios.filter(e=>e.estado==="en_lavanderia");
   const historial=envios.filter(e=>e.estado==="recogido");
 
+  // Estados nuevos para el rediseño
+  const [tabLav,setTabLav]=useState("todas");
+  const [selCarga,setSelCarga]=useState(null);
+
   if(load)return <div className="loading"><div className="spin"/><span>Cargando…</span></div>;
-  return <>
-    <div style={{padding:"28px 32px 16px"}}><div style={{fontSize:12,color:T.ink3,fontWeight:500}}>{enLav.length} envíos pendientes</div><div style={{fontSize:28,fontWeight:700,color:T.ink,letterSpacing:-.8,lineHeight:1.02,marginTop:2}}>Lavandería</div></div>
-    <div className="pb">
-      <button className="btn bp" style={{marginBottom:16}} onClick={()=>{setItems(articulos.map(a=>({...a,cantidad:0})));setNotas("");setShowEnvio(true);}}>➕ Enviar a lavandería</button>
 
-      {enLav.length===0?<div className="empty"><span className="ico">🧺</span><p>Sin envíos pendientes</p></div>
-      :enLav.map(e=><div key={e.id} className="card" style={{marginBottom:10,borderLeft:"3px solid #D4A017"}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8}}>
-          <div><div style={{fontSize:14,fontWeight:600,color:"#1A1A1A"}}>Envío {new Date(e.fecha_envio+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"})}</div>
-            <div style={{fontSize:12,color:"#8A8580",marginTop:3}}>{(e.items||[]).map(i=>`${i.nombre} ×${i.cantidad}`).join(", ")}</div>
-            {e.notas&&<div style={{fontSize:11,color:"#8A8580",marginTop:2}}>{e.notas}</div>}
-            <div style={{fontSize:11,color:"#BFBAB4",marginTop:3}}>Por {e.creado_por}</div>
+  // Aliases template → schema real (solo hay 2 estados en BD: 'en_lavanderia' / 'recogido')
+  const cargas=envios.map(e=>({...e,created_at:e.created_at||e.fecha_envio,articulos:e.items||[]}));
+  const cargasFiltradas=cargas.filter(c=>{
+    const tab=tabLav||'todas';
+    if(tab==='todas')return true;
+    if(tab==='pendiente')return ['pendiente','recogida'].includes(c.estado);
+    if(tab==='curso')return ['lavando','secando','planchando','en_lavanderia'].includes(c.estado);
+    if(tab==='lista')return ['lista','entregada','recogido'].includes(c.estado);
+    return true;
+  });
+  // Mapeo de estados reales → posición en el timeline visual del template
+  const idxEstado=(est)=>{
+    if(est==='en_lavanderia')return 1; // 'lavando'
+    if(est==='recogido')return 4; // 'lista'
+    return ['pendiente','lavando','secando','planchando','lista'].indexOf(est);
+  };
+  // Cambio rápido de estado: para 'lista'/'entregada' usa el flujo de recogida (modal con checklist).
+  // Para los intermedios hace patch directo del campo estado (queda fuera del flujo formal).
+  const cambiarEstadoCarga=async(id,newEstado)=>{
+    if(newEstado==='lista'||newEstado==='entregada'){
+      const c=envios.find(x=>x.id===id);
+      if(c){abrirRecogida(c);setSelCarga(null);}
+      return;
+    }
+    try{
+      await sbPatch("lavanderia",`id=eq.${id}`,{estado:newEstado},tok);
+      setEnvios(prev=>prev.map(x=>x.id===id?{...x,estado:newEstado}:x));
+      setSelCarga(prev=>prev?{...prev,estado:newEstado}:null);
+    }catch(e){console.error("Error cambiando estado:",e);}
+  };
+  const setShowNuevoLav=(v)=>{
+    if(v){setItems(articulos.map(a=>({...a,cantidad:0})));setNotas("");}
+    setShowEnvio(v);
+  };
+
+  return (
+    <div style={{paddingBottom:100,background:T.bg,minHeight:'100%',fontFamily:T.sans}}>
+
+      {/* Header */}
+      <div style={{padding:'54px 20px 6px',display:'flex',justifyContent:'space-between',alignItems:'flex-end'}}>
+        <div>
+          <div style={{fontSize:10.5,color:T.ink3,fontWeight:700,letterSpacing:0.8,textTransform:'uppercase'}}>Operaciones</div>
+          <div style={{fontSize:28,fontWeight:800,color:T.ink,letterSpacing:-0.9,lineHeight:1.05,marginTop:2}}>Lavandería</div>
+        </div>
+        <button onClick={()=>setShowNuevoLav&&setShowNuevoLav(true)} style={{width:40,height:40,borderRadius:999,background:T.ink,color:'#fff',border:0,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}>
+          <FmIcon name="plus" size={16} stroke="#fff"/>
+        </button>
+      </div>
+
+      {/* KPIs */}
+      <div style={{padding:'18px 20px 14px',display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8}}>
+        {[
+          {bg:T.ink,        fg:'#fff', value:cargas.length,                                                       label:'Cargas'},
+          {bg:T.softBlue,   fg:T.ink,  value:cargas.filter(c=>c.estado==='lavando'||c.estado==='secando'||c.estado==='en_lavanderia').length, label:'En curso'},
+          {bg:T.olive,      fg:T.ink,  value:cargas.filter(c=>c.estado==='lista'||c.estado==='entregada'||c.estado==='recogido').length, label:'Listas'},
+        ].map((k,i)=>(
+          <div key={i} style={{background:k.bg,color:k.fg,borderRadius:16,padding:'14px 14px 16px',minHeight:86,display:'flex',flexDirection:'column',justifyContent:'space-between'}}>
+            <div style={{fontSize:9.5,fontWeight:700,letterSpacing:0.8,textTransform:'uppercase',opacity:0.8}}>{k.label}</div>
+            <div style={{fontSize:30,fontWeight:800,letterSpacing:-1.2,lineHeight:1}}>{k.value}</div>
           </div>
-          <button className="btn bp sm" onClick={()=>abrirRecogida(e)}>✅ Recogido</button>
-        </div>
-      </div>)}
+        ))}
+      </div>
 
-      {historial.length>0&&<>
-        <div style={{fontSize:11,color:"#8A8580",textTransform:"uppercase",letterSpacing:1,fontWeight:700,marginTop:24,marginBottom:10}}>Historial</div>
-        {historial.slice(0,10).map(e=>{const inc=e.incidencias_recogida||[];return<div key={e.id} className="card" style={{marginBottom:8,opacity:inc.length>0?1:.7,borderLeft:inc.length>0?"3px solid #D4A017":"none"}}>
-          <div style={{fontSize:13,fontWeight:600,color:"#1A1A1A"}}>✅ {new Date(e.fecha_envio+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"})} → {e.fecha_recogida?new Date(e.fecha_recogida+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"}):"—"}</div>
-          <div style={{fontSize:12,color:"#8A8580"}}>{(e.items||[]).map(i=>`${i.nombre} ×${i.cantidad}`).join(", ")}{e.coste?` · ${parseFloat(e.coste).toLocaleString("es-ES")}€`:""}</div>
-          {inc.length>0&&<div style={{marginTop:6,padding:"6px 10px",background:"#FEF3CD",borderRadius:8,fontSize:12}}>
-            <div style={{fontWeight:600,color:"#856404",marginBottom:4}}>⚠️ Incidencias:</div>
-            {inc.map((ic,j)=><div key={j} style={{color:"#856404"}}>• {ic.nombre}: falta {ic.faltan}{ic.nota?` (${ic.nota})`:""}</div>)}
-          </div>}
-        </div>})}
-      </>}
-    </div>
-
-    {showEnvio&&<div className="ov" onClick={()=>setShowEnvio(false)}><div className="modal" style={{maxHeight:"90vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
-      <h3>🧺 Enviar a lavandería</h3>
-      {items.map((it,idx)=><div key={it.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderBottom:"1px solid rgba(0,0,0,.04)"}}>
-        <div style={{flex:1,fontSize:13,color:"#1A1A1A"}}>{it.nombre}</div>
-        <div style={{display:"flex",alignItems:"center",gap:6}}>
-          <button className="btn bg sm" onClick={()=>setItems(prev=>prev.map((p,i)=>i===idx?{...p,cantidad:Math.max(0,p.cantidad-1)}:p))}>−</button>
-          <span style={{fontSize:16,fontWeight:700,minWidth:24,textAlign:"center"}}>{it.cantidad}</span>
-          <button className="btn bg sm" onClick={()=>setItems(prev=>prev.map((p,i)=>i===idx?{...p,cantidad:p.cantidad+1}:p))}>+</button>
+      {/* Tabs estado */}
+      <div style={{padding:'0 20px 14px'}}>
+        <div style={{display:'flex',gap:6,overflowX:'auto'}}>
+          {[
+            {k:'todas',     l:'Todas',     n:cargas.length},
+            {k:'pendiente', l:'Pendientes',n:cargas.filter(c=>c.estado==='pendiente'||c.estado==='recogida').length},
+            {k:'curso',     l:'En curso',  n:cargas.filter(c=>['lavando','secando','planchando','en_lavanderia'].includes(c.estado)).length},
+            {k:'lista',     l:'Listas',    n:cargas.filter(c=>['lista','entregada','recogido'].includes(c.estado)).length},
+          ].map(t=>{
+            const on=(tabLav||'todas')===t.k;
+            return(
+              <button key={t.k} onClick={()=>setTabLav&&setTabLav(t.k)} style={{padding:'8px 14px',borderRadius:999,background:on?T.ink:T.surface,color:on?'#fff':T.ink2,border:'1px solid '+(on?T.ink:T.line),fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:T.sans,flexShrink:0,display:'inline-flex',alignItems:'center',gap:6}}>
+                {t.l}
+                <span style={{fontSize:10,fontWeight:800,padding:'1px 6px',borderRadius:999,background:on?'rgba(255,255,255,0.2)':T.bg,color:on?'#fff':T.ink3}}>{t.n}</span>
+              </button>
+            );
+          })}
         </div>
-      </div>)}
-      <div className="fg" style={{marginTop:12}}><label>Notas</label><textarea className="fi" rows={2} value={notas} onChange={e=>setNotas(e.target.value)} placeholder="Notas opcionales…"/></div>
-      <div className="mft"><button className="btn bg" onClick={()=>setShowEnvio(false)}>Cancelar</button><button className="btn bp" onClick={enviar} disabled={saving||items.every(i=>i.cantidad===0)}>{saving?"Enviando…":"🧺 Confirmar envío"}</button></div>
-    </div></div>}
+      </div>
+
+      {/* Lista cargas */}
+      <div style={{padding:'0 20px',display:'flex',flexDirection:'column',gap:10}}>
+        {cargasFiltradas.length===0&&(
+          <div style={{textAlign:'center',padding:'60px 0',color:T.ink3,fontSize:13}}>
+            <div style={{fontSize:32,marginBottom:8}}>🧺</div>
+            Sin cargas en esta categoría
+          </div>
+        )}
+        {cargasFiltradas.map(c=>{
+          const estadoColor={pendiente:T.gold,recogida:T.gold,lavando:T.softBlue,secando:T.softBlue,planchando:T.softBlue,en_lavanderia:T.softBlue,lista:T.olive,entregada:T.ink3,recogido:T.olive}[c.estado]||T.gold;
+          const estadoLabel={pendiente:'Pendiente',recogida:'Recogida',lavando:'Lavando',secando:'Secando',planchando:'Planchando',en_lavanderia:'En lavandería',lista:'Lista',entregada:'Entregada',recogido:'Recogida'}[c.estado]||c.estado;
+          const fecha=c.created_at?new Date(c.created_at+(c.created_at.includes('T')?'':'T12:00:00')).toLocaleDateString('es-ES',{day:'numeric',month:'short'}):'—';
+          return(
+            <div key={c.id} onClick={()=>setSelCarga&&setSelCarga(c)} style={{background:T.surface,border:'1px solid '+T.line,borderRadius:18,padding:14,cursor:'pointer',display:'flex',gap:12}}>
+              <span style={{width:4,height:48,borderRadius:4,background:estadoColor,flexShrink:0}}/>
+              <div style={{width:48,height:48,borderRadius:12,background:estadoColor+'22',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,fontSize:22}}>
+                🧺
+              </div>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:8,marginBottom:4}}>
+                  <div style={{fontSize:14,fontWeight:700,color:T.ink,letterSpacing:-0.2,minWidth:0}}>
+                    Carga #{c.numero||c.id?.toString().slice(-4)}
+                  </div>
+                  <span style={{padding:'2px 8px',borderRadius:999,background:estadoColor+'22',color:estadoColor,fontSize:10,fontWeight:700,flexShrink:0}}>
+                    {estadoLabel}
+                  </span>
+                </div>
+                <div style={{fontSize:11,color:T.ink3,marginBottom:6}}>
+                  {(c.items||c.articulos||[]).length} artículos · {fecha}
+                </div>
+                {(c.reserva_nombre||c.linkedTo)&&(
+                  <div style={{fontSize:11,color:T.ink2,display:'flex',alignItems:'center',gap:4}}>
+                    <FmIcon name="calendar" size={10} stroke={T.ink3}/>{c.reserva_nombre||c.linkedTo}
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Detalle carga */}
+      {selCarga&&(
+        <div style={{position:'fixed',inset:0,background:T.bg,zIndex:30,overflow:'auto',paddingBottom:100,fontFamily:T.sans}}>
+          <div style={{padding:'54px 20px 14px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+            <button onClick={()=>setSelCarga(null)} style={{width:38,height:38,borderRadius:999,background:T.surface,border:'1px solid '+T.line,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}>
+              <FmIcon name="chevL" size={16} stroke={T.ink}/>
+            </button>
+            <div style={{fontFamily:T.mono||'monospace',fontSize:11,color:T.ink3,fontWeight:600,letterSpacing:0.8}}>
+              #{selCarga.numero||selCarga.id?.toString().slice(-4)}
+            </div>
+            <div style={{width:38}}/>
+          </div>
+
+          <div style={{padding:'10px 20px 18px'}}>
+            <div style={{fontSize:28,fontWeight:800,color:T.ink,letterSpacing:-1,lineHeight:1.05}}>
+              Carga de lavandería
+            </div>
+            <div style={{fontSize:13,color:T.ink2,fontWeight:600,marginTop:4}}>
+              {(selCarga.items||selCarga.articulos||[]).length} artículos
+            </div>
+          </div>
+
+          {/* Estado timeline */}
+          <div style={{padding:'0 20px 14px'}}>
+            <div style={{fontSize:10.5,color:T.ink3,fontWeight:700,letterSpacing:0.8,textTransform:'uppercase',padding:'0 4px 8px'}}>Estado</div>
+            <div style={{background:T.surface,border:'1px solid '+T.line,borderRadius:18,padding:16}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
+                {['pendiente','lavando','secando','planchando','lista'].map((est,i,arr)=>{
+                  const idx=idxEstado(selCarga.estado);
+                  const done=i<=idx;
+                  return(
+                    <Fragment key={est}>
+                      <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:4}}>
+                        <div style={{width:28,height:28,borderRadius:999,background:done?T.olive:T.line,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                          {done&&<FmIcon name="check" size={13} stroke="white" sw={3}/>}
+                        </div>
+                        <div style={{fontSize:9,color:done?T.ink:T.ink3,fontWeight:done?700:500,textTransform:'capitalize'}}>{est}</div>
+                      </div>
+                      {i<arr.length-1&&<div style={{flex:1,height:2,background:done&&i<idx?T.olive:T.line,marginTop:-15}}/>}
+                    </Fragment>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* Lista artículos */}
+          <div style={{padding:'0 20px 14px'}}>
+            <div style={{fontSize:10.5,color:T.ink3,fontWeight:700,letterSpacing:0.8,textTransform:'uppercase',padding:'0 4px 8px'}}>Artículos</div>
+            <div style={{background:T.surface,border:'1px solid '+T.line,borderRadius:18,overflow:'hidden'}}>
+              {(selCarga.items||selCarga.articulos||[]).map((item,i,arr)=>(
+                <div key={i} style={{display:'flex',justifyContent:'space-between',padding:'12px 16px',borderBottom:i<arr.length-1?'1px solid '+T.line:'none'}}>
+                  <span style={{fontSize:13,color:T.ink}}>{item.nombre||item.name||item}</span>
+                  <span style={{fontSize:13,fontWeight:700,color:T.ink3}}>{item.cantidad||1} {item.unidad||'uds'}</span>
+                </div>
+              ))}
+              {(selCarga.items||selCarga.articulos||[]).length===0&&(
+                <div style={{padding:'14px 16px',color:T.ink3,fontSize:13,textAlign:'center'}}>Sin artículos registrados</div>
+              )}
+            </div>
+          </div>
+
+          {/* Notas */}
+          {selCarga.notas&&(
+            <div style={{padding:'0 20px 14px'}}>
+              <div style={{fontSize:10.5,color:T.ink3,fontWeight:700,letterSpacing:0.8,textTransform:'uppercase',padding:'0 4px 8px'}}>Notas</div>
+              <div style={{background:T.surface,border:'1px solid '+T.line,borderRadius:18,padding:14,fontSize:13,color:T.ink,lineHeight:1.5}}>
+                {selCarga.notas}
+              </div>
+            </div>
+          )}
+
+          {/* Acciones cambio estado */}
+          <div style={{padding:'0 20px 14px'}}>
+            <div style={{fontSize:10.5,color:T.ink3,fontWeight:700,letterSpacing:0.8,textTransform:'uppercase',padding:'0 4px 8px'}}>Cambiar estado</div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+              {[
+                {k:'lavando',l:'Lavando',c:T.softBlue},
+                {k:'secando',l:'Secando',c:T.softBlue},
+                {k:'planchando',l:'Planchando',c:T.softBlue},
+                {k:'lista',l:'Lista (recogida)',c:T.olive},
+                {k:'entregada',l:'Entregada (recogida)',c:T.ink3},
+              ].map(b=>(
+                <button key={b.k} onClick={()=>cambiarEstadoCarga&&cambiarEstadoCarga(selCarga.id,b.k)} style={{padding:'13px 0',borderRadius:14,border:'1px solid '+T.line,background:selCarga.estado===b.k?b.c:T.surface,color:T.ink,fontFamily:T.sans,fontWeight:700,fontSize:13,cursor:'pointer'}}>
+                  {b.l}
+                </button>
+              ))}
+            </div>
+          </div>
+
+        </div>
+      )}
+
+      {/* MODALES LEGACY CONSERVADOS — flujo formal de envío y recogida con checklist */}
+
+      {showEnvio&&<div className="ov" onClick={()=>setShowEnvio(false)}><div className="modal" style={{maxHeight:"90vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
+        <h3>🧺 Enviar a lavandería</h3>
+        {items.map((it,idx)=><div key={it.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderBottom:"1px solid rgba(0,0,0,.04)"}}>
+          <div style={{flex:1,fontSize:13,color:"#1A1A1A"}}>{it.nombre}</div>
+          <div style={{display:"flex",alignItems:"center",gap:6}}>
+            <button className="btn bg sm" onClick={()=>setItems(prev=>prev.map((p,i)=>i===idx?{...p,cantidad:Math.max(0,p.cantidad-1)}:p))}>−</button>
+            <span style={{fontSize:16,fontWeight:700,minWidth:24,textAlign:"center"}}>{it.cantidad}</span>
+            <button className="btn bg sm" onClick={()=>setItems(prev=>prev.map((p,i)=>i===idx?{...p,cantidad:p.cantidad+1}:p))}>+</button>
+          </div>
+        </div>)}
+        <div className="fg" style={{marginTop:12}}><label>Notas</label><textarea className="fi" rows={2} value={notas} onChange={e=>setNotas(e.target.value)} placeholder="Notas opcionales…"/></div>
+        <div className="mft"><button className="btn bg" onClick={()=>setShowEnvio(false)}>Cancelar</button><button className="btn bp" onClick={enviar} disabled={saving||items.every(i=>i.cantidad===0)}>{saving?"Enviando…":"🧺 Confirmar envío"}</button></div>
+      </div></div>}
 
     {showRecogida&&<div className="ov" onClick={()=>setShowRecogida(null)}><div className="modal" style={{maxHeight:"92vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
       <h3>✅ Checklist de recogida</h3>
@@ -6843,7 +7155,9 @@ function Lavanderia({perfil,tok,rol}){
         <button className="btn bp" onClick={()=>ejecutarEnvio(items.filter(i=>i.cantidad>0),fuentes)} disabled={saving}>{saving?"Enviando…":"Enviar igualmente →"}</button>
       </div>
     </div></div>}
-  </>;
+
+    </div>
+  );
 }
 
 // ─── ALMACÉN ────────────────────────────────────────────────────────────────
