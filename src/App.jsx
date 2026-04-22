@@ -3105,98 +3105,281 @@ function DashL({perfil,setPage,tok}){
     const adms=await sbGet("usuarios","?rol=eq.admin&select=id",tok).catch(()=>[]);
     for(const a of adms)await sbPost("notificaciones",{para:a.id,txt:`🔑 ${perfil.nombre} solicita limpiar el día del checkin (${c.fecha_checkin_siguiente})`},tok).catch(()=>{});
     setCoordP(prev=>prev.filter(x=>x.id!==c.id));}catch(_){}setSavingC(false);};
-  return <div style={{paddingBottom:100,background:T.bg,minHeight:"100%",fontFamily:T.sans}}>
 
-    {/* Greeting */}
-    <div style={{padding:"54px 20px 16px"}}>
-      <div style={{fontSize:12,color:T.ink3,fontWeight:500}}>{new Date().toLocaleDateString("es-ES",{weekday:"long",day:"numeric",month:"long"}).replace(/^\w/,c=>c.toUpperCase())}</div>
-      <div style={{fontSize:28,fontWeight:700,color:T.ink,letterSpacing:-.8,lineHeight:1.02,marginTop:2}}>Hola, {perfil.nombre.split(" ")[0]} 👋</div>
-    </div>
+  // Aliases template → reales del componente
+  const t=perfil?.es_operario?SB_KEY:tok;
+  // Derivamos coordPL con shape del template (tipo en lugar de estado, fechas_disponibles, etc.)
+  const coordPL=coordP.map(c=>{
+    const fechaFmt=c.fecha_checkin_siguiente?new Date(c.fecha_checkin_siguiente+"T12:00:00").toLocaleDateString("es-ES",{weekday:"long",day:"numeric",month:"long"}):"—";
+    const dias=c.estado==="servicio_creado_pendiente_fecha"?getDias(c.ventana_inicio||new Date().toISOString(),c.ventana_fin||new Date(Date.now()+3*86400000).toISOString()):[];
+    return{
+      ...c,
+      tipo:c.estado==="preguntando_si_lista"?"preguntando_si_lista":"servicio_creado_pendiente_fecha",
+      reserva_nombre:fechaFmt,
+      titulo:c.estado==="servicio_creado_pendiente_fecha"?`Limpieza antes del ${fechaFmt}`:undefined,
+      dias_restantes:c.fecha_checkin_siguiente?Math.ceil((new Date(c.fecha_checkin_siguiente+"T12:00:00")-new Date())/(86400000)):0,
+      fechas_disponibles:dias.map(d=>d.toISOString().split("T")[0]),
+    };
+  });
+  // Wrappers de las acciones (extraen los handlers inline existentes)
+  const responderCoord=async(id,listaSi)=>{
+    const c=coordP.find(x=>x.id===id);if(!c||savingC)return;setSavingC(true);
+    const fechaFmt=c.fecha_checkin_siguiente?new Date(c.fecha_checkin_siguiente+"T12:00:00").toLocaleDateString("es-ES",{weekday:"long",day:"numeric",month:"long"}):"—";
+    try{
+      if(listaSi){
+        await sbPatch("coordinacion_servicios",`id=eq.${c.id}`,{estado:"casa_lista_confirmada",respondido_por:perfil.nombre},t);
+        const adms=await sbGet("usuarios","?rol=eq.admin&select=id",t).catch(()=>[]);
+        for(const a of adms)await sbPost("notificaciones",{para:a.id,txt:`✅ ${perfil.nombre} confirma: casa lista para el ${fechaFmt}`},t).catch(()=>{});
+        setCoordP(prev=>prev.filter(x=>x.id!==c.id));
+      }else{
+        const[srv]=await sbPost("servicios",{nombre:`Limpieza pre-reserva — ${fechaFmt}`,fecha:new Date().toISOString().split("T")[0],creado_por:perfil.nombre},t);
+        for(const zona of LIMP_ZONAS){
+          const ts=[...(zona.tareas||[]),...(zona.subzonas?zona.subzonas.flatMap(s=>s.tareas):[])];
+          for(const ta of ts)await sbPost("servicio_tareas",{servicio_id:srv.id,tarea_id:ta.id,zona:zona.nombre,es_extra:false,done:false},t).catch(()=>{});
+        }
+        await sbPatch("coordinacion_servicios",`id=eq.${c.id}`,{estado:"servicio_creado_pendiente_fecha",servicio_id:srv.id},t);
+        setCoordP(prev=>prev.map(x=>x.id===c.id?{...x,estado:"servicio_creado_pendiente_fecha",servicio_id:srv.id}:x));
+      }
+    }catch(_){}setSavingC(false);
+  };
+  const elegirFecha=(id,fechaStr)=>{const c=coordP.find(x=>x.id===id);if(c)confirmarFecha(c,new Date(fechaStr+"T12:00:00"));};
+  const solicitarPermiso=(id)=>{const c=coordP.find(x=>x.id===id);if(c)pedirPermiso(c);};
+  // El template referencia variables que no existen en este componente → declaradas como vacías
+  // para que los `&&` de los bloques los oculten sin ReferenceError.
+  const srvActivo=null;
+  const misServicios=[];
+  const cwk=[];
+  const toggleTareaL=undefined;
 
-    {/* BANNER 1 — ¿Está la casa lista? */}
-    {coordP.filter(c=>c.estado==="preguntando_si_lista").map(c=>{
-      const t=perfil?.es_operario?SB_KEY:tok;
-      const fechaFmt=c.fecha_checkin_siguiente?new Date(c.fecha_checkin_siguiente+"T12:00:00").toLocaleDateString("es-ES",{weekday:"long",day:"numeric",month:"long"}):"—";
-      const diasH=c.fecha_checkin_siguiente?Math.ceil((new Date(c.fecha_checkin_siguiente+"T12:00:00")-new Date())/(86400000)):0;
-      return <div key={c.id} style={{padding:"0 20px 12px"}}>
-        <div style={{background:T.terracotta,borderRadius:20,padding:16,color:T.ink}}>
-          <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8}}>
-            <div style={{width:8,height:8,borderRadius:999,background:T.ink}}/>
-            <span style={{fontSize:10,fontWeight:700,letterSpacing:1,textTransform:"uppercase"}}>Acción requerida</span>
-          </div>
-          <div style={{fontSize:18,fontWeight:700,letterSpacing:-.4,lineHeight:1.2}}>¿Está la casa lista?</div>
-          <div style={{fontSize:12,color:"rgba(20,10,5,.7)",marginTop:4}}>Reserva el {fechaFmt} — en {diasH} día{diasH!==1?"s":""}</div>
-          <div style={{display:"flex",gap:8,marginTop:12}}>
-            <button disabled={savingC} onClick={async()=>{setSavingC(true);try{await sbPatch("coordinacion_servicios",`id=eq.${c.id}`,{estado:"casa_lista_confirmada",respondido_por:perfil.nombre},t);const adms=await sbGet("usuarios","?rol=eq.admin&select=id",t).catch(()=>[]);for(const a of adms)await sbPost("notificaciones",{para:a.id,txt:`✅ ${perfil.nombre} confirma: casa lista para el ${fechaFmt}`},t).catch(()=>{});setCoordP(prev=>prev.filter(x=>x.id!==c.id));}catch(_){}setSavingC(false);}} style={{flex:1,padding:"12px 0",borderRadius:14,background:T.ink,color:"white",border:0,fontFamily:T.sans,fontSize:13,fontWeight:700,cursor:"pointer"}}>{savingC?"…":"✓ Sí, está lista"}</button>
-            <button disabled={savingC} onClick={async()=>{setSavingC(true);try{const[srv]=await sbPost("servicios",{nombre:`Limpieza pre-reserva — ${fechaFmt}`,fecha:new Date().toISOString().split("T")[0],creado_por:perfil.nombre},t);for(const zona of LIMP_ZONAS){const ts=[...(zona.tareas||[]),...(zona.subzonas?zona.subzonas.flatMap(s=>s.tareas):[])];for(const ta of ts)await sbPost("servicio_tareas",{servicio_id:srv.id,tarea_id:ta.id,zona:zona.nombre,es_extra:false,done:false},t).catch(()=>{});}await sbPatch("coordinacion_servicios",`id=eq.${c.id}`,{estado:"servicio_creado_pendiente_fecha",servicio_id:srv.id},t);setCoordP(prev=>prev.map(x=>x.id===c.id?{...x,estado:"servicio_creado_pendiente_fecha",servicio_id:srv.id}:x));}catch(_){}setSavingC(false);}} style={{flex:1,padding:"12px 0",borderRadius:14,background:"white",color:T.ink,border:0,fontFamily:T.sans,fontSize:13,fontWeight:700,cursor:"pointer"}}>✗ Falta limpiar</button>
-          </div>
+  return (
+    <div style={{paddingBottom:100,background:T.bg,minHeight:'100%',fontFamily:T.sans}}>
+
+      {/* Greeting */}
+      <div style={{padding:'54px 20px 16px'}}>
+        <div style={{fontSize:12,color:T.ink3,fontWeight:500}}>
+          {new Date().toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'}).replace(/^\w/,c=>c.toUpperCase())}
         </div>
-      </div>;
-    })}
-
-    {/* BANNER 2 — Elegir día de limpieza */}
-    {coordP.filter(c=>c.estado==="servicio_creado_pendiente_fecha").map(c=>{
-      const fechaFmt=c.fecha_checkin_siguiente?new Date(c.fecha_checkin_siguiente+"T12:00:00").toLocaleDateString("es-ES",{weekday:"long",day:"numeric",month:"long"}):"—";
-      const dias=getDias(c.ventana_inicio||new Date().toISOString(),c.ventana_fin||new Date(Date.now()+3*86400000).toISOString());
-      return <div key={c.id} style={{padding:"0 20px 12px"}}>
-        <div style={{background:T.gold,borderRadius:20,padding:16,color:T.ink}}>
-          <div style={{fontSize:10,fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginBottom:6}}>Elige día</div>
-          <div style={{fontSize:16,fontWeight:700,letterSpacing:-.3,lineHeight:1.25}}>Limpieza antes de reserva</div>
-          <div style={{fontSize:12,color:"rgba(30,25,5,.72)",marginTop:4}}>Reserva el {fechaFmt}</div>
-          <div style={{display:"grid",gridTemplateColumns:`repeat(${Math.min(dias.length,3)},1fr)`,gap:6,marginTop:12}}>
-            {dias.slice(0,3).map((d,i)=><button key={d.toISOString()} onClick={()=>confirmarFecha(c,d)} disabled={savingC} style={{padding:"10px 0",borderRadius:14,background:i===0?T.ink:"rgba(255,255,255,.6)",color:i===0?"white":T.ink,border:0,cursor:"pointer",fontFamily:T.sans}}>
-              <div style={{fontSize:10,fontWeight:600,opacity:.7}}>{d.toLocaleDateString("es-ES",{weekday:"short"})}</div>
-              <div style={{fontSize:20,fontWeight:700,letterSpacing:-.5,marginTop:2}}>{d.getDate()}</div>
-              {i===0&&<div style={{fontSize:9,marginTop:2,opacity:.8}}>recomendado</div>}
-            </button>)}
-          </div>
-          <div style={{display:"flex",gap:8,marginTop:10,flexWrap:"wrap"}}>
-            <button onClick={()=>{setShowDatePick(c);setCustomDate("");}} style={{background:"transparent",border:0,color:T.ink,fontFamily:T.sans,fontSize:12,fontWeight:600,cursor:"pointer",textDecoration:"underline",padding:4}}>📅 Otra fecha</button>
-            {c.fecha_checkin_siguiente&&<button onClick={()=>pedirPermiso(c)} disabled={savingC} style={{background:"transparent",border:0,color:T.ink,fontFamily:T.sans,fontSize:12,fontWeight:600,cursor:"pointer",textDecoration:"underline",padding:4}}>🔑 Pedir permiso día checkin</button>}
-          </div>
+        <div style={{fontSize:28,fontWeight:700,color:T.ink,letterSpacing:-0.8,lineHeight:1.02,marginTop:2}}>
+          Hola, {perfil?.nombre?.split(' ')[0]||'Carmen'} 👋
         </div>
-      </div>;
-    })}
+      </div>
 
-    {/* Modal fecha custom */}
-    {showDatePick&&(
-      <div style={{position:"fixed",inset:0,background:"rgba(20,15,10,0.6)",zIndex:999,display:"flex",alignItems:"flex-end",fontFamily:T.sans}} onClick={()=>setShowDatePick(null)}>
-        <div style={{width:"100%",background:T.bg,borderTopLeftRadius:24,borderTopRightRadius:24,padding:"20px 20px 34px"}} onClick={e=>e.stopPropagation()}>
-          <div style={{display:"flex",justifyContent:"center",marginBottom:14}}><div style={{width:44,height:4,borderRadius:999,background:T.line}}/></div>
-          <div style={{fontSize:22,fontWeight:700,color:T.ink,letterSpacing:-.6,marginBottom:16}}>Elegir fecha</div>
-          <div style={{marginBottom:16}}>
-            <div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase",marginBottom:8}}>Fecha</div>
-            <div style={{display:"flex",alignItems:"center",gap:8,background:T.surface,border:"1px solid "+T.line,borderRadius:14,padding:"12px 14px"}}>
-              <FmIcon name="calendar" size={14} stroke={T.ink3}/>
-              <input type="date" value={customDate} onChange={e=>setCustomDate(e.target.value)} style={{flex:1,background:"transparent",border:0,outline:"none",fontFamily:T.sans,fontSize:14,color:T.ink}}/>
+      {/* BANNER 1 — ¿Está la casa lista? — terracotta */}
+      {(coordPL||[]).filter(c=>c.tipo==='preguntando_si_lista'||c.tipo==='pregunta_lista').map((c,idx)=>(
+        <div key={c.id||idx} style={{padding:'0 20px 12px'}}>
+          <div style={{background:T.terracotta,borderRadius:20,padding:18,color:T.ink,position:'relative',overflow:'hidden'}}>
+            <div style={{position:'absolute',top:-30,right:-30,width:120,height:120,borderRadius:999,background:'rgba(255,255,255,0.15)'}}/>
+            <div style={{position:'relative'}}>
+              <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}>
+                <div style={{width:8,height:8,borderRadius:999,background:T.ink,boxShadow:'0 0 0 4px rgba(0,0,0,0.15)'}}/>
+                <span style={{fontSize:10,fontWeight:700,letterSpacing:1,textTransform:'uppercase'}}>Acción requerida</span>
+              </div>
+              <div style={{fontSize:18,fontWeight:700,letterSpacing:-0.4,lineHeight:1.2}}>
+                ¿Está lista la casa para {c.reserva_nombre||c.reservaNombre||'la próxima reserva'}?
+              </div>
+              <div style={{fontSize:12,color:'rgba(20,10,5,0.7)',marginTop:4}}>
+                Check-in en {c.dias_restantes||c.diasRestantes||3} días
+              </div>
+              <div style={{display:'flex',gap:8,marginTop:14}}>
+                <button disabled={savingC} onClick={()=>responderCoord&&responderCoord(c.id,true)} style={{flex:1,padding:'12px 0',borderRadius:14,background:T.ink,color:'white',border:0,fontFamily:T.sans,fontSize:13,fontWeight:700,cursor:'pointer'}}>
+                  ✓ Sí, lista
+                </button>
+                <button disabled={savingC} onClick={()=>responderCoord&&responderCoord(c.id,false)} style={{flex:1,padding:'12px 0',borderRadius:14,background:'white',color:T.ink,border:0,fontFamily:T.sans,fontSize:13,fontWeight:700,cursor:'pointer'}}>
+                  ✗ Falta limpiar
+                </button>
+              </div>
             </div>
           </div>
-          <div style={{display:"flex",gap:8}}>
-            <button onClick={()=>setShowDatePick(null)} style={{flex:1,padding:"14px 0",borderRadius:999,border:"1px solid "+T.line,background:T.surface,color:T.ink,fontFamily:T.sans,fontWeight:600,fontSize:14,cursor:"pointer"}}>Cancelar</button>
-            <button disabled={!customDate||savingC} onClick={()=>{confirmarFecha(showDatePick,new Date(customDate+"T12:00:00"));setShowDatePick(null);}} style={{flex:2,padding:"14px 0",borderRadius:999,border:0,background:!customDate?T.ink+"55":T.ink,color:"white",fontFamily:T.sans,fontWeight:700,fontSize:14,cursor:!customDate?"not-allowed":"pointer"}}>{savingC?"…":"Confirmar"}</button>
+        </div>
+      ))}
+
+      {/* BANNER 2 — Elegir día — gold */}
+      {(coordPL||[]).filter(c=>c.tipo==='servicio_creado_pendiente_fecha'||c.tipo==='elegir_fecha').map((c,idx)=>(
+        <div key={c.id||idx} style={{padding:'0 20px 12px'}}>
+          <div style={{background:T.gold,borderRadius:20,padding:18,color:T.ink}}>
+            <div style={{fontSize:10,fontWeight:700,letterSpacing:1,textTransform:'uppercase',marginBottom:6}}>Elige día</div>
+            <div style={{fontSize:16,fontWeight:700,letterSpacing:-0.3,lineHeight:1.25}}>{c.titulo||c.title||'Limpieza pendiente'}</div>
+            <div style={{fontSize:12,color:'rgba(30,25,5,0.72)',marginTop:4}}>¿Cuándo prefieres limpiar?</div>
+            <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:6,marginTop:12}}>
+              {(c.fechas_disponibles||c.fechasDisponibles||[]).slice(0,3).map((f,i)=>{
+                const d=new Date(f+'T12:00:00');
+                return(
+                  <button key={f} disabled={savingC} onClick={()=>elegirFecha&&elegirFecha(c.id,f)} style={{padding:'10px 0',borderRadius:14,background:i===0?T.ink:'rgba(255,255,255,0.6)',color:i===0?'white':T.ink,border:0,cursor:'pointer',fontFamily:T.sans}}>
+                    <div style={{fontSize:10,fontWeight:600,opacity:0.7}}>{d.toLocaleDateString('es-ES',{weekday:'short'})}</div>
+                    <div style={{fontSize:20,fontWeight:700,letterSpacing:-0.5,marginTop:2}}>{d.getDate()}</div>
+                    {i===0&&<div style={{fontSize:9,marginTop:2,opacity:0.8}}>recomendado</div>}
+                  </button>
+                );
+              })}
+            </div>
+            <div style={{display:'flex',gap:14,justifyContent:'center',flexWrap:'wrap',marginTop:10}}>
+              <button onClick={()=>{setShowDatePick(coordP.find(x=>x.id===c.id));setCustomDate('');}} style={{background:'transparent',border:0,color:T.ink,fontFamily:T.sans,fontSize:12,fontWeight:600,cursor:'pointer',textDecoration:'underline',padding:4}}>📅 Otra fecha</button>
+              {c.fecha_checkin_siguiente&&<button onClick={()=>solicitarPermiso&&solicitarPermiso(c.id)} disabled={savingC} style={{background:'transparent',border:0,color:T.ink,fontFamily:T.sans,fontSize:12,fontWeight:600,cursor:'pointer',textDecoration:'underline',padding:4}}>
+                🔑 No puedo · solicitar permiso
+              </button>}
+            </div>
           </div>
         </div>
-      </div>
-    )}
+      ))}
 
-    {/* Sin pendientes */}
-    {coordP.length===0&&<div style={{padding:"0 20px 14px"}}>
-      <div style={{background:T.surface,borderRadius:20,padding:20,border:"1px solid "+T.line,textAlign:"center"}}>
-        <div style={{fontSize:32,marginBottom:8}}>✅</div>
-        <div style={{fontSize:16,fontWeight:700,color:T.ink}}>Todo al día</div>
-        <div style={{fontSize:13,color:T.ink3,marginTop:4}}>No tienes coordinaciones pendientes</div>
-      </div>
-    </div>}
+      {/* Servicio activo — donut grande (oculto: srvActivo no existe en este componente) */}
+      {srvActivo&&(
+        <div style={{padding:'0 20px 14px'}}>
+          <div style={{fontSize:11,color:T.ink3,letterSpacing:1,textTransform:'uppercase',fontWeight:700,marginBottom:8}}>Tu servicio activo</div>
+          <div style={{background:T.surface,borderRadius:20,padding:16,border:'1px solid '+T.line}}>
+            {(()=>{
+              const zonasDone=srvActivo.zonas_completadas||0;
+              const zonasTotal=srvActivo.total_zonas||14;
+              const pct=Math.round((zonasDone/Math.max(zonasTotal,1))*100);
+              return(
+                <>
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:14}}>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:10,color:'#5A8A3E',letterSpacing:1,textTransform:'uppercase',fontWeight:700,marginBottom:4}}>
+                        {srvActivo.estado==='en_curso'?'En curso':'Asignado'}
+                        {srvActivo.hora_inicio&&' · desde '+srvActivo.hora_inicio.slice(0,5)}
+                      </div>
+                      <div style={{fontSize:18,fontWeight:700,color:T.ink,letterSpacing:-0.4,marginBottom:4}}>{srvActivo.titulo||srvActivo.nombre}</div>
+                      {srvActivo.reserva_nombre&&(
+                        <div style={{fontSize:11,color:T.ink3,display:'flex',alignItems:'center',gap:4}}>
+                          <FmIcon name="calendar" size={10} stroke={T.ink3}/>{srvActivo.reserva_nombre}
+                        </div>
+                      )}
+                    </div>
+                    <div style={{width:64,height:64,borderRadius:999,background:`conic-gradient(${T.olive} ${pct*3.6}deg,${T.line} 0)`,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                      <div style={{width:50,height:50,borderRadius:999,background:T.surface,display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,fontWeight:700,color:T.ink}}>{pct}%</div>
+                    </div>
+                  </div>
+                  <div style={{fontSize:11,color:T.ink3,marginBottom:10}}>
+                    {zonasDone} de {zonasTotal} zonas completadas
+                  </div>
+                  <button onClick={()=>setPage&&setPage('limpieza')} style={{width:'100%',padding:'13px 0',borderRadius:14,background:T.ink,color:'white',border:0,fontFamily:T.sans,fontWeight:700,fontSize:13,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:6}}>
+                    Continuar limpieza <FmIcon name="arrow" size={13} stroke="white"/>
+                  </button>
+                </>
+              );
+            })()}
+          </div>
+        </div>
+      )}
 
-    {/* Accesos rápidos */}
-    <div style={{padding:"0 20px 14px",display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-      {[{icon:"settings",t:"Mi servicio",s:"Checklist limpieza",id:"limpieza",bg:T.terracotta+"22",stroke:T.terracotta},{icon:"calendar",t:"Calendario",s:"Próximos eventos",id:"cal-limp",bg:T.lavender+"22",stroke:"#4A3A8A"}].map(it=><button key={it.id} onClick={()=>setPage(it.id)} style={{background:T.surface,border:"1px solid "+T.line,borderRadius:16,padding:16,cursor:"pointer",textAlign:"left",fontFamily:T.sans}}>
-        <div style={{width:36,height:36,borderRadius:10,background:it.bg,display:"flex",alignItems:"center",justifyContent:"center",marginBottom:8}}><FmIcon name={it.icon} size={18} stroke={it.stroke}/></div>
-        <div style={{fontSize:14,fontWeight:700,color:T.ink}}>{it.t}</div>
-        <div style={{fontSize:11,color:T.ink3,marginTop:3}}>{it.s}</div>
-      </button>)}
+      {/* Estado vacío "Todo al día" */}
+      {!srvActivo&&(coordPL||[]).length===0&&(
+        <div style={{padding:'0 20px 14px'}}>
+          <div style={{background:T.surface,borderRadius:20,padding:'28px 20px',border:'1px solid '+T.line,textAlign:'center'}}>
+            <div style={{fontSize:36,marginBottom:8}}>✅</div>
+            <div style={{fontSize:17,fontWeight:700,color:T.ink,letterSpacing:-0.3}}>Todo al día</div>
+            <div style={{fontSize:13,color:T.ink3,marginTop:4}}>No hay servicios pendientes ahora</div>
+          </div>
+        </div>
+      )}
+
+      {/* Stats KPIs — solo se renderiza si hay datos (cwk y misServicios están vacíos en este componente) */}
+      {((cwk||[]).length>0||(misServicios||[]).length>0)&&(
+        <div style={{padding:'0 20px 14px',display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+          {[
+            {bg:T.terracotta, fg:T.ink, value:`${(cwk||[]).filter(t=>t.hecha||t.completada).length}/${(cwk||[]).length||0}`, label:'Tareas semana'},
+            {bg:T.ink,        fg:'#fff', value:misServicios?.length||0,                                                       label:'Mis servicios'},
+          ].map((k,i)=>(
+            <div key={i} style={{background:k.bg,color:k.fg,borderRadius:18,padding:'14px 16px 16px',minHeight:80,display:'flex',flexDirection:'column',justifyContent:'space-between'}}>
+              <div style={{fontSize:9.5,fontWeight:700,letterSpacing:0.8,textTransform:'uppercase',opacity:0.8}}>{k.label}</div>
+              <div style={{fontSize:24,fontWeight:800,letterSpacing:-0.8,lineHeight:1}}>{k.value}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Mis servicios recientes (oculto sin datos) */}
+      {(misServicios||[]).length>0&&(
+        <div style={{padding:'0 20px 14px'}}>
+          <div style={{fontSize:11,color:T.ink3,letterSpacing:1,textTransform:'uppercase',fontWeight:700,marginBottom:8}}>Mis servicios recientes</div>
+          <div style={{background:T.surface,borderRadius:18,border:'1px solid '+T.line,overflow:'hidden'}}>
+            {(misServicios||[]).slice(0,5).map((s,i,arr)=>{
+              const meta={completado:T.olive,finalizado:T.olive,en_curso:T.softBlue,programado:T.softBlue,pendiente_fecha:T.gold,pendiente:T.gold}[s.estado]||T.ink3;
+              const label={completado:'Hecho',finalizado:'Hecho',en_curso:'En curso',programado:'Programado',pendiente_fecha:'Sin fecha',pendiente:'Pendiente'}[s.estado]||s.estado;
+              return(
+                <div key={s.id} onClick={()=>setPage&&setPage('limpieza')} style={{padding:'12px 14px',borderBottom:i<arr.length-1?'1px solid '+T.line:'none',display:'flex',gap:10,alignItems:'center',cursor:'pointer'}}>
+                  <div style={{width:4,height:36,borderRadius:999,background:meta,flexShrink:0}}/>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:13,fontWeight:700,color:T.ink,letterSpacing:-0.2,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{s.titulo}</div>
+                    <div style={{fontSize:11,color:T.ink3,marginTop:2}}>{s.fecha||'Sin fecha'}</div>
+                  </div>
+                  <span style={{fontSize:10,padding:'3px 8px',borderRadius:999,background:meta+'22',color:meta,fontWeight:700,flexShrink:0}}>
+                    {label}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Tareas pendientes esta semana (oculto sin datos) */}
+      {(cwk||[]).filter(t=>!t.hecha&&!t.completada).length>0&&(
+        <div style={{padding:'0 20px 14px'}}>
+          <div style={{fontSize:11,color:T.ink3,letterSpacing:1,textTransform:'uppercase',fontWeight:700,marginBottom:8,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+            <span>Esta semana</span>
+            <span style={{color:T.terracotta,fontWeight:700}}>
+              {(cwk||[]).filter(t=>t.hecha||t.completada).length}/{(cwk||[]).length}
+            </span>
+          </div>
+          <div style={{background:T.surface,borderRadius:18,border:'1px solid '+T.line,overflow:'hidden'}}>
+            {(cwk||[]).slice(0,6).map((t,i,arr)=>{
+              const done=t.hecha||t.completada;
+              return(
+                <div key={t.id||i} onClick={()=>toggleTareaL&&toggleTareaL(t)} style={{display:'flex',alignItems:'center',gap:12,padding:'13px 16px',borderBottom:i<arr.length-1?'1px solid '+T.line:'none',cursor:'pointer'}}>
+                  <div style={{width:22,height:22,borderRadius:7,background:done?T.olive:'transparent',border:'1.5px solid '+(done?T.olive:T.line),display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                    {done&&<FmIcon name="check" size={12} stroke="white" sw={3}/>}
+                  </div>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:13,fontWeight:done?500:600,color:done?T.ink3:T.ink,textDecoration:done?'line-through':'none',letterSpacing:-0.1}}>
+                      {t.nombre||t.tarea||t.descripcion||t.txt}
+                    </div>
+                    {t.zona&&(
+                      <div style={{fontSize:11,color:T.ink3,marginTop:2}}>{t.zona}</div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Accesos rápidos (preservados — útiles para nav) */}
+      <div style={{padding:'0 20px 14px',display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+        {[{icon:'settings',t:'Mi servicio',s:'Checklist limpieza',id:'limpieza',bg:T.terracotta+'22',stroke:T.terracotta},{icon:'calendar',t:'Calendario',s:'Próximos eventos',id:'cal-limp',bg:T.lavender+'22',stroke:'#4A3A8A'}].map(it=>(
+          <button key={it.id} onClick={()=>setPage(it.id)} style={{background:T.surface,border:'1px solid '+T.line,borderRadius:16,padding:16,cursor:'pointer',textAlign:'left',fontFamily:T.sans}}>
+            <div style={{width:36,height:36,borderRadius:10,background:it.bg,display:'flex',alignItems:'center',justifyContent:'center',marginBottom:8}}><FmIcon name={it.icon} size={18} stroke={it.stroke}/></div>
+            <div style={{fontSize:14,fontWeight:700,color:T.ink}}>{it.t}</div>
+            <div style={{fontSize:11,color:T.ink3,marginTop:3}}>{it.s}</div>
+          </button>
+        ))}
+      </div>
+
+      {/* Modal fecha custom (preservado — útil cuando ninguna fecha sugerida vale) */}
+      {showDatePick&&(
+        <div style={{position:'fixed',inset:0,background:'rgba(20,15,10,0.6)',zIndex:999,display:'flex',alignItems:'flex-end',fontFamily:T.sans}} onClick={()=>setShowDatePick(null)}>
+          <div style={{width:'100%',background:T.bg,borderTopLeftRadius:24,borderTopRightRadius:24,padding:'20px 20px 34px'}} onClick={e=>e.stopPropagation()}>
+            <div style={{display:'flex',justifyContent:'center',marginBottom:14}}><div style={{width:44,height:4,borderRadius:999,background:T.line}}/></div>
+            <div style={{fontSize:22,fontWeight:700,color:T.ink,letterSpacing:-0.6,marginBottom:16}}>Elegir fecha</div>
+            <div style={{marginBottom:16}}>
+              <div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:0.5,textTransform:'uppercase',marginBottom:8}}>Fecha</div>
+              <div style={{display:'flex',alignItems:'center',gap:8,background:T.surface,border:'1px solid '+T.line,borderRadius:14,padding:'12px 14px'}}>
+                <FmIcon name="calendar" size={14} stroke={T.ink3}/>
+                <input type="date" value={customDate} onChange={e=>setCustomDate(e.target.value)} style={{flex:1,background:'transparent',border:0,outline:'none',fontFamily:T.sans,fontSize:14,color:T.ink}}/>
+              </div>
+            </div>
+            <div style={{display:'flex',gap:8}}>
+              <button onClick={()=>setShowDatePick(null)} style={{flex:1,padding:'14px 0',borderRadius:999,border:'1px solid '+T.line,background:T.surface,color:T.ink,fontFamily:T.sans,fontWeight:600,fontSize:14,cursor:'pointer'}}>Cancelar</button>
+              <button disabled={!customDate||savingC} onClick={()=>{confirmarFecha(showDatePick,new Date(customDate+'T12:00:00'));setShowDatePick(null);}} style={{flex:2,padding:'14px 0',borderRadius:999,border:0,background:!customDate?T.ink+'55':T.ink,color:'white',fontFamily:T.sans,fontWeight:700,fontSize:14,cursor:!customDate?'not-allowed':'pointer'}}>{savingC?'…':'Confirmar'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
-  </div>;
+  );
 }
 function DashC({perfil,reservas,setPage}){
   const pend=reservas.filter(r=>r.estado==="visita"||r.estado==="pendiente_contrato").length;
