@@ -2958,30 +2958,90 @@ function DashJ({perfil,jsem,jpunt,cwk,setPage,tok}){
         <OpsMiniKpi value={fmtEl(tiempoJornada)} label="Tiempo hoy" color={T.ink}/>
       </div>
 
-      {/* Checklist semanal solo si NO hay servicio activo */}
-      {!srvActivo&&<div style={{padding:"0 20px 14px"}}>
-        <div style={{fontSize:11,color:T.ink3,letterSpacing:1,textTransform:"uppercase",fontWeight:700,marginBottom:8}}>Tareas pendientes</div>
-        <div style={{background:T.surface,borderRadius:16,border:"1px solid "+T.line,overflow:"hidden"}}>
-          {actv.slice(0,6).map((t,i,arr)=><div key={t.id} style={{display:"flex",alignItems:"center",gap:10,padding:"12px 14px",borderBottom:i<arr.length-1?"1px solid "+T.line:"none"}}>
-            <div style={{width:20,height:20,borderRadius:6,border:"1.5px solid "+(sj[t.id]?.done?T.olive:T.line),background:sj[t.id]?.done?T.olive:"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{sj[t.id]?.done&&<FmIcon name="check" size={11} stroke="white" sw={2.5}/>}</div>
-            <div style={{flex:1,minWidth:0}}>
-              <div style={{fontSize:13,color:sj[t.id]?.done?T.ink3:T.ink,fontWeight:sj[t.id]?.done?400:500,textDecoration:sj[t.id]?.done?"line-through":"none"}}>{t.txt}</div>
-              {t.zona&&<div style={{fontSize:10,color:T.ink3,marginTop:2}}>{t.zona}</div>}
+      {/* Servicio activo — card compacto con progreso (link a jcheck) */}
+      {srvActivo&&(()=>{
+        const sDone=srvTareas.filter(t=>t.done).length;
+        const sTot=srvTareas.length;
+        const pct=Math.round((sDone/Math.max(sTot,1))*100);
+        return(
+          <div style={{padding:'0 20px 14px'}}>
+            <div style={{fontSize:11,color:T.ink3,letterSpacing:1,textTransform:'uppercase',fontWeight:700,marginBottom:8}}>Servicio activo</div>
+            <div style={{background:T.surface,borderRadius:20,padding:16,border:'1px solid '+T.olive+'44'}}>
+              <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:10}}>
+                <div style={{width:8,height:8,borderRadius:999,background:T.olive,boxShadow:'0 0 0 4px '+T.olive+'33'}}/>
+                <div style={{fontSize:10,color:'#5A8A3E',letterSpacing:1,textTransform:'uppercase',fontWeight:700}}>En curso</div>
+              </div>
+              <div style={{fontSize:18,fontWeight:700,color:T.ink,letterSpacing:-0.4,marginBottom:4}}>{srvActivo.nombre||'Servicio'}</div>
+              {srvActivo.reserva_nombre&&(
+                <div style={{fontSize:12,color:T.ink3,marginBottom:10,display:'flex',alignItems:'center',gap:4}}>
+                  <FmIcon name="calendar" size={11} stroke={T.ink3}/>{srvActivo.reserva_nombre}
+                </div>
+              )}
+              <div style={{display:'flex',justifyContent:'space-between',marginBottom:6,fontSize:11,color:T.ink3}}>
+                <span>{sDone} de {sTot} tareas</span>
+                <span style={{fontWeight:700,color:T.olive}}>{pct}%</span>
+              </div>
+              <div style={{height:5,background:T.bg,borderRadius:999,overflow:'hidden'}}>
+                <div style={{width:pct+'%',height:'100%',background:T.olive}}/>
+              </div>
+              <button onClick={()=>setPage&&setPage('jcheck')} style={{marginTop:12,width:'100%',padding:'12px 0',borderRadius:14,background:T.ink,color:'white',border:0,fontFamily:T.sans,fontWeight:700,fontSize:13,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:6}}>
+                Ver tareas <FmIcon name="arrow" size={13} stroke="white"/>
+              </button>
             </div>
-          </div>)}
-          {jpunt.map((t,i)=><div key={t.id} style={{display:"flex",alignItems:"center",gap:10,padding:"12px 14px",borderBottom:"none"}}>
-            <div style={{width:20,height:20,borderRadius:6,border:"1.5px solid "+(t.done?T.olive:T.line),background:t.done?T.olive:"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{t.done&&<FmIcon name="check" size={11} stroke="white" sw={2.5}/>}</div>
-            <div style={{flex:1,minWidth:0}}>
-              <div style={{fontSize:13,color:t.done?T.ink3:T.ink,fontWeight:t.done?400:500,textDecoration:t.done?"line-through":"none"}}>{t.txt}</div>
-              <div style={{fontSize:10,color:T.terracotta,marginTop:2}}>📌 Puntual</div>
+          </div>
+        );
+      })()}
+
+      {/* Tareas de esta semana (rediseño) — solo si NO hay servicio activo */}
+      {!srvActivo&&(actv.length+jpunt.length)>0&&(()=>{
+        const semanalesHechas=actv.filter(t=>sj[t.id]?.done).length;
+        const puntualesHechas=jpunt.filter(t=>t.done).length;
+        const hechasTot=semanalesHechas+puntualesHechas;
+        const total=actv.length+jpunt.length;
+        const listaMostrada=[...actv.map(t=>({...t,__kind:'semanal',__done:!!sj[t.id]?.done})),...jpunt.map(t=>({...t,__kind:'puntual',__done:!!t.done}))].slice(0,8);
+        return(
+          <div style={{padding:'0 20px 14px'}}>
+            <div style={{fontSize:11,color:T.ink3,letterSpacing:1,textTransform:'uppercase',fontWeight:700,marginBottom:8,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+              <span>Esta semana</span>
+              <span style={{color:T.olive,fontWeight:700}}>{hechasTot}/{total}</span>
             </div>
-          </div>)}
-          {tot===0&&<div style={{padding:"20px 14px",textAlign:"center",color:T.ink3,fontSize:13}}>Sin tareas esta semana</div>}
+            <div style={{background:T.surface,borderRadius:18,border:'1px solid '+T.line,overflow:'hidden'}}>
+              {listaMostrada.map((t,i,arr)=>{
+                const done=t.__done;
+                const frecLbl=t.__kind==='puntual'?'Puntual':(t.frec===1?'Semanal':t.frec?`Cada ${t.frec} sem`:null);
+                return(
+                  <div key={`${t.__kind}-${t.id||i}`} onClick={()=>setPage&&setPage('jcheck')} style={{display:'flex',alignItems:'center',gap:12,padding:'13px 16px',borderBottom:i<arr.length-1?'1px solid '+T.line:'none',cursor:'pointer'}}>
+                    <div style={{width:22,height:22,borderRadius:7,background:done?T.olive:'transparent',border:'1.5px solid '+(done?T.olive:T.line),display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,transition:'all 0.15s'}}>
+                      {done&&<FmIcon name="check" size={12} stroke="white" sw={3}/>}
+                    </div>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:13,fontWeight:done?500:600,color:done?T.ink3:T.ink,textDecoration:done?'line-through':'none',letterSpacing:-0.1}}>{t.txt}</div>
+                      {(t.zona||frecLbl)&&(
+                        <div style={{fontSize:11,color:T.ink3,marginTop:2,display:'flex',alignItems:'center',gap:6}}>
+                          {t.zona&&<span>{t.zona}</span>}
+                          {t.zona&&frecLbl&&<span>·</span>}
+                          {frecLbl&&<span style={{padding:'1px 6px',borderRadius:999,background:(t.__kind==='puntual'?T.terracotta:T.olive)+'22',color:t.__kind==='puntual'?T.terracotta:'#5A8A3E',fontWeight:600,fontSize:10}}>{frecLbl}</span>}
+                        </div>
+                      )}
+                    </div>
+                    {!done&&<FmIcon name="clock" size={13} stroke={T.ink3}/>}
+                  </div>
+                );
+              })}
+            </div>
+            {total>8&&(
+              <button onClick={()=>setPage&&setPage('jcheck')} style={{marginTop:8,width:'100%',padding:10,borderRadius:12,background:'transparent',border:'1px dashed '+T.line,color:T.ink3,fontFamily:T.sans,fontSize:12,fontWeight:600,cursor:'pointer'}}>
+                Ver todas las tareas ({total})
+              </button>
+            )}
+          </div>
+        );
+      })()}
+      {!srvActivo&&(actv.length+jpunt.length)===0&&(
+        <div style={{padding:'0 20px 14px'}}>
+          <div style={{background:T.surface,borderRadius:18,border:'1px solid '+T.line,padding:'20px 14px',textAlign:'center',color:T.ink3,fontSize:13}}>Sin tareas esta semana</div>
         </div>
-        <button onClick={()=>setPage("jcheck")} style={{width:"100%",padding:"12px 0",borderRadius:999,border:"1px solid "+T.line,background:T.surface,color:T.ink,fontFamily:T.sans,fontSize:13,fontWeight:600,cursor:"pointer",marginTop:10,display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
-          <FmIcon name="check" size={14} stroke={T.ink}/>Ir al checklist completo
-        </button>
-      </div>}
+      )}
 
     {/* Modal nueva jornada */}
     {showNuevaJornada&&<div className="ov"><div className="modal" style={{maxWidth:400,textAlign:"center"}}>
@@ -8304,6 +8364,18 @@ function CalJardin({tok,perfil}){
         )}
         <div style={{fontSize:10.5,color:T.ink3,letterSpacing:.6,fontWeight:700,textTransform:"uppercase",marginBottom:8}}>Calendario</div>
         <CalBase tok={tok} rol="jardinero"/>
+        {/* Leyenda visual */}
+        <div style={{padding:'14px 4px 0',display:'flex',gap:14,flexWrap:'wrap',fontSize:11,color:T.ink3}}>
+          <div style={{display:'flex',alignItems:'center',gap:5}}>
+            <div style={{width:10,height:10,borderRadius:3,background:T.terracotta}}/>Evento
+          </div>
+          <div style={{display:'flex',alignItems:'center',gap:5}}>
+            <div style={{width:10,height:10,borderRadius:3,background:T.gold+'66'}}/>Preparación / recogida
+          </div>
+          <div style={{display:'flex',alignItems:'center',gap:5}}>
+            <div style={{width:10,height:10,borderRadius:3,background:T.softBlue+'88'}}/>Airbnb
+          </div>
+        </div>
       </div>
       <style>{`@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}`}</style>
     </div>
