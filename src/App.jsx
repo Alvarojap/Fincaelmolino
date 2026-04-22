@@ -2558,10 +2558,40 @@ function DashJ({perfil,jsem,jpunt,cwk,setPage,tok}){
   const [meteoJ,setMeteoJ]=useState(null);
   useEffect(()=>{fetchMeteo().then(dias=>{if(dias&&dias.length>=2){const r0=dias[0].precipitacion,r1=dias[1].precipitacion;const maxR=Math.max(r0,r1);if(maxR>30)setMeteoJ({rain:maxR,day:r1>r0?"mañana":"hoy"});}});},[]);
   const temp=getTemporada();
+  const [sjOverlay,setSjOverlay]=useState({});
+  const [jpuntOverlay,setJpuntOverlay]=useState({});
   const sj={}; jsem.forEach(r=>sj[r.tarea_id]=r);
+  Object.keys(sjOverlay).forEach(k=>{sj[k]={...(sj[k]||{}),...sjOverlay[k]};});
+  const jpuntMerged=jpunt.map(t=>jpuntOverlay[t.id]?{...t,...jpuntOverlay[t.id]}:t);
   const actv=JARDIN_T[temp].filter(t=>tocaSemana({...t,frec:t.frec},cwk));
-  const tot=actv.length+jpunt.length;
-  const comp=actv.filter(t=>sj[t.id]?.done).length+jpunt.filter(t=>t.done).length;
+  const tot=actv.length+jpuntMerged.length;
+  const comp=actv.filter(t=>sj[t.id]?.done).length+jpuntMerged.filter(t=>t.done).length;
+
+  // Toggle inline de tareas semanales (patch a jardin_semana con columnas reales)
+  const toggleTareaSemanal=async(tarea)=>{
+    const existing=sj[tarea.id];
+    const newDone=!existing?.done;
+    const nowISO=new Date().toISOString();
+    const patch={done:newDone,completado_por:newDone?perfil.nombre:null,completado_ts:newDone?nowISO:null};
+    setSjOverlay(prev=>({...prev,[tarea.id]:{...(existing||{}),...patch,tarea_id:tarea.id}}));
+    try{
+      if(existing?.id){
+        await sbPatch("jardin_semana",`id=eq.${existing.id}`,patch,tok);
+      }else{
+        const res=await sbPost("jardin_semana",{semana:cwk,tarea_id:tarea.id,done:true,completado_por:perfil.nombre,completado_ts:nowISO,nota:null,foto_url:null},tok);
+        if(res&&res[0])setSjOverlay(prev=>({...prev,[tarea.id]:{...(prev[tarea.id]||{}),id:res[0].id}}));
+      }
+    }catch(e){console.error("Error toggle semanal:",e);}
+  };
+  const toggleTareaPuntual=async(tarea)=>{
+    const cur=jpuntOverlay[tarea.id]?{...tarea,...jpuntOverlay[tarea.id]}:tarea;
+    const newDone=!cur.done;
+    const nowISO=new Date().toISOString();
+    const patch={done:newDone,completado_por:newDone?perfil.nombre:null,completado_ts:newDone?nowISO:null};
+    setJpuntOverlay(prev=>({...prev,[tarea.id]:patch}));
+    try{await sbPatch("jardin_puntual",`id=eq.${tarea.id}`,patch,tok);}
+    catch(e){console.error("Error toggle puntual:",e);}
+  };
   // Servicio activo
   const [srvActivo,setSrvActivo]=useState(null);
   const [srvTareas,setSrvTareas]=useState([]);
@@ -2958,47 +2988,13 @@ function DashJ({perfil,jsem,jpunt,cwk,setPage,tok}){
         <OpsMiniKpi value={fmtEl(tiempoJornada)} label="Tiempo hoy" color={T.ink}/>
       </div>
 
-      {/* Servicio activo — card compacto con progreso (link a jcheck) */}
-      {srvActivo&&(()=>{
-        const sDone=srvTareas.filter(t=>t.done).length;
-        const sTot=srvTareas.length;
-        const pct=Math.round((sDone/Math.max(sTot,1))*100);
-        return(
-          <div style={{padding:'0 20px 14px'}}>
-            <div style={{fontSize:11,color:T.ink3,letterSpacing:1,textTransform:'uppercase',fontWeight:700,marginBottom:8}}>Servicio activo</div>
-            <div style={{background:T.surface,borderRadius:20,padding:16,border:'1px solid '+T.olive+'44'}}>
-              <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:10}}>
-                <div style={{width:8,height:8,borderRadius:999,background:T.olive,boxShadow:'0 0 0 4px '+T.olive+'33'}}/>
-                <div style={{fontSize:10,color:'#5A8A3E',letterSpacing:1,textTransform:'uppercase',fontWeight:700}}>En curso</div>
-              </div>
-              <div style={{fontSize:18,fontWeight:700,color:T.ink,letterSpacing:-0.4,marginBottom:4}}>{srvActivo.nombre||'Servicio'}</div>
-              {srvActivo.reserva_nombre&&(
-                <div style={{fontSize:12,color:T.ink3,marginBottom:10,display:'flex',alignItems:'center',gap:4}}>
-                  <FmIcon name="calendar" size={11} stroke={T.ink3}/>{srvActivo.reserva_nombre}
-                </div>
-              )}
-              <div style={{display:'flex',justifyContent:'space-between',marginBottom:6,fontSize:11,color:T.ink3}}>
-                <span>{sDone} de {sTot} tareas</span>
-                <span style={{fontWeight:700,color:T.olive}}>{pct}%</span>
-              </div>
-              <div style={{height:5,background:T.bg,borderRadius:999,overflow:'hidden'}}>
-                <div style={{width:pct+'%',height:'100%',background:T.olive}}/>
-              </div>
-              <button onClick={()=>setPage&&setPage('jcheck')} style={{marginTop:12,width:'100%',padding:'12px 0',borderRadius:14,background:T.ink,color:'white',border:0,fontFamily:T.sans,fontWeight:700,fontSize:13,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:6}}>
-                Ver tareas <FmIcon name="arrow" size={13} stroke="white"/>
-              </button>
-            </div>
-          </div>
-        );
-      })()}
-
       {/* Tareas de esta semana (rediseño) — solo si NO hay servicio activo */}
-      {!srvActivo&&(actv.length+jpunt.length)>0&&(()=>{
+      {!srvActivo&&(actv.length+jpuntMerged.length)>0&&(()=>{
         const semanalesHechas=actv.filter(t=>sj[t.id]?.done).length;
-        const puntualesHechas=jpunt.filter(t=>t.done).length;
+        const puntualesHechas=jpuntMerged.filter(t=>t.done).length;
         const hechasTot=semanalesHechas+puntualesHechas;
-        const total=actv.length+jpunt.length;
-        const listaMostrada=[...actv.map(t=>({...t,__kind:'semanal',__done:!!sj[t.id]?.done})),...jpunt.map(t=>({...t,__kind:'puntual',__done:!!t.done}))].slice(0,8);
+        const total=actv.length+jpuntMerged.length;
+        const listaMostrada=[...actv.map(t=>({...t,__kind:'semanal',__done:!!sj[t.id]?.done})),...jpuntMerged.map(t=>({...t,__kind:'puntual',__done:!!t.done}))].slice(0,8);
         return(
           <div style={{padding:'0 20px 14px'}}>
             <div style={{fontSize:11,color:T.ink3,letterSpacing:1,textTransform:'uppercase',fontWeight:700,marginBottom:8,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
@@ -3010,7 +3006,7 @@ function DashJ({perfil,jsem,jpunt,cwk,setPage,tok}){
                 const done=t.__done;
                 const frecLbl=t.__kind==='puntual'?'Puntual':(t.frec===1?'Semanal':t.frec?`Cada ${t.frec} sem`:null);
                 return(
-                  <div key={`${t.__kind}-${t.id||i}`} onClick={()=>setPage&&setPage('jcheck')} style={{display:'flex',alignItems:'center',gap:12,padding:'13px 16px',borderBottom:i<arr.length-1?'1px solid '+T.line:'none',cursor:'pointer'}}>
+                  <div key={`${t.__kind}-${t.id||i}`} onClick={e=>{e.stopPropagation();if(t.__kind==='semanal')toggleTareaSemanal(t);else toggleTareaPuntual(t);}} style={{display:'flex',alignItems:'center',gap:12,padding:'13px 16px',borderBottom:i<arr.length-1?'1px solid '+T.line:'none',cursor:'pointer'}}>
                     <div style={{width:22,height:22,borderRadius:7,background:done?T.olive:'transparent',border:'1.5px solid '+(done?T.olive:T.line),display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,transition:'all 0.15s'}}>
                       {done&&<FmIcon name="check" size={12} stroke="white" sw={3}/>}
                     </div>
@@ -3037,7 +3033,7 @@ function DashJ({perfil,jsem,jpunt,cwk,setPage,tok}){
           </div>
         );
       })()}
-      {!srvActivo&&(actv.length+jpunt.length)===0&&(
+      {!srvActivo&&(actv.length+jpuntMerged.length)===0&&(
         <div style={{padding:'0 20px 14px'}}>
           <div style={{background:T.surface,borderRadius:18,border:'1px solid '+T.line,padding:'20px 14px',textAlign:'center',color:T.ink3,fontSize:13}}>Sin tareas esta semana</div>
         </div>
@@ -7871,6 +7867,15 @@ function CalBase({tok,rol="admin"}){
     if(r.bloqueo_dia_anterior&&!r.dia_anterior_desbloqueado){const d=new Date(new Date(r.fecha+"T12:00:00").getTime()-86400000).toISOString().split("T")[0];fechasBloq.add(d);}
     if(r.bloqueo_dia_posterior&&!r.dia_posterior_desbloqueado){const d=new Date(new Date(r.fecha+"T12:00:00").getTime()+86400000).toISOString().split("T")[0];fechasBloq.add(d);}
   }});
+  // Bloqueo automático para vista jardinero: día anterior (preparación) y posterior (recogida)
+  // de TODA reserva no cancelada, sin depender de flags bloqueo_dia_*
+  if(isJ){
+    reservas.forEach(r=>{if(r.estado!=="cancelada"&&r.fecha){
+      const ts=new Date(r.fecha+"T12:00:00").getTime();
+      fechasBloq.add(new Date(ts-86400000).toISOString().split("T")[0]);
+      fechasBloq.add(new Date(ts+86400000).toISOString().split("T")[0]);
+    }});
+  }
 
   // Reservas normales para un día
   const grReservas=d=>reservas.filter(r=>r.fecha===ds(d));
@@ -8364,13 +8369,13 @@ function CalJardin({tok,perfil}){
         )}
         <div style={{fontSize:10.5,color:T.ink3,letterSpacing:.6,fontWeight:700,textTransform:"uppercase",marginBottom:8}}>Calendario</div>
         <CalBase tok={tok} rol="jardinero"/>
-        {/* Leyenda visual */}
+        {/* Leyenda visual — colores sincronizados con CalBase */}
         <div style={{padding:'14px 4px 0',display:'flex',gap:14,flexWrap:'wrap',fontSize:11,color:T.ink3}}>
           <div style={{display:'flex',alignItems:'center',gap:5}}>
             <div style={{width:10,height:10,borderRadius:3,background:T.terracotta}}/>Evento
           </div>
           <div style={{display:'flex',alignItems:'center',gap:5}}>
-            <div style={{width:10,height:10,borderRadius:3,background:T.gold+'66'}}/>Preparación / recogida
+            <div style={{width:10,height:10,borderRadius:3,background:T.terracotta+'33',border:'1px dashed '+T.terracotta}}/>Preparación / recogida
           </div>
           <div style={{display:'flex',alignItems:'center',gap:5}}>
             <div style={{width:10,height:10,borderRadius:3,background:T.softBlue+'88'}}/>Airbnb
