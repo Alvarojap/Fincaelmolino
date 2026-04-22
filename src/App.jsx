@@ -2569,9 +2569,11 @@ function DashJ({perfil,jsem,jpunt,cwk,setPage,tok}){
   const [jornadaId,setJornadaId]=useState(null);
   const [jornadaFin,setJornadaFin]=useState(false);
   const [jornadaDurMin,setJornadaDurMin]=useState(0);
-  const [tiempoJornada,setTiempoJornada]=useState(0);
+  const [jornadaInicioISO,setJornadaInicioISO]=useState(null);
   const [pausado,setPausado]=useState(false);
   const [pausasArr,setPausasArr]=useState([]);
+  const [pausaActualISO,setPausaActualISO]=useState(null);
+  const [,setTickCount]=useState(0);
   const [saving2,setSaving2]=useState(false);
   const [showFinJornada,setShowFinJornada]=useState(false);
   const [showFinSrv,setShowFinSrv]=useState(false);
@@ -2595,30 +2597,37 @@ function DashJ({perfil,jsem,jpunt,cwk,setPage,tok}){
       const allTareas=await sbGet("jardin_servicio_tareas",`?servicio_id=eq.${s.id}&select=*&order=created_at.asc`,tok).catch(()=>[]);
       setSrvTareas(allTareas.filter(t=>!t.añadida_por_jardinero));
       setSrvExtras(allTareas.filter(t=>t.añadida_por_jardinero));
-      // Jornada hoy
+      // Jornada hoy — recuperar estado basado en timestamps ISO de BD (fuente de verdad)
       let jHoy=[];
       try{jHoy=await sbGet("jornadas_jardineria",`?servicio_id=eq.${s.id}&hora_inicio=gte.${hoyStr}T00:00:00&hora_inicio=lte.${hoyStr}T23:59:59&select=*`,tok);}catch(_){jHoy=[];}
       if(jHoy.length>0){
         const j=jHoy[0];
-        setJornadaId(j.id);setPausasArr(j.pausas||[]);
-        localStorage.setItem(`fm_jornada_id_${s.id}`,String(j.id));
+        setJornadaId(j.id);
+        setJornadaInicioISO(j.hora_inicio||null);
+        const pArrRaw=j.pausas||[];
         if(j.hora_fin){
           setJornadaFin(true);setJornadaDurMin(j.duracion_minutos||0);
+          setPausasArr(pArrRaw);setPausado(false);setPausaActualISO(null);
         }else{
           setJornadaFin(false);
-          if(!localStorage.getItem(`fm_jornada_inicio_${s.id}`)&&j.hora_inicio){
-            const ts=new Date(j.hora_inicio).getTime();
-            if(ts>0)localStorage.setItem(`fm_jornada_inicio_${s.id}`,ts.toString());
+          // Detectar pausa actual: (a) última con fin=null en pausas[], o (b) columna pausa_actual_iso
+          const lastP=pArrRaw[pArrRaw.length-1];
+          if(lastP&&!lastP.fin){
+            setPausasArr(pArrRaw.slice(0,-1));
+            setPausado(true);
+            const ini=lastP.inicio;
+            const iniISO=typeof ini==='number'?new Date(ini).toISOString():(ini||j.pausa_actual_iso||null);
+            setPausaActualISO(iniISO);
+          }else if(j.pausa_actual_iso){
+            setPausasArr(pArrRaw);setPausado(true);setPausaActualISO(j.pausa_actual_iso);
+          }else{
+            setPausasArr(pArrRaw);setPausado(false);setPausaActualISO(null);
           }
-          const pArr=j.pausas||[];
-          const lastP=pArr[pArr.length-1];
-          setPausado(!!lastP&&!lastP.fin);
-          if(lastP&&!lastP.fin)localStorage.setItem(`fm_jornada_pausado_${s.id}`,String(lastP.inicio));
         }
       }else{
         setJornadaId(null);setJornadaFin(false);
-        const lsIni=localStorage.getItem(`fm_jornada_inicio_${s.id}`);
-        if(!lsIni)setShowNuevaJornada(true);
+        setJornadaInicioISO(null);setPausasArr([]);setPausado(false);setPausaActualISO(null);
+        setShowNuevaJornada(true);
       }
     }catch(_){}
   };
@@ -2634,80 +2643,103 @@ function DashJ({perfil,jsem,jpunt,cwk,setPage,tok}){
   };
   useEffect(()=>{if(tok){loadSrvActivo();loadCoordYServicios();}},[]);
 
-  // Cronómetro — uses timestamps from localStorage for persistence
+  // Cronómetro — tick cada segundo solo si jornada activa y no pausada (re-render forzado)
   useEffect(()=>{
-    const sId=srvActivo?.id;
-    if(!sId||jornadaFin)return;
-    const inicio=parseInt(localStorage.getItem(`fm_jornada_inicio_${sId}`)||"0");
-    if(!inicio)return;
-    const calcPausas=()=>{
-      let ms=0;
-      for(const p of pausasArr){
-        if(p.inicio&&p.fin)ms+=(p.fin-p.inicio);
-        else if(p.inicio&&!p.fin)ms+=(Date.now()-p.inicio);
+    if(!jornadaId||pausado||jornadaFin)return;
+    const t=setInterval(()=>setTickCount(c=>c+1),1000);
+    return()=>clearInterval(t);
+  },[jornadaId,pausado,jornadaFin]);
+  // Cálculo de segundos reales en cada render basado en timestamps ISO (no contadores)
+  const calcularSegundosReales=()=>{
+    if(!jornadaInicioISO)return 0;
+    const iniMs=new Date(jornadaInicioISO).getTime();
+    if(!iniMs||isNaN(iniMs))return 0;
+    const ahora=Date.now();
+    let ms=ahora-iniMs;
+    pausasArr.forEach(p=>{
+      if(p.inicio&&p.fin){
+        const pi=new Date(p.inicio).getTime();
+        const pf=new Date(p.fin).getTime();
+        if(!isNaN(pi)&&!isNaN(pf))ms-=Math.max(0,pf-pi);
       }
-      return ms;
-    };
-    const calc=()=>Math.max(0,Math.floor((Date.now()-inicio-calcPausas())/1000));
-    setTiempoJornada(calc());
-    const iv=setInterval(()=>setTiempoJornada(calc()),1000);
-    return()=>clearInterval(iv);
-  },[srvActivo?.id,jornadaFin,pausado,pausasArr]);
+    });
+    if(pausado&&pausaActualISO){
+      const pa=new Date(pausaActualISO).getTime();
+      if(!isNaN(pa))ms-=Math.max(0,ahora-pa);
+    }
+    return Math.max(0,Math.floor(ms/1000));
+  };
+  const tiempoJornada=jornadaFin?jornadaDurMin*60:calcularSegundosReales();
 
   const fmtEl=s=>{const h=Math.floor(s/3600);const m=Math.floor((s%3600)/60);const ss=s%60;return `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(ss).padStart(2,"0")}`;};
   const fmtHM=mins=>{const h=Math.floor(mins/60);const m=Math.round(mins%60);return `${h}h ${m}min`;};
 
   const iniciarJornada=async()=>{
     if(saving2||!srvActivo)return;setSaving2(true);
-    const ahora=new Date();
-    const tsInicio=ahora.getTime();
+    const ahoraISO=new Date().toISOString();
     try{
-      const [j]=await sbPost("jornadas_jardineria",{servicio_id:srvActivo.id,fecha:hoyStr,hora_inicio:ahora.toISOString(),pausas:[]},tok);
-      setJornadaId(j.id);setJornadaFin(false);setPausasArr([]);setPausado(false);
-      localStorage.setItem(`fm_jornada_inicio_${srvActivo.id}`,tsInicio.toString());
-      localStorage.setItem(`fm_jornada_id_${srvActivo.id}`,String(j.id));
+      const [j]=await sbPost("jornadas_jardineria",{servicio_id:srvActivo.id,fecha:hoyStr,hora_inicio:ahoraISO,pausas:[]},tok);
+      setJornadaId(j.id);setJornadaFin(false);
+      setJornadaInicioISO(ahoraISO);
+      setPausasArr([]);setPausado(false);setPausaActualISO(null);
       setShowNuevaJornada(false);
-    }catch(_){}
+    }catch(e){console.error("Error iniciando jornada:",e);}
     setSaving2(false);
   };
 
   const togglePausa=async()=>{
     if(!jornadaId||saving2)return;setSaving2(true);
-    const newPausas=[...pausasArr];
-    if(!pausado){
-      newPausas.push({inicio:Date.now(),fin:null});
-      localStorage.setItem(`fm_jornada_pausado_${srvActivo.id}`,Date.now().toString());
+    const ahoraISO=new Date().toISOString();
+    if(pausado){
+      // Reanudar: cerrar pausa actual y moverla a completadas
+      const nuevasPausas=[...pausasArr,{inicio:pausaActualISO,fin:ahoraISO}];
+      setPausasArr(nuevasPausas);setPausado(false);setPausaActualISO(null);
+      try{
+        await sbPatch("jornadas_jardineria",`id=eq.${jornadaId}`,{pausas:nuevasPausas,pausa_actual_iso:null},tok);
+      }catch(_){
+        try{await sbPatch("jornadas_jardineria",`id=eq.${jornadaId}`,{pausas:nuevasPausas},tok);}catch(e){console.error("Error reanudando:",e);}
+      }
     }else{
-      const last=newPausas[newPausas.length-1];
-      if(last)last.fin=Date.now();
-      localStorage.removeItem(`fm_jornada_pausado_${srvActivo.id}`);
+      // Pausar: marcar pausa actual; encode también en array con fin=null (backward compat)
+      setPausado(true);setPausaActualISO(ahoraISO);
+      const arrConPausaAbierta=[...pausasArr,{inicio:ahoraISO,fin:null}];
+      try{
+        await sbPatch("jornadas_jardineria",`id=eq.${jornadaId}`,{pausa_actual_iso:ahoraISO,pausas:arrConPausaAbierta},tok);
+      }catch(_){
+        try{await sbPatch("jornadas_jardineria",`id=eq.${jornadaId}`,{pausas:arrConPausaAbierta},tok);}catch(e){console.error("Error pausando:",e);}
+      }
     }
-    try{
-      await sbPatch("jornadas_jardineria",`id=eq.${jornadaId}`,{pausas:newPausas},tok);
-      setPausasArr(newPausas);setPausado(!pausado);
-    }catch(_){}
     setSaving2(false);
   };
 
   const terminarJornada=async()=>{
     if(!jornadaId||!srvActivo||saving2)return;setSaving2(true);
-    const ahora=new Date();
-    const newPausas=[...pausasArr];
-    const last=newPausas[newPausas.length-1];
-    if(last&&!last.fin)last.fin=Date.now();
-    const durMin=Math.max(0,Math.round(tiempoJornada/60));
+    const ahoraISO=new Date().toISOString();
+    const segundosFinales=calcularSegundosReales();
+    const durMin=Math.max(0,Math.round(segundosFinales/60));
+    const horasFinales=+(segundosFinales/3600).toFixed(2);
+    // Si estaba pausado, cerrar la pausa actual al terminar
+    let finalPausas=pausasArr;
+    if(pausado&&pausaActualISO)finalPausas=[...pausasArr,{inicio:pausaActualISO,fin:ahoraISO}];
     try{
-      await sbPatch("jornadas_jardineria",`id=eq.${jornadaId}`,{hora_fin:ahora.toISOString(),duracion_minutos:durMin,pausas:newPausas},tok);
-      const horasJornada=Math.round(durMin/60*100)/100;
+      try{
+        await sbPatch("jornadas_jardineria",`id=eq.${jornadaId}`,{hora_fin:ahoraISO,duracion_minutos:durMin,pausas:finalPausas,pausa_actual_iso:null},tok);
+      }catch(_){
+        await sbPatch("jornadas_jardineria",`id=eq.${jornadaId}`,{hora_fin:ahoraISO,duracion_minutos:durMin,pausas:finalPausas},tok);
+      }
       const prevHoras=parseFloat(srvActivo.horas_totales)||0;
-      await sbPatch("jardin_servicios",`id=eq.${srvActivo.id}`,{horas_totales:prevHoras+horasJornada},tok).catch(()=>{});
-      // Cleanup localStorage
-      localStorage.removeItem(`fm_jornada_inicio_${srvActivo.id}`);
-      localStorage.removeItem(`fm_jornada_id_${srvActivo.id}`);
-      localStorage.removeItem(`fm_jornada_pausado_${srvActivo.id}`);
+      await sbPatch("jardin_servicios",`id=eq.${srvActivo.id}`,{horas_totales:prevHoras+horasFinales},tok).catch(()=>{});
+      // Cleanup localStorage residual (por si hay claves de versión anterior)
+      try{
+        localStorage.removeItem(`fm_jornada_inicio_${srvActivo.id}`);
+        localStorage.removeItem(`fm_jornada_id_${srvActivo.id}`);
+        localStorage.removeItem(`fm_jornada_pausado_${srvActivo.id}`);
+      }catch(_){}
       setJornadaFin(true);setJornadaDurMin(durMin);setShowFinJornada(false);
+      setJornadaInicioISO(null);setPausado(false);setPausaActualISO(null);setPausasArr([]);
       await loadSrvActivo();
-    }catch(_){}setSaving2(false);
+    }catch(e){console.error("Error terminando jornada:",e);}
+    setSaving2(false);
   };
 
   const toggleTarea=async(id,cur)=>{
