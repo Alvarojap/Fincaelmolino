@@ -740,6 +740,7 @@ export default function App() {
   const PAGES={
     dashboard:   <Dashboard   {...P}/>,
     jcheck:      <JardinCheck {...P}/>,
+    lcheck:      <LimpiezaCheck {...P}/>,
     jadmin:      <JardinAdmin {...P}/>,
     incidencias: <Incidencias {...P}/>,
     limpieza:    <Limpieza    {...P}/>,
@@ -3595,105 +3596,208 @@ function JardinCheck({perfil,tok,rol}){
     </div>;
   })():null;
 
-  return <>
-    <div style={{padding:"28px 32px 16px"}}><div style={{fontSize:12,color:T.ink3,fontWeight:500}}>{TEMPORADA_LBL[temp]} · {comp}/{tot} tareas</div><div style={{fontSize:28,fontWeight:700,color:T.ink,letterSpacing:-.8,lineHeight:1.02,marginTop:2}}>{isA?"Checklist jardín":"Mi checklist"}</div></div>
-    <div className="pb">
-      <div className="prog" style={{marginBottom:14,height:7}}><div className="pfill" style={{width:`${tot?(comp/tot)*100:0}%`}}/></div>
-      {bannerVerifJsx}
-      {todoHecho&&!showFinal&&!isA&&(
-        <div style={{marginBottom:16}}>
-          <button className="btn bp" style={{width:"100%",justifyContent:"center",fontSize:15,padding:"12px"}} onClick={()=>{setFinalCheck({});setFinalMode(null);setFinalNota("");setShowFinal(true);}}>✅ Abrir control final del jardín</button>
-        </div>
-      )}
-      {actv.length>0&&(
-        <div className="card" style={{marginBottom:14}}>
-          <div className="chdr"><span className="ctit">📋 Esta semana</span><span className="badge" style={{background:"rgba(16,185,129,.1)",color:"#A6BE59"}}>{comp}/{actv.length}</span></div>
-          {actv.map(t=>{
-            const e=sj[t.id]||{};
-            return <div key={t.id} className={`cli${e.done?" done":""}`}>
-              <div className={`chk${e.done?" on":""}`} onClick={()=>toggle(t.id)} style={{cursor:"pointer"}}/>
-              <div style={{flex:1,minWidth:0}}>
-                <span className="tz">{t.zona}</span>
-                <div className={`tl${e.done?" done":""}`}>{t.txt}</div>
-                <div className="tm" style={{color:"#6366f1"}}>🔁 {FREC_LBL[fr[t.id]||t.frec]}</div>
-                {e.done&&<div className="tm">✓ {e.completado_por} · {fmtDT(e.completado_ts)}</div>}
-                {e.nota&&<div className="nbox">📝 {e.nota}</div>}
-                {e.foto_url&&<img src={e.foto_url} alt="" className="pthumb"/>}
-                {e.resp_admin&&<div className="rbox">✅ Admin: {e.resp_admin}</div>}
-              </div>
-              <span className="ibtn" onClick={()=>openNota(t.id,false)}>{e.nota||e.foto_url?"✏️":"➕"}</span>
-            </div>;
-          })}
-        </div>
-      )}
-      {jpunt.length>0&&(
-        <div className="card" style={{marginBottom:14}}>
-          <div className="chdr"><span className="ctit">⭐ Puntuales</span></div>
-          {jpunt.map(t=>(
-            <div key={t.id} className={`cli${t.done?" done":""}`}>
-              <div className={`chk${t.done?" on":""}`} onClick={()=>toggle(t.id,true)} style={{cursor:"pointer"}}/>
-              <div style={{flex:1,minWidth:0}}>
-                <span className="tz">{t.zona||"General"}</span>
-                <div className={`tl${t.done?" done":""}`}>{t.txt}</div>
-                <div className="tm" style={{color:"#D4A017"}}>📌 Puntual · {t.creado_por}</div>
-                {t.done&&<div className="tm">✓ {t.completado_por} · {fmtDT(t.completado_ts)}</div>}
-                {t.nota&&<div className="nbox">📝 {t.nota}</div>}
-                {t.foto_url&&<img src={t.foto_url} alt="" className="pthumb"/>}
-                {t.resp_admin&&<div className="rbox">✅ Admin: {t.resp_admin}</div>}
-              </div>
-              <span className="ibtn" onClick={()=>openNota(t.id,true)}>{t.nota||t.foto_url?"✏️":"➕"}</span>
+  // Aliases para el rediseño: template espera srvActivo/srvTareas/toggleTarea/toggleTareaSemanal/toggleTareaPuntual/finalizarServicio
+  const srvActivo=misSrvs[0]||null;
+  const srvTareas=(srvActivo?.jardin_servicio_tareas||[]);
+  const toggleTarea=(t)=>toggleSrvTarea(t.id,t.done);
+  const toggleTareaSemanal=(t)=>toggle(t.id,false);
+  const toggleTareaPuntual=(t)=>toggle(t.id,true);
+  const finalizarServicio=async()=>{
+    if(!srvActivo||saving)return;setSaving(true);
+    try{
+      await sbPatch("jardin_servicios",`id=eq.${srvActivo.id}`,{estado:"completado"},tok);
+      await load_();
+    }catch(e){console.error("Error finalizando servicio jardín:",e);}
+    setSaving(false);
+  };
+
+  return (
+    <div style={{paddingBottom:100,background:T.bg,minHeight:'100%',fontFamily:T.sans}}>
+
+      {/* Header */}
+      <div style={{padding:'54px 20px 14px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+        <button onClick={()=>setPage&&setPage('dashboard')} style={{width:38,height:38,borderRadius:999,background:T.surface,border:'1px solid '+T.line,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}>
+          <FmIcon name="chevL" size={16} stroke={T.ink}/>
+        </button>
+        <div style={{fontSize:11,color:T.ink3,letterSpacing:1,textTransform:'uppercase',fontWeight:600}}>Jardín</div>
+        <div style={{width:38}}/>
+      </div>
+
+      {/* Banner de verificación semanal (conservado: crítico para cerrar la semana) */}
+      {bannerVerifJsx&&<div style={{padding:'0 20px 14px'}}>{bannerVerifJsx}</div>}
+
+      {/* Si hay servicio activo: progreso + tareas */}
+      {srvActivo?(
+        <>
+          <div style={{padding:'0 20px 14px'}}>
+            <div style={{fontSize:26,fontWeight:800,color:T.ink,letterSpacing:-0.9,lineHeight:1.1}}>
+              {srvActivo.nombre||srvActivo.titulo}
             </div>
-          ))}
-        </div>
-      )}
-      {misSrvs.length>0&&misSrvs.map(s=>{const tareas=s.jardin_servicio_tareas||[];const hechas=tareas.filter(t=>t.done).length;
-        const fi=new Date(s.fecha_inicio+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"});
-        const ff=new Date(s.fecha_fin+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"});
-        const abierto=srvOpen[s.id];
-        return <div key={s.id} className="card" style={{marginBottom:14,border:"1px solid rgba(201,168,76,.2)"}}>
-          <div className="chdr" onClick={()=>setSrvOpen(prev=>({...prev,[s.id]:!prev[s.id]}))} style={{cursor:"pointer"}}>
-            <span className="ctit">{abierto?"▼":"▶"} 🌿 {s.nombre}</span>
-            <span className="badge" style={{background:"rgba(201,168,76,.1)",color:"#EC683E"}}>{hechas}/{tareas.length}</span>
+            {(srvActivo.reserva_nombre||srvActivo.fecha_inicio)&&(
+              <div style={{fontSize:13,color:T.ink3,marginTop:4,display:'flex',alignItems:'center',gap:6}}>
+                <FmIcon name="calendar" size={13} stroke={T.olive}/>
+                {srvActivo.reserva_nombre||`${new Date(srvActivo.fecha_inicio+'T12:00:00').toLocaleDateString('es-ES',{day:'numeric',month:'short'})}${srvActivo.fecha_fin?` – ${new Date(srvActivo.fecha_fin+'T12:00:00').toLocaleDateString('es-ES',{day:'numeric',month:'short'})}`:''}`}
+              </div>
+            )}
           </div>
-          <div style={{padding:"2px 0",fontSize:12,color:"#8A8580"}}>📅 {fi} – {ff}</div>
-          {abierto&&<>
-            {s.notas&&<div className="nbox" style={{margin:"6px 0"}}>📝 {s.notas}</div>}
-            <div className="prog" style={{margin:"8px 0",height:5}}><div className="pfill" style={{width:`${tareas.length?(hechas/tareas.length)*100:0}%`,background:"#EC683E"}}/></div>
-            {tareas.map(t=><div key={t.id} className={`cli${t.done?" done":""}`}>
-              <div className={`chk${t.done?" on":""}`} onClick={()=>toggleSrvTarea(t.id,t.done)} style={{cursor:"pointer"}}/>
-              <div style={{flex:1,minWidth:0}}>
-                <div className={`tl${t.done?" done":""}`}>{t.txt}</div>
-                {t.done&&<div className="tm">✓ {t.completado_por} · {fmtDT(t.completado_ts)}</div>}
-                {t.nota&&<div className="nbox">📝 {t.nota}</div>}
-                {t.foto_url&&<img src={t.foto_url} alt="" className="pthumb"/>}
+
+          {/* Card progreso donut */}
+          {(()=>{
+            const total=srvTareas.length||0;
+            const done=srvTareas.filter(t=>t.done).length||0;
+            const pct=Math.round((done/Math.max(total,1))*100);
+            return(
+              <div style={{padding:'0 20px 14px'}}>
+                <div style={{background:T.surface,borderRadius:20,padding:16,border:'1px solid '+T.line,display:'flex',alignItems:'center',gap:16}}>
+                  <div style={{width:76,height:76,borderRadius:999,background:`conic-gradient(${T.olive} ${pct*3.6}deg,${T.line} 0)`,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                    <div style={{width:60,height:60,borderRadius:999,background:T.surface,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center'}}>
+                      <div style={{fontSize:16,fontWeight:800,color:T.ink,letterSpacing:-0.4,lineHeight:1}}>{pct}%</div>
+                      <div style={{fontSize:9,color:T.ink3,fontWeight:600}}>hecho</div>
+                    </div>
+                  </div>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:11,color:T.ink3,letterSpacing:0.8,textTransform:'uppercase',fontWeight:700,marginBottom:4}}>Tareas completadas</div>
+                    <div style={{fontSize:24,fontWeight:800,color:T.ink,letterSpacing:-0.8,lineHeight:1}}>
+                      {done}<span style={{fontSize:14,color:T.ink3,fontWeight:600}}>/{total}</span>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <span className="ibtn" onClick={()=>openSrvNota(t)}>{t.nota||t.foto_url?"✏️":"➕"}</span>
-            </div>)}
-            {hechas===tareas.length&&tareas.length>0&&<div style={{textAlign:"center",padding:"10px 0",fontSize:13,color:"#A6BE59",fontWeight:600}}>✅ ¡Servicio completado!</div>}
-          </>}
-        </div>;
-      })}
-      {tot===0&&misSrvs.length===0&&<div className="empty"><span className="ico">✅</span><p>Sin tareas esta semana</p></div>}
-      {inac.length>0&&(
-        <div className="card" style={{opacity:.4}}>
-          <div className="chdr"><span className="ctit" style={{color:"#8A8580"}}>⏭ No toca esta semana</span></div>
-          {inac.map(t=>(
-            <div key={t.id} style={{display:"flex",alignItems:"center",gap:10,padding:"7px 0",borderBottom:"1px solid rgba(255,255,255,.04)"}}>
-              <span style={{fontSize:13}}>⏸</span>
-              <div><div style={{fontSize:12,color:"#8A8580"}}>{t.txt}</div><div style={{fontSize:10,color:"#BFBAB4"}}>🔁 {FREC_LBL[fr[t.id]||t.frec]}</div></div>
+            );
+          })()}
+
+          {/* Lista tareas del servicio */}
+          {srvTareas.length>0&&(
+            <div style={{padding:'0 20px 14px'}}>
+              <div style={{fontSize:11,color:T.ink3,letterSpacing:1,textTransform:'uppercase',fontWeight:700,marginBottom:8}}>Tareas del servicio</div>
+              <div style={{background:T.surface,borderRadius:18,border:'1px solid '+T.line,overflow:'hidden'}}>
+                {srvTareas.map((t,i,arr)=>{
+                  const done=!!t.done;
+                  return(
+                    <div key={t.id||i} style={{display:'flex',alignItems:'center',gap:12,padding:'14px 16px',borderBottom:i<arr.length-1?'1px solid '+T.line:'none'}}>
+                      <div onClick={()=>toggleTarea(t)} style={{width:22,height:22,borderRadius:7,background:done?T.olive:'transparent',border:'1.5px solid '+(done?T.olive:T.line),display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,cursor:'pointer'}}>
+                        {done&&<FmIcon name="check" size={12} stroke="white" sw={3}/>}
+                      </div>
+                      <span onClick={()=>toggleTarea(t)} style={{flex:1,fontSize:14,color:done?T.ink3:T.ink,textDecoration:done?'line-through':'none',fontWeight:done?500:600,cursor:'pointer'}}>
+                        {t.txt||t.descripcion||t.nombre||t.tarea}
+                      </span>
+                      <span onClick={()=>openSrvNota(t)} style={{fontSize:14,cursor:'pointer',color:T.ink3,padding:4}}>{t.nota||t.foto_url?'✏️':'➕'}</span>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-          ))}
+          )}
+
+          {/* Botón finalizar servicio si todo hecho */}
+          {srvTareas.length>0&&srvTareas.every(t=>t.done)&&(
+            <div style={{padding:'0 20px 14px'}}>
+              <button onClick={finalizarServicio} disabled={saving} style={{width:'100%',padding:'16px 0',borderRadius:999,background:T.ink,color:'white',border:0,fontFamily:T.sans,fontWeight:700,fontSize:15,cursor:saving?'default':'pointer',opacity:saving?0.6:1,display:'flex',alignItems:'center',justifyContent:'center',gap:8}}>
+                <FmIcon name="check" size={16} stroke="white" sw={3}/>
+                {saving?'Guardando…':'Finalizar servicio'}
+              </button>
+            </div>
+          )}
+        </>
+      ):(
+        // Sin servicio activo: solo mostramos empty si tampoco hay tareas semanales
+        (actv.length===0&&jpunt.length===0)&&(
+          <div style={{padding:'40px 20px',textAlign:'center'}}>
+            <div style={{fontSize:48,marginBottom:12}}>🌿</div>
+            <div style={{fontSize:20,fontWeight:800,color:T.ink,letterSpacing:-0.5}}>Sin tareas esta semana</div>
+            <div style={{fontSize:13,color:T.ink3,marginTop:6}}>Cuando haya trabajo asignado aparecerá aquí</div>
+          </div>
+        )
+      )}
+
+      {/* Control final del jardín (conservado: es la verificación semanal, flow crítico) */}
+      {todoHecho&&!showFinal&&!isA&&!yaVerif&&(
+        <div style={{padding:'0 20px 14px'}}>
+          <button onClick={()=>{setFinalCheck({});setFinalMode(null);setFinalNota('');setShowFinal(true);}} style={{width:'100%',padding:'16px 0',borderRadius:999,background:T.olive,color:T.ink,border:0,fontFamily:T.sans,fontWeight:700,fontSize:15,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:8}}>
+            <FmIcon name="check" size={16} stroke={T.ink} sw={3}/>
+            Abrir control final del jardín
+          </button>
         </div>
       )}
+
+      {/* Sección "Esta semana" — tareas semanales + puntuales */}
+      {((actv||[]).length>0||(jpunt||[]).length>0)&&(
+        <div style={{padding:'0 20px 14px'}}>
+          <div style={{fontSize:11,color:T.ink3,letterSpacing:1,textTransform:'uppercase',fontWeight:700,marginBottom:8,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+            <span>Esta semana · {TEMPORADA_LBL[temp]}</span>
+            <span style={{color:T.olive,fontWeight:700}}>{comp}/{tot}</span>
+          </div>
+          <div style={{background:T.surface,borderRadius:18,border:'1px solid '+T.line,overflow:'hidden'}}>
+            {[...(actv||[]).map(t=>({...t,__kind:'semanal'})),...(jpunt||[]).map(t=>({...t,__kind:'puntual'}))].map((t,i,arr)=>{
+              const done=t.__kind==='semanal'?(sj?.[t.id]?.done||false):(t.done||false);
+              const entry=t.__kind==='semanal'?(sj[t.id]||{}):t;
+              return(
+                <div key={(t.__kind||'')+(t.id||i)} style={{display:'flex',alignItems:'center',gap:12,padding:'13px 16px',borderBottom:i<arr.length-1?'1px solid '+T.line:'none'}}>
+                  <div onClick={(e)=>{e.stopPropagation();t.__kind==='semanal'?toggleTareaSemanal(t):toggleTareaPuntual(t);}} style={{width:22,height:22,borderRadius:7,background:done?T.olive:'transparent',border:'1.5px solid '+(done?T.olive:T.line),display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,cursor:'pointer'}}>
+                    {done&&<FmIcon name="check" size={12} stroke="white" sw={3}/>}
+                  </div>
+                  <div onClick={(e)=>{e.stopPropagation();t.__kind==='semanal'?toggleTareaSemanal(t):toggleTareaPuntual(t);}} style={{flex:1,minWidth:0,cursor:'pointer'}}>
+                    <div style={{fontSize:13,fontWeight:done?500:600,color:done?T.ink3:T.ink,textDecoration:done?'line-through':'none'}}>{t.txt}</div>
+                    <div style={{fontSize:10,color:T.ink3,marginTop:2,display:'flex',alignItems:'center',gap:5,flexWrap:'wrap'}}>
+                      {t.zona&&<span>{t.zona}</span>}
+                      <span style={{padding:'1px 6px',borderRadius:999,background:t.__kind==='puntual'?T.terracotta+'22':T.olive+'22',color:t.__kind==='puntual'?T.terracotta:'#5A8A3E',fontWeight:600}}>
+                        {t.__kind==='puntual'?'Puntual':(FREC_LBL[fr[t.id]||t.frec]||'Semanal')}
+                      </span>
+                    </div>
+                    {entry.nota&&<div style={{fontSize:11,color:T.ink3,marginTop:4,padding:'4px 8px',background:T.bg,borderRadius:6}}>📝 {entry.nota}</div>}
+                  </div>
+                  <span onClick={()=>openNota(t.id,t.__kind==='puntual')} style={{fontSize:14,cursor:'pointer',color:T.ink3,padding:4}}>{entry.nota||entry.foto_url?'✏️':'➕'}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Servicios custom adicionales (si hay más de uno) */}
+      {misSrvs.length>1&&misSrvs.slice(1).map(s=>{
+        const tareas=s.jardin_servicio_tareas||[];const hechas=tareas.filter(t=>t.done).length;
+        const abierto=srvOpen[s.id];
+        return(
+          <div key={s.id} style={{padding:'0 20px 14px'}}>
+            <div style={{background:T.surface,borderRadius:18,border:'1px solid '+T.line,overflow:'hidden'}}>
+              <div onClick={()=>setSrvOpen(prev=>({...prev,[s.id]:!prev[s.id]}))} style={{padding:'14px 16px',cursor:'pointer',display:'flex',alignItems:'center',gap:12}}>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:14,fontWeight:700,color:T.ink,letterSpacing:-0.2}}>🌿 {s.nombre}</div>
+                  <div style={{fontSize:11,color:T.ink3,marginTop:2}}>{hechas}/{tareas.length} tareas</div>
+                </div>
+                <FmIcon name={abierto?'chevD':'chevR'} size={15} stroke={T.ink3}/>
+              </div>
+              {abierto&&tareas.length>0&&(
+                <div style={{borderTop:'1px solid '+T.line,background:T.bg}}>
+                  {tareas.map((t,j)=>{
+                    const done=!!t.done;
+                    return(
+                      <div key={t.id} onClick={()=>toggleSrvTarea(t.id,t.done)} style={{display:'flex',alignItems:'center',gap:12,padding:'11px 16px',borderBottom:j<tareas.length-1?'1px solid '+T.line:'none',cursor:'pointer'}}>
+                        <div style={{width:20,height:20,borderRadius:6,background:done?T.olive:'transparent',border:'1.5px solid '+(done?T.olive:T.line),display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                          {done&&<FmIcon name="check" size={11} stroke="white" sw={3}/>}
+                        </div>
+                        <span style={{flex:1,fontSize:13,color:done?T.ink3:T.ink,textDecoration:done?'line-through':'none',fontWeight:done?500:600}}>{t.txt}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })}
+
+      {/* Historial de semanas anteriores (conservado) */}
       {historial.length>0&&(
-        <div style={{marginTop:24}}>
-          <div style={{fontSize:11,color:"#8A8580",textTransform:"uppercase",letterSpacing:1.5,marginBottom:10}}>📁 Semanas anteriores</div>
+        <div style={{padding:'0 20px 14px'}}>
+          <div style={{fontSize:11,color:T.ink3,letterSpacing:1,textTransform:'uppercase',fontWeight:700,marginBottom:8}}>Semanas anteriores</div>
           {historial.map(h=><SemanaArchivada key={h.id} semana={h.semana} estado={h.done} nota={h.nota}/>)}
         </div>
       )}
-    </div>
 
-    {showFinal&&!isA&&(
+      {/* Modal control final (conservado) */}
+      {showFinal&&!isA&&(
       <div className="ov" style={{alignItems:"flex-end",padding:0}}>
         <div style={{background:"#FFFFFF",border:"1px solid rgba(201,168,76,.25)",borderRadius:"20px 20px 0 0",padding:"24px 20px 36px",width:"100%",maxWidth:540,maxHeight:"92vh",overflowY:"auto"}}>
           <div style={{textAlign:"center",marginBottom:20}}>
@@ -3735,7 +3839,9 @@ function JardinCheck({perfil,tok,rol}){
     )}
     {modal&&<NotaModal nota={nota} setNota={setNota} foto={foto} setFoto={setFoto} onSave={saveNota} onClose={()=>setModal(null)} tok={tok}/>}
     {srvModal&&<NotaModal nota={srvNota} setNota={setSrvNota} foto={srvFoto} setFoto={setSrvFoto} onSave={saveSrvNota} onClose={()=>setSrvModal(null)} tok={tok}/>}
-  </>;
+
+    </div>
+  );
 }
 
 // ─── JARDÍN ADMIN ────────────────────────────────────────────────────────────
@@ -4819,6 +4925,285 @@ const LIMP_CF = [
   {id:"cf11",txt:"Sin objetos olvidados por huéspedes"},
   {id:"cf12",txt:"Alarma lista para activar"},
 ];
+
+// ─── LIMPIEZA CHECK (pantalla propia de la limpiadora, separada de Limpieza admin) ───
+function LimpiezaCheck({perfil,tok,setPage}){
+  const [srvActivoL,setSrvActivoL]=useState(null);
+  const [tareasServ,setTareasServ]=useState([]);
+  const [zonaExpandida,setZonaExpandida]=useState(null);
+  const [showIncidencia,setShowIncidencia]=useState(false);
+  const [incidenciaForm,setIncidenciaForm]=useState({zona:"",descripcion:"",foto:null,severidad:"media"});
+  const [loading,setLoading]=useState(true);
+  const [saving,setSaving]=useState(false);
+
+  const targetId=perfil?.es_operario?perfil.referencia_id:perfil?.id;
+
+  useEffect(()=>{
+    (async()=>{
+      try{
+        // Servicios reales de limpieza: tabla 'servicios', estados activos según uso del admin existente
+        const r=await sbGet("servicios",`?limpiadora_id=eq.${targetId}&estado=in.(programado,en_curso,activo,pendiente)&select=*&order=fecha.asc&limit=1`,tok).catch(()=>[]);
+        if(r&&r.length>0){
+          const srv=r[0];setSrvActivoL(srv);
+          const t=await sbGet("servicio_tareas",`?servicio_id=eq.${srv.id}&select=*&order=zona.asc,id.asc`,tok).catch(()=>[]);
+          setTareasServ(t||[]);
+        }
+      }catch(e){console.error("Error cargando servicio limpieza:",e);}
+      setLoading(false);
+    })();
+  },[targetId,tok]);
+
+  // Agrupar tareas por zona (schema real: servicio_tareas.zona es string)
+  const zonasAgrupadas=(()=>{
+    const grupos={};
+    tareasServ.forEach(t=>{const zona=t.zona||"General";if(!grupos[zona])grupos[zona]=[];grupos[zona].push(t);});
+    return Object.entries(grupos).map(([nombre,tareas])=>({
+      nombre,tareas,
+      todasHechas:tareas.length>0&&tareas.every(t=>t.done),
+      hechas:tareas.filter(t=>t.done).length,
+    }));
+  })();
+  const totalTareas=tareasServ.length;
+  const tareasHechas=tareasServ.filter(t=>t.done).length;
+  const pct=Math.round((tareasHechas/Math.max(totalTareas,1))*100);
+
+  const toggleTarea=async(tarea)=>{
+    if(saving)return;setSaving(true);
+    const newDone=!tarea.done;
+    try{
+      await sbPatch("servicio_tareas",`id=eq.${tarea.id}`,{
+        done:newDone,
+        completado_por:newDone?perfil.nombre:null,
+        completado_ts:newDone?new Date().toISOString():null,
+      },tok);
+      setTareasServ(arr=>arr.map(t=>t.id===tarea.id?{...t,done:newDone,completado_por:newDone?perfil.nombre:null,completado_ts:newDone?new Date().toISOString():null}:t));
+    }catch(e){console.error("Error toggle tarea:",e);}
+    setSaving(false);
+  };
+
+  const finalizarServicio=async()=>{
+    if(!srvActivoL||saving)return;setSaving(true);
+    try{
+      await sbPatch("servicios",`id=eq.${srvActivoL.id}`,{
+        estado:"finalizado",
+        hora_fin:new Date().toTimeString().slice(0,5),
+      },tok);
+      // Notificar admins
+      try{
+        const adms=await sbGet("usuarios","?rol=eq.admin&select=id",tok).catch(()=>[]);
+        for(const a of adms)await sbPost("notificaciones",{para:a.id,txt:`✅ ${perfil.nombre} ha finalizado el servicio "${srvActivoL.nombre||"Limpieza"}"`},tok).catch(()=>{});
+      }catch(_){}
+      setSrvActivoL(null);setTareasServ([]);
+      setPage&&setPage("dashboard");
+    }catch(e){console.error("Error finalizando:",e);alert("No se pudo finalizar el servicio");}
+    setSaving(false);
+  };
+
+  // Incidencia → se persiste como servicio_tarea extra con nota. Así aparece en el módulo Incidencias
+  // del admin (que agrega servicio_tareas con nota IS NOT NULL).
+  const guardarIncidencia=async()=>{
+    if(!srvActivoL||!incidenciaForm.descripcion.trim()||saving)return;setSaving(true);
+    try{
+      const prefix={alta:"🔴 URGENTE",media:"🟡",baja:"🔵"}[incidenciaForm.severidad]||"";
+      const notaTxt=`${prefix} ${incidenciaForm.descripcion.trim()}`;
+      await sbPost("servicio_tareas",{
+        servicio_id:srvActivoL.id,
+        tarea_id:`incidencia_${Date.now()}`,
+        zona:incidenciaForm.zona||"General",
+        txt:`Incidencia reportada por ${perfil.nombre}`,
+        es_extra:true,
+        done:true,
+        completado_por:perfil.nombre,
+        completado_ts:new Date().toISOString(),
+        nota:notaTxt,
+        foto_url:null,
+      },tok);
+      // Notificar admins
+      try{
+        const adms=await sbGet("usuarios","?rol=eq.admin&select=id",tok).catch(()=>[]);
+        const msg=`⚠️ Incidencia en "${srvActivoL.nombre||"Limpieza"}" (${incidenciaForm.zona||"General"}): ${notaTxt}`;
+        for(const a of adms)await sbPost("notificaciones",{para:a.id,txt:msg},tok).catch(()=>{});
+      }catch(_){}
+      setShowIncidencia(false);
+      setIncidenciaForm({zona:"",descripcion:"",foto:null,severidad:"media"});
+    }catch(e){console.error("Error creando incidencia:",e);}
+    setSaving(false);
+  };
+
+  if(loading){
+    return <div style={{padding:"80px 20px",textAlign:"center",color:T.ink3,fontFamily:T.sans}}>Cargando…</div>;
+  }
+
+  return (
+    <div style={{paddingBottom:100,background:T.bg,minHeight:'100%',fontFamily:T.sans}}>
+
+      {/* Header */}
+      <div style={{padding:'54px 20px 14px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+        <button onClick={()=>setPage&&setPage('dashboard')} style={{width:38,height:38,borderRadius:999,background:T.surface,border:'1px solid '+T.line,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}>
+          <FmIcon name="chevL" size={16} stroke={T.ink}/>
+        </button>
+        <div style={{fontSize:11,color:T.ink3,letterSpacing:1,textTransform:'uppercase',fontWeight:600}}>Limpieza</div>
+        <div style={{width:38}}/>
+      </div>
+
+      {!srvActivoL?(
+        <div style={{padding:'40px 20px',textAlign:'center'}}>
+          <div style={{fontSize:48,marginBottom:12}}>✨</div>
+          <div style={{fontSize:20,fontWeight:800,color:T.ink,letterSpacing:-0.5}}>Sin servicio activo</div>
+          <div style={{fontSize:13,color:T.ink3,marginTop:6}}>Cuando tengas un servicio asignado aparecerá aquí</div>
+        </div>
+      ):(
+        <>
+          {/* Título */}
+          <div style={{padding:'0 20px 14px'}}>
+            <div style={{fontSize:26,fontWeight:800,color:T.ink,letterSpacing:-0.9,lineHeight:1.1}}>
+              {srvActivoL.nombre||srvActivoL.titulo||'Servicio de limpieza'}
+            </div>
+            {srvActivoL.fecha&&(
+              <div style={{fontSize:13,color:T.ink3,marginTop:4,display:'flex',alignItems:'center',gap:6}}>
+                <FmIcon name="calendar" size={13} stroke={T.terracotta}/>
+                {new Date(srvActivoL.fecha+'T12:00:00').toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'})}
+              </div>
+            )}
+          </div>
+
+          {/* Card progreso donut */}
+          <div style={{padding:'0 20px 14px'}}>
+            <div style={{background:T.surface,borderRadius:20,padding:16,border:'1px solid '+T.line,display:'flex',alignItems:'center',gap:16}}>
+              <div style={{width:76,height:76,borderRadius:999,background:`conic-gradient(${T.terracotta} ${pct*3.6}deg,${T.line} 0)`,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                <div style={{width:60,height:60,borderRadius:999,background:T.surface,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center'}}>
+                  <div style={{fontSize:16,fontWeight:800,color:T.ink,letterSpacing:-0.4,lineHeight:1}}>{pct}%</div>
+                  <div style={{fontSize:9,color:T.ink3,fontWeight:600}}>hecho</div>
+                </div>
+              </div>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:11,color:T.ink3,letterSpacing:0.8,textTransform:'uppercase',fontWeight:700,marginBottom:4}}>Tareas completadas</div>
+                <div style={{fontSize:24,fontWeight:800,color:T.ink,letterSpacing:-0.8,lineHeight:1}}>
+                  {tareasHechas}<span style={{fontSize:14,color:T.ink3,fontWeight:600}}>/{totalTareas}</span>
+                </div>
+                <div style={{fontSize:11,color:T.ink3,marginTop:4}}>{zonasAgrupadas.filter(z=>z.todasHechas).length}/{zonasAgrupadas.length} zonas</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Zonas acordeón */}
+          {zonasAgrupadas.length>0&&(
+            <div style={{padding:'0 20px 14px'}}>
+              <div style={{fontSize:11,color:T.ink3,letterSpacing:1,textTransform:'uppercase',fontWeight:700,marginBottom:8}}>Zonas a limpiar</div>
+              <div style={{display:'flex',flexDirection:'column',gap:8}}>
+                {zonasAgrupadas.map((z,i)=>{
+                  const expandida=zonaExpandida===z.nombre;
+                  return(
+                    <div key={z.nombre} style={{background:T.surface,borderRadius:16,border:'1px solid '+(z.todasHechas?T.olive+'44':T.line),overflow:'hidden'}}>
+                      <div onClick={()=>setZonaExpandida(expandida?null:z.nombre)} style={{padding:'14px 16px',cursor:'pointer',display:'flex',alignItems:'center',gap:12}}>
+                        <div style={{width:28,height:28,borderRadius:8,background:z.todasHechas?T.olive:T.line+'66',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,fontSize:10,fontWeight:800,color:z.todasHechas?'white':T.ink3}}>
+                          {z.todasHechas?<FmIcon name="check" size={13} stroke="white" sw={3}/>:String(i+1).padStart(2,'0')}
+                        </div>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{fontSize:14,fontWeight:700,color:T.ink,letterSpacing:-0.2}}>{z.nombre}</div>
+                          <div style={{fontSize:11,color:T.ink3,marginTop:2}}>{z.hechas}/{z.tareas.length} tareas</div>
+                        </div>
+                        <FmIcon name={expandida?'chevD':'chevR'} size={15} stroke={T.ink3}/>
+                      </div>
+                      {expandida&&(
+                        <div style={{borderTop:'1px solid '+T.line,background:T.bg}}>
+                          {z.tareas.map((t,j)=>{
+                            const done=!!t.done;
+                            return(
+                              <div key={t.id} onClick={()=>toggleTarea(t)} style={{display:'flex',alignItems:'center',gap:12,padding:'11px 16px 11px 52px',borderBottom:j<z.tareas.length-1?'1px solid '+T.line:'none',cursor:'pointer'}}>
+                                <div style={{width:20,height:20,borderRadius:6,background:done?T.olive:'transparent',border:'1.5px solid '+(done?T.olive:T.line),display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                                  {done&&<FmIcon name="check" size={11} stroke="white" sw={3}/>}
+                                </div>
+                                <span style={{flex:1,fontSize:13,color:done?T.ink3:T.ink,textDecoration:done?'line-through':'none',fontWeight:done?500:600}}>
+                                  {t.txt||(LIMP_T.find(x=>x.id===t.tarea_id)?.txt)||t.tarea_id||'Tarea'}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Botón incidencia */}
+          <div style={{padding:'0 20px 14px'}}>
+            <button onClick={()=>setShowIncidencia(true)} style={{width:'100%',padding:'14px 0',borderRadius:16,background:T.surface,border:'1px dashed '+T.terracotta+'88',color:T.terracotta,fontFamily:T.sans,fontWeight:700,fontSize:13,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:8}}>
+              <FmIcon name="camera" size={15} stroke={T.terracotta}/>
+              Reportar incidencia
+            </button>
+          </div>
+
+          {/* Finalizar servicio */}
+          {tareasHechas>=totalTareas&&totalTareas>0&&(
+            <div style={{padding:'0 20px 14px'}}>
+              <button onClick={finalizarServicio} disabled={saving} style={{width:'100%',padding:'16px 0',borderRadius:999,background:T.ink,color:'white',border:0,fontFamily:T.sans,fontWeight:700,fontSize:15,cursor:saving?'default':'pointer',opacity:saving?0.6:1,display:'flex',alignItems:'center',justifyContent:'center',gap:8}}>
+                <FmIcon name="check" size={16} stroke="white" sw={3}/>
+                {saving?'Guardando…':'Finalizar servicio'}
+              </button>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Sheet incidencia */}
+      {showIncidencia&&(
+        <div onClick={()=>setShowIncidencia(false)} style={{position:'fixed',inset:0,background:'rgba(20,15,10,0.6)',zIndex:999,display:'flex',alignItems:'flex-end',fontFamily:T.sans}}>
+          <div onClick={e=>e.stopPropagation()} style={{width:'100%',background:T.bg,borderTopLeftRadius:24,borderTopRightRadius:24,maxHeight:'92vh',overflow:'auto',paddingBottom:34}}>
+            <div style={{padding:'14px 0 0',display:'flex',justifyContent:'center'}}>
+              <div style={{width:44,height:4,borderRadius:999,background:T.line}}/>
+            </div>
+            <div style={{padding:'14px 20px 16px',display:'flex',justifyContent:'space-between',alignItems:'center',borderBottom:'1px solid '+T.line}}>
+              <div style={{fontSize:20,fontWeight:800,color:T.ink,letterSpacing:-0.6}}>Nueva incidencia</div>
+              <button onClick={()=>setShowIncidencia(false)} style={{width:32,height:32,borderRadius:999,background:T.surface,border:'1px solid '+T.line,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}>
+                <FmIcon name="x" size={14} stroke={T.ink}/>
+              </button>
+            </div>
+            <div style={{padding:'16px 20px',display:'flex',flexDirection:'column',gap:14}}>
+              <div>
+                <div style={{fontSize:10.5,color:T.ink3,fontWeight:700,letterSpacing:0.8,textTransform:'uppercase',marginBottom:8}}>Zona</div>
+                <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
+                  {zonasAgrupadas.map(z=>{
+                    const on=incidenciaForm.zona===z.nombre;
+                    return(
+                      <button key={z.nombre} onClick={()=>setIncidenciaForm(v=>({...v,zona:z.nombre}))} style={{padding:'7px 12px',borderRadius:999,border:'1px solid '+(on?T.ink:T.line),background:on?T.ink:T.surface,color:on?'white':T.ink2,fontFamily:T.sans,fontSize:12,fontWeight:700,cursor:'pointer'}}>
+                        {z.nombre}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              <div>
+                <div style={{fontSize:10.5,color:T.ink3,fontWeight:700,letterSpacing:0.8,textTransform:'uppercase',marginBottom:8}}>Descripción</div>
+                <textarea rows={4} value={incidenciaForm.descripcion} onChange={e=>setIncidenciaForm(v=>({...v,descripcion:e.target.value}))} placeholder="Describe qué has encontrado…" style={{width:'100%',padding:'12px 14px',boxSizing:'border-box',borderRadius:14,border:'1px solid '+T.line,background:T.surface,fontFamily:T.sans,fontSize:13,color:T.ink,fontWeight:500,resize:'none',outline:'none',lineHeight:1.5}}/>
+              </div>
+              <div>
+                <div style={{fontSize:10.5,color:T.ink3,fontWeight:700,letterSpacing:0.8,textTransform:'uppercase',marginBottom:8}}>Urgencia</div>
+                <div style={{display:'flex',gap:6}}>
+                  {[{k:'baja',l:'Baja',c:T.softBlue},{k:'media',l:'Media',c:T.gold},{k:'alta',l:'Alta',c:T.terracotta}].map(s=>{
+                    const on=incidenciaForm.severidad===s.k;
+                    return(
+                      <button key={s.k} onClick={()=>setIncidenciaForm(v=>({...v,severidad:s.k}))} style={{flex:1,padding:'10px 0',borderRadius:12,border:'1px solid '+(on?s.c:T.line),background:on?s.c:T.surface,color:on?T.ink:T.ink2,fontFamily:T.sans,fontSize:12,fontWeight:700,cursor:'pointer'}}>
+                        {s.l}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              <div style={{display:'flex',gap:8,paddingTop:4}}>
+                <button onClick={()=>setShowIncidencia(false)} style={{flex:1,padding:'14px 0',borderRadius:999,border:'1px solid '+T.line,background:T.surface,color:T.ink,fontFamily:T.sans,fontWeight:600,fontSize:14,cursor:'pointer'}}>Cancelar</button>
+                <button onClick={guardarIncidencia} disabled={saving||!incidenciaForm.descripcion.trim()} style={{flex:2,padding:'14px 0',borderRadius:999,border:0,background:T.ink,color:'white',fontFamily:T.sans,fontWeight:700,fontSize:14,cursor:(saving||!incidenciaForm.descripcion.trim())?'default':'pointer',opacity:(saving||!incidenciaForm.descripcion.trim())?0.5:1}}>{saving?'Guardando…':'Guardar incidencia'}</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function Limpieza({perfil,tok,rol,setPage}){
   const isA=rol==="admin";
