@@ -4355,6 +4355,8 @@ function JardinAdmin({perfil,tok,setPage}){
 // ─── INCIDENCIAS ─────────────────────────────────────────────────────────────
 function Incidencias({tok}){
   const [items,setItems]=useState([]);const [load,setLoad]=useState(true);
+  const [tabIncidencias,setTabIncidencias]=useState("todas");
+  const [selIncidencia,setSelIncidencia]=useState(null);
   useEffect(()=>{
     (async()=>{
       try{
@@ -4381,10 +4383,218 @@ function Incidencias({tok}){
     setItems(prev=>prev.map(x=>x.id===item.id?{...x,resp_admin:resp}:x));
   };
   if(load)return <div className="loading"><div className="spin"/><span>Cargando…</span></div>;
-  return <>
-    <div style={{padding:"28px 32px 16px"}}><div style={{fontSize:12,color:T.ink3,fontWeight:500}}>{items.length} anotaciones registradas</div><div style={{fontSize:28,fontWeight:700,color:T.ink,letterSpacing:-.8,lineHeight:1.02,marginTop:2}}>Incidencias</div></div>
-    <div className="pb">{items.length===0?<div className="empty"><span className="ico">✅</span><p>Sin incidencias registradas</p></div>:items.map(inc=><IncCard key={inc.id} inc={inc} onResp={saveResp}/>)}</div>
-  </>;
+
+  // Aliases para el template rediseñado (mapeo a schema real)
+  const incidencias=items.map(it=>({
+    ...it,
+    descripcion:it.nota,
+    titulo:it.tarea,
+    reportado_por:it.completado_por,
+    ubicacion:it.zona,
+    severidad:'media', // schema no tiene severidad — todas medias por defecto
+    resuelta:!!it.resp_admin, // gestionada por admin = resuelta
+    notas:it.resp_admin||null,
+    servicio_titulo:it.tipo,
+  }));
+  const incidenciasFiltradas=incidencias.filter(i=>{
+    const tab=tabIncidencias||'todas';
+    if(tab==='todas')return true;
+    if(tab==='abiertas')return !i.resuelta&&!i.resuelto;
+    if(tab==='urgentes')return i.severidad==='alta'||i.urgente;
+    if(tab==='resueltas')return i.resuelta||i.resuelto;
+    return true;
+  });
+  const marcarResuelta=async(inc)=>{
+    const txt=inc.notas||inc.resp_admin||'Resuelta — gestionada por admin';
+    await saveResp(inc,txt);
+    setSelIncidencia(prev=>prev?{...prev,resp_admin:txt,notas:txt,resuelta:true}:null);
+  };
+  const reabrirIncidencia=async(inc)=>{
+    await saveResp(inc,null);
+    setSelIncidencia(prev=>prev?{...prev,resp_admin:null,notas:null,resuelta:false}:null);
+  };
+  // asignarMantenimiento no existe en el modelo actual — el botón queda como no-op via &&
+
+  return (
+    <div style={{paddingBottom:100,background:T.bg,minHeight:'100%',fontFamily:T.sans}}>
+
+      {/* Header */}
+      <div style={{padding:'54px 20px 6px',display:'flex',justifyContent:'space-between',alignItems:'flex-end'}}>
+        <div>
+          <div style={{fontSize:10.5,color:T.ink3,fontWeight:700,letterSpacing:0.8,textTransform:'uppercase'}}>Mantenimiento</div>
+          <div style={{fontSize:28,fontWeight:800,color:T.ink,letterSpacing:-0.9,lineHeight:1.05,marginTop:2}}>Incidencias</div>
+        </div>
+      </div>
+
+      {/* KPIs 3 cols */}
+      <div style={{padding:'18px 20px 14px',display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8}}>
+        {[
+          {bg:T.ink,        fg:'#fff', value:incidencias.length,                                                              label:'Total'},
+          {bg:T.terracotta, fg:T.ink,  value:incidencias.filter(i=>!i.resuelta&&!i.resuelto).length,                          label:'Abiertas'},
+          {bg:T.olive,      fg:T.ink,  value:incidencias.filter(i=>i.resuelta||i.resuelto).length,                            label:'Resueltas'},
+        ].map((k,i)=>(
+          <div key={i} style={{background:k.bg,color:k.fg,borderRadius:16,padding:'14px 14px 16px',minHeight:86,display:'flex',flexDirection:'column',justifyContent:'space-between'}}>
+            <div style={{fontSize:9.5,fontWeight:700,letterSpacing:0.8,textTransform:'uppercase',opacity:0.8}}>{k.label}</div>
+            <div style={{fontSize:30,fontWeight:800,letterSpacing:-1.2,lineHeight:1}}>{k.value}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Tabs filtro */}
+      <div style={{padding:'0 20px 14px'}}>
+        <div style={{display:'flex',gap:6,overflowX:'auto'}}>
+          {[
+            {k:'todas',    l:'Todas',     n:incidencias.length},
+            {k:'abiertas', l:'Abiertas',  n:incidencias.filter(i=>!i.resuelta&&!i.resuelto).length},
+            {k:'urgentes', l:'Urgentes',  n:incidencias.filter(i=>i.severidad==='alta'||i.urgente).length},
+            {k:'resueltas',l:'Resueltas', n:incidencias.filter(i=>i.resuelta||i.resuelto).length},
+          ].map(t=>{
+            const on=(tabIncidencias||'todas')===t.k;
+            return(
+              <button key={t.k} onClick={()=>setTabIncidencias&&setTabIncidencias(t.k)} style={{padding:'8px 14px',borderRadius:999,background:on?T.ink:T.surface,color:on?'#fff':T.ink2,border:'1px solid '+(on?T.ink:T.line),fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:T.sans,flexShrink:0,display:'inline-flex',alignItems:'center',gap:6}}>
+                {t.l}
+                <span style={{fontSize:10,fontWeight:800,padding:'1px 6px',borderRadius:999,background:on?'rgba(255,255,255,0.2)':T.bg,color:on?'#fff':T.ink3}}>{t.n}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Lista incidencias */}
+      <div style={{padding:'0 20px',display:'flex',flexDirection:'column',gap:10}}>
+        {incidenciasFiltradas.length===0&&(
+          <div style={{textAlign:'center',padding:'60px 0',color:T.ink3,fontSize:13}}>
+            <div style={{fontSize:32,marginBottom:8}}>✓</div>
+            Sin incidencias en esta categoría
+          </div>
+        )}
+        {incidenciasFiltradas.map(inc=>{
+          const resuelta=inc.resuelta||inc.resuelto;
+          const sev=inc.severidad||(inc.urgente?'alta':'media');
+          const sevColor={alta:T.terracotta,media:T.gold,baja:T.softBlue}[sev]||T.gold;
+          const fecha=inc.created_at?new Date(inc.created_at).toLocaleDateString('es-ES',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'—';
+          const tieneFoto=inc.foto_url||inc.imagen||inc.foto;
+          return(
+            <div key={inc.id} onClick={()=>setSelIncidencia&&setSelIncidencia(inc)} style={{background:T.surface,border:'1px solid '+T.line,borderRadius:18,padding:14,cursor:'pointer',opacity:resuelta?0.65:1}}>
+              <div style={{display:'flex',gap:12}}>
+                {tieneFoto?(
+                  <div style={{width:60,height:60,borderRadius:14,background:`linear-gradient(135deg,${T.peach||'#F2995E'},${T.terracotta})`,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,overflow:'hidden'}}>
+                    <img src={tieneFoto} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}} onError={e=>{e.target.style.display='none';}}/>
+                  </div>
+                ):(
+                  <div style={{width:60,height:60,borderRadius:14,background:sevColor+'22',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                    <FmIcon name="warn" size={22} stroke={sevColor}/>
+                  </div>
+                )}
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:4,flexWrap:'wrap'}}>
+                    <span style={{padding:'2px 8px',borderRadius:999,background:sevColor+'22',color:sevColor,fontSize:10,fontWeight:700,textTransform:'uppercase'}}>
+                      {sev==='alta'?'Urgente':sev}
+                    </span>
+                    <span style={{padding:'2px 8px',borderRadius:999,background:T.ink+'14',color:T.ink2,fontSize:10,fontWeight:700}}>{inc.tag} {inc.tipo}</span>
+                    {resuelta&&(
+                      <span style={{padding:'2px 8px',borderRadius:999,background:T.olive+'22',color:'#5A8A3E',fontSize:10,fontWeight:700,display:'inline-flex',alignItems:'center',gap:3}}>
+                        <FmIcon name="check" size={9} stroke="#5A8A3E" sw={3}/>Resuelta
+                      </span>
+                    )}
+                  </div>
+                  <div style={{fontSize:14,fontWeight:700,color:T.ink,letterSpacing:-0.2,lineHeight:1.3,marginBottom:3}}>
+                    {inc.descripcion||inc.titulo||'Incidencia'}
+                  </div>
+                  <div style={{fontSize:11,color:T.ink3,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
+                    {(inc.zona||inc.ubicacion)&&(<><span>{inc.zona||inc.ubicacion}</span><span style={{color:T.ink4||T.ink3}}>·</span></>)}
+                    {(inc.reportado_por||inc.autor)&&(<><span>{inc.reportado_por||inc.autor}</span><span style={{color:T.ink4||T.ink3}}>·</span></>)}
+                    <span>{fecha}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Detalle incidencia — pantalla completa */}
+      {selIncidencia&&(
+        <div style={{position:'fixed',inset:0,background:T.bg,zIndex:30,overflow:'auto',paddingBottom:100,fontFamily:T.sans}}>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'54px 20px 8px'}}>
+            <button onClick={()=>setSelIncidencia(null)} style={{width:38,height:38,borderRadius:999,background:T.surface,border:'1px solid '+T.line,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}>
+              <FmIcon name="chevL" size={16} stroke={T.ink}/>
+            </button>
+            <div style={{fontFamily:T.mono||'monospace',fontSize:11,color:T.ink3,fontWeight:600,letterSpacing:0.8}}>
+              {String(selIncidencia.id).slice(-8).toUpperCase()}
+            </div>
+            <div style={{width:38}}/>
+          </div>
+
+          <div style={{padding:'14px 20px 4px'}}>
+            {(()=>{
+              const sev=selIncidencia.severidad||(selIncidencia.urgente?'alta':'media');
+              const sevColor={alta:T.terracotta,media:T.gold,baja:T.softBlue}[sev]||T.gold;
+              return(
+                <div style={{display:'inline-flex',alignItems:'center',gap:6,padding:'4px 10px',borderRadius:999,background:sevColor,color:T.ink,fontSize:10.5,fontWeight:700,letterSpacing:0.4,textTransform:'uppercase'}}>
+                  <span style={{width:5,height:5,borderRadius:999,background:T.ink}}/>
+                  {sev==='alta'?'Urgente':sev}
+                </div>
+              );
+            })()}
+          </div>
+
+          <div style={{padding:'10px 20px 18px'}}>
+            <div style={{fontSize:24,fontWeight:800,color:T.ink,letterSpacing:-0.8,lineHeight:1.15}}>
+              {selIncidencia.descripcion||selIncidencia.titulo||'Incidencia'}
+            </div>
+          </div>
+
+          {(selIncidencia.foto_url||selIncidencia.imagen||selIncidencia.foto)&&(
+            <div style={{padding:'0 20px 14px'}}>
+              <div style={{borderRadius:18,overflow:'hidden',background:T.surface,border:'1px solid '+T.line,maxHeight:300,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                <img src={selIncidencia.foto_url||selIncidencia.imagen||selIncidencia.foto} alt="" style={{width:'100%',objectFit:'cover'}}/>
+              </div>
+            </div>
+          )}
+
+          <div style={{padding:'0 20px 14px'}}>
+            <div style={{background:T.surface,border:'1px solid '+T.line,borderRadius:18,overflow:'hidden'}}>
+              {[
+                {l:'Zona',v:selIncidencia.zona||selIncidencia.ubicacion||'No especificada'},
+                {l:'Tipo',v:selIncidencia.tipo||'—'},
+                {l:'Reportado por',v:selIncidencia.reportado_por||selIncidencia.autor||selIncidencia.completado_por||'—'},
+                {l:'Fecha',v:selIncidencia.created_at?new Date(selIncidencia.created_at).toLocaleString('es-ES',{day:'numeric',month:'long',hour:'2-digit',minute:'2-digit'}):'—'},
+              ].map((row,i,arr)=>(
+                <div key={i} style={{display:'flex',justifyContent:'space-between',padding:'13px 16px',borderBottom:i<arr.length-1?'1px solid '+T.line:'none'}}>
+                  <span style={{fontSize:13,color:T.ink3,fontWeight:500}}>{row.l}</span>
+                  <span style={{fontSize:13,fontWeight:700,color:T.ink,textAlign:'right',maxWidth:'60%'}}>{row.v}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {selIncidencia.notas&&(
+            <div style={{padding:'0 20px 14px'}}>
+              <div style={{fontSize:10.5,color:T.ink3,fontWeight:700,letterSpacing:0.8,textTransform:'uppercase',padding:'0 4px 8px'}}>Respuesta del admin</div>
+              <div style={{background:T.surface,border:'1px solid '+T.line,borderRadius:18,padding:14,fontSize:13,color:T.ink,lineHeight:1.5}}>
+                {selIncidencia.notas}
+              </div>
+            </div>
+          )}
+
+          <div style={{padding:'0 20px 14px',display:'flex',gap:8}}>
+            {!(selIncidencia.resuelta||selIncidencia.resuelto)?(
+              <button onClick={()=>marcarResuelta&&marcarResuelta(selIncidencia)} style={{flex:1,padding:'14px 0',borderRadius:999,border:0,background:T.olive,color:T.ink,fontFamily:T.sans,fontWeight:700,fontSize:13,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:8}}>
+                <FmIcon name="check" size={14} stroke={T.ink} sw={3}/>Marcar resuelta
+              </button>
+            ):(
+              <button onClick={()=>reabrirIncidencia&&reabrirIncidencia(selIncidencia)} style={{flex:1,padding:'14px 0',borderRadius:999,border:'1px solid '+T.line,background:T.surface,color:T.ink,fontFamily:T.sans,fontWeight:600,fontSize:13,cursor:'pointer'}}>
+                Reabrir incidencia
+              </button>
+            )}
+          </div>
+
+        </div>
+      )}
+
+    </div>
+  );
 }
 function IncCard({inc,onResp}){
   const [show,setShow]=useState(false);const [reply,setReply]=useState(inc.resp_admin||"");
