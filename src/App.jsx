@@ -1965,6 +1965,32 @@ function RvEventDetail({reserva,tok,perfil,rol,isA,onClose,onChanged,isDesktopPa
       const u={...localR,saldo_cobrado:true,saldo_fecha:hoy,estado_pago:"pagado_completo"};
       setLocalR(u);onChanged&&onChanged(u);setShowPagoTotal(false);}catch(_){}setCobroSaving(false);
   };
+  // Deshacer pago: vuelve la reserva al estado anterior (seña cobrada).
+  // No borramos el gasto de comisión generado: dejamos que el admin lo ajuste
+  // a mano en Gastos, así no perdemos rastro contable accidentalmente.
+  const deshacerPago=async()=>{
+    if(cobroSaving)return;
+    if(!window.confirm("¿Deshacer el pago total? La reserva volverá a estado 'Seña cobrada' y el saldo aparecerá como pendiente.\n\nNota: la comisión registrada en Gastos NO se borra automáticamente — revísala a mano si procede."))return;
+    setCobroSaving(true);
+    try{
+      await sbPatch("reservas",`id=eq.${localR.id}`,{saldo_cobrado:false,saldo_fecha:null,estado_pago:localR.seña_cobrada?"seña_cobrada":"pendiente"},tok);
+      await addHistorial("reserva",localR.id,`Pago total deshecho — saldo vuelve a pendiente`,perfil?.nombre||"Admin",tok);
+      const u={...localR,saldo_cobrado:false,saldo_fecha:null,estado_pago:localR.seña_cobrada?"seña_cobrada":"pendiente"};
+      setLocalR(u);onChanged&&onChanged(u);
+    }catch(_){}setCobroSaving(false);
+  };
+  // Deshacer seña: vuelve a estado pendiente y borra importe/fecha de seña.
+  const deshacerSeña=async()=>{
+    if(cobroSaving)return;
+    if(!window.confirm("¿Deshacer la seña cobrada? La reserva volverá a 'Pendiente' y el importe de la seña se borrará."))return;
+    setCobroSaving(true);
+    try{
+      await sbPatch("reservas",`id=eq.${localR.id}`,{seña_cobrada:false,seña_fecha:null,seña_importe:null,estado_pago:"pendiente",saldo_cobrado:false,saldo_fecha:null},tok);
+      await addHistorial("reserva",localR.id,`Seña deshecha — reserva vuelve a pendiente`,perfil?.nombre||"Admin",tok);
+      const u={...localR,seña_cobrada:false,seña_fecha:null,seña_importe:null,estado_pago:"pendiente",saldo_cobrado:false,saldo_fecha:null};
+      setLocalR(u);onChanged&&onChanged(u);
+    }catch(_){}setCobroSaving(false);
+  };
 
   return(
     <div style={{position:isDesktopPanel?"relative":"fixed",inset:isDesktopPanel?"auto":0,background:T.bg,zIndex:isDesktopPanel?"auto":200,overflow:"auto",paddingBottom:100}}>
@@ -2010,11 +2036,13 @@ function RvEventDetail({reserva,tok,perfil,rol,isA,onClose,onChanged,isDesktopPa
           <div style={{height:12,borderRadius:999,background:T.bg,overflow:"hidden",marginBottom:14}}>
             <div style={{width:pct+"%",height:"100%",background:pct===100?T.olive:`linear-gradient(90deg,${T.olive},${T.gold})`}}/>
           </div>
-          {pending>0&&isA&&<div style={{background:T.bg,borderRadius:12,padding:"10px 12px",display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
-            <div><div style={{fontSize:11,color:T.ink3,fontWeight:600}}>Pendiente</div><div style={{fontSize:17,fontWeight:700,color:T.ink,letterSpacing:-.4}}>{fE(pending)}</div></div>
-            <div style={{display:"flex",gap:6}}>
+          {isA&&(pending>0||localR.seña_cobrada||localR.saldo_cobrado)&&<div style={{background:T.bg,borderRadius:12,padding:"10px 12px",marginBottom:10,display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,flexWrap:"wrap"}}>
+            <div>{pending>0?<><div style={{fontSize:11,color:T.ink3,fontWeight:600}}>Pendiente</div><div style={{fontSize:17,fontWeight:700,color:T.ink,letterSpacing:-.4}}>{fE(pending)}</div></>:<><div style={{fontSize:11,color:T.ink3,fontWeight:600}}>Estado</div><div style={{fontSize:13,fontWeight:700,color:T.olive}}>✓ Pagado completo</div></>}</div>
+            <div style={{display:"flex",gap:6,flexWrap:"wrap",justifyContent:"flex-end"}}>
               {(localR.estado_pago==="pendiente"||!localR.estado_pago)&&localR.estado!=="cancelada"&&<button onClick={()=>setShowSeña(true)} style={{padding:"10px 14px",borderRadius:999,background:T.ink,color:"#fff",border:0,fontWeight:700,fontSize:12,cursor:"pointer",fontFamily:T.sans}}>Registrar seña</button>}
               {localR.estado_pago==="seña_cobrada"&&<button onClick={()=>setShowPagoTotal(true)} style={{padding:"10px 14px",borderRadius:999,background:T.olive,color:T.ink,border:0,fontWeight:700,fontSize:12,cursor:"pointer",fontFamily:T.sans}}>Cobrar saldo</button>}
+              {localR.saldo_cobrado&&<button onClick={deshacerPago} disabled={cobroSaving} style={{padding:"9px 13px",borderRadius:999,background:"transparent",color:T.ink2,border:`1px solid ${T.line}`,fontWeight:700,fontSize:12,cursor:"pointer",fontFamily:T.sans,display:"inline-flex",alignItems:"center",gap:6}}><FmIcon name="x" size={12} stroke={T.ink2}/>{cobroSaving?"…":"Deshacer pago"}</button>}
+              {localR.seña_cobrada&&!localR.saldo_cobrado&&<button onClick={deshacerSeña} disabled={cobroSaving} style={{padding:"9px 13px",borderRadius:999,background:"transparent",color:T.ink2,border:`1px solid ${T.line}`,fontWeight:700,fontSize:12,cursor:"pointer",fontFamily:T.sans,display:"inline-flex",alignItems:"center",gap:6}}><FmIcon name="x" size={12} stroke={T.ink2}/>{cobroSaving?"…":"Deshacer seña"}</button>}
             </div>
           </div>}
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
@@ -2191,6 +2219,8 @@ function RvBnbDetail({reserva,tok,perfil,onClose,onChanged}){
   const outFmt=localR.fecha_salida?new Date(localR.fecha_salida+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"}):"—";
   const initials=(localR.huesped||"").split(" ").map(p=>p[0]).slice(0,2).join("").toUpperCase()||"?";
   const [saving,setSaving]=useState(false);
+  const [showEdit,setShowEdit]=useState(false);
+  const [editForm,setEditForm]=useState({huesped:"",fecha_entrada:"",fecha_salida:"",personas:"",precio:"",notas:""});
   const gBtn={width:36,height:36,borderRadius:999,background:"rgba(255,255,255,.14)",border:0,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"};
 
   const regCobro=async()=>{
@@ -2199,15 +2229,58 @@ function RvBnbDetail({reserva,tok,perfil,onClose,onChanged}){
       await addHistorial("reserva_airbnb",localR.id,`Cobro registrado: ${fE(precio)}`,perfil?.nombre||"Admin",tok).catch(()=>{});
       const u={...localR,cobrado:true};setLocalR(u);onChanged&&onChanged(u);}catch(_){}setSaving(false);
   };
+  const deshacerCobro=async()=>{
+    if(saving)return;
+    if(!window.confirm(`¿Marcar como NO cobrada esta reserva? El importe (${fE(precio)}) volverá a aparecer como pendiente.`))return;
+    setSaving(true);
+    try{await sbPatch("reservas_airbnb",`id=eq.${localR.id}`,{cobrado:false},tok);
+      await addHistorial("reserva_airbnb",localR.id,`Cobro deshecho — vuelve a pendiente`,perfil?.nombre||"Admin",tok).catch(()=>{});
+      const u={...localR,cobrado:false};setLocalR(u);onChanged&&onChanged(u);}catch(_){}setSaving(false);
+  };
+  const abrirEdit=()=>{
+    setEditForm({
+      huesped:localR.huesped||"",
+      fecha_entrada:localR.fecha_entrada||"",
+      fecha_salida:localR.fecha_salida||"",
+      personas:localR.personas||"",
+      precio:localR.precio||"",
+      notas:localR.notas||"",
+    });
+    setShowEdit(true);
+  };
+  const guardarEdit=async()=>{
+    if(saving)return;setSaving(true);
+    try{
+      const patch={
+        huesped:editForm.huesped||localR.huesped,
+        fecha_entrada:editForm.fecha_entrada||null,
+        fecha_salida:editForm.fecha_salida||null,
+        personas:parseInt(editForm.personas)||null,
+        precio:parseFloat(editForm.precio)||null,
+        notas:editForm.notas||null,
+      };
+      await sbPatch("reservas_airbnb",`id=eq.${localR.id}`,patch,tok);
+      const cambios=[];
+      if(String(patch.precio||0)!==String(parseFloat(localR.precio)||0))cambios.push(`precio: ${fE(localR.precio)} → ${fE(patch.precio)}`);
+      if(patch.huesped!==localR.huesped)cambios.push(`huésped: ${localR.huesped} → ${patch.huesped}`);
+      if(patch.fecha_entrada!==localR.fecha_entrada)cambios.push(`entrada: ${localR.fecha_entrada} → ${patch.fecha_entrada}`);
+      if(patch.fecha_salida!==localR.fecha_salida)cambios.push(`salida: ${localR.fecha_salida} → ${patch.fecha_salida}`);
+      if(cambios.length>0)await addHistorial("reserva_airbnb",localR.id,`Editado — ${cambios.join(" · ")}`,perfil?.nombre||"Admin",tok).catch(()=>{});
+      const u={...localR,...patch};setLocalR(u);onChanged&&onChanged(u);setShowEdit(false);
+    }catch(_){}setSaving(false);
+  };
 
   return(
     <div style={{position:"fixed",inset:0,background:T.bg,zIndex:200,overflow:"auto",paddingBottom:100}}>
       {/* Hero azul */}
       <div style={{background:"linear-gradient(165deg,#1E3A5F 0%,#0E0E0E 100%)",paddingTop:54,paddingBottom:22,paddingLeft:20,paddingRight:20,color:"#fff",position:"relative",overflow:"hidden"}}>
         <div style={{position:"absolute",right:-30,top:-40,width:220,height:220,borderRadius:999,background:T.softBlue+"55",filter:"blur(45px)"}}/>
-        <div style={{position:"relative",display:"flex",justifyContent:"space-between",marginBottom:22}}>
+        <div style={{position:"relative",display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:22}}>
           <button onClick={onClose} style={gBtn}><FmIcon name="chevL" size={16} stroke="#fff"/></button>
-          <span style={{fontSize:11,padding:"4px 10px",borderRadius:999,background:"rgba(255,255,255,.12)",color:"#fff",fontWeight:700}}>Airbnb</span>
+          <div style={{display:"flex",gap:8,alignItems:"center"}}>
+            <button onClick={abrirEdit} style={{...gBtn,width:"auto",padding:"0 12px",gap:6,fontSize:12,fontWeight:700,color:"#fff",fontFamily:T.sans}}><FmIcon name="edit" size={14} stroke="#fff"/>Editar</button>
+            <span style={{fontSize:11,padding:"4px 10px",borderRadius:999,background:"rgba(255,255,255,.12)",color:"#fff",fontWeight:700}}>Airbnb</span>
+          </div>
         </div>
         <div style={{position:"relative"}}>
           <div style={{fontSize:11,letterSpacing:1,textTransform:"uppercase",opacity:.65,fontWeight:600}}>Alojamiento vacacional</div>
@@ -2236,6 +2309,7 @@ function RvBnbDetail({reserva,tok,perfil,onClose,onChanged}){
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
             <div style={{fontSize:12,color:T.ink3,fontWeight:600}}>Cobrado <span style={{color:T.ink,fontWeight:700}}>{fE(cobrado)}</span></div>
             {!localR.cobrado&&precio>0&&<button onClick={regCobro} disabled={saving} style={{padding:"10px 14px",borderRadius:999,background:T.ink,color:"#fff",border:0,fontWeight:700,fontSize:12,cursor:"pointer",fontFamily:T.sans}}>{saving?"…":"Cobrar "}{!saving&&fE(precio)}</button>}
+            {localR.cobrado&&<button onClick={deshacerCobro} disabled={saving} style={{padding:"9px 13px",borderRadius:999,background:"transparent",color:T.ink2,border:`1px solid ${T.line}`,fontWeight:700,fontSize:12,cursor:"pointer",fontFamily:T.sans,display:"inline-flex",alignItems:"center",gap:6}}><FmIcon name="x" size={12} stroke={T.ink2}/>{saving?"…":"Deshacer cobro"}</button>}
           </div>
         </div>
 
@@ -2255,6 +2329,31 @@ function RvBnbDetail({reserva,tok,perfil,onClose,onChanged}){
         <Historial entidad_tipo="reserva_airbnb" entidad_id={localR.id} tok={tok} perfil={perfil||{nombre:"Admin"}}/>
         <button onClick={onClose} style={{width:"100%",padding:"13px 16px",borderRadius:14,border:`1px solid ${T.line}`,background:T.surface,color:T.ink3,fontWeight:700,fontSize:13,cursor:"pointer",fontFamily:T.sans,marginTop:8}}>← Volver a reservas</button>
       </div>
+
+      {showEdit&&<div style={{position:"fixed",inset:0,background:"rgba(20,15,10,.6)",zIndex:1000,display:"flex",alignItems:"flex-end",fontFamily:T.sans}}>
+        <div style={{width:"100%",maxWidth:540,margin:"0 auto",background:T.bg,borderRadius:"24px 24px 0 0",padding:"22px 20px 32px",maxHeight:"92vh",overflowY:"auto"}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+            <div><div style={{fontSize:11,color:T.ink3,letterSpacing:.5,textTransform:"uppercase",fontWeight:700}}>Reserva Airbnb</div><div style={{fontSize:22,fontWeight:700,color:T.ink,letterSpacing:-.6,marginTop:2}}>Editar reserva</div></div>
+            <button onClick={()=>setShowEdit(false)} style={{width:32,height:32,borderRadius:999,background:T.surface,border:`1px solid ${T.line}`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}><FmIcon name="x" size={15} stroke={T.ink}/></button>
+          </div>
+          <div style={{display:"flex",flexDirection:"column",gap:14}}>
+            <div><div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase",marginBottom:8}}>Huésped</div><div style={{background:T.surface,border:`1px solid ${T.line}`,borderRadius:14,padding:"12px 14px"}}><input value={editForm.huesped} onChange={e=>setEditForm(v=>({...v,huesped:e.target.value}))} placeholder="Nombre completo" style={{width:"100%",background:"transparent",border:0,outline:"none",fontFamily:T.sans,fontSize:14,color:T.ink}}/></div></div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+              <div><div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase",marginBottom:8}}>Entrada</div><div style={{background:T.surface,border:`1px solid ${T.line}`,borderRadius:14,padding:"10px 14px"}}><input type="date" value={editForm.fecha_entrada} onChange={e=>setEditForm(v=>({...v,fecha_entrada:e.target.value}))} style={{width:"100%",background:"transparent",border:0,outline:"none",fontFamily:T.sans,fontSize:13,color:T.ink}}/></div></div>
+              <div><div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase",marginBottom:8}}>Salida</div><div style={{background:T.surface,border:`1px solid ${T.line}`,borderRadius:14,padding:"10px 14px"}}><input type="date" value={editForm.fecha_salida} onChange={e=>setEditForm(v=>({...v,fecha_salida:e.target.value}))} style={{width:"100%",background:"transparent",border:0,outline:"none",fontFamily:T.sans,fontSize:13,color:T.ink}}/></div></div>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+              <div><div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase",marginBottom:8}}>Personas</div><div style={{background:T.surface,border:`1px solid ${T.line}`,borderRadius:14,padding:"10px 14px"}}><input type="number" inputMode="numeric" value={editForm.personas} onChange={e=>setEditForm(v=>({...v,personas:e.target.value}))} placeholder="2" style={{width:"100%",background:"transparent",border:0,outline:"none",fontFamily:T.sans,fontSize:14,color:T.ink}}/></div></div>
+              <div><div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase",marginBottom:8}}>Precio (€)</div><div style={{background:T.surface,border:`1px solid ${T.line}`,borderRadius:14,padding:"10px 14px",display:"flex",alignItems:"center",gap:6}}><input type="number" inputMode="decimal" value={editForm.precio} onChange={e=>setEditForm(v=>({...v,precio:e.target.value}))} placeholder="150" style={{flex:1,background:"transparent",border:0,outline:"none",fontFamily:T.sans,fontSize:18,fontWeight:700,color:T.ink}}/><span style={{fontSize:14,color:T.ink3,fontWeight:700}}>€</span></div></div>
+            </div>
+            <div><div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase",marginBottom:8}}>Notas</div><div style={{background:T.surface,border:`1px solid ${T.line}`,borderRadius:14,padding:"10px 14px"}}><textarea value={editForm.notas} onChange={e=>setEditForm(v=>({...v,notas:e.target.value}))} rows={2} placeholder="Observaciones…" style={{width:"100%",background:"transparent",border:0,outline:"none",fontFamily:T.sans,fontSize:13,color:T.ink,resize:"none",boxSizing:"border-box"}}/></div></div>
+          </div>
+          <div style={{display:"flex",gap:8,marginTop:18}}>
+            <button onClick={()=>setShowEdit(false)} style={{flex:1,padding:"14px 0",borderRadius:999,border:`1px solid ${T.line}`,background:T.surface,color:T.ink,fontFamily:T.sans,fontWeight:600,fontSize:14,cursor:"pointer"}}>Cancelar</button>
+            <button onClick={guardarEdit} disabled={saving} style={{flex:2,padding:"14px 0",borderRadius:999,border:0,background:T.ink,color:"#fff",fontFamily:T.sans,fontWeight:700,fontSize:14,cursor:"pointer"}}>{saving?"Guardando…":"Guardar cambios"}</button>
+          </div>
+        </div>
+      </div>}
     </div>
   );
 }
