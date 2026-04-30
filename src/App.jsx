@@ -1806,8 +1806,20 @@ function ContactosBlockDesktop({contactos,setPage}){const colors=[T.lavender,T.o
     {contactos.length===0&&<div style={{padding:"16px",color:T.ink3,fontSize:13,textAlign:"center"}}>Sin contactos</div>}</div></div>;}
 
 // ─── OPS HELPERS (Limpieza + Jardinería) ──────────────────────────────────────
-const OPS_STATE_META={pendiente:{label:"Sin fecha",color:"#ECD227",bg:"#ECD22722",ink:"#8A6B0F"},pendiente_fecha:{label:"Sin fecha",color:"#ECD227",bg:"#ECD22722",ink:"#8A6B0F"},programado:{label:"Fecha OK",color:"#7FB2FF",bg:"#7FB2FF22",ink:"#2A5BA0"},en_curso:{label:"En curso",color:"#A6BE59",bg:"#A6BE5922",ink:"#4A7A2E"},completado:{label:"Finalizado",color:"#BFB9AE",bg:"#F5F3F0",ink:"#7A766F"},finalizado:{label:"Finalizado",color:"#BFB9AE",bg:"#F5F3F0",ink:"#7A766F"},conflicto:{label:"Conflicto",color:"#D9443A",bg:"#D9443A18",ink:"#9A2A22"},activo:{label:"Activo",color:"#A6BE59",bg:"#A6BE5922",ink:"#4A7A2E"}};
+const OPS_STATE_META={pendiente:{label:"Pendiente",color:"#ECD227",bg:"#ECD22722",ink:"#8A6B0F"},pendiente_fecha:{label:"Sin fecha",color:"#ECD227",bg:"#ECD22722",ink:"#8A6B0F"},programado:{label:"Programado",color:"#7FB2FF",bg:"#7FB2FF22",ink:"#2A5BA0"},en_curso:{label:"En curso",color:"#A6BE59",bg:"#A6BE5922",ink:"#4A7A2E"},completado:{label:"Finalizado",color:"#BFB9AE",bg:"#F5F3F0",ink:"#7A766F"},finalizado:{label:"Finalizado",color:"#BFB9AE",bg:"#F5F3F0",ink:"#7A766F"},conflicto:{label:"Conflicto",color:"#D9443A",bg:"#D9443A18",ink:"#9A2A22"},activo:{label:"Activo",color:"#A6BE59",bg:"#A6BE5922",ink:"#4A7A2E"}};
 function getOpsMeta(e){return OPS_STATE_META[e]||OPS_STATE_META.pendiente;}
+// Resuelve el estado visual de un servicio de limpieza usando los campos
+// reales (verificado, hora_inicio, fecha) en lugar de fiarse del estado
+// almacenado, que a menudo se queda en "pendiente" aunque haya fecha y/o
+// el servicio esté en curso.
+function resolveLimpEstado(srv){
+  if(!srv)return "pendiente_fecha";
+  if(srv.verificado)return "completado";
+  if(srv.hora_inicio)return "en_curso";
+  const e=srv.estado;
+  if(!e||e==="pendiente"||e==="pendiente_fecha")return srv.fecha?"programado":"pendiente_fecha";
+  return e;
+}
 function OpsAvatar({name="?",size=28,color:c}){const cols=["#AFA3FF","#A6BE59","#7FB2FF","#ECD227","#EC683E"];const cl=c||cols[(name||"X").charCodeAt(0)%cols.length];return<div style={{width:size,height:size,borderRadius:999,background:cl,display:"flex",alignItems:"center",justifyContent:"center",fontSize:size*.4,fontWeight:700,color:"#1A1A1A",fontFamily:T.sans,flexShrink:0}}>{(name||"?")[0].toUpperCase()}</div>;}
 function OpsMiniKpi({value,label,color}){return<div style={{background:T.surface,borderRadius:16,padding:"10px 12px",border:`1px solid ${T.line}`}}><div style={{width:22,height:3,background:color,borderRadius:2,marginBottom:6}}/><div style={{fontSize:20,fontWeight:700,color:T.ink,letterSpacing:-.6,lineHeight:1}}>{value}</div><div style={{fontSize:10,color:T.ink3,fontWeight:500,textTransform:"uppercase",letterSpacing:.4,marginTop:4}}>{label}</div></div>;}
 function OpsStatePill({estado}){const m=getOpsMeta(estado);return<span style={{display:"inline-flex",alignItems:"center",gap:4,height:20,padding:"0 8px",borderRadius:999,background:m.bg,color:m.ink,fontSize:10,fontWeight:700}}><span style={{width:5,height:5,borderRadius:999,background:m.color}}/>{m.label}</span>;}
@@ -5279,6 +5291,7 @@ function Limpieza({perfil,tok,rol,setPage}){
   // Paso hora fin
   const [finalStep,setFinalStep]=useState("check"); // "check" | "consumo" | "hora"
   const [consumoItems,setConsumoItems]=useState([]);
+  const [horaInicio,setHoraInicio]=useState("");
   const [horaFin,setHoraFin]=useState("");
   const [tarifaHora,setTarifaHora]=useState(0);
   const [horasCalc,setHorasCalc]=useState(0);
@@ -5394,12 +5407,23 @@ function Limpieza({perfil,tok,rol,setPage}){
     setSaving(false);
   };
 
+  // Helpers de hora HH:MM <-> número decimal
+  const _parseHM=s=>{if(!s)return null;const [h,m]=String(s).split(":").map(Number);if(isNaN(h))return null;return h+(m||0)/60;};
+  const _calcHoras=(hi,hf)=>{const a=_parseHM(hi),b=_parseHM(hf);if(a==null||b==null)return 0;let d=b-a;if(d<0)d+=24;return Math.max(0,Math.round(d*100)/100);};
+
   const prepararPasoHora=async()=>{
     const ahora=new Date();
     const hfDefault=`${String(ahora.getHours()).padStart(2,"0")}:${String(ahora.getMinutes()).padStart(2,"0")}`;
     setHoraFin(hfDefault);
     const srv_=servicios.find(s=>s.id===actId);
     const mod=srv_?.modalidad_pago||"por_horas";
+    // Hora de inicio: de la fila o, si no, del created_at, redondeada a HH:MM
+    let hiDefault=srv_?.hora_inicio?String(srv_.hora_inicio).slice(0,5):"";
+    if(!hiDefault&&srv_?.created_at){
+      const d=new Date(srv_.created_at);
+      hiDefault=`${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;
+    }
+    setHoraInicio(hiDefault);
     // Tarifa: de la limpiadora asignada o fallback a configuracion
     let tarifa=0;
     if(mod==="por_horas"){
@@ -5413,20 +5437,7 @@ function Limpieza({perfil,tok,rol,setPage}){
       }
     }
     setTarifaHora(tarifa);
-    // Calcular horas
-    const horaInicioStr=srv_?.hora_inicio||null;
-    const createdAt=srv_?.created_at||null;
-    let hIni=null;
-    if(horaInicioStr){
-      const [h,m]=horaInicioStr.split(":").map(Number);
-      hIni=h+m/60;
-    }else if(createdAt){
-      const d=new Date(createdAt);
-      hIni=d.getHours()+d.getMinutes()/60;
-    }
-    const [hfH,hfM]=hfDefault.split(":").map(Number);
-    const hFin=hfH+hfM/60;
-    const horas=hIni!==null?Math.max(0,Math.round((hFin-hIni)*100)/100):0;
+    const horas=_calcHoras(hiDefault,hfDefault);
     setHorasCalc(horas);
     // Coste según modalidad
     if(mod==="permuta"){setCosteCalc(0);}
@@ -5435,25 +5446,15 @@ function Limpieza({perfil,tok,rol,setPage}){
     setFinalStep("hora");
   };
 
-  const recalcHora=(newHoraFin)=>{
-    setHoraFin(newHoraFin);
-    const srv_=servicios.find(s=>s.id===actId);
-    const horaInicioStr=srv_?.hora_inicio||null;
-    const createdAt=srv_?.created_at||null;
-    let hIni=null;
-    if(horaInicioStr){
-      const [h,m]=horaInicioStr.split(":").map(Number);
-      hIni=h+m/60;
-    }else if(createdAt){
-      const d=new Date(createdAt);
-      hIni=d.getHours()+d.getMinutes()/60;
-    }
-    const [hfH,hfM]=newHoraFin.split(":").map(Number);
-    const hFin=hfH+hfM/60;
-    const horas=hIni!==null?Math.max(0,Math.round((hFin-hIni)*100)/100):0;
+  const recalcHoras=(hi,hf)=>{
+    setHoraInicio(hi);setHoraFin(hf);
+    const horas=_calcHoras(hi,hf);
     setHorasCalc(horas);
     setCosteCalc(tarifaHora>0?Math.round(horas*tarifaHora*100)/100:0);
   };
+  // Compat: las funciones antiguas siguen disponibles
+  const recalcHora=(nuevaFin)=>recalcHoras(horaInicio,nuevaFin);
+  const recalcInicio=(nuevoIni)=>recalcHoras(nuevoIni,horaFin);
 
   const prepararConsumo=async()=>{
     try{
@@ -5529,13 +5530,16 @@ function Limpieza({perfil,tok,rol,setPage}){
         verificado_nota:notaFinal,
         verificado_por:perfil.nombre,
         verificado_ts:new Date().toISOString(),
+        hora_inicio:horaInicio||undefined,
         hora_fin:horaFin,
         coste_calculado:costeCalc||null,
         tarifa_hora_aplicada:tarifaHora||null,
       };
       await sbPatch("servicios",`id=eq.${actId}`,patchData,tok).catch(()=>{
-        // Si campos no existen, reintentar sin ellos
-        return sbPatch("servicios",`id=eq.${actId}`,{verificado:true,verificado_ok:!esParcial,verificado_nota:notaFinal,verificado_por:perfil.nombre,verificado_ts:new Date().toISOString()},tok);
+        // Si algún campo no existe en el esquema, reintentar sin los opcionales
+        return sbPatch("servicios",`id=eq.${actId}`,{verificado:true,verificado_ok:!esParcial,verificado_nota:notaFinal,verificado_por:perfil.nombre,verificado_ts:new Date().toISOString(),hora_inicio:horaInicio||undefined,hora_fin:horaFin},tok).catch(()=>
+          sbPatch("servicios",`id=eq.${actId}`,{verificado:true,verificado_ok:!esParcial,verificado_nota:notaFinal,verificado_por:perfil.nombre,verificado_ts:new Date().toISOString()},tok)
+        );
       });
       // Insertar gasto según modalidad
       const srv_g=servicios.find(s=>s.id===actId);
@@ -5641,7 +5645,7 @@ function Limpieza({perfil,tok,rol,setPage}){
         {/* Lista scrollable */}
         <div style={{flex:1,overflow:"auto",padding:"8px 10px"}}>
           {srvFilt.map(s=>{
-            const m=getOpsMeta(s.estado||(s.verificado?"completado":"pendiente"));
+            const m=getOpsMeta(resolveLimpEstado(s));
             const on=actId===s.id;
             return(
               <div key={s.id} onClick={()=>setActId(s.id)} style={{borderRadius:14,padding:"12px 13px",marginBottom:5,cursor:"pointer",background:on?T.ink:"transparent",border:"1px solid "+(on?T.ink2:T.line),transition:"all 0.1s"}}>
@@ -5684,7 +5688,7 @@ function Limpieza({perfil,tok,rol,setPage}){
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:22,gap:16}}>
               <div style={{flex:1}}>
                 <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8,flexWrap:"wrap"}}>
-                  {(()=>{const m=getOpsMeta(srv.estado||(srv.verificado?"completado":"en_curso"));return(
+                  {(()=>{const m=getOpsMeta(resolveLimpEstado(srv));return(
                     <span style={{display:"inline-flex",alignItems:"center",gap:4,height:22,padding:"0 9px",borderRadius:999,background:m.bg,color:m.ink,fontSize:10.5,fontWeight:700}}>
                       <span style={{width:5,height:5,borderRadius:999,background:m.color}}/>{m.label}
                     </span>
@@ -6309,12 +6313,20 @@ function Limpieza({perfil,tok,rol,setPage}){
             return <>
             <div style={{textAlign:"center",marginBottom:16}}>
               <div style={{fontSize:28,marginBottom:6}}>🕐</div>
-              <div style={{fontFamily:"'Inter Tight',sans-serif",fontSize:18,color:"#1A1A1A",marginBottom:4}}>¿A qué hora has terminado?</div>
+              <div style={{fontFamily:"'Inter Tight',sans-serif",fontSize:18,color:"#1A1A1A",marginBottom:4}}>¿Cuánto has trabajado?</div>
+              <div style={{fontSize:12,color:T.ink3,marginTop:4}}>Ajusta inicio y fin si hace falta</div>
             </div>
-            <div className="fg">
-              <label>Hora de finalización</label>
-              <input type="time" className="fi" value={horaFin} onChange={e=>recalcHora(e.target.value)} style={{fontSize:18,textAlign:"center",padding:"12px"}}/>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+              <div className="fg" style={{margin:0}}>
+                <label>Inicio</label>
+                <input type="time" className="fi" value={horaInicio} onChange={e=>recalcInicio(e.target.value)} style={{fontSize:18,textAlign:"center",padding:"12px"}}/>
+              </div>
+              <div className="fg" style={{margin:0}}>
+                <label>Fin</label>
+                <input type="time" className="fi" value={horaFin} onChange={e=>recalcHora(e.target.value)} style={{fontSize:18,textAlign:"center",padding:"12px"}}/>
+              </div>
             </div>
+            <div style={{height:14}}/>
             {horasCalc>0&&<div style={{background:"rgba(201,168,76,.06)",border:"1px solid rgba(201,168,76,.15)",borderRadius:10,padding:"14px 16px",marginBottom:14}}>
               <div style={{fontSize:13,color:"#1A1A1A",marginBottom:6}}>⏱ Has trabajado <strong style={{color:"#EC683E"}}>{horasCalc} horas</strong></div>
               {mod==="permuta"?<div style={{fontSize:14,color:"#a5b4fc"}}>🔄 Permuta: {srvM?.permuta_descripcion||"Acuerdo de permuta"} — Coste: 0€</div>
@@ -6322,7 +6334,7 @@ function Limpieza({perfil,tok,rol,setPage}){
               :tarifaHora>0?<div style={{fontSize:14,color:"#1A1A1A"}}>Coste: <strong>{horasCalc}</strong> × <strong>{tarifaHora}€/h</strong> = <strong style={{color:"#EC683E",fontSize:18}}>{costeCalc}€</strong></div>
               :<div style={{fontSize:12,color:"#D4A017",marginTop:4}}>⚠️ Configura la tarifa por hora en Ajustes para calcular el coste automáticamente</div>}
             </div>}
-            {horasCalc===0&&<div style={{background:"rgba(245,158,11,.06)",border:"1px solid rgba(245,158,11,.15)",borderRadius:8,padding:"10px 12px",marginBottom:14,fontSize:12,color:"#D4A017"}}>No se ha podido calcular la duración. Puedes continuar igualmente.</div>}
+            {horasCalc===0&&<div style={{background:"rgba(245,158,11,.06)",border:"1px solid rgba(245,158,11,.15)",borderRadius:10,padding:"12px 14px",marginBottom:14,fontSize:12,color:"#8A6B0F"}}>⚠️ La duración calculada es 0h. Revisa la <strong>hora de inicio</strong> arriba (si no marcaste "Iniciar servicio" estará por defecto). Igualmente puedes continuar.</div>}
             <div style={{display:"flex",gap:8,marginTop:8}}>
               <button className="btn bg" style={{flex:1,justifyContent:"center"}} onClick={()=>setFinalStep("check")}>← Volver</button>
               <button className="btn bp" style={{flex:2,justifyContent:"center",padding:"12px",fontSize:15}} onClick={confirmarConHora} disabled={finalSaving}>{finalSaving?"Guardando…":"✅ Confirmar y cerrar servicio"}</button>
@@ -9038,8 +9050,18 @@ function CalBase({tok,rol="admin"}){
   const [resultadoBusqueda,setResultadoBusqueda]=useState(null);
 
   useEffect(()=>{
-    sbGet("reservas","?select=*&order=fecha.asc",tok).then(setReservas).catch(()=>{});
-    sbGet("reservas_airbnb","?select=*&order=fecha_entrada.asc",tok).then(setAirbnbs).catch(()=>{});
+    // Para limpieza/jardinero usamos SB_KEY: el JWT del operario/usuario no
+    // siempre tiene RLS para leer "reservas", lo que dejaba el calendario
+    // sin eventos (solo Airbnb). Si la lectura con su token falla, se
+    // reintenta con SB_KEY como red de seguridad.
+    const tokRsv=(rol==="limpieza"||rol==="jardinero")?SB_KEY:tok;
+    const tryRead=(table,query,setter)=>{
+      sbGet(table,query,tokRsv).then(setter).catch(()=>{
+        if(tokRsv!==SB_KEY)sbGet(table,query,SB_KEY).then(setter).catch(()=>{});
+      });
+    };
+    tryRead("reservas","?select=*&order=fecha.asc",setReservas);
+    tryRead("reservas_airbnb","?select=*&order=fecha_entrada.asc",setAirbnbs);
   },[]);
 
   const pm=()=>mes===0?(setMes(11),setAño(y=>y-1)):setMes(m=>m-1);
