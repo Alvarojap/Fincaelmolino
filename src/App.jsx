@@ -464,21 +464,36 @@ input,select,textarea{font-family:inherit}
 ::-webkit-scrollbar{width:0;height:0}
 .app{display:flex;min-height:100vh;min-height:100dvh}
 .main{flex:1;min-width:0;display:flex;flex-direction:column;overflow-x:hidden}
-.sb{width:256px;min-width:256px;background:#FFFFFF;color:#1A1A1A;display:flex;flex-direction:column;position:sticky;top:0;height:100vh;height:100dvh;overflow-y:auto;flex-shrink:0;border-right:1px solid #E5E0D6}
-.sb-logo{padding:24px 20px 18px;border-bottom:1px solid #E5E0D6}
-.sb-logo h1{font-family:inherit;font-size:17px;color:#1A1A1A;font-weight:700;letter-spacing:-.5px;margin-top:2px}
-.sb-logo p{font-size:9px;color:#7A766F;margin-top:3px;text-transform:uppercase;letter-spacing:2px;font-weight:600}
+/* === Sidebar desktop (negro fijo, replicando AdminExtrasSidebar del diseño) === */
+.sb{width:256px;min-width:256px;background:#1A1A1A;color:#FFFFFF;display:flex;flex-direction:column;position:sticky;top:0;height:100vh;height:100dvh;overflow-y:auto;flex-shrink:0}
+.sb-logo{padding:24px 20px 18px;border-bottom:1px solid rgba(255,255,255,.1)}
+.sb-logo h1{font-family:inherit;font-size:17px;color:#FFFFFF;font-weight:700;letter-spacing:-.5px;margin-top:2px}
+.sb-logo p{font-size:9px;color:rgba(255,255,255,.5);margin-top:3px;text-transform:uppercase;letter-spacing:2px;font-weight:600}
 .sb-nav{flex:1;padding:12px 10px;overflow-y:auto}
-.nav-sec{font-size:9px;color:#BFB9AE;text-transform:uppercase;letter-spacing:2px;padding:14px 12px 6px;margin-top:2px;font-weight:700}
+.nav-sec{font-size:9px;color:rgba(255,255,255,.35);text-transform:uppercase;letter-spacing:2px;padding:14px 12px 6px;margin-top:2px;font-weight:700}
 .nw{position:relative}
-.nb{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;cursor:pointer;font-size:13px;color:#3A3733;transition:all .15s ease;border:none;background:none;width:100%;text-align:left;font-family:inherit;font-weight:500;margin-bottom:2px}
-.nb:hover{background:#F5F3F0;color:#1A1A1A}
-.nb.on{background:#1A1A1A;color:#FFFFFF;font-weight:700}
+.nb{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;cursor:pointer;font-size:13px;color:rgba(255,255,255,.7);transition:all .15s ease;border:none;background:none;width:100%;text-align:left;font-family:inherit;font-weight:500;margin-bottom:2px}
+.nb:hover{background:rgba(255,255,255,.06);color:#FFFFFF}
+.nb.on{background:rgba(255,255,255,.1);color:#FFFFFF;font-weight:700}
 .nb.on .nb-ico{color:#FFFFFF}
-.nb-ico{font-size:16px;width:22px;text-align:center;flex-shrink:0;color:#7A766F}
+.nb-ico{font-size:16px;width:22px;text-align:center;flex-shrink:0;color:rgba(255,255,255,.7)}
 .nb-badge{position:absolute;top:6px;right:8px;background:#EC683E;color:#1A1A1A;border-radius:20px;padding:1px 6px;font-size:10px;font-weight:700;min-width:16px;text-align:center;pointer-events:none}
-.sb-user{padding:16px;border-top:1px solid #E5E0D6;display:flex;align-items:center;gap:12px;flex-shrink:0}
-.sb .uname{color:#1A1A1A}.sb .urole{color:#7A766F}
+.sb-user{padding:16px;border-top:1px solid rgba(255,255,255,.1);display:flex;align-items:center;gap:12px;flex-shrink:0}
+.sb .uname{color:#FFFFFF}.sb .urole{color:rgba(255,255,255,.5)}
+/* === Drawer móvil (blanco): override del sidebar a tema claro === */
+.drawer .sb{background:#FFFFFF!important;color:#1A1A1A!important}
+.drawer .sb-logo{border-bottom:1px solid #E5E0D6}
+.drawer .sb-logo h1{color:#1A1A1A}
+.drawer .sb-logo p{color:#7A766F}
+.drawer .nav-sec{color:#BFB9AE}
+.drawer .nb{color:#3A3733}
+.drawer .nb:hover{background:#F5F3F0;color:#1A1A1A}
+.drawer .nb.on{background:#1A1A1A;color:#FFFFFF}
+.drawer .nb.on .nb-ico{color:#FFFFFF}
+.drawer .nb-ico{color:#7A766F}
+.drawer .sb-user{border-top:1px solid #E5E0D6}
+.drawer .sb .uname{color:#1A1A1A}
+.drawer .sb .urole{color:#7A766F}
 .av{width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,#EC683E,#AFA3FF);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff;flex-shrink:0}
 .uname{font-size:13px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .urole{font-size:11px;color:rgba(255,255,255,.4);text-transform:capitalize;margin-top:1px}
@@ -1060,7 +1075,7 @@ function Sidebar({perfil,page,setPage,onLogout,inDrawer,onClose}){
           <div className="uname">{perfil.nombre}</div>
           <div className="urole">{RL[rol]}</div>
         </div>
-        <button className="logout-btn" onClick={onLogout} title="Cerrar sesión"><Icon name="logout" size={18}/></button>
+        {onLogout&&<button className="logout-btn" onClick={onLogout} title="Cerrar sesión"><Icon name="logout" size={18}/></button>}
       </div>
     )}
     {inDrawer&&(
@@ -2380,15 +2395,13 @@ function RvBnbDetail({reserva,tok,perfil,onClose,onChanged}){
 }
 
 // ─── DESKTOP RESERVAS ─────────────────────────────────────────────────────────
-function AppSidebarDesktop({page,setPage,perfil,noVistos}){
-  const nav=[{k:"home",i:"home",l:"Inicio",g:"principal"},{k:"contactos",i:"users",l:"Contactos",g:"principal"},{k:"reservas",i:"calendar",l:"Reservas",g:"principal"},{k:"almacen",i:"box",l:"Almacén",g:"principal"},{k:"gastos",i:"euro",l:"Gastos",g:"finanzas"},{k:"analisis",i:"chart",l:"Análisis",g:"finanzas"},{k:"limpieza",i:"settings",l:"Limpieza",g:"operaciones"},{k:"jadmin",i:"leaf",l:"Jardinería",g:"operaciones"},{k:"chat",i:"mail",l:"Mensajes",g:"comunicacion"},{k:"notifs",i:"bell",l:"Alertas",g:"comunicacion",badge:noVistos?.total||0},{k:"usuarios",i:"users",l:"Usuarios",g:"config"},{k:"ajustes",i:"settings",l:"Ajustes",g:"config"}];
-  const gs=["principal","finanzas","operaciones","comunicacion","config"];
-  const gl={principal:"Principal",finanzas:"Finanzas",operaciones:"Operaciones",comunicacion:"Comunicación",config:"Configuración"};
-  return<div style={{width:240,background:T.ink,color:"#fff",display:"flex",flexDirection:"column",flexShrink:0,height:"100vh",position:"sticky",top:0}}>
-    <div style={{padding:"22px 20px 18px",borderBottom:"1px solid rgba(255,255,255,.1)"}}><div style={{display:"flex",alignItems:"center",gap:10}}><LogoMark size={28}/><div><div style={{fontSize:15,fontWeight:700,letterSpacing:-.3}}>Finca El Molino</div><div style={{fontSize:10,color:"rgba(255,255,255,.5)",letterSpacing:1,textTransform:"uppercase",fontWeight:600,marginTop:1}}>Admin · {perfil?.nombre?.split(" ")[0]||"Admin"}</div></div></div></div>
-    <div style={{flex:1,overflow:"auto",padding:"14px 12px"}}>{gs.map(g=><div key={g} style={{marginBottom:12}}><div style={{fontSize:9,color:"rgba(255,255,255,.35)",fontWeight:700,letterSpacing:1.1,textTransform:"uppercase",padding:"4px 10px 6px"}}>{gl[g]}</div>{nav.filter(n=>n.g===g).map(n=>{const on=n.k===page;return<button key={n.k} onClick={()=>setPage(n.k)} style={{width:"100%",padding:"8px 10px",borderRadius:10,background:on?"rgba(255,255,255,.1)":"transparent",color:on?"#fff":"rgba(255,255,255,.7)",border:0,textAlign:"left",cursor:"pointer",fontFamily:T.sans,display:"flex",alignItems:"center",gap:10,marginBottom:1}}><FmIcon name={n.i} size={15} stroke={on?"#fff":"rgba(255,255,255,.7)"} sw={on?2.2:1.8}/><span style={{flex:1,fontSize:12.5,fontWeight:on?700:500,letterSpacing:-.1}}>{n.l}</span>{n.badge>0&&<span style={{fontSize:9.5,padding:"2px 6px",borderRadius:999,background:T.terracotta,color:T.ink,fontWeight:700}}>{n.badge}</span>}</button>;})}</div>)}</div>
-    <div style={{padding:14,borderTop:"1px solid rgba(255,255,255,.1)",display:"flex",alignItems:"center",gap:10}}><div style={{width:34,height:34,borderRadius:10,background:T.terracotta,color:T.ink,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:700,flexShrink:0}}>{perfil?.nombre?.slice(0,1)||"A"}</div><div style={{flex:1,minWidth:0}}><div style={{fontSize:12,fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{perfil?.nombre||"Administrador"}</div><div style={{fontSize:10,color:"rgba(255,255,255,.5)"}}>Administrador</div></div></div>
-  </div>;
+// AppSidebarDesktop delega en el componente Sidebar para garantizar que la
+// barra lateral sea EXACTAMENTE la misma estructura/items en todas las
+// pantallas desktop (Dashboard, Reservas, Limpieza, JardinAdmin, Chat, etc.).
+// Antes había dos componentes con navegaciones distintas y eso provocaba la
+// inconsistencia que reportaba el usuario.
+function AppSidebarDesktop({page,setPage,perfil}){
+  return <Sidebar perfil={perfil} page={page} setPage={setPage} onLogout={null}/>;
 }
 
 function sMeta(s){const m={Visita:{bg:"#E9F0FC",ink:"#2B4B80",dot:"#7FB2FF"},Confirmada:{bg:"#FBF3C7",ink:"#7A6B15",dot:"#ECD227"},"Seña OK":{bg:"#F8DCC4",ink:"#8F4A1C",dot:"#EC683E"},Pagado:{bg:"#DCE8BC",ink:"#4D6B1F",dot:"#7E9B3E"},Finalizada:{bg:"#EEEAE3",ink:"#7A766F",dot:"#BFB9AE"},Cancelada:{bg:"#F5E0DE",ink:"#9B3C33",dot:"#D9443A"},Cobrado:{bg:"#DCE8BC",ink:"#4D6B1F",dot:"#7E9B3E"},Pendiente:{bg:"#FBDCDC",ink:"#9B3C33",dot:"#F35757"}};return m[s]||m.Visita;}
@@ -6850,13 +6863,16 @@ function Limpieza({perfil,tok,rol,setPage}){
 }
 
 // ─── CHAT ────────────────────────────────────────────────────────────────────
-function Chat({perfil,tok,rol}){
+function Chat({perfil,tok,rol,setPage}){
   const isA=rol==="admin";
   const myId=isA?"admin":String(perfil.id);
   const [usuarios,setUsuarios]=useState([]);const [conId,setConId]=useState(isA?null:"admin");
   const [msgs,setMsgs]=useState([]);const [txt,setTxt]=useState("");const [fotoMsg,setFotoMsg]=useState(null);
   const [load,setLoad]=useState(true);const [unread,setUnread]=useState({});
   const endRef=useRef(null);const inputRef=useRef(null);
+  const [isDesktop,setIsDesktop]=useState(typeof window!=="undefined"&&window.innerWidth>=769);
+  useEffect(()=>{const fn=()=>setIsDesktop(window.innerWidth>=769);window.addEventListener("resize",fn);return()=>window.removeEventListener("resize",fn);},[]);
+  const {noVistos:nvCh}=useContext(BadgeCtx);
 
   const loadUnread=async()=>{
     try{const r=await sbGet("mensajes",`?para=eq.${myId}&leido=eq.false&select=de`,tok);const counts={};r.forEach(m=>{counts[String(m.de)]=(counts[String(m.de)]||0)+1;});setUnread(counts);}catch(_){}
@@ -6900,12 +6916,18 @@ function Chat({perfil,tok,rol}){
   const miId=myId;
 
   return (
-    <div style={{height:'100vh',display:'flex',flexDirection:'column',background:T.bg,fontFamily:T.sans,position:'fixed',inset:0,zIndex:1,paddingBottom:0}}>
+    <div style={{height:'100vh',display:'flex',flexDirection:isDesktop?'row':'column',background:T.bg,fontFamily:T.sans,position:'fixed',inset:0,zIndex:1,paddingBottom:0}}>
+      {/* Sidebar fijo en desktop — replica patrón AdminExtrasSidebar del diseño */}
+      {isDesktop&&<AppSidebarDesktop page="chat" setPage={setPage} perfil={perfil} noVistos={nvCh}/>}
+      <div style={{flex:1,display:'flex',flexDirection:'column',minWidth:0,height:'100%'}}>
 
-      {/* Header */}
-      <div style={{padding:'54px 20px 14px',borderBottom:'1px solid '+T.line,background:T.bg,flexShrink:0}}>
-        <div style={{fontSize:12,color:T.ink3,fontWeight:500}}>Mensajes</div>
-        <div style={{fontSize:26,fontWeight:700,color:T.ink,letterSpacing:-0.8,lineHeight:1.02,marginTop:2}}>Chat</div>
+      {/* Header — en desktop con botón volver si hay conversación abierta */}
+      <div style={{padding:isDesktop?'18px 28px':'54px 20px 14px',borderBottom:'1px solid '+T.line,background:isDesktop?T.surface:T.bg,flexShrink:0,display:'flex',alignItems:'center',gap:14}}>
+        {isDesktop&&conId&&isA&&<button onClick={()=>setConId(null)} style={{width:36,height:36,borderRadius:999,background:T.bg,border:'1px solid '+T.line,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',flexShrink:0}}><FmIcon name="chevL" size={16} stroke={T.ink}/></button>}
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{fontSize:11,color:T.ink3,fontWeight:600,letterSpacing:.4,textTransform:'uppercase'}}>Mensajes</div>
+          <div style={{fontSize:isDesktop?22:26,fontWeight:700,color:T.ink,letterSpacing:-0.6,lineHeight:1.05,marginTop:1}}>{isDesktop&&conId&&conUser?(conUser.nombre||'Conversación'):'Chat'}</div>
+        </div>
       </div>
 
       {/* Lista canales o conversación activa */}
@@ -7026,6 +7048,7 @@ function Chat({perfil,tok,rol}){
         </>
       )}
 
+      </div>
     </div>
   );
 }
