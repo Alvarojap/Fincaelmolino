@@ -75,18 +75,38 @@ async function authLogin(email, password) {
 async function authLogout(tok) {
   await fetch(`${SB_URL}/auth/v1/logout`,{method:"POST",headers:HDRA(tok)});
 }
+// Comprime y reescala una imagen antes de subirla. Las cámaras de móvil
+// suelen capturar 5–12 MB; reducimos a JPEG ~1280px para que la subida sea
+// muchísimo más rápida (clave para conexiones flojas en la finca).
+async function compressImage(file,maxDim=1280,quality=0.78){
+  if(!file||!file.type?.startsWith("image/"))return file;
+  if(file.size<350*1024)return file; // si ya es pequeño, no perdemos tiempo
+  try{
+    const dataUrl=await new Promise((res,rej)=>{const r=new FileReader();r.onload=e=>res(e.target.result);r.onerror=rej;r.readAsDataURL(file);});
+    const img=await new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=dataUrl;});
+    const ratio=Math.min(1,maxDim/Math.max(img.width,img.height));
+    const w=Math.round(img.width*ratio),h=Math.round(img.height*ratio);
+    const canvas=document.createElement("canvas");canvas.width=w;canvas.height=h;
+    const ctx=canvas.getContext("2d");ctx.drawImage(img,0,0,w,h);
+    const blob=await new Promise(res=>canvas.toBlob(res,"image/jpeg",quality));
+    if(!blob||blob.size>=file.size)return file;
+    return new File([blob],(file.name||"foto").replace(/\.[^.]+$/,"")+".jpg",{type:"image/jpeg",lastModified:Date.now()});
+  }catch(_){return file;}
+}
+
 async function uploadFoto(file, tok) {
-  const ext = file.name.split(".").pop();
+  const compressed=await compressImage(file);
+  const ext = (compressed.name||"").split(".").pop()||"jpg";
   const path = `${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
   // Try with provided token first, then fallback to SB_KEY
   let r = await fetch(`${SB_URL}/storage/v1/object/fotos/${path}`,{
-    method:"POST", headers:{"apikey":SB_KEY,"Authorization":`Bearer ${tok||SB_KEY}`,"Content-Type":file.type},
-    body:file
+    method:"POST", headers:{"apikey":SB_KEY,"Authorization":`Bearer ${tok||SB_KEY}`,"Content-Type":compressed.type||"image/jpeg"},
+    body:compressed
   });
   if (!r.ok && tok && tok !== SB_KEY) {
     r = await fetch(`${SB_URL}/storage/v1/object/fotos/${path}`,{
-      method:"POST", headers:{"apikey":SB_KEY,"Authorization":`Bearer ${SB_KEY}`,"Content-Type":file.type},
-      body:file
+      method:"POST", headers:{"apikey":SB_KEY,"Authorization":`Bearer ${SB_KEY}`,"Content-Type":compressed.type||"image/jpeg"},
+      body:compressed
     });
   }
   if (!r.ok) throw new Error(await r.text());
@@ -5205,6 +5225,34 @@ function LimpiezaCheck({perfil,tok,setPage}){
   );
 }
 
+// Helpers compartidos por el módulo Limpieza
+const limpModLbl=m=>m==="precio_fijo_servicio"?"Precio fijo":m==="permuta"?"Permuta":"Por horas";
+function limpCalcCoste(srv,limpiadoras=[]){
+  if(!srv)return{importe:0,horas:0,tarifa:0,detalle:""};
+  const mod=srv.modalidad_pago||"por_horas";
+  if(mod==="permuta")return{importe:0,horas:0,tarifa:0,detalle:srv.permuta_descripcion||"Permuta"};
+  if(mod==="precio_fijo_servicio"){const p=parseFloat(srv.precio_fijo_acordado)||parseFloat(srv.coste_calculado)||0;return{importe:p,horas:0,tarifa:0,detalle:"Precio fijo pactado"};}
+  // por_horas — tarifa de la propia fila o, si no, de la limpiadora
+  let tarifa=parseFloat(srv.tarifa_hora_aplicada)||0;
+  if(!tarifa&&srv.limpiadora_id){
+    const limp=limpiadoras.find(l=>String(l.id)===String(srv.limpiadora_id));
+    if(limp?.tarifa_hora)tarifa=parseFloat(limp.tarifa_hora)||0;
+  }
+  let horas=0;
+  if(srv.hora_inicio&&srv.hora_fin){
+    const [h1,m1]=srv.hora_inicio.split(":").map(Number);
+    const [h2,m2]=srv.hora_fin.split(":").map(Number);
+    horas=Math.max(0,Math.round((h2+m2/60-h1-m1/60)*100)/100);
+  }else if(srv.hora_inicio&&!srv.verificado){
+    const [h1,m1]=srv.hora_inicio.split(":").map(Number);
+    const n=new Date();
+    horas=Math.max(0,Math.round((n.getHours()+n.getMinutes()/60-h1-m1/60)*100)/100);
+  }
+  const guardado=parseFloat(srv.coste_calculado)||0;
+  const estimado=tarifa>0&&horas>0?Math.round(horas*tarifa*100)/100:0;
+  return{importe:guardado>0?guardado:estimado,horas,tarifa,detalle:tarifa>0?`${horas}h × ${tarifa}€/h`:"Tarifa sin definir"};
+}
+
 function Limpieza({perfil,tok,rol,setPage}){
   const isA=rol==="admin";
   const isL=rol==="limpieza";
@@ -5280,39 +5328,57 @@ function Limpieza({perfil,tok,rol,setPage}){
     }catch(_){}setSaving(false);
   };
 
-  // Toggle tarea by tarea_id (string like "bpb1") — POST if new, PATCH if exists
-  const toggleT=async tareaId=>{
-    if(isA||saving)return;
-    setSaving(true);
-    // tareaId here is the DB row id (integer) for existing tareas
+  // Toggle tarea — actualización optimista: UI responde al instante, PATCH va en segundo plano
+  const toggleT=tareaId=>{
+    if(isA)return;
     const cur=tareas.find(t=>t.id===tareaId);
-    const nuevoDone=!cur?.done;
-    await sbPatch("servicio_tareas",`id=eq.${tareaId}`,{
+    if(!cur)return;
+    const nuevoDone=!cur.done;
+    const ts=nuevoDone?new Date().toISOString():null;
+    const por=nuevoDone?perfil.nombre:null;
+    // 1. UI optimista
+    let nuevasTareas;
+    setTareas(prev=>{
+      nuevasTareas=prev.map(t=>t.id===tareaId?{...t,done:nuevoDone,completado_por:por,completado_ts:ts}:t);
+      return nuevasTareas;
+    });
+    // 2. Auto-abrir modal de cierre si todo hecho (usando estado optimista)
+    setTimeout(()=>{
+      const srvC=servicios.find(s=>s.id===actId);
+      const yaVerifC=srvC?.verificado;
+      const todas=(nuevasTareas||[]).filter(t=>!t.es_extra).every(t=>t.done);
+      if(todas&&!yaVerifC&&!isA){
+        setFinalCheck({});setFinalMode(null);setFinalNota("");setFinalStep("check");setShowFinal(true);
+      }
+    },0);
+    // 3. PATCH en segundo plano; rollback si falla
+    sbPatch("servicio_tareas",`id=eq.${tareaId}`,{
       done:nuevoDone,
-      completado_por:nuevoDone?perfil.nombre:null,
-      completado_ts:nuevoDone?new Date().toISOString():null,
-    },tok);
-    await loadTareas(actId);
-    const updated=await sbGet("servicio_tareas",`?servicio_id=eq.${actId}&select=*`,tok);
-    const srvC=servicios.find(s=>s.id===actId);
-    const yaVerifC=srvC?.verificado;
-    const todas=updated.filter(t=>!t.es_extra).every(t=>t.done);
-    if(todas&&!yaVerifC&&!isA){
-      setFinalCheck({});setFinalMode(null);setFinalNota("");setFinalStep("check");setShowFinal(true);
-    }
-    setSaving(false);
+      completado_por:por,
+      completado_ts:ts,
+    },tok).catch(()=>{
+      setTareas(prev=>prev.map(t=>t.id===tareaId?{...t,done:cur.done,completado_por:cur.completado_por,completado_ts:cur.completado_ts}:t));
+    });
   };
 
   const addExtra=async()=>{
     if(!actId||!newE.txt||saving)return;setSaving(true);
-    await sbPost("servicio_tareas",{servicio_id:actId,txt:newE.txt,zona:newE.zona,es_extra:true,done:false,creado_por:perfil.nombre},tok);
-    setNewE({txt:"",zona:""});setShowEx(false);await loadTareas(actId);setSaving(false);
+    try{
+      const [row]=await sbPost("servicio_tareas",{servicio_id:actId,txt:newE.txt,zona:newE.zona,es_extra:true,done:false,creado_por:perfil.nombre},tok);
+      if(row)setTareas(prev=>[...prev,row]);
+    }catch(_){}
+    setNewE({txt:"",zona:""});setShowEx(false);setSaving(false);
   };
 
-  const saveNota=async()=>{
-    if(!notaM||saving)return;setSaving(true);
-    await sbPatch("servicio_tareas",`id=eq.${notaM.id}`,{nota,foto_url:foto||null},tok);
-    setNotaM(null);await loadTareas(actId);setSaving(false);
+  const saveNota=()=>{
+    if(!notaM)return;
+    const id=notaM.id;
+    const newNota=nota;
+    const newFoto=foto;
+    // UI optimista: cierra modal y actualiza local de inmediato
+    setNotaM(null);
+    setTareas(prev=>prev.map(t=>t.id===id?{...t,nota:newNota,foto_url:newFoto||null}:t));
+    sbPatch("servicio_tareas",`id=eq.${id}`,{nota:newNota,foto_url:newFoto||null},tok).catch(()=>{});
   };
   const openN=t=>{setNota(t.nota||"");setFoto(t.foto_url||null);setNotaM(t);};
 
@@ -5417,7 +5483,10 @@ function Limpieza({perfil,tok,rol,setPage}){
     if(modo==="incidencia"&&!finalNota.trim())return;
     setFinalSaving(true);
     try{
-      const notaFinal=`⚠️ Con incidencias: ${finalNota}`;
+      const fijasL=tareas.filter(t=>!t.es_extra);
+      const pendientes=fijasL.filter(t=>!t.done&&!String(t.tarea_id||"").endsWith("_cerrada"));
+      const sufijoPend=pendientes.length>0?` · ${pendientes.length} tareas no realizadas`:"";
+      const notaFinal=`⚠️ Con incidencias: ${finalNota}${sufijoPend}`;
       await sbPatch("servicios",`id=eq.${actId}`,{
         verificado:true,
         verificado_ok:false,
@@ -5427,7 +5496,7 @@ function Limpieza({perfil,tok,rol,setPage}){
       },tok);
       const admins=await sbGet("usuarios","?rol=eq.admin&select=id",tok);
       const srv=servicios.find(s=>s.id===actId);
-      const msg=`⚠️ ${perfil.nombre} ha cerrado "${srv?.nombre}" con incidencias: "${finalNota}"`;
+      const msg=`⚠️ ${perfil.nombre} ha cerrado "${srv?.nombre}" con incidencias: "${finalNota}"${sufijoPend}`;
       for(const a of admins){
         await sbPost("notificaciones",{para:a.id,txt:msg},tok);
         sendPush("🌾 Finca El Molino",msg,"limpieza-verificacion");
@@ -5443,10 +5512,20 @@ function Limpieza({perfil,tok,rol,setPage}){
     setFinalSaving(true);
     try{
       const hoyStr=new Date().toISOString().split("T")[0];
-      const notaFinal=`✅ Verificado OK · ${new Date().toLocaleString("es-ES")} · ${horasCalc}h`;
+      // Detectar tareas pendientes (no realizadas) para registrar el cierre parcial.
+      const fijasL=tareas.filter(t=>!t.es_extra);
+      const pendientes=fijasL.filter(t=>!t.done&&!String(t.tarea_id||"").endsWith("_cerrada"));
+      const esParcial=pendientes.length>0;
+      const resumenPend=pendientes.slice(0,8).map(t=>{
+        const tx=LIMP_T.find(x=>x.id===t.tarea_id)?.txt||t.txt||t.tarea_id;
+        return `${t.zona||"General"}: ${tx}`;
+      }).join(" · ")+(pendientes.length>8?` (+${pendientes.length-8} más)`:"");
+      const notaFinal=esParcial
+        ?`⚠️ Cierre parcial · ${new Date().toLocaleString("es-ES")} · ${horasCalc}h · ${pendientes.length} tareas no realizadas — ${resumenPend}`
+        :`✅ Verificado OK · ${new Date().toLocaleString("es-ES")} · ${horasCalc}h`;
       const patchData={
         verificado:true,
-        verificado_ok:true,
+        verificado_ok:!esParcial,
         verificado_nota:notaFinal,
         verificado_por:perfil.nombre,
         verificado_ts:new Date().toISOString(),
@@ -5456,23 +5535,26 @@ function Limpieza({perfil,tok,rol,setPage}){
       };
       await sbPatch("servicios",`id=eq.${actId}`,patchData,tok).catch(()=>{
         // Si campos no existen, reintentar sin ellos
-        return sbPatch("servicios",`id=eq.${actId}`,{verificado:true,verificado_ok:true,verificado_nota:notaFinal,verificado_por:perfil.nombre,verificado_ts:new Date().toISOString()},tok);
+        return sbPatch("servicios",`id=eq.${actId}`,{verificado:true,verificado_ok:!esParcial,verificado_nota:notaFinal,verificado_por:perfil.nombre,verificado_ts:new Date().toISOString()},tok);
       });
       // Insertar gasto según modalidad
       const srv_g=servicios.find(s=>s.id===actId);
       const mod=srv_g?.modalidad_pago||"por_horas";
       const fechaFmt=new Date(srv_g?.fecha+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"});
+      const sufijoParcial=esParcial?" (parcial)":"";
       if(mod==="permuta"){
-        await sbPost("gastos",{fecha:hoyStr,categoria:"Personal",concepto:`Permuta: ${srv_g?.permuta_descripcion||"Limpieza"} - ${srv_g?.nombre||"Servicio"} - ${fechaFmt}`,importe:0,origen:"auto_limpieza"},tok).catch(()=>{});
+        await sbPost("gastos",{fecha:hoyStr,categoria:"Personal",concepto:`Permuta: ${srv_g?.permuta_descripcion||"Limpieza"} - ${srv_g?.nombre||"Servicio"}${sufijoParcial} - ${fechaFmt}`,importe:0,origen:"auto_limpieza"},tok).catch(()=>{});
       }else if(mod==="precio_fijo_servicio"&&costeCalc>0){
-        await sbPost("gastos",{fecha:hoyStr,categoria:"Personal",concepto:`Limpieza - ${srv_g?.nombre||"Servicio"} - ${fechaFmt}`,importe:costeCalc,origen:"auto_limpieza"},tok).catch(()=>{});
+        await sbPost("gastos",{fecha:hoyStr,categoria:"Personal",concepto:`Limpieza - ${srv_g?.nombre||"Servicio"}${sufijoParcial} - ${fechaFmt}`,importe:costeCalc,origen:"auto_limpieza"},tok).catch(()=>{});
       }else if(tarifaHora>0&&costeCalc>0){
-        await sbPost("gastos",{fecha:hoyStr,categoria:"Personal",concepto:`Limpieza - ${srv_g?.nombre||"Servicio"} - ${fechaFmt}`,importe:costeCalc,origen:"auto_limpieza"},tok).catch(()=>{});
+        await sbPost("gastos",{fecha:hoyStr,categoria:"Personal",concepto:`Limpieza - ${srv_g?.nombre||"Servicio"}${sufijoParcial} - ${fechaFmt}`,importe:costeCalc,origen:"auto_limpieza"},tok).catch(()=>{});
       }
       const admins=await sbGet("usuarios","?rol=eq.admin&select=id",tok);
       const srv=servicios.find(s=>s.id===actId);
       const costoTxt=tarifaHora>0?` (${horasCalc}h × ${tarifaHora}€ = ${costeCalc}€)`:"";
-      const msg=`✅ ${perfil.nombre} ha verificado el servicio "${srv?.nombre}". Todo listo.${costoTxt}`;
+      const msg=esParcial
+        ?`⚠️ ${perfil.nombre} ha cerrado "${srv?.nombre}" como parcial: ${pendientes.length} tareas no realizadas.${costoTxt}`
+        :`✅ ${perfil.nombre} ha verificado el servicio "${srv?.nombre}". Todo listo.${costoTxt}`;
       for(const a of admins){
         await sbPost("notificaciones",{para:a.id,txt:msg},tok);
         sendPush("🌾 Finca El Molino",msg,"limpieza-verificacion");
@@ -5639,7 +5721,7 @@ function Limpieza({perfil,tok,rol,setPage}){
                   <OpsAvatar name={srv.limpiadora_nombre||"?"} size={48}/>
                   <div style={{flex:1}}>
                     <div style={{fontSize:16,fontWeight:700,color:T.ink}}>{srv.limpiadora_nombre||"Sin asignar"}</div>
-                    <div style={{fontSize:12,color:T.ink3,marginTop:2}}>Limpiadora · {srv.modalidad_pago||"horas"} · {srv.tarifa_hora||0}€/h</div>
+                    <div style={{fontSize:12,color:T.ink3,marginTop:2}}>Limpiadora · {limpModLbl(srv.modalidad_pago)}{srv.modalidad_pago==="por_horas"&&srv.tarifa_hora_aplicada?` · ${parseFloat(srv.tarifa_hora_aplicada)}€/h`:""}</div>
                   </div>
                 </div>
                 <div style={{height:1,background:T.line,margin:"0 0 14px"}}/>
@@ -5655,18 +5737,17 @@ function Limpieza({perfil,tok,rol,setPage}){
                 </div>
               </div>
               {/* Coste terracotta */}
+              {(()=>{const c=limpCalcCoste(srv,limpiadoras);const yaCerr=parseFloat(srv.coste_calculado)>0;return(
               <div style={{background:T.terracotta,borderRadius:18,padding:20,color:T.ink}}>
-                <div style={{fontSize:11,color:"rgba(30,20,10,0.7)",letterSpacing:.8,textTransform:"uppercase",fontWeight:700,marginBottom:8}}>Coste calculado</div>
+                <div style={{fontSize:11,color:"rgba(30,20,10,0.7)",letterSpacing:.8,textTransform:"uppercase",fontWeight:700,marginBottom:8}}>{yaCerr?"Coste calculado":c.importe>0?"Coste estimado":"Coste"}</div>
                 <div style={{fontSize:48,fontWeight:700,letterSpacing:-1.8,lineHeight:1}}>
-                  {parseFloat(srv.coste_calculado||0)>0?fmtE(srv.coste_calculado):"—"}
+                  {c.importe>0?fmtE(c.importe):"—"}
                 </div>
                 <div style={{fontSize:12,color:"rgba(30,20,10,0.75)",marginTop:10,lineHeight:1.5}}>
-                  {srv.modalidad_pago==="horas"
-                    ?<><div><b>{srv.horas_trabajadas||0}h</b> × {srv.tarifa_hora||0}€/h</div><div style={{opacity:.7}}>calculado del cronómetro</div></>
-                    :<div>Precio fijo pactado</div>
-                  }
+                  <div>{c.detalle}</div>
+                  <div style={{opacity:.7}}>{limpModLbl(srv.modalidad_pago)}{!yaCerr&&srv.hora_inicio&&!srv.hora_fin&&srv.modalidad_pago==="por_horas"?" · en curso":""}</div>
                 </div>
-              </div>
+              </div>);})()}
             </div>
 
             {/* Progreso zonas */}
@@ -5908,7 +5989,7 @@ function Limpieza({perfil,tok,rol,setPage}){
               <OpsAvatar name={srv.limpiadora_nombre||"?"} size={38}/>
               <div style={{flex:1}}>
                 <div style={{fontSize:13,fontWeight:700,color:T.ink}}>{srv.limpiadora_nombre||"Sin asignar"}</div>
-                <div style={{fontSize:11,color:T.ink3}}>Limpiadora · {srv.modalidad_pago||"horas"} · {srv.tarifa_hora||0}€/h</div>
+                <div style={{fontSize:11,color:T.ink3}}>Limpiadora · {limpModLbl(srv.modalidad_pago)}{srv.modalidad_pago==="por_horas"&&srv.tarifa_hora_aplicada?` · ${parseFloat(srv.tarifa_hora_aplicada)}€/h`:""}</div>
               </div>
             </div>
             <div style={{height:1,background:T.line,margin:"0 0 12px"}}/>
@@ -5923,25 +6004,24 @@ function Limpieza({perfil,tok,rol,setPage}){
         </div>
 
         {/* Coste — bloque terracotta */}
+        {(()=>{const c=limpCalcCoste(srv);const yaCerr=parseFloat(srv.coste_calculado)>0;return(
         <div style={{padding:"0 20px 14px"}}>
           <div style={{fontSize:11,color:T.ink3,letterSpacing:1,textTransform:"uppercase",fontWeight:700,marginBottom:8}}>Coste</div>
           <div style={{background:T.terracotta,borderRadius:20,padding:18,color:T.ink}}>
             <div style={{display:"flex",alignItems:"flex-end",justifyContent:"space-between",gap:10}}>
               <div>
-                <div style={{fontSize:10,color:"rgba(30,20,10,0.65)",letterSpacing:1,textTransform:"uppercase",fontWeight:700}}>Total calculado</div>
+                <div style={{fontSize:10,color:"rgba(30,20,10,0.65)",letterSpacing:1,textTransform:"uppercase",fontWeight:700}}>{yaCerr?"Total calculado":c.importe>0?"Estimado":"Total"}</div>
                 <div style={{fontSize:44,fontWeight:700,letterSpacing:-1.5,lineHeight:1,marginTop:6}}>
-                  {parseFloat(srv.coste_calculado||0)>0?parseFloat(srv.coste_calculado).toLocaleString("es-ES")+"€":"—"}
+                  {c.importe>0?Math.round(c.importe).toLocaleString("es-ES")+"€":"—"}
                 </div>
               </div>
               <div style={{textAlign:"right",fontSize:11,color:"rgba(30,20,10,0.75)",lineHeight:1.6}}>
-                {srv.modalidad_pago==="horas"
-                  ?<><div><b>{srv.horas_trabajadas||0}h</b> × {srv.tarifa_hora||0}€</div><div style={{opacity:.7}}>modalidad por horas</div></>
-                  :<div>Precio fijo</div>
-                }
+                <div>{c.detalle}</div>
+                <div style={{opacity:.7}}>{limpModLbl(srv.modalidad_pago)}{!yaCerr&&srv.hora_inicio&&!srv.hora_fin&&srv.modalidad_pago==="por_horas"?" · en curso":""}</div>
               </div>
             </div>
           </div>
-        </div>
+        </div>);})()}
 
         {/* Progreso zonas */}
         {(()=>{
@@ -5999,12 +6079,14 @@ function Limpieza({perfil,tok,rol,setPage}){
             )}
           </>}
 
-          {/* Botón verificación si todo hecho y no verificado */}
-          {!isA&&todoHecho&&!yaVerif&&(
+          {/* Botón verificación: si está en curso y no verificado, siempre se puede cerrar
+              (también de forma parcial si quedan tareas). */}
+          {!isA&&srv.hora_inicio&&!yaVerif&&(
             <div style={{marginBottom:14}}>
               <button className="btn bp" style={{width:"100%",justifyContent:"center",fontSize:15,padding:"12px"}} onClick={()=>{setFinalCheck({});setFinalMode(null);setFinalNota("");setFinalStep("check");setShowFinal(true);}}>
-                ✅ Abrir verificación final del servicio
+                {todoHecho?"✅ Abrir verificación final del servicio":`✅ Finalizar servicio (${tot-comp} tareas pendientes)`}
               </button>
+              {!todoHecho&&<div style={{fontSize:11,color:T.ink3,marginTop:6,textAlign:"center"}}>Puedes cerrar el servicio aunque queden tareas (ej: solo planta baja). Quedará archivado indicando lo no realizado.</div>}
             </div>
           )}
 
@@ -6066,14 +6148,24 @@ function Limpieza({perfil,tok,rol,setPage}){
                       📷 Cerrar zona con foto
                       <input type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={async e=>{
                         const f=e.target.files[0];if(!f)return;
-                        try{const url=await uploadFotoSeguro(f);await sbPost("servicio_tareas",{servicio_id:actId,tarea_id:zona.id+"_cerrada",zona:zona.nombre,done:true,completado_por:perfil.nombre,completado_ts:new Date().toISOString(),foto_url:url,es_extra:false},tok);await loadTareas(actId);}catch(_){}
+                        try{
+                          const url=await uploadFotoSeguro(f);
+                          const [row]=await sbPost("servicio_tareas",{servicio_id:actId,tarea_id:zona.id+"_cerrada",zona:zona.nombre,done:true,completado_por:perfil.nombre,completado_ts:new Date().toISOString(),foto_url:url,es_extra:false},tok);
+                          if(row)setTareas(prev=>[...prev,row]);
+                        }catch(_){}
                       }}/>
                     </label>
                     <button className="btn bg" style={{width:"100%",justifyContent:"center",marginTop:6}} onClick={async()=>{
-                      await sbPost("servicio_tareas",{servicio_id:actId,tarea_id:zona.id+"_cerrada",zona:zona.nombre,done:true,completado_por:perfil.nombre,completado_ts:new Date().toISOString(),es_extra:false},tok).catch(()=>{});await loadTareas(actId);
+                      try{
+                        const [row]=await sbPost("servicio_tareas",{servicio_id:actId,tarea_id:zona.id+"_cerrada",zona:zona.nombre,done:true,completado_por:perfil.nombre,completado_ts:new Date().toISOString(),es_extra:false},tok);
+                        if(row)setTareas(prev=>[...prev,row]);
+                      }catch(_){}
                     }}>Cerrar zona sin foto</button>
                   </>:<button className="btn bp" style={{width:"100%",justifyContent:"center"}} onClick={async()=>{
-                    await sbPost("servicio_tareas",{servicio_id:actId,tarea_id:zona.id+"_cerrada",zona:zona.nombre,done:true,completado_por:perfil.nombre,completado_ts:new Date().toISOString(),es_extra:false},tok).catch(()=>{});await loadTareas(actId);
+                    try{
+                      const [row]=await sbPost("servicio_tareas",{servicio_id:actId,tarea_id:zona.id+"_cerrada",zona:zona.nombre,done:true,completado_por:perfil.nombre,completado_ts:new Date().toISOString(),es_extra:false},tok);
+                      if(row)setTareas(prev=>[...prev,row]);
+                    }catch(_){}
                   }}>✅ Cerrar zona</button>}
                 </div>}
                 {cerradaRow?.foto_url&&<img src={cerradaRow.foto_url} alt="" className="pthumb" style={{marginTop:8}}/>}
@@ -6161,10 +6253,13 @@ function Limpieza({perfil,tok,rol,setPage}){
           {!finalMode&&<>
             <div style={{textAlign:"center",marginBottom:20}}>
               <div style={{fontSize:30,fontWeight:700,color:T.ink,letterSpacing:-.8,lineHeight:1.05}}>Cierre del servicio</div>
-              <div style={{fontSize:13,color:T.ink3,marginTop:6}}>Todas las tareas completadas. ¿Cómo quieres cerrar?</div>
+              <div style={{fontSize:13,color:T.ink3,marginTop:6}}>{todoHecho?"Todas las tareas completadas. ¿Cómo quieres cerrar?":`Quedan ${tot-comp} tareas sin marcar. Puedes cerrar el servicio igualmente (cierre parcial).`}</div>
             </div>
+            {!todoHecho&&<div style={{background:T.gold+"18",border:`1px solid ${T.gold}55`,borderRadius:14,padding:"10px 12px",marginBottom:14,fontSize:12,color:"#8A6B0F",lineHeight:1.5}}>
+              ⚠️ <b>Cierre parcial</b> — el servicio quedará archivado indicando las tareas no realizadas. Útil para limpiezas parciales (ej: solo planta baja).
+            </div>}
             <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:20}}>
-              <button onClick={()=>setFinalMode("ok")} style={{width:"100%",padding:16,borderRadius:16,background:T.ink,color:"white",border:0,fontFamily:T.sans,fontWeight:700,fontSize:15,cursor:"pointer"}}>✅ Todo correcto — casa lista</button>
+              <button onClick={()=>setFinalMode("ok")} style={{width:"100%",padding:16,borderRadius:16,background:T.ink,color:"white",border:0,fontFamily:T.sans,fontWeight:700,fontSize:15,cursor:"pointer"}}>{todoHecho?"✅ Todo correcto — casa lista":"✅ Cerrar servicio (parcial)"}</button>
               <button onClick={()=>setFinalMode("incidencia")} style={{width:"100%",padding:16,borderRadius:16,background:T.surface,color:T.ink,border:`1px solid ${T.line}`,fontFamily:T.sans,fontWeight:700,fontSize:15,cursor:"pointer"}}>⚠️ Cerrar con incidencias</button>
             </div>
           </>}
@@ -9066,7 +9161,8 @@ function CalBase({tok,rol="admin"}){
           const txtColor=(isSel||isT)?"#fff":hasRsv?(rsv[0].incluye_casa?T.terracotta:T.gold):hasAir?T.softBlue:T.ink2;
           return<div key={d} onClick={()=>setSel(isSel?null:d)} style={{aspectRatio:"1/1.1",borderRadius:10,padding:4,background:cellBg,border:cellBorder,display:"flex",flexDirection:"column",justifyContent:"space-between",overflow:"hidden",cursor:"pointer"}}>
             <div style={{fontSize:12,fontWeight:(isSel||isT)?700:600,color:txtColor,textAlign:"right"}}>{d}</div>
-            {hasRsv&&!isSel&&!isT&&<div style={{fontSize:7.5,fontWeight:700,color:T.ink,lineHeight:1.05,overflow:"hidden"}}>{rsv[0].nombre?.split("·")[0]?.trim().slice(0,14)}</div>}
+            {hasRsv&&!isSel&&!isT&&!isL&&<div style={{fontSize:7.5,fontWeight:700,color:T.ink,lineHeight:1.05,overflow:"hidden"}}>{rsv[0].nombre?.split("·")[0]?.trim().slice(0,14)}</div>}
+            {hasRsv&&!isSel&&!isT&&isL&&<div style={{fontSize:7.5,fontWeight:700,color:T.ink,lineHeight:1.05,overflow:"hidden"}}>{rsv[0].incluye_casa?"Evento+Casa":"Evento"}</div>}
             {hasAir&&!hasRsv&&!isSel&&!isT&&<div style={{width:6,height:6,borderRadius:999,background:T.softBlue,alignSelf:"flex-end"}}/>}
             {esBloq&&!hasRsv&&!hasAir&&!isSel&&<div style={{fontSize:7,alignSelf:"flex-end",opacity:.7}}>🔒</div>}
           </div>;
@@ -9086,16 +9182,16 @@ function CalBase({tok,rol="admin"}){
       {fechasBloq.has(ds(sel))&&grReservas(sel).length===0&&grAirbnb(sel).length===0&&<div style={{background:T.terracotta+"15",border:`1px solid ${T.terracotta}40`,borderRadius:14,padding:12,display:"flex",gap:10,alignItems:"center",marginBottom:8}}><span style={{fontSize:18}}>🔒</span><div style={{fontSize:13,fontWeight:600,color:T.ink}}>Día bloqueado automáticamente por reserva con casa</div></div>}
       {grReservas(sel).map(r=>{const color=r.incluye_casa?T.terracotta:T.gold;return<div key={r.id} style={{background:color,borderRadius:18,padding:14,marginBottom:8,color:T.ink}}>
         <div style={{fontSize:10.5,fontWeight:700,letterSpacing:.6,textTransform:"uppercase",opacity:.7}}>{r.tipo||"Evento"} · {r.incluye_casa?"Finca + Casa":"Solo finca"}</div>
-        <div style={{fontSize:17,fontWeight:700,letterSpacing:-.4,marginTop:4}}>{r.nombre}</div>
-        {r.invitados&&<div style={{fontSize:12,marginTop:4,opacity:.8}}>{r.invitados} invitados</div>}
+        <div style={{fontSize:17,fontWeight:700,letterSpacing:-.4,marginTop:4}}>{isL?"Evento":r.nombre}</div>
+        {!isL&&r.invitados&&<div style={{fontSize:12,marginTop:4,opacity:.8}}>{r.invitados} invitados</div>}
         {isA&&getPrecioReserva(r)>0&&<div style={{fontSize:14,fontWeight:700,marginTop:8}}>{(Math.round(getPrecioReserva(r))).toLocaleString("es-ES")}€</div>}
       </div>;})}
       {grAirbnb(sel).map(a=>(isC
         ?<div key={a.id} style={{background:T.coral+"15",border:`1px solid ${T.coral}`,borderRadius:14,padding:12,color:T.danger,fontWeight:700,fontSize:13}}>🔴 Fecha no disponible</div>
         :<div key={a.id} style={{background:T.softBlue+"20",border:`1px solid ${T.softBlue}55`,borderRadius:18,padding:14,marginBottom:8}}>
           <div style={{fontSize:10,fontWeight:700,letterSpacing:.5,textTransform:"uppercase",color:T.softBlue,marginBottom:4}}>Airbnb</div>
-          <div style={{fontSize:15,fontWeight:700,color:T.ink}}>{(isA||isL)?a.huesped:"Alojamiento turístico"}</div>
-          <div style={{fontSize:11,color:T.ink3,marginTop:3}}>{fmtRango(a)}{a.personas?` · ${a.personas} personas`:""}</div>
+          <div style={{fontSize:15,fontWeight:700,color:T.ink}}>{isA?a.huesped:"Alojamiento turístico"}</div>
+          <div style={{fontSize:11,color:T.ink3,marginTop:3}}>{fmtRango(a)}{(isA||isJ)&&a.personas?` · ${a.personas} personas`:""}</div>
           {isA&&a.precio&&<div style={{fontSize:13,fontWeight:700,color:T.ink,marginTop:6}}>{parseFloat(a.precio).toLocaleString("es-ES")}€</div>}
         </div>
       ))}
@@ -9131,8 +9227,8 @@ function CalBase({tok,rol="admin"}){
         {airbnbMes.slice(0,4).map(a=><div key={a.id} style={{background:T.surface,border:`1px solid ${T.line}`,borderRadius:14,padding:12,display:"flex",alignItems:"center",gap:12}}>
           <div style={{width:36,height:36,borderRadius:10,background:T.softBlue+"30",display:"flex",alignItems:"center",justifyContent:"center"}}><FmIcon name="home" size={16} stroke={T.softBlue}/></div>
           <div style={{flex:1,minWidth:0}}>
-            <div style={{fontSize:13,fontWeight:700,color:T.ink}}>{(isA||isL)?a.huesped:"Alojamiento turístico"}</div>
-            <div style={{fontSize:11,color:T.ink3}}>{fmtRango(a)}{a.personas?` · ${a.personas} personas`:""}</div>
+            <div style={{fontSize:13,fontWeight:700,color:T.ink}}>{isA?a.huesped:"Alojamiento turístico"}</div>
+            <div style={{fontSize:11,color:T.ink3}}>{fmtRango(a)}{isA&&a.personas?` · ${a.personas} personas`:""}</div>
           </div>
         </div>)}
       </div>
@@ -9153,6 +9249,23 @@ function CalBase({tok,rol="admin"}){
           </div>)}
         </div>}
     </div>}
+
+    {/* Lista eventos del mes para limpieza (sin nombre/precio) */}
+    {isL&&!sel&&rsvMes.length>0&&<div style={{marginTop:16}}>
+      <div style={{fontSize:10.5,color:T.ink3,letterSpacing:.6,fontWeight:700,textTransform:"uppercase",marginBottom:10}}>Eventos este mes</div>
+      <div style={{display:"flex",flexDirection:"column",gap:8}}>
+        {rsvMes.map(r=>{const color=r.incluye_casa?T.terracotta:T.gold;const f=new Date(r.fecha+"T12:00:00");const dayN=f.toLocaleDateString("es-ES",{weekday:"short"}).slice(0,3).toUpperCase();return<div key={r.id} onClick={()=>setSel(f.getDate())} style={{background:T.surface,border:`1px solid ${T.line}`,borderRadius:14,padding:12,display:"flex",alignItems:"center",gap:12,cursor:"pointer"}}>
+          <div style={{width:42,textAlign:"center",paddingRight:10,borderRight:`1px solid ${T.line}`}}>
+            <div style={{fontSize:9,color:T.ink3,fontWeight:700,letterSpacing:.5}}>{dayN}</div>
+            <div style={{fontSize:20,fontWeight:700,color,lineHeight:1,fontFamily:T.sans}}>{f.getDate()}</div>
+          </div>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontSize:13,fontWeight:700,color:T.ink}}>Evento{r.incluye_casa?" + Casa":" (solo finca)"}</div>
+            <div style={{fontSize:11,color:T.ink3}}>{f.toLocaleDateString("es-ES",{weekday:"long",day:"numeric",month:"long"})}</div>
+          </div>
+        </div>;})}
+      </div>
+    </div>}
   </>;
 }
 
@@ -9165,36 +9278,21 @@ function Calendario({tok,rol}){
   </>;
 }
 function CalLimpieza({tok,perfil}){
-  const [srv,setSrv]=useState(null);
-  const [tareas,setTareas]=useState([]);
+  // Calendario para el rol limpieza: muestra el mes con los huecos de
+  // reservas (Airbnb / evento) sin nombre ni precio. Las tarjetas de
+  // coordinación (¿casa lista?, elegir fecha) siguen apareciendo arriba.
   const [coordP,setCoordP]=useState([]);
   const [savingC,setSavingC]=useState(false);
-  const [saving,setSaving]=useState(false);
-  const [zonasOpen,setZonasOpen]=useState({0:true});
   const [load,setLoad]=useState(true);
   const [showDatePick,setShowDatePick]=useState(null);
   const [customDate,setCustomDate]=useState("");
   const t=perfil?.es_operario?SB_KEY:tok;
   useEffect(()=>{
-    Promise.all([
-      sbGet("servicios","?select=*&order=fecha.desc&limit=1",t),
-      sbGet("coordinacion_servicios","?estado=in.(preguntando_si_lista,servicio_creado_pendiente_fecha)&select=*",t),
-    ]).then(([srvs,coords])=>{
-      setCoordP(coords.filter(c=>!c.tipo?.includes("jardin")));
-      if(srvs.length>0){setSrv(srvs[0]);sbGet("servicio_tareas",`?servicio_id=eq.${srvs[0].id}&select=*`,t).then(setTareas).catch(()=>{});}
-      setLoad(false);
-    }).catch(()=>setLoad(false));
+    sbGet("coordinacion_servicios","?estado=in.(preguntando_si_lista,servicio_creado_pendiente_fecha)&select=*",t)
+      .then(coords=>setCoordP(coords.filter(c=>!c.tipo?.includes("jardin"))))
+      .catch(()=>{})
+      .finally(()=>setLoad(false));
   },[]);
-  const toggleT=async(tareaId)=>{
-    if(saving)return;setSaving(true);
-    const cur=tareas.find(x=>x.id===tareaId);const nuevoDone=!cur?.done;
-    await sbPatch("servicio_tareas",`id=eq.${tareaId}`,{done:nuevoDone,completado_por:nuevoDone?(perfil?.nombre||"Staff"):null,completado_ts:nuevoDone?new Date().toISOString():null},tok).catch(()=>{});
-    setTareas(prev=>prev.map(x=>x.id===tareaId?{...x,done:nuevoDone}:x));setSaving(false);
-  };
-  const tMap={};tareas.forEach(x=>{if(x.tarea_id)tMap[x.tarea_id]=x;});
-  const allT=LIMP_ZONAS.flatMap(z=>[...(z.tareas||[]),...(z.subzonas?.flatMap(s=>s.tareas)||[])]);
-  const totalT=allT.length;const doneT=allT.filter(x=>tMap[x.id]?.done).length;
-  const pct=totalT>0?Math.round(doneT/totalT*100):0;const deg=Math.round(doneT/Math.max(totalT,1)*360);
   const confirmarFecha=async(c,dia)=>{
     if(savingC)return;setSavingC(true);const ds=dia.toISOString().split("T")[0];
     try{await sbPatch("coordinacion_servicios",`id=eq.${c.id}`,{fecha_programada:ds,estado:"confirmado",respondido_por:perfil?.nombre||"Staff"},tok);
@@ -9206,9 +9304,9 @@ function CalLimpieza({tok,perfil}){
   return(
     <div style={{paddingBottom:100}}>
       <div style={{padding:"54px 20px 14px"}}>
-        <div style={{fontSize:11,color:T.ink3,letterSpacing:.6,fontWeight:600,textTransform:"uppercase"}}>Servicio activo</div>
-        <div style={{fontFamily:T.sans,fontSize:28,fontWeight:700,color:T.ink,letterSpacing:-1,lineHeight:1.05}}>Limpieza</div>
-        {srv&&<div style={{fontSize:12,color:T.ink3,marginTop:3}}>{srv.nombre} · {new Date(srv.fecha+"T12:00:00").toLocaleDateString("es-ES",{weekday:"long",day:"numeric",month:"short"})}</div>}
+        <div style={{fontSize:11,color:T.ink3,letterSpacing:.6,fontWeight:600,textTransform:"uppercase"}}>Vista mensual</div>
+        <div style={{fontFamily:T.sans,fontSize:28,fontWeight:700,color:T.ink,letterSpacing:-1,lineHeight:1.05}}>Calendario</div>
+        <div style={{fontSize:12,color:T.ink3,marginTop:3}}>Reservas y bloqueos del mes</div>
       </div>
       <div style={{padding:"0 16px"}}>
         {coordP.map(c=>{
@@ -9241,61 +9339,7 @@ function CalLimpieza({tok,perfil}){
             </div>
           );
         })}
-        {srv?(
-          <div style={{background:T.olive+"18",border:`1px solid ${T.olive}44`,borderRadius:20,padding:16,marginBottom:14,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-            <div>
-              <div style={{fontSize:10,color:"#5A8A3E",letterSpacing:.8,textTransform:"uppercase",fontWeight:700}}>En curso{srv.hora_inicio?` · desde ${srv.hora_inicio}`:""}</div>
-              <div style={{fontFamily:T.sans,fontSize:17,color:T.ink,fontWeight:700,marginTop:2}}>{srv.nombre}</div>
-              <div style={{fontSize:11,color:T.ink3,marginTop:2}}>{LIMP_ZONAS.length} zonas · {totalT} tareas</div>
-            </div>
-            <div style={{width:54,height:54,borderRadius:999,background:`conic-gradient(${T.olive} ${deg}deg,${T.line} 0)`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-              <div style={{width:44,height:44,borderRadius:999,background:T.surface,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:T.sans,fontSize:13,fontWeight:700,color:T.ink}}>{pct}%</div>
-            </div>
-          </div>
-        ):(
-          <div style={{background:T.surface,border:`1px solid ${T.line}`,borderRadius:20,padding:16,marginBottom:14,textAlign:"center",color:T.ink3,fontSize:13}}>Sin servicio activo</div>
-        )}
-        <div style={{display:"flex",flexDirection:"column",gap:8}}>
-          {LIMP_ZONAS.map((z,zi)=>{
-            const zonaTareas=[...(z.tareas||[]),...(z.subzonas?.flatMap(s=>s.tareas)||[])];
-            const donePorZona=zonaTareas.filter(x=>tMap[x.id]?.done).length;
-            const totalPorZona=zonaTareas.length;
-            const zDone=totalPorZona>0&&donePorZona===totalPorZona;
-            const enProg=donePorZona>0&&!zDone;
-            const open=!!zonasOpen[zi];
-            return(
-              <div key={z.id} style={{background:T.surface,border:`1px solid ${T.line}`,borderRadius:16,overflow:"hidden"}}>
-                <button onClick={()=>setZonasOpen(prev=>({...prev,[zi]:!prev[zi]}))} style={{width:"100%",padding:"13px 14px",background:"transparent",border:0,cursor:"pointer",display:"flex",alignItems:"center",gap:12,fontFamily:T.sans,textAlign:"left"}}>
-                  <div style={{width:28,height:28,borderRadius:8,background:zDone?T.olive:enProg?T.gold+"44":T.bg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,flexShrink:0}}>
-                    {zDone?<FmIcon name="check" size={13} stroke="white"/>:<span>{z.emoji}</span>}
-                  </div>
-                  <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontSize:13,fontWeight:600,color:T.ink}}>{z.nombre}</div>
-                    {totalPorZona>0&&<div style={{fontSize:10.5,color:T.ink3,marginTop:1}}>{donePorZona}/{totalPorZona} tareas{enProg&&<span style={{color:T.gold}}> · en progreso</span>}</div>}
-                    {totalPorZona===0&&<div style={{fontSize:10.5,color:T.ink4,marginTop:1}}>Sin tareas registradas</div>}
-                  </div>
-                  <FmIcon name={open?"chevU":"chevD"} size={15} stroke={T.ink3}/>
-                </button>
-                {open&&zonaTareas.length>0&&(
-                  <div style={{padding:"0 14px 14px",borderTop:`1px solid ${T.line}`}}>
-                    <div style={{display:"flex",flexDirection:"column",marginTop:4}}>
-                      {zonaTareas.map((ta,ti)=>{
-                        const dbRow=tMap[ta.id];const done=!!dbRow?.done;
-                        return(
-                          <button key={ta.id} onClick={()=>dbRow&&toggleT(dbRow.id)} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",background:"transparent",border:0,cursor:dbRow?"pointer":"default",fontFamily:T.sans,textAlign:"left",borderBottom:ti<zonaTareas.length-1?`1px solid ${T.line}`:"none"}}>
-                            <div style={{width:20,height:20,borderRadius:6,background:done?T.olive:"transparent",border:`1.5px solid ${done?T.olive:T.ink4}`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{done&&<FmIcon name="check" size={11} stroke="white"/>}</div>
-                            <span style={{flex:1,fontSize:12.5,color:done?T.ink3:T.ink,textDecoration:done?"line-through":"none",fontWeight:done?400:500}}>{ta.txt}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                    {z.foto_requerida&&<button style={{marginTop:8,padding:"8px 12px",borderRadius:8,background:T.bg,border:`1px dashed ${T.ink4}`,color:T.ink2,fontFamily:T.sans,fontSize:11,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:6}}><FmIcon name="camera" size={13} stroke={T.ink2}/> Subir foto de zona</button>}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
+        <CalBase tok={t} rol="limpieza"/>
       </div>
       {showDatePick&&<div className="ov" onClick={()=>setShowDatePick(null)}><div className="modal" style={{maxWidth:360}} onClick={e=>e.stopPropagation()}>
         <h3>📅 Elegir fecha</h3>
