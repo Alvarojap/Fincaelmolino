@@ -821,15 +821,19 @@ export default function App() {
           cada cabecera, como el patrón AppHeader del diseño. */}
       {!drawerOpen&&<button className="mob-fab-menu" onClick={()=>setDrawerOpen(true)} aria-label="Menú" style={{
         position:'fixed',
-        top:'max(calc(env(safe-area-inset-top, 0px) + 50px), 50px)',
-        right:14,
-        width:42,height:42,borderRadius:999,
+        // Alineado con el top de los botones de acción de las cabeceras:
+        // las cabeceras tienen padding-top:54 + alignItems:flex-end, así
+        // que el botón de acción tiene su top exactamente en y=54. Mismo
+        // tamaño (38x38) que el resto para que quede idéntico.
+        top:'max(calc(env(safe-area-inset-top, 0px) + 10px), 54px)',
+        right:20,
+        width:38,height:38,borderRadius:999,
         background:T.surface,border:'1px solid '+T.line,
         alignItems:'center',justifyContent:'center',
         cursor:'pointer',zIndex:90
       }}>
-        <FmIcon name="menu" size={18} stroke={T.ink}/>
-        {(noVistos||0)>0&&<span style={{position:'absolute',top:5,right:5,width:9,height:9,borderRadius:999,background:'#F35757',border:'2px solid '+T.surface}}/>}
+        <FmIcon name="menu" size={17} stroke={T.ink}/>
+        {(noVistos||0)>0&&<span style={{position:'absolute',top:4,right:4,width:9,height:9,borderRadius:999,background:'#F35757',border:'2px solid '+T.surface}}/>}
       </button>}
       {drawerOpen&&<div className="drawer-overlay" onClick={()=>setDrawerOpen(false)}/>}
       <div className={`drawer${drawerOpen?" open":""}`}>
@@ -4548,7 +4552,7 @@ function JardinAdmin({perfil,tok,setPage}){
   return <div style={{paddingBottom:100,background:T.bg,minHeight:"100%",fontFamily:T.sans}}>
 
     {/* Header */}
-    <div style={{padding:"54px 20px 16px",display:"flex",alignItems:"flex-end",justifyContent:"space-between"}}>
+    <div style={{padding:"54px 20px 16px",display:"flex",alignItems:"flex-start",justifyContent:"space-between"}}>
       <div>
         <div style={{fontSize:12,color:T.ink3,fontWeight:500}}>Planificación</div>
         <div style={{fontSize:30,fontWeight:700,color:T.ink,letterSpacing:-1,lineHeight:1.02}}>Jardinería</div>
@@ -6367,7 +6371,7 @@ function Limpieza({perfil,tok,rol,setPage}){
   /* ═══════ MOBILE LAYOUT ═══════ */
   return <div style={{paddingBottom:100}}>
     {/* Header */}
-    <div style={{padding:"54px 20px 16px",display:"flex",alignItems:"flex-end",justifyContent:"space-between"}}>
+    <div style={{padding:"54px 20px 16px",display:"flex",alignItems:"flex-start",justifyContent:"space-between"}}>
       <div><div style={{fontSize:12,color:T.ink3,fontWeight:500}}>Servicios</div><div style={{fontSize:30,fontWeight:700,color:T.ink,letterSpacing:-1,lineHeight:1.02}}>{isA?"Limpieza":"Mi servicio"}</div></div>
       {isA&&<button onClick={()=>setShowNew(true)} style={{width:38,height:38,borderRadius:999,background:T.ink,border:0,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}><FmIcon name="plus" size={18} stroke="white"/></button>}
     </div>
@@ -8943,7 +8947,7 @@ function Gastos({tok,perfil}){
 
   return <>
     {/* Header */}
-    <div style={{padding:"54px 20px 16px",display:"flex",alignItems:"flex-end",justifyContent:"space-between"}}>
+    <div style={{padding:"54px 20px 16px",display:"flex",alignItems:"flex-start",justifyContent:"space-between"}}>
       <div><div style={{fontSize:12,color:T.ink3,fontWeight:500}}>Control financiero</div><div style={{fontSize:30,fontWeight:700,color:T.ink,letterSpacing:-1,lineHeight:1.02}}>Gastos</div></div>
       <button onClick={()=>{setForm(formVacio);setShowForm(true);}} style={{width:38,height:38,borderRadius:999,background:T.ink,border:0,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}><FmIcon name="plus" size={18} stroke="white"/></button>
     </div>
@@ -10098,7 +10102,7 @@ function CalBase({tok,rol="admin"}){
 
 function Calendario({tok,rol}){
   return <>
-    <div style={{padding:"54px 20px 16px",display:"flex",justifyContent:"space-between",alignItems:"flex-end"}}>
+    <div style={{padding:"54px 20px 16px",display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
       <div><div style={{fontSize:12,color:T.ink3,fontWeight:500}}>Vista mensual</div><div style={{fontSize:28,fontWeight:700,color:T.ink,letterSpacing:-1,lineHeight:1.02}}>Calendario</div></div>
     </div>
     <div className="pb" style={{maxWidth:900}}><CalBase tok={tok} rol={rol}/></div>
@@ -10835,7 +10839,7 @@ function Reservas({tok,rol,perfil,navTarget,setNavTarget,setPage}){
 
   return <div style={{paddingBottom:100}}>
     {/* Header */}
-    <div style={{padding:"54px 20px 16px",display:"flex",alignItems:"flex-end",justifyContent:"space-between",gap:10}}>
+    <div style={{padding:"54px 20px 16px",display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:10}}>
       <div><div style={{fontSize:12,color:T.ink3,fontWeight:500}}>Eventos & Airbnb · {new Date().getFullYear()}</div><div style={{fontSize:30,fontWeight:700,color:T.ink,letterSpacing:-1,lineHeight:1.02}}>Reservas</div></div>
       <div style={{display:"flex",gap:6}}>
         <button onClick={()=>setPage?.("calendario")} style={{width:40,height:40,borderRadius:999,background:T.surface,border:`1px solid ${T.line}`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}><FmIcon name="calendar" size={17} stroke={T.ink}/></button>
@@ -11484,7 +11488,7 @@ function Contactos({perfil,tok,rol,setPage}){
   const conteo=estado=>contactos.filter(c=>c.estado===estado).length;
   return <div style={{background:T.bg,minHeight:"100%",paddingBottom:100}}>
     {/* Header */}
-    <div style={{padding:"54px 20px 16px",display:"flex",alignItems:"flex-end",justifyContent:"space-between",gap:10}}>
+    <div style={{padding:"54px 20px 16px",display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:10}}>
       <div style={{flex:1}}><div style={{fontSize:12,color:T.ink3,fontWeight:500,marginBottom:2}}>CRM · Clientes y leads</div><div style={{fontSize:30,fontWeight:700,color:T.ink,letterSpacing:-1,lineHeight:1.02}}>Contactos</div></div>
       <button onClick={()=>{setForm(formVacio);setEditando(false);setShowForm(true);}} style={{width:40,height:40,borderRadius:999,background:T.terracotta,color:"white",border:0,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",boxShadow:"0 6px 14px rgba(236,104,62,.3)",flexShrink:0}}><FmIcon name="plus" size={18} stroke="white"/></button>
     </div>
