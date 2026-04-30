@@ -4687,17 +4687,23 @@ function Incidencias({tok}){
   useEffect(()=>{
     (async()=>{
       try{
+        // Optimización: order=created_at.desc + limit + select acotado.
+        // Antes hacíamos SELECT * sin orden ni límite sobre 3 tablas que
+        // crecen sin parar, lo que provocaba el "tarda demasiado".
+        const FIELDS_S="id,tarea_id,nota,foto_url,created_at,completado_por,resp_admin,resp_ts";
+        const FIELDS_P="id,txt,zona,nota,foto_url,created_at,completado_por,resp_admin,resp_ts";
+        const FIELDS_L="id,tarea_id,txt,zona,nota,foto_url,created_at,completado_por,resp_admin,resp_ts,servicios(nombre)";
         const [jsem,jpunt,stk]=await Promise.all([
-          sbGet("jardin_semana","?nota=not.is.null&tarea_id=neq.VERIFICACION_FINAL&select=*",tok),
-          sbGet("jardin_puntual","?nota=not.is.null&select=*",tok),
-          sbGet("servicio_tareas","?nota=not.is.null&select=*,servicios(nombre)",tok),
+          sbGet("jardin_semana",`?nota=not.is.null&tarea_id=neq.VERIFICACION_FINAL&select=${FIELDS_S}&order=created_at.desc.nullslast&limit=300`,tok),
+          sbGet("jardin_puntual",`?nota=not.is.null&select=${FIELDS_P}&order=created_at.desc.nullslast&limit=300`,tok),
+          sbGet("servicio_tareas",`?nota=not.is.null&select=${FIELDS_L}&order=created_at.desc.nullslast&limit=300`,tok),
         ]);
         const todasTareas=Object.values(JARDIN_T).flat();
         const all=[
           ...jsem.map(r=>({...r,tipo:"Jardín",tag:"🌿",tarea:todasTareas.find(t=>t.id===r.tarea_id)?.txt||r.tarea_id,zona:todasTareas.find(t=>t.id===r.tarea_id)?.zona||"—",isSemana:true})),
           ...jpunt.map(r=>({...r,tipo:"Jardín puntual",tag:"📌",tarea:r.txt,zona:r.zona||"General"})),
           ...stk.map(r=>({...r,tipo:`Limpieza: ${r.servicios?.nombre||""}`,tag:"🧹",tarea:r.txt||(LIMP_T.find(t=>t.id===r.tarea_id)?.txt)||r.tarea_id,zona:r.zona||"—"})),
-        ].sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
+        ].sort((a,b)=>new Date(b.created_at||0)-new Date(a.created_at||0));
         setItems(all);
       }catch(_){}
       setLoad(false);
