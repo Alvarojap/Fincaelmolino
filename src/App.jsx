@@ -9685,6 +9685,197 @@ function Ajustes({tok,rol,perfil,setPage}){
     setNotifPerm(p);
   };
 
+  // ─── EXPORTACIONES ────────────────────────────────────────────────────────
+  const [exporting,setExporting]=useState(null);
+  // Helper: convierte una celda a CSV-safe (comillas + escape de comillas internas)
+  const csvCell=v=>{
+    if(v==null)return "";
+    const s=String(v).replace(/"/g,'""');
+    return /[",\n;]/.test(s)?`"${s}"`:s;
+  };
+  const csvRow=arr=>arr.map(csvCell).join(";")+"\n";
+  const downloadFile=(filename,content,mime="text/csv;charset=utf-8")=>{
+    // BOM para que Excel/Numbers detecten UTF-8 correctamente
+    const blob=new Blob(["﻿"+content],{type:mime});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement("a");
+    a.href=url;a.download=filename;document.body.appendChild(a);a.click();
+    setTimeout(()=>{document.body.removeChild(a);URL.revokeObjectURL(url);},0);
+  };
+
+  const exportarReservas=async()=>{
+    if(exporting)return;setExporting("reservas");
+    try{
+      const año=new Date().getFullYear();
+      const [rsv,abnb]=await Promise.all([
+        sbGet("reservas",`?fecha=gte.${año-1}-01-01&select=*&order=fecha.asc`,tok).catch(()=>[]),
+        sbGet("reservas_airbnb",`?fecha_entrada=gte.${año-1}-01-01&select=*&order=fecha_entrada.asc`,tok).catch(()=>[]),
+      ]);
+      const headers=["Tipo","Fecha","Nombre/Huésped","Tipo evento","Incluye casa","Personas/Invitados","Estado","Precio total","Seña importe","Seña cobrada","Saldo cobrado","Estado pago","Notas","ID"];
+      let csv=csvRow(headers);
+      rsv.forEach(r=>{
+        const total=parseFloat(r.precio_total)||parseFloat(r.precio)||((parseFloat(r.precio_finca)||0)+(parseFloat(r.precio_casa)||0));
+        csv+=csvRow(["Evento",r.fecha||"",r.nombre||"",r.tipo||"",r.incluye_casa?"Sí":"No",r.invitados||"",r.estado||"",total||"",r.seña_importe||"",r.seña_cobrada?"Sí":"No",r.saldo_cobrado?"Sí":"No",r.estado_pago||"",r.notas||"",r.id]);
+      });
+      abnb.forEach(a=>{
+        csv+=csvRow(["Airbnb",a.fecha_entrada||"",a.huesped||"",`Airbnb ${a.fecha_entrada||""}→${a.fecha_salida||""}`,"—",a.personas||"",a.cobrado?"cobrado":"pendiente",a.precio||"","","",a.cobrado?"Sí":"No",a.cobrado?"pagado_completo":"pendiente",a.notas||"",a.id]);
+      });
+      downloadFile(`reservas_${año}.csv`,csv);
+      setFeedback(prev=>({...prev,exp:"reservas-ok"}));
+    }catch(e){setFeedback(prev=>({...prev,exp:"error"}));}
+    setTimeout(()=>setFeedback(prev=>({...prev,exp:null})),2500);
+    setExporting(null);
+  };
+
+  const exportarGastos=async()=>{
+    if(exporting)return;setExporting("gastos");
+    try{
+      const año=new Date().getFullYear();
+      const g=await sbGet("gastos",`?fecha=gte.${año-1}-01-01&select=*&order=fecha.desc`,tok).catch(()=>[]);
+      const headers=["Fecha","Categoría","Concepto","Importe","Origen","Recurrente","Frecuencia","Reserva vinculada","Factura","Notas","ID"];
+      let csv=csvRow(headers);
+      g.forEach(x=>{
+        csv+=csvRow([x.fecha||"",x.categoria||"",x.concepto||"",parseFloat(x.importe)||0,x.origen||"manual",x.recurrente?"Sí":"No",x.frecuencia||"",x.reserva_vinculada_id||x.reserva_id||"",x.factura_url?"Sí":"No",x.notas||"",x.id]);
+      });
+      downloadFile(`gastos_${año}.csv`,csv);
+      setFeedback(prev=>({...prev,exp:"gastos-ok"}));
+    }catch(e){setFeedback(prev=>({...prev,exp:"error"}));}
+    setTimeout(()=>setFeedback(prev=>({...prev,exp:null})),2500);
+    setExporting(null);
+  };
+
+  const exportarInforme=async()=>{
+    if(exporting)return;setExporting("informe");
+    try{
+      const año=new Date().getFullYear();
+      const [rsv,abnb,gst]=await Promise.all([
+        sbGet("reservas",`?fecha=gte.${año}-01-01&fecha=lte.${año}-12-31&select=*&order=fecha.asc`,tok).catch(()=>[]),
+        sbGet("reservas_airbnb",`?fecha_entrada=gte.${año}-01-01&fecha_entrada=lte.${año}-12-31&select=*&order=fecha_entrada.asc`,tok).catch(()=>[]),
+        sbGet("gastos",`?fecha=gte.${año}-01-01&fecha=lte.${año}-12-31&select=*&order=fecha.asc`,tok).catch(()=>[]),
+      ]);
+      // Métricas
+      const fmt=v=>(Math.round(parseFloat(v)||0)).toLocaleString("es-ES")+" €";
+      const facturacion=rsv.reduce((s,r)=>s+(parseFloat(r.precio_total)||parseFloat(r.precio)||((parseFloat(r.precio_finca)||0)+(parseFloat(r.precio_casa)||0))),0)
+                       +abnb.reduce((s,a)=>s+(parseFloat(a.precio)||0),0);
+      let cobrado=0;
+      rsv.forEach(r=>{const seña=parseFloat(r.seña_importe)||0;const t=parseFloat(r.precio_total)||parseFloat(r.precio)||0;if(r.seña_cobrada)cobrado+=seña;if(r.saldo_cobrado)cobrado+=(t-seña);});
+      abnb.forEach(a=>{if(a.cobrado)cobrado+=parseFloat(a.precio)||0;});
+      const pendiente=Math.max(0,facturacion-cobrado);
+      const gastos=gst.reduce((s,g)=>s+(parseFloat(g.importe)||0),0);
+      const beneficio=cobrado-gastos;
+      const margen=cobrado>0?Math.round(beneficio/cobrado*100):0;
+      // Por mes
+      const mesesL=["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
+      const porMes=Array.from({length:12},(_,i)=>{
+        const m=String(i+1).padStart(2,"0");
+        const factR=rsv.filter(r=>(r.fecha||"").slice(5,7)===m).reduce((s,r)=>s+(parseFloat(r.precio_total)||parseFloat(r.precio)||0),0);
+        const factA=abnb.filter(a=>(a.fecha_entrada||"").slice(5,7)===m).reduce((s,a)=>s+(parseFloat(a.precio)||0),0);
+        const gM=gst.filter(g=>(g.fecha||"").slice(5,7)===m).reduce((s,g)=>s+(parseFloat(g.importe)||0),0);
+        return{mes:mesesL[i],facturacion:factR+factA,gastos:gM,beneficio:factR+factA-gM,nReservas:rsv.filter(r=>(r.fecha||"").slice(5,7)===m).length+abnb.filter(a=>(a.fecha_entrada||"").slice(5,7)===m).length};
+      });
+      // Por categoría
+      const cats={};gst.forEach(g=>{const k=g.categoria||"Otros";cats[k]=(cats[k]||0)+(parseFloat(g.importe)||0);});
+      const catsArr=Object.entries(cats).sort((a,b)=>b[1]-a[1]);
+      // Top reservas
+      const allRsv=[...rsv.map(r=>({n:r.nombre,t:"Evento",f:r.fecha,p:parseFloat(r.precio_total)||parseFloat(r.precio)||0,inv:r.invitados})),...abnb.map(a=>({n:`Airbnb · ${a.huesped}`,t:"Airbnb",f:a.fecha_entrada,p:parseFloat(a.precio)||0,inv:a.personas}))].filter(x=>x.p>0).sort((a,b)=>b.p-a.p).slice(0,10);
+
+      const hoyFmt=new Date().toLocaleDateString("es-ES",{day:"numeric",month:"long",year:"numeric"});
+      // HTML del informe — print-friendly. Usa fuentes del sistema y paleta del diseño.
+      const html=`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Informe anual ${año} — Finca El Molino</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Inter Tight','Segoe UI',sans-serif;color:#1A1A1A;background:#fff;padding:32px 36px;font-size:12px;line-height:1.45}
+.cover{padding:40px 0 24px;border-bottom:3px solid #1A1A1A;margin-bottom:32px}
+.cover h1{font-size:42px;font-weight:800;letter-spacing:-1.6;line-height:1}
+.cover .sub{font-size:13px;color:#7A766F;font-weight:600;letter-spacing:1.5;text-transform:uppercase;margin-top:8px}
+.cover .meta{margin-top:18px;font-size:11px;color:#7A766F}
+h2{font-size:18px;font-weight:700;letter-spacing:-.4;margin:28px 0 14px;color:#1A1A1A;border-bottom:1px solid #E5E0D6;padding-bottom:8px}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:18px}
+.kpi{background:#F5F3F0;padding:14px 16px;border-radius:14px;border:1px solid #E5E0D6}
+.kpi .l{font-size:9.5px;color:#7A766F;font-weight:700;letter-spacing:.8;text-transform:uppercase}
+.kpi .v{font-size:22px;font-weight:800;letter-spacing:-.6;margin-top:5px;font-variant-numeric:tabular-nums}
+.kpi.terra{background:#EC683E;color:#1A1A1A;border-color:#EC683E}
+.kpi.terra .l{color:rgba(30,20,10,.7)}
+.kpi.olive{background:#A6BE59;border-color:#A6BE59}
+.kpi.olive .l{color:rgba(30,20,10,.7)}
+.kpi.lav{background:#AFA3FF;border-color:#AFA3FF}
+.kpi.lav .l{color:rgba(30,20,10,.7)}
+.kpi.gold{background:#ECD227;border-color:#ECD227}
+.kpi.gold .l{color:rgba(30,20,10,.7)}
+table{width:100%;border-collapse:collapse;margin-top:6px;font-size:11px}
+th,td{padding:8px 10px;text-align:left;border-bottom:1px solid #E5E0D6}
+th{background:#F5F3F0;font-weight:700;color:#3A3733;font-size:10px;text-transform:uppercase;letter-spacing:.4}
+.r{text-align:right;font-variant-numeric:tabular-nums;font-weight:600}
+.pos{color:#5A9A4E}
+.neg{color:#D9443A}
+.bar{display:inline-block;height:6px;background:#A6BE59;border-radius:3px;vertical-align:middle;margin-right:6px}
+.foot{margin-top:42px;padding-top:18px;border-top:1px solid #E5E0D6;font-size:10px;color:#7A766F;display:flex;justify-content:space-between}
+.print-btn{position:fixed;top:14px;right:14px;background:#1A1A1A;color:#fff;border:0;padding:10px 18px;border-radius:999px;font-weight:700;font-size:12px;cursor:pointer;font-family:inherit;box-shadow:0 4px 12px rgba(0,0,0,.15)}
+@media print{.print-btn{display:none}body{padding:24px 28px}.kpi{break-inside:avoid}table{break-inside:avoid}h2{break-after:avoid}}
+</style></head>
+<body>
+<button class="print-btn" onclick="window.print()">📄 Imprimir / Guardar como PDF</button>
+
+<div class="cover">
+  <div class="sub">Finca El Molino · Informe anual</div>
+  <h1>Ejercicio ${año}</h1>
+  <div class="meta">Generado el ${hoyFmt}${perfil?.nombre?` · por ${perfil.nombre}`:""}</div>
+</div>
+
+<h2>Resumen ejecutivo</h2>
+<div class="kpis">
+  <div class="kpi terra"><div class="l">Facturación total</div><div class="v">${fmt(facturacion)}</div></div>
+  <div class="kpi olive"><div class="l">Ya cobrado</div><div class="v">${fmt(cobrado)}</div></div>
+  <div class="kpi gold"><div class="l">Pendiente cobro</div><div class="v">${fmt(pendiente)}</div></div>
+  <div class="kpi lav"><div class="l">Gastos del ejercicio</div><div class="v">${fmt(gastos)}</div></div>
+</div>
+<div class="kpis" style="grid-template-columns:repeat(3,1fr)">
+  <div class="kpi"><div class="l">Beneficio neto</div><div class="v ${beneficio>=0?'pos':'neg'}">${fmt(beneficio)}</div></div>
+  <div class="kpi"><div class="l">Margen neto</div><div class="v ${margen>=0?'pos':'neg'}">${margen}%</div></div>
+  <div class="kpi"><div class="l">Reservas en el año</div><div class="v">${rsv.length+abnb.length}</div></div>
+</div>
+
+<h2>Detalle por mes</h2>
+<table>
+  <thead><tr><th>Mes</th><th class="r">Reservas</th><th class="r">Facturación</th><th class="r">Gastos</th><th class="r">Beneficio</th></tr></thead>
+  <tbody>
+    ${porMes.map(m=>`<tr><td><strong>${m.mes}</strong></td><td class="r">${m.nReservas}</td><td class="r">${fmt(m.facturacion)}</td><td class="r">${fmt(m.gastos)}</td><td class="r ${m.beneficio>=0?'pos':'neg'}">${fmt(m.beneficio)}</td></tr>`).join("")}
+    <tr style="background:#F5F3F0;font-weight:800"><td>TOTAL</td><td class="r">${rsv.length+abnb.length}</td><td class="r">${fmt(facturacion)}</td><td class="r">${fmt(gastos)}</td><td class="r ${beneficio>=0?'pos':'neg'}">${fmt(beneficio)}</td></tr>
+  </tbody>
+</table>
+
+<h2>Gastos por categoría</h2>
+<table>
+  <thead><tr><th>Categoría</th><th class="r">Importe</th><th class="r">% del total</th><th>Distribución</th></tr></thead>
+  <tbody>
+    ${catsArr.map(([k,v])=>{const pct=gastos>0?Math.round(v/gastos*100):0;return `<tr><td><strong>${k}</strong></td><td class="r">${fmt(v)}</td><td class="r">${pct}%</td><td><span class="bar" style="width:${pct*1.6}px"></span></td></tr>`;}).join("")}
+  </tbody>
+</table>
+
+<h2>Top 10 reservas por importe</h2>
+<table>
+  <thead><tr><th>#</th><th>Reserva</th><th>Tipo</th><th>Fecha</th><th class="r">Invitados/Pers.</th><th class="r">Importe</th></tr></thead>
+  <tbody>
+    ${allRsv.map((r,i)=>`<tr><td>${i+1}</td><td><strong>${(r.n||"—").replace(/</g,"&lt;")}</strong></td><td>${r.t}</td><td>${r.f||"—"}</td><td class="r">${r.inv||"—"}</td><td class="r">${fmt(r.p)}</td></tr>`).join("")}
+  </tbody>
+</table>
+
+<div class="foot">
+  <div>Finca El Molino · Murcia</div>
+  <div>Informe generado el ${hoyFmt}</div>
+</div>
+</body></html>`;
+      const w=window.open("","_blank");
+      if(!w){alert("Permite ventanas emergentes para abrir el informe.");setExporting(null);return;}
+      w.document.write(html);w.document.close();
+      // Pequeña espera para que renderice antes de invocar print
+      setTimeout(()=>{try{w.focus();w.print();}catch(_){}},500);
+      setFeedback(prev=>({...prev,exp:"informe-ok"}));
+    }catch(e){console.error(e);setFeedback(prev=>({...prev,exp:"error"}));}
+    setTimeout(()=>setFeedback(prev=>({...prev,exp:null})),2500);
+    setExporting(null);
+  };
+
   if(load)return <div className="loading"><div className="spin"/><span>Cargando…</span></div>;
 
   // Aliases para el template rediseñado
@@ -9808,15 +9999,25 @@ function Ajustes({tok,rol,perfil,setPage}){
         <div style={{fontSize:11,color:T.ink3,letterSpacing:1,textTransform:'uppercase',fontWeight:700,marginBottom:10}}>Exportación</div>
         <div style={{background:T.surface,borderRadius:18,border:'1px solid '+T.line,overflow:'hidden'}}>
           {[
-            {l:'Exportar reservas CSV',fn:'exportarReservas'},
-            {l:'Exportar gastos CSV',fn:'exportarGastos'},
-            {l:'Informe anual PDF',fn:'exportarInforme'},
-          ].map((row,i,arr)=>(
-            <button key={row.fn} onClick={()=>window[row.fn]&&window[row.fn]()} style={{width:'100%',textAlign:'left',display:'flex',alignItems:'center',justifyContent:'space-between',padding:'14px 16px',borderBottom:i<arr.length-1?'1px solid '+T.line:'none',background:'transparent',border:0,cursor:'pointer',fontFamily:T.sans}}>
-              <span style={{fontSize:13,fontWeight:600,color:T.ink}}>{row.l}</span>
-              <FmIcon name="arrow" size={14} stroke={T.ink3}/>
-            </button>
-          ))}
+            {l:'Exportar reservas CSV',sub:'Eventos y Airbnb del año en curso',k:'reservas',fn:exportarReservas},
+            {l:'Exportar gastos CSV',sub:'Todos los gastos del año en curso',k:'gastos',fn:exportarGastos},
+            {l:'Informe anual PDF',sub:'Resumen financiero completo · imprimible',k:'informe',fn:exportarInforme},
+          ].map((row,i,arr)=>{
+            const busy=exporting===row.k;
+            const ok=feedback.exp===`${row.k}-ok`;
+            return(
+              <button key={row.k} onClick={()=>!exporting&&row.fn()} disabled={!!exporting} style={{width:'100%',textAlign:'left',display:'flex',alignItems:'center',justifyContent:'space-between',padding:'14px 16px',borderBottom:i<arr.length-1?'1px solid '+T.line:'none',background:'transparent',border:0,cursor:exporting?'wait':'pointer',fontFamily:T.sans,opacity:exporting&&!busy?.5:1}}>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:13,fontWeight:600,color:T.ink}}>{row.l}</div>
+                  <div style={{fontSize:11,color:T.ink3,marginTop:2}}>{row.sub}</div>
+                </div>
+                {busy?<span style={{fontSize:11,color:T.ink3,fontWeight:600}}>Generando…</span>
+                :ok?<span style={{fontSize:11,color:T.olive||"#5A9A4E",fontWeight:700}}>✓ Listo</span>
+                :<FmIcon name="arrow" size={14} stroke={T.ink3}/>}
+              </button>
+            );
+          })}
+          {feedback.exp==="error"&&<div style={{padding:"10px 16px",background:"#FEF2F2",color:"#D9443A",fontSize:12,fontWeight:600,borderTop:"1px solid "+T.line}}>No se pudo generar el archivo. Revisa la conexión.</div>}
         </div>
       </div>
 
