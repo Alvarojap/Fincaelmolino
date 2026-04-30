@@ -1809,12 +1809,18 @@ function ContactosBlockDesktop({contactos,setPage}){const colors=[T.lavender,T.o
 const OPS_STATE_META={pendiente:{label:"Pendiente",color:"#ECD227",bg:"#ECD22722",ink:"#8A6B0F"},pendiente_fecha:{label:"Sin fecha",color:"#ECD227",bg:"#ECD22722",ink:"#8A6B0F"},programado:{label:"Programado",color:"#7FB2FF",bg:"#7FB2FF22",ink:"#2A5BA0"},en_curso:{label:"En curso",color:"#A6BE59",bg:"#A6BE5922",ink:"#4A7A2E"},completado:{label:"Finalizado",color:"#BFB9AE",bg:"#F5F3F0",ink:"#7A766F"},finalizado:{label:"Finalizado",color:"#BFB9AE",bg:"#F5F3F0",ink:"#7A766F"},conflicto:{label:"Conflicto",color:"#D9443A",bg:"#D9443A18",ink:"#9A2A22"},activo:{label:"Activo",color:"#A6BE59",bg:"#A6BE5922",ink:"#4A7A2E"}};
 function getOpsMeta(e){return OPS_STATE_META[e]||OPS_STATE_META.pendiente;}
 // Resuelve el estado visual de un servicio de limpieza usando los campos
-// reales (verificado, hora_inicio, fecha) en lugar de fiarse del estado
+// reales (verificado, hora_inicio/fin, fecha) en lugar de fiarse del estado
 // almacenado, que a menudo se queda en "pendiente" aunque haya fecha y/o
 // el servicio esté en curso.
 function resolveLimpEstado(srv){
   if(!srv)return "pendiente_fecha";
+  // Señales de que el servicio está cerrado/finalizado, en cualquier
+  // combinación: verificado, hora_fin guardada, coste calculado, o estado
+  // explícito completado/finalizado. Cualquiera basta para considerarlo "Hecho".
   if(srv.verificado)return "completado";
+  if(["completado","finalizado"].includes(srv.estado))return "completado";
+  if(srv.hora_fin)return "completado";
+  if(parseFloat(srv.coste_calculado)>0)return "completado";
   if(srv.hora_inicio)return "en_curso";
   const e=srv.estado;
   if(!e||e==="pendiente"||e==="pendiente_fecha")return srv.fecha?"programado":"pendiente_fecha";
@@ -5239,6 +5245,23 @@ function LimpiezaCheck({perfil,tok,setPage}){
 
 // Helpers compartidos por el módulo Limpieza
 const limpModLbl=m=>m==="precio_fijo_servicio"?"Precio fijo":m==="permuta"?"Permuta":"Por horas";
+// Convierte "14:00", "14:00:00" o "14:00:00+02:00" → número decimal de hora.
+// Devuelve null si no es parseable.
+function limpParseHora(s){
+  if(s==null)return null;
+  const m=String(s).match(/^(\d{1,2}):(\d{2})/);
+  if(!m)return null;
+  const h=Number(m[1]),mi=Number(m[2]);
+  if(isNaN(h)||isNaN(mi))return null;
+  return h+mi/60;
+}
+function limpDiffHoras(hi,hf){
+  const a=limpParseHora(hi),b=limpParseHora(hf);
+  if(a==null||b==null)return 0;
+  let d=b-a;
+  if(d<0)d+=24; // si cierra después de medianoche
+  return Math.max(0,Math.round(d*100)/100);
+}
 function limpCalcCoste(srv,limpiadoras=[]){
   if(!srv)return{importe:0,horas:0,tarifa:0,detalle:""};
   const mod=srv.modalidad_pago||"por_horas";
@@ -5252,13 +5275,11 @@ function limpCalcCoste(srv,limpiadoras=[]){
   }
   let horas=0;
   if(srv.hora_inicio&&srv.hora_fin){
-    const [h1,m1]=srv.hora_inicio.split(":").map(Number);
-    const [h2,m2]=srv.hora_fin.split(":").map(Number);
-    horas=Math.max(0,Math.round((h2+m2/60-h1-m1/60)*100)/100);
+    horas=limpDiffHoras(srv.hora_inicio,srv.hora_fin);
   }else if(srv.hora_inicio&&!srv.verificado){
-    const [h1,m1]=srv.hora_inicio.split(":").map(Number);
     const n=new Date();
-    horas=Math.max(0,Math.round((n.getHours()+n.getMinutes()/60-h1-m1/60)*100)/100);
+    const ahora=`${String(n.getHours()).padStart(2,"0")}:${String(n.getMinutes()).padStart(2,"0")}`;
+    horas=limpDiffHoras(srv.hora_inicio,ahora);
   }
   const guardado=parseFloat(srv.coste_calculado)||0;
   const estimado=tarifa>0&&horas>0?Math.round(horas*tarifa*100)/100:0;
@@ -5329,7 +5350,11 @@ function Limpieza({perfil,tok,rol,setPage}){
         extra.limpiadora_id=newS.limpiadora_id;
         extra.limpiadora_nombre=limpSel?.nombre||"";
         if(newS.modalidad_pago)extra.modalidad_pago=newS.modalidad_pago;
-        if(newS.modalidad_pago==="por_horas")extra.tarifa_hora_aplicada=parseFloat(newS.tarifa_hora)||null;
+        if(newS.modalidad_pago==="por_horas"){
+          // Si admin no escribe tarifa, usar la de la ficha de la limpiadora
+          const tFinal=parseFloat(newS.tarifa_hora)||parseFloat(limpSel?.tarifa_hora)||null;
+          extra.tarifa_hora_aplicada=tFinal;
+        }
         if(newS.modalidad_pago==="precio_fijo_servicio")extra.precio_fijo_acordado=parseFloat(newS.precio_fijo_acordado)||null;
         if(newS.modalidad_pago==="permuta")extra.permuta_descripcion=newS.permuta_descripcion||null;
         await sbPatch("servicios",`id=eq.${srv.id}`,extra,tok).catch(()=>{});
@@ -5407,9 +5432,9 @@ function Limpieza({perfil,tok,rol,setPage}){
     setSaving(false);
   };
 
-  // Helpers de hora HH:MM <-> número decimal
-  const _parseHM=s=>{if(!s)return null;const [h,m]=String(s).split(":").map(Number);if(isNaN(h))return null;return h+(m||0)/60;};
-  const _calcHoras=(hi,hf)=>{const a=_parseHM(hi),b=_parseHM(hf);if(a==null||b==null)return 0;let d=b-a;if(d<0)d+=24;return Math.max(0,Math.round(d*100)/100);};
+  // Helpers de hora HH:MM (delegados al helper de módulo, robusto con
+  // formato HH:MM:SS y zonas horarias)
+  const _calcHoras=(hi,hf)=>limpDiffHoras(hi,hf);
 
   const prepararPasoHora=async()=>{
     const ahora=new Date();
@@ -5573,7 +5598,29 @@ function Limpieza({perfil,tok,rol,setPage}){
 
   const selLimpiadora=(id)=>{
     const l=limpiadoras.find(x=>String(x.id)===String(id));
-    setNewS(prev=>({...prev,limpiadora_id:id,modalidad_pago:l?.modalidad||"por_horas",tarifa_hora:l?.modalidad==="por_horas"?String(l?.tarifa_hora||""):""}));
+    const mod=l?.modalidad||"por_horas";
+    setNewS(prev=>({
+      ...prev,
+      limpiadora_id:id,
+      modalidad_pago:mod,
+      // Si la limpiadora trae tarifa por defecto en su ficha, autorrellenar siempre
+      tarifa_hora:mod==="por_horas"?String(l?.tarifa_hora||""):"",
+      precio_fijo_acordado:"",
+      permuta_descripcion:"",
+    }));
+  };
+  // Cambia la modalidad sin perder la tarifa por defecto de la limpiadora.
+  // Si pasa a "por horas" y la limpiadora tiene tarifa por defecto en su ficha,
+  // se vuelve a coger esa tarifa automáticamente (admin puede sobrescribir).
+  const selModalidad=(nuevaMod)=>{
+    setNewS(prev=>{
+      const l=limpiadoras.find(x=>String(x.id)===String(prev.limpiadora_id));
+      return{
+        ...prev,
+        modalidad_pago:nuevaMod,
+        tarifa_hora:nuevaMod==="por_horas"?(prev.tarifa_hora||String(l?.tarifa_hora||"")):"",
+      };
+    });
   };
 
   // tabLimp MUST be before any conditional returns (React hooks rule)
@@ -5596,7 +5643,14 @@ function Limpieza({perfil,tok,rol,setPage}){
   const todoHecho=tot>0&&comp===tot;
   const yaVerif=srv?.verificado;
 
-  const srvFilt=tabLimp==="todos"?servicios:tabLimp==="pendientes"?servicios.filter(s=>["pendiente","pendiente_fecha"].includes(s.estado||"")||(!s.estado&&!s.verificado)):tabLimp==="activos"?servicios.filter(s=>["en_curso","programado","activo"].includes(s.estado||"")):servicios.filter(s=>["completado","finalizado"].includes(s.estado||"")||s.verificado);
+  // Filtros usando resolveLimpEstado para que los servicios cerrados
+  // (verificado / hora_fin / coste_calculado / estado completado) caigan
+  // SIEMPRE en "Hechos", aunque la columna estado siga en "pendiente".
+  const _est=s=>resolveLimpEstado(s);
+  const srvFilt=tabLimp==="todos"?servicios
+    :tabLimp==="pendientes"?servicios.filter(s=>{const e=_est(s);return e==="pendiente_fecha"||e==="pendiente";})
+    :tabLimp==="activos"?servicios.filter(s=>{const e=_est(s);return e==="en_curso"||e==="programado"||e==="activo";})
+    :servicios.filter(s=>_est(s)==="completado");
   const costeLimp=(servicios.reduce((t,s)=>t+(parseFloat(s.coste_calculado)||0),0)).toLocaleString("es-ES")+"€";
   const fmtE=v=>(Math.round(parseFloat(v)||0)).toLocaleString("es-ES")+"€";
   const zComputedGlobal=useZonas?LIMP_ZONAS.filter(z=>!!tMap[z.id+"_cerrada"]?.done).length:0;
@@ -5625,16 +5679,16 @@ function Limpieza({perfil,tok,rol,setPage}){
           {/* KPIs 3 cols */}
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,marginBottom:12}}>
             <OpsMiniKpi value={servicios.length} label="Total" color={T.ink}/>
-            <OpsMiniKpi value={servicios.filter(s=>!["completado","finalizado"].includes(s.estado||"")&&!s.verificado).length} label="Abiertos" color={T.olive}/>
+            <OpsMiniKpi value={servicios.filter(s=>_est(s)!=="completado").length} label="Abiertos" color={T.olive}/>
             <OpsMiniKpi value={costeLimp} label="Coste" color={T.terracotta}/>
           </div>
           {/* Tabs */}
           <div style={{display:"flex",gap:2,background:T.bg,borderRadius:999,padding:3}}>
             {[
               {k:"todos",l:"Todos",c:servicios.length},
-              {k:"pendientes",l:"Pend.",c:servicios.filter(s=>["pendiente","pendiente_fecha"].includes(s.estado||"")||(!s.estado&&!s.verificado)).length},
-              {k:"activos",l:"Activos",c:servicios.filter(s=>["en_curso","programado","activo"].includes(s.estado||"")).length},
-              {k:"hechos",l:"Hechos",c:servicios.filter(s=>["completado","finalizado"].includes(s.estado||"")||s.verificado).length},
+              {k:"pendientes",l:"Pend.",c:servicios.filter(s=>{const e=_est(s);return e==="pendiente_fecha"||e==="pendiente";}).length},
+              {k:"activos",l:"Activos",c:servicios.filter(s=>{const e=_est(s);return e==="en_curso"||e==="programado"||e==="activo";}).length},
+              {k:"hechos",l:"Hechos",c:servicios.filter(s=>_est(s)==="completado").length},
             ].map(t=>(
               <button key={t.k} onClick={()=>setTabLimp(t.k)} style={{flex:1,padding:"7px 4px",borderRadius:999,border:0,cursor:"pointer",background:tabLimp===t.k?T.ink:"transparent",color:tabLimp===t.k?"#fff":T.ink2,fontWeight:700,fontSize:10.5,fontFamily:T.sans,whiteSpace:"nowrap"}}>
                 {t.l} <span style={{opacity:.6,fontSize:9}}>{t.c}</span>
@@ -5888,18 +5942,22 @@ function Limpieza({perfil,tok,rol,setPage}){
                 {limpiadoras.filter(l=>l.activa).map(l=><option key={l.id} value={l.id}>{l.nombre}</option>)}
               </select>
             </div>
-            {newS.limpiadora_id&&<>
+            {newS.limpiadora_id&&(()=>{
+              const limpSel=limpiadoras.find(x=>String(x.id)===String(newS.limpiadora_id));
+              const tarifaPorDef=parseFloat(limpSel?.tarifa_hora)||0;
+              return <>
               <div className="fg"><label>Modalidad de pago</label>
-                <select className="fi" value={newS.modalidad_pago} onChange={e=>setNewS(v=>({...v,modalidad_pago:e.target.value}))}>
+                <select className="fi" value={newS.modalidad_pago} onChange={e=>selModalidad(e.target.value)}>
                   <option value="por_horas">Por horas</option>
                   <option value="precio_fijo_servicio">Precio fijo</option>
                   <option value="permuta">Permuta</option>
                 </select>
               </div>
-              {newS.modalidad_pago==="por_horas"&&<div className="fg"><label>Tarifa €/hora</label><input type="number" inputMode="decimal" className="fi" value={newS.tarifa_hora} onChange={e=>setNewS(v=>({...v,tarifa_hora:e.target.value}))} placeholder="Ej: 12"/></div>}
+              {newS.modalidad_pago==="por_horas"&&<div className="fg"><label>Tarifa €/hora{tarifaPorDef>0?<span style={{fontSize:11,color:T.ink3,fontWeight:500,marginLeft:6}}>(por defecto: {tarifaPorDef}€)</span>:""}</label><input type="number" inputMode="decimal" className="fi" value={newS.tarifa_hora} onChange={e=>setNewS(v=>({...v,tarifa_hora:e.target.value}))} placeholder={tarifaPorDef>0?String(tarifaPorDef):"Ej: 12"}/>{tarifaPorDef>0&&!newS.tarifa_hora&&<div style={{fontSize:11,color:T.ink3,marginTop:4}}>Se usará {tarifaPorDef}€ si lo dejas vacío</div>}</div>}
               {newS.modalidad_pago==="precio_fijo_servicio"&&<div className="fg"><label>Importe acordado (€)</label><input type="number" inputMode="decimal" className="fi" value={newS.precio_fijo_acordado} onChange={e=>setNewS(v=>({...v,precio_fijo_acordado:e.target.value}))} placeholder="Ej: 80"/></div>}
               {newS.modalidad_pago==="permuta"&&<div className="fg"><label>Descripción del acuerdo</label><input className="fi" value={newS.permuta_descripcion} onChange={e=>setNewS(v=>({...v,permuta_descripcion:e.target.value}))} placeholder="Ej: 1 noche en la casa"/></div>}
-            </>}
+              </>;
+            })()}
           </>}
           <div className="mft"><button className="btn bg" onClick={()=>setShowNew(false)}>Cancelar</button><button className="btn bp" onClick={crearSrv} disabled={saving}>Crear y notificar</button></div>
         </div>
@@ -5927,13 +5985,13 @@ function Limpieza({perfil,tok,rol,setPage}){
     {/* KPIs */}
     {isA&&<div style={{padding:"0 20px 14px",display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
       <OpsMiniKpi value={servicios.length} label="Total" color={T.ink}/>
-      <OpsMiniKpi value={servicios.filter(s=>!["finalizado","completado"].includes(s.estado||"")&&!s.verificado).length} label="Abiertos" color={T.olive}/>
+      <OpsMiniKpi value={servicios.filter(s=>_est(s)!=="completado").length} label="Abiertos" color={T.olive}/>
       <OpsMiniKpi value={costeLimp} label="Coste período" color={T.terracotta}/>
     </div>}
 
     {/* Tabs */}
     {isA&&<div style={{padding:"0 20px 14px"}}><div style={{display:"flex",background:T.surface,borderRadius:999,padding:4,border:`1px solid ${T.line}`,gap:2}}>
-      {[{k:"todos",l:"Todos",c:servicios.length},{k:"pendientes",l:"Pendientes",c:servicios.filter(s=>["pendiente","pendiente_fecha"].includes(s.estado||"")||(!s.estado&&!s.verificado)).length},{k:"activos",l:"Activos",c:servicios.filter(s=>["en_curso","programado","activo"].includes(s.estado||"")).length},{k:"hechos",l:"Hechos",c:servicios.filter(s=>["completado","finalizado"].includes(s.estado||"")||s.verificado).length}].map(t=><button key={t.k} onClick={()=>setTabLimp(t.k)} style={{flex:1,padding:"9px 6px",borderRadius:999,border:0,background:tabLimp===t.k?T.ink:"transparent",color:tabLimp===t.k?"#fff":T.ink2,fontFamily:T.sans,fontSize:11,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4}}>{t.l}<span style={{fontSize:9,padding:"1px 5px",borderRadius:999,background:tabLimp===t.k?"rgba(255,255,255,.2)":T.bg,color:tabLimp===t.k?"#fff":T.ink3}}>{t.c}</span></button>)}
+      {[{k:"todos",l:"Todos",c:servicios.length},{k:"pendientes",l:"Pendientes",c:servicios.filter(s=>{const e=_est(s);return e==="pendiente_fecha"||e==="pendiente";}).length},{k:"activos",l:"Activos",c:servicios.filter(s=>{const e=_est(s);return e==="en_curso"||e==="programado"||e==="activo";}).length},{k:"hechos",l:"Hechos",c:servicios.filter(s=>_est(s)==="completado").length}].map(t=><button key={t.k} onClick={()=>setTabLimp(t.k)} style={{flex:1,padding:"9px 6px",borderRadius:999,border:0,background:tabLimp===t.k?T.ink:"transparent",color:tabLimp===t.k?"#fff":T.ink2,fontFamily:T.sans,fontSize:11,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4}}>{t.l}<span style={{fontSize:9,padding:"1px 5px",borderRadius:999,background:tabLimp===t.k?"rgba(255,255,255,.2)":T.bg,color:tabLimp===t.k?"#fff":T.ink3}}>{t.c}</span></button>)}
     </div></div>}
 
     {/* Lista con OpsServiceCard */}
@@ -6219,18 +6277,22 @@ function Limpieza({perfil,tok,rol,setPage}){
               {limpiadoras.filter(l=>l.activa).map(l=><option key={l.id} value={l.id}>{l.nombre}</option>)}
             </select>
           </div>
-          {newS.limpiadora_id&&<>
+          {newS.limpiadora_id&&(()=>{
+            const limpSel=limpiadoras.find(x=>String(x.id)===String(newS.limpiadora_id));
+            const tarifaPorDef=parseFloat(limpSel?.tarifa_hora)||0;
+            return <>
             <div className="fg"><label>Modalidad de pago</label>
-              <select className="fi" value={newS.modalidad_pago} onChange={e=>setNewS(v=>({...v,modalidad_pago:e.target.value}))}>
+              <select className="fi" value={newS.modalidad_pago} onChange={e=>selModalidad(e.target.value)}>
                 <option value="por_horas">Por horas</option>
                 <option value="precio_fijo_servicio">Precio fijo</option>
                 <option value="permuta">Permuta</option>
               </select>
             </div>
-            {newS.modalidad_pago==="por_horas"&&<div className="fg"><label>Tarifa €/hora</label><input type="number" inputMode="decimal" className="fi" value={newS.tarifa_hora} onChange={e=>setNewS(v=>({...v,tarifa_hora:e.target.value}))} placeholder="Ej: 12"/></div>}
+            {newS.modalidad_pago==="por_horas"&&<div className="fg"><label>Tarifa €/hora{tarifaPorDef>0?<span style={{fontSize:11,color:T.ink3,fontWeight:500,marginLeft:6}}>(por defecto: {tarifaPorDef}€)</span>:""}</label><input type="number" inputMode="decimal" className="fi" value={newS.tarifa_hora} onChange={e=>setNewS(v=>({...v,tarifa_hora:e.target.value}))} placeholder={tarifaPorDef>0?String(tarifaPorDef):"Ej: 12"}/>{tarifaPorDef>0&&!newS.tarifa_hora&&<div style={{fontSize:11,color:T.ink3,marginTop:4}}>Se usará {tarifaPorDef}€ si lo dejas vacío</div>}</div>}
             {newS.modalidad_pago==="precio_fijo_servicio"&&<div className="fg"><label>Importe acordado (€)</label><input type="number" inputMode="decimal" className="fi" value={newS.precio_fijo_acordado} onChange={e=>setNewS(v=>({...v,precio_fijo_acordado:e.target.value}))} placeholder="Ej: 80"/></div>}
             {newS.modalidad_pago==="permuta"&&<div className="fg"><label>Descripción del acuerdo</label><input className="fi" value={newS.permuta_descripcion} onChange={e=>setNewS(v=>({...v,permuta_descripcion:e.target.value}))} placeholder="Ej: 1 noche en la casa"/></div>}
-          </>}
+            </>;
+          })()}
         </>}
         <div className="mft"><button className="btn bg" onClick={()=>setShowNew(false)}>Cancelar</button><button className="btn bp" onClick={crearSrv} disabled={saving}>Crear y notificar</button></div>
       </div>
