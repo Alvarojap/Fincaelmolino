@@ -1968,12 +1968,21 @@ function RvEventDetail({reserva,tok,perfil,rol,isA,onClose,onChanged,isDesktopPa
   const [vincularContacto,setVincularContacto]=useState(false);
   const [busqContacto,setBusqContacto]=useState("");
   const [contactosBusq,setContactosBusq]=useState([]);
+  const [serviciosExtra,setServiciosExtra]=useState([]);
+  const [serviciosExtraOpen,setServiciosExtraOpen]=useState(null);
 
   useEffect(()=>{
     setContacto(null);
     if(localR?.contacto_id)sbGet("contactos",`?id=eq.${localR.contacto_id}&select=*`,tok).then(r=>setContacto(r?.[0]||null)).catch(()=>setContacto(null));
     sbGet("coordinacion_servicios",`?reserva_id=eq.${localR.id}&select=*&order=created_at.asc&limit=5`,tok).then(setServicios).catch(()=>{});
+    sbGet("v_servicios_resumen",`?reserva_id=eq.${localR.id}&select=*&order=id.asc`,tok).then(rows=>{setServiciosExtra(rows||[]);setServiciosExtraOpen(null);}).catch(()=>setServiciosExtra([]));
   },[localR?.id,localR?.contacto_id]);
+  useEffect(()=>{
+    if(serviciosExtraOpen===null&&serviciosExtra.length>0){
+      const auto=serviciosExtra.some(s=>(parseFloat(s.pendiente_cobro)||0)>0||(parseFloat(s.pendiente_pago)||0)>0||s.estado==="ofertado");
+      setServiciosExtraOpen(auto);
+    }
+  },[serviciosExtra,serviciosExtraOpen]);
   useEffect(()=>{if(!busqContacto||busqContacto.length<2){setContactosBusq([]);return;}sbGet("contactos",`?or=(nombre.ilike.*${busqContacto}*,telefono.ilike.*${busqContacto}*)&limit=10`,tok).then(r=>setContactosBusq(r||[])).catch(()=>setContactosBusq([]));},[busqContacto]);
 
   const fecha=localR.fecha?new Date(localR.fecha+"T12:00:00"):null;
@@ -2157,6 +2166,70 @@ function RvEventDetail({reserva,tok,perfil,rol,isA,onClose,onChanged,isDesktopPa
             </div>;
           })}
         </div></>}
+
+        {/* Servicios contratados (servicios adicionales de esta reserva) */}
+        {serviciosExtra.length>0&&(()=>{
+          const totC=serviciosExtra.reduce((s,x)=>s+(parseFloat(x.precio_cliente)||0),0);
+          const totCob=serviciosExtra.reduce((s,x)=>s+(parseFloat(x.cobrado_cliente)||0),0);
+          const totCost=serviciosExtra.reduce((s,x)=>s+(parseFloat(x.coste_proveedor)||0),0);
+          const totPag=serviciosExtra.reduce((s,x)=>s+(parseFloat(x.pagado_proveedor)||0),0);
+          const pendCob=Math.max(0,totC-totCob);
+          const pendPag=Math.max(0,totCost-totPag);
+          const margen=serviciosExtra.reduce((s,x)=>s+(parseFloat(x.margen_total)||0),0);
+          const accion=pendCob>0||pendPag>0||serviciosExtra.some(s=>s.estado==="ofertado");
+          const isOpen=serviciosExtraOpen===true;
+          const ESTADO_META={ofertado:{l:"Ofertado",bg:T.gold+"22",fg:"#8A6B0F",dot:T.gold},aceptado:{l:"Aceptado",bg:T.softBlue+"22",fg:"#2A5BA0",dot:T.softBlue},completado:{l:"Completado",bg:T.olive+"22",fg:"#4A7A2E",dot:T.olive},cancelado:{l:"Cancelado",bg:T.coral+"22",fg:"#9A2A22",dot:T.coral}};
+          return<>
+            <div style={{fontSize:10.5,color:T.ink3,letterSpacing:.6,fontWeight:700,textTransform:"uppercase",marginBottom:10,marginTop:6}}>Servicios contratados</div>
+            <div style={{background:T.surface,border:`1px solid ${T.line}`,borderRadius:18,marginBottom:12,overflow:"hidden"}}>
+              <button onClick={()=>setServiciosExtraOpen(!isOpen)} style={{width:"100%",background:"transparent",border:0,padding:"12px 14px",display:"flex",alignItems:"center",gap:12,cursor:"pointer",fontFamily:T.sans,textAlign:"left"}}>
+                <div style={{width:36,height:36,borderRadius:10,background:T.terracotta+"40",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><FmIcon name="sparkle" size={16} stroke={T.ink}/></div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                    <div style={{fontSize:13,fontWeight:700,color:T.ink}}>Servicios contratados</div>
+                    {accion&&<span style={{display:"inline-flex",alignItems:"center",gap:4,height:18,padding:"0 8px",borderRadius:999,background:T.gold,color:T.ink,fontSize:9.5,fontWeight:700}}><FmIcon name="warn" size={9} stroke={T.ink} sw={2.4}/>Acción</span>}
+                  </div>
+                  <div style={{fontSize:11,color:T.ink3,marginTop:2}}>{serviciosExtra.length} servicio{serviciosExtra.length!==1?"s":""} · {fE(totCob)}/{fE(totC)} cobrado{pendPag>0?` · ${fE(pendPag)} por pagar`:""}</div>
+                </div>
+                <FmIcon name={isOpen?"chevD":"chevR"} size={14} stroke={T.ink3}/>
+              </button>
+              {isOpen&&<div style={{borderTop:`1px solid ${T.line}`,padding:6}}>
+                {serviciosExtra.map((s,i)=>{
+                  const meta=ESTADO_META[s.estado]||{l:s.estado||"—",bg:T.ink3+"22",fg:T.ink3,dot:T.ink3};
+                  const tieneProv=(parseFloat(s.coste_proveedor)||0)>0;
+                  const pCob=parseFloat(s.pendiente_cobro)||0;
+                  const pPag=parseFloat(s.pendiente_pago)||0;
+                  return<div key={s.id} style={{padding:"10px 10px",borderBottom:i<serviciosExtra.length-1?`1px solid ${T.line}`:0,display:"flex",gap:12,alignItems:"flex-start"}}>
+                    <div style={{width:32,height:32,borderRadius:9,background:(tieneProv?T.lavender:T.olive)+"40",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,marginTop:2}}><FmIcon name="sparkle" size={14} stroke={T.ink}/></div>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap",marginBottom:3}}>
+                        <div style={{fontSize:13,fontWeight:700,color:T.ink}}>{s.nombre||"Servicio"}</div>
+                        <span style={{display:"inline-flex",alignItems:"center",gap:4,height:18,padding:"0 7px",borderRadius:999,background:meta.bg,color:meta.fg,fontSize:9.5,fontWeight:700}}><span style={{width:5,height:5,borderRadius:999,background:meta.dot}}/>{meta.l}</span>
+                      </div>
+                      {s.categoria&&<div style={{fontSize:11,color:T.ink3,marginBottom:6}}>{s.categoria}</div>}
+                      <div style={{display:"grid",gridTemplateColumns:tieneProv?"1fr 1fr":"1fr",gap:8,fontSize:11}}>
+                        <div style={{background:T.bg,padding:"6px 9px",borderRadius:9}}>
+                          <div style={{fontSize:9,color:T.ink3,fontWeight:700,letterSpacing:.4,textTransform:"uppercase"}}>Cliente</div>
+                          <div style={{fontWeight:700,color:T.ink,marginTop:2}}>{fE(s.cobrado_cliente)} <span style={{color:T.ink3,fontWeight:500}}>/ {fE(s.precio_cliente)}</span></div>
+                          {pCob>0&&<div style={{fontSize:10,color:"#8A6B0F",fontWeight:700,marginTop:1}}>Pendiente {fE(pCob)}</div>}
+                        </div>
+                        {tieneProv&&<div style={{background:T.bg,padding:"6px 9px",borderRadius:9}}>
+                          <div style={{fontSize:9,color:T.ink3,fontWeight:700,letterSpacing:.4,textTransform:"uppercase"}}>Proveedor</div>
+                          <div style={{fontWeight:700,color:T.ink,marginTop:2}}>{fE(s.pagado_proveedor)} <span style={{color:T.ink3,fontWeight:500}}>/ {fE(s.coste_proveedor)}</span></div>
+                          {pPag>0&&<div style={{fontSize:10,color:"#9A2A22",fontWeight:700,marginTop:1}}>Por pagar {fE(pPag)}</div>}
+                        </div>}
+                      </div>
+                    </div>
+                  </div>;
+                })}
+                {serviciosExtra.length>1&&<div style={{padding:"10px 12px",marginTop:4,background:T.olive+"14",border:`1px solid ${T.olive}33`,borderRadius:12,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                  <div style={{fontSize:11,color:T.ink2,fontWeight:700,letterSpacing:.3,textTransform:"uppercase"}}>Margen total</div>
+                  <div style={{fontSize:14,fontWeight:700,color:margen>=0?"#4A7A2E":"#9A2A22"}}>{margen>=0?"+":""}{fE(margen)}</div>
+                </div>}
+              </div>}
+            </div>
+          </>;
+        })()}
 
         <TareasComerciales entidad_tipo="reserva" entidad_id={localR.id} entidad_nombre={localR.nombre} tok={tok} perfil={perfil||{nombre:"Admin"}} rol={rol}/>
         <Historial entidad_tipo="reserva" entidad_id={localR.id} tok={tok} perfil={perfil||{nombre:"Admin"}}/>
