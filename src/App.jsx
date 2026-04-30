@@ -464,19 +464,21 @@ input,select,textarea{font-family:inherit}
 ::-webkit-scrollbar{width:0;height:0}
 .app{display:flex;min-height:100vh;min-height:100dvh}
 .main{flex:1;min-width:0;display:flex;flex-direction:column;overflow-x:hidden}
-.sb{width:256px;min-width:256px;background:#1A1A1A;display:flex;flex-direction:column;position:sticky;top:0;height:100vh;height:100dvh;overflow-y:auto;flex-shrink:0}
-.sb-logo{padding:24px 20px 18px;border-bottom:1px solid rgba(255,255,255,.08)}
-.sb-logo h1{font-family:inherit;font-size:17px;color:#fff;font-weight:700;letter-spacing:-.5px;margin-top:2px}
-.sb-logo p{font-size:9px;color:rgba(255,255,255,.4);margin-top:3px;text-transform:uppercase;letter-spacing:2px;font-weight:600}
+.sb{width:256px;min-width:256px;background:#FFFFFF;color:#1A1A1A;display:flex;flex-direction:column;position:sticky;top:0;height:100vh;height:100dvh;overflow-y:auto;flex-shrink:0;border-right:1px solid #E5E0D6}
+.sb-logo{padding:24px 20px 18px;border-bottom:1px solid #E5E0D6}
+.sb-logo h1{font-family:inherit;font-size:17px;color:#1A1A1A;font-weight:700;letter-spacing:-.5px;margin-top:2px}
+.sb-logo p{font-size:9px;color:#7A766F;margin-top:3px;text-transform:uppercase;letter-spacing:2px;font-weight:600}
 .sb-nav{flex:1;padding:12px 10px;overflow-y:auto}
-.nav-sec{font-size:9px;color:rgba(255,255,255,.25);text-transform:uppercase;letter-spacing:2px;padding:14px 12px 6px;margin-top:2px;font-weight:700}
+.nav-sec{font-size:9px;color:#BFB9AE;text-transform:uppercase;letter-spacing:2px;padding:14px 12px 6px;margin-top:2px;font-weight:700}
 .nw{position:relative}
-.nb{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;cursor:pointer;font-size:13px;color:rgba(255,255,255,.5);transition:all .15s ease;border:none;background:none;width:100%;text-align:left;font-family:inherit;font-weight:500;margin-bottom:2px}
-.nb:hover{background:rgba(255,255,255,.06);color:rgba(255,255,255,.85)}
-.nb.on{background:rgba(255,255,255,.08);color:#FFFFFF;font-weight:600}
-.nb-ico{font-size:16px;width:22px;text-align:center;flex-shrink:0}
-.nb-badge{position:absolute;top:6px;right:8px;background:#EC683E;color:#fff;border-radius:20px;padding:1px 6px;font-size:10px;font-weight:700;min-width:16px;text-align:center;pointer-events:none}
-.sb-user{padding:16px;border-top:1px solid rgba(255,255,255,.08);display:flex;align-items:center;gap:12px;flex-shrink:0}
+.nb{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;cursor:pointer;font-size:13px;color:#3A3733;transition:all .15s ease;border:none;background:none;width:100%;text-align:left;font-family:inherit;font-weight:500;margin-bottom:2px}
+.nb:hover{background:#F5F3F0;color:#1A1A1A}
+.nb.on{background:#1A1A1A;color:#FFFFFF;font-weight:700}
+.nb.on .nb-ico{color:#FFFFFF}
+.nb-ico{font-size:16px;width:22px;text-align:center;flex-shrink:0;color:#7A766F}
+.nb-badge{position:absolute;top:6px;right:8px;background:#EC683E;color:#1A1A1A;border-radius:20px;padding:1px 6px;font-size:10px;font-weight:700;min-width:16px;text-align:center;pointer-events:none}
+.sb-user{padding:16px;border-top:1px solid #E5E0D6;display:flex;align-items:center;gap:12px;flex-shrink:0}
+.sb .uname{color:#1A1A1A}.sb .urole{color:#7A766F}
 .av{width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,#EC683E,#AFA3FF);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff;flex-shrink:0}
 .uname{font-size:13px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .urole{font-size:11px;color:rgba(255,255,255,.4);text-transform:capitalize;margin-top:1px}
@@ -486,9 +488,10 @@ input,select,textarea{font-family:inherit}
 .mob-top-title{font-family:'Inter Tight',sans-serif;font-size:16px;color:#EC683E;font-weight:800}
 .mob-menu-btn{background:none;border:none;color:#1A1A1A;font-size:24px;cursor:pointer;padding:8px;display:flex;align-items:center;justify-content:center;border-radius:10px;line-height:1;transition:background .15s}
 .mob-menu-btn:active{background:#F0EEE9}
-.drawer-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:300;backdrop-filter:blur(12px)}
-.drawer{position:fixed;left:0;top:0;bottom:0;width:min(300px,85vw);background:#1A1A1A;z-index:400;display:flex;flex-direction:column;overflow-y:auto;transform:translateX(-100%);transition:transform .28s cubic-bezier(.4,0,.2,1);box-shadow:8px 0 40px rgba(0,0,0,.2)}
+.drawer-overlay{position:fixed;inset:0;background:rgba(20,15,10,.45);z-index:300;backdrop-filter:blur(8px)}
+.drawer{position:fixed;left:0;top:0;bottom:0;width:min(310px,85vw);background:#FFFFFF;z-index:400;display:flex;flex-direction:column;overflow-y:auto;transform:translateX(-100%);transition:transform .28s cubic-bezier(.32,.72,0,1);box-shadow:8px 0 40px rgba(40,30,20,.18)}
 .drawer.open{transform:translateX(0)}
+.drawer .sb{width:100%!important;min-width:0!important;background:#FFFFFF!important;border-right:0!important;height:100%}
 .mob-bar{position:fixed;bottom:0;left:0;right:0;z-index:90;background:rgba(250,250,247,0.92);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-top:1px solid #E8E4DC;padding-bottom:env(safe-area-inset-bottom, 0px)}
 .mob-bar-inner{display:flex;height:60px;align-items:stretch}
 .mob-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;background:none;border:0;cursor:pointer;font-size:10px;font-weight:600;color:#BFBAB4;font-family:var(--sans, system-ui);padding:0;transition:color 0.15s}
@@ -602,19 +605,20 @@ hr.div{border:none;border-top:1px solid #E5E0D6;margin:16px 0}
 .spin{display:inline-block;width:18px;height:18px;border:2.5px solid rgba(236,104,62,.15);border-top-color:#EC683E;border-radius:50%;animation:spin .6s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
 .loading{display:flex;align-items:center;justify-content:center;min-height:200px;color:#8A8580;gap:10px;font-size:14px;font-weight:500}
-.drawer-user-card{padding:22px 18px 18px;border-bottom:1px solid rgba(255,255,255,.08);display:flex;align-items:center;gap:14px;background:rgba(255,255,255,.04);flex-shrink:0}
-.drawer-close{background:none;border:none;color:rgba(255,255,255,.4);font-size:22px;cursor:pointer;padding:6px;margin-left:auto;border-radius:8px;line-height:1;flex-shrink:0;transition:all .15s ease}
-.drawer-close:hover{color:#fff;background:rgba(255,255,255,.1)}
+.drawer-user-card{padding:22px 18px 18px;border-bottom:1px solid #E5E0D6;display:flex;align-items:center;gap:14px;background:#FFFFFF;flex-shrink:0}
+.drawer-close{background:#F5F3F0;border:none;color:#1A1A1A;font-size:22px;cursor:pointer;padding:6px;margin-left:auto;border-radius:999px;width:34px;height:34px;display:flex;align-items:center;justify-content:center;line-height:1;flex-shrink:0;transition:all .15s ease}
+.drawer-close:hover{background:#E5E0D6}
 .chat-list-col{width:240px;flex-shrink:0;border-right:1px solid #E5E0D6;overflow-y:auto;display:flex;flex-direction:column;background:#FFFFFF}
 .chat-area{flex:1;display:flex;flex-direction:column;min-width:0;min-height:0}
 .chdr2{padding:14px 20px;border-bottom:1px solid #E5E0D6;display:flex;align-items:center;gap:12px;flex-shrink:0;background:#FFFFFF}
 @media (min-width:769px){
-  .mob-top,.mob-bar,.drawer,.drawer-overlay,.mob-back{display:none!important}
+  .mob-top,.mob-bar,.drawer,.drawer-overlay,.mob-back,.mob-fab-menu{display:none!important}
   .chat-mobile-wrap{display:none!important}
 }
 @media (max-width:768px){
   .app>.sb{display:none!important;width:0!important;min-width:0!important;overflow:hidden!important}
-  .mob-top{display:flex}.mob-bar{display:block}
+  .mob-top{display:none!important}.mob-bar{display:block}
+  .mob-fab-menu{display:flex}
   .app{flex-direction:column}.main{width:100%;flex:1;overflow-x:hidden}
   .ph{padding:18px 16px 14px}.ph h2{font-size:22px}
   .pb{padding:16px 14px 96px}
@@ -800,20 +804,21 @@ export default function App() {
     <style>{CSS}</style>
     <div className="app">
       <Sidebar perfil={perfil} page={page} setPage={setPage} onLogout={logout}/>
-      <div className="mob-top">
-        <div style={{display:'flex',alignItems:'center',gap:8}}>
-          <MolinoLogo size={24}/>
-          <span style={{fontSize:15,fontWeight:700,color:T.ink,letterSpacing:-0.3}}>Finca El Molino</span>
-        </div>
-        <div style={{display:'flex',alignItems:'center',gap:8}}>
-          {noVistos>0&&(
-            <div style={{width:8,height:8,borderRadius:999,background:'#F35757'}}/>
-          )}
-          <button className="mob-menu-btn" onClick={()=>setDrawerOpen(true)} style={{width:36,height:36,borderRadius:999,background:T.surface,border:'1px solid '+T.line,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}>
-            <FmIcon name="menu" size={18} stroke={T.ink}/>
-          </button>
-        </div>
-      </div>
+      {/* FAB hamburguesa flotante (solo móvil) — abre el drawer lateral.
+          Posicionado top-right respetando el safe-area-inset-top de iOS. */}
+      {!drawerOpen&&<button className="mob-fab-menu" onClick={()=>setDrawerOpen(true)} aria-label="Menú" style={{
+        position:'fixed',
+        top:'max(env(safe-area-inset-top, 12px), 12px)',
+        right:14,
+        width:44,height:44,borderRadius:999,
+        background:T.surface,border:'1px solid '+T.line,
+        alignItems:'center',justifyContent:'center',
+        cursor:'pointer',zIndex:90,
+        boxShadow:'0 2px 10px rgba(40,30,20,0.12)'
+      }}>
+        <FmIcon name="menu" size={18} stroke={T.ink}/>
+        {(noVistos||0)>0&&<span style={{position:'absolute',top:6,right:6,width:9,height:9,borderRadius:999,background:'#F35757',border:'2px solid '+T.surface}}/>}
+      </button>}
       {drawerOpen&&<div className="drawer-overlay" onClick={()=>setDrawerOpen(false)}/>}
       <div className={`drawer${drawerOpen?" open":""}`}>
         <Sidebar perfil={perfil} page={page} setPage={goTo} onLogout={logout} inDrawer onClose={()=>setDrawerOpen(false)}/>
