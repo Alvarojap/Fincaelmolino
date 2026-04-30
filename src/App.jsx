@@ -5050,7 +5050,7 @@ function Incidencias({tok}){
     <div style={{paddingBottom:100,background:T.bg,minHeight:'100%',fontFamily:T.sans}}>
 
       {/* Header */}
-      <div style={{padding:'54px 20px 6px',display:'flex',justifyContent:'space-between',alignItems:'flex-end'}}>
+      <div style={{padding:'54px 20px 6px',display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
         <div>
           <div style={{fontSize:10.5,color:T.ink3,fontWeight:700,letterSpacing:0.8,textTransform:'uppercase'}}>Mantenimiento</div>
           <div style={{fontSize:28,fontWeight:800,color:T.ink,letterSpacing:-0.9,lineHeight:1.05,marginTop:2}}>Incidencias</div>
@@ -7229,7 +7229,7 @@ function Notifs({perfil,tok,rol}){
     <div style={{paddingBottom:100,background:T.bg,minHeight:'100%',fontFamily:T.sans}}>
 
       {/* Header */}
-      <div style={{padding:'54px 20px 16px',display:'flex',alignItems:'flex-end',justifyContent:'space-between'}}>
+      <div style={{padding:'54px 20px 16px',display:'flex',alignItems:'flex-start',justifyContent:'space-between'}}>
         <div>
           <div style={{fontSize:12,color:T.ink3,fontWeight:500}}>Centro de avisos</div>
           <div style={{fontSize:30,fontWeight:700,color:T.ink,letterSpacing:-1,lineHeight:1.02}}>Notificaciones</div>
@@ -7387,7 +7387,7 @@ function Usuarios({tok}){
     <div style={{paddingBottom:100,background:T.bg,minHeight:'100%',fontFamily:T.sans}}>
 
       {/* Header */}
-      <div style={{padding:'54px 20px 16px',display:'flex',alignItems:'flex-end',justifyContent:'space-between'}}>
+      <div style={{padding:'54px 20px 16px',display:'flex',alignItems:'flex-start',justifyContent:'space-between'}}>
         <div>
           <div style={{fontSize:12,color:T.ink3,fontWeight:500}}>Accesos y roles</div>
           <div style={{fontSize:30,fontWeight:700,color:T.ink,letterSpacing:-1,lineHeight:1.02}}>Usuarios</div>
@@ -8125,7 +8125,7 @@ function Lavanderia({perfil,tok,rol}){
     <div style={{paddingBottom:100,background:T.bg,minHeight:'100%',fontFamily:T.sans}}>
 
       {/* Header */}
-      <div style={{padding:'54px 20px 6px',display:'flex',justifyContent:'space-between',alignItems:'flex-end'}}>
+      <div style={{padding:'54px 20px 6px',display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
         <div>
           <div style={{fontSize:10.5,color:T.ink3,fontWeight:700,letterSpacing:0.8,textTransform:'uppercase'}}>Operaciones</div>
           <div style={{fontSize:28,fontWeight:800,color:T.ink,letterSpacing:-0.9,lineHeight:1.05,marginTop:2}}>Lavandería</div>
@@ -8515,7 +8515,7 @@ function AlmacenPage({perfil,tok,rol}){
     <div style={{paddingBottom:100,background:T.bg,minHeight:'100%',fontFamily:T.sans}}>
 
       {/* Header */}
-      <div style={{padding:'54px 20px 16px',display:'flex',alignItems:'flex-end',justifyContent:'space-between'}}>
+      <div style={{padding:'54px 20px 16px',display:'flex',alignItems:'flex-start',justifyContent:'space-between'}}>
         <div>
           <div style={{fontSize:12,color:T.ink3,fontWeight:500}}>Inventario</div>
           <div style={{fontSize:30,fontWeight:700,color:T.ink,letterSpacing:-1,lineHeight:1.02}}>Almacén</div>
@@ -10746,8 +10746,14 @@ function Reservas({tok,rol,perfil,navTarget,setNavTarget,setPage}){
     const hoy=new Date().toISOString().split("T")[0];
     const ACTIVOS_=["visita","pendiente_contrato","contrato_firmado","reserva_pagada","precio_total"];
     const pasadas=r.filter(x=>x.fecha<hoy&&ACTIVOS_.includes(x.estado));
-    for(const p of pasadas){await sbPatch("reservas",`id=eq.${p.id}`,{estado:"finalizada"},tok).catch(()=>{});p.estado="finalizada";}
+    // Optimistic local update: marca como finalizada en memoria para que la UI renderice ya
+    pasadas.forEach(p=>{p.estado="finalizada";});
     setReservas(r);setAirbnbs(ab);setLoad(false);
+    // Persistir en background con un único PATCH (id=in.(...)) en lugar de N llamadas en serie
+    if(pasadas.length>0){
+      const ids=pasadas.map(p=>p.id).join(",");
+      sbPatch("reservas",`id=in.(${ids})`,{estado:"finalizada"},tok).catch(()=>{});
+    }
   };
   useEffect(()=>{load_();},[]);
   const abrirReserva=async(r)=>{setSel(r);if(r.contacto_id){const[c]=await sbGet("contactos",`?id=eq.${r.contacto_id}&select=*`,tok).catch(()=>[]);setContactoVinc(c||null);}else setContactoVinc(null);};
@@ -11823,7 +11829,7 @@ function Visitas({perfil,tok,rol,setPage,navTarget,setNavTarget}){
     <div style={{background:T.bg,minHeight:'100%',paddingBottom:100,fontFamily:T.sans}}>
 
       {/* Header */}
-      <div style={{padding:'54px 20px 6px',display:'flex',justifyContent:'space-between',alignItems:'flex-end'}}>
+      <div style={{padding:'54px 20px 6px',display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
         <div>
           <div style={{fontSize:10.5,color:T.ink3,fontWeight:700,letterSpacing:0.8,textTransform:'uppercase'}}>Captación</div>
           <div style={{fontSize:28,fontWeight:800,color:T.ink,letterSpacing:-0.9,lineHeight:1.05,marginTop:2}}>Visitas</div>
