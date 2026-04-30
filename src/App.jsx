@@ -75,6 +75,18 @@ async function authLogin(email, password) {
 async function authLogout(tok) {
   await fetch(`${SB_URL}/auth/v1/logout`,{method:"POST",headers:HDRA(tok)});
 }
+// Parser de timestamps tolerante a zona horaria. Postgres devuelve
+// "2026-04-30T08:00:00" sin offset cuando la columna es TIMESTAMP (sin TZ),
+// y `new Date(string)` lo interpreta como hora LOCAL → en España (UTC+2)
+// eso restaba 2h al cronómetro y la jornada arrancaba con +2h fantasmas.
+// Si el string no trae Z ni offset, lo tratamos como UTC.
+function parseTSUTC(s){
+  if(!s)return null;
+  let str=String(s);
+  if(/T\d{2}:\d{2}/.test(str)&&!/Z|[+-]\d{2}:?\d{2}$/.test(str))str+="Z";
+  const d=new Date(str);
+  return isNaN(d.getTime())?null:d;
+}
 // Comprime y reescala una imagen antes de subirla. Las cámaras de móvil
 // suelen capturar 5–12 MB; reducimos a JPEG ~1280px para que la subida sea
 // muchísimo más rápida (clave para conexiones flojas en la finca).
@@ -2654,6 +2666,8 @@ function DashJ({perfil,jsem,jpunt,cwk,setPage,tok}){
   const [editExtraId,setEditExtraId]=useState(null);
   const [editExtraNota,setEditExtraNota]=useState("");
   const [editExtraFoto,setEditExtraFoto]=useState(null);
+  // Ficha del jardinero (tarifa por defecto y modalidad)
+  const [jardinero,setJardinero]=useState(null);
   const hoyStr=new Date().toISOString().split("T")[0];
   const jId=perfil.es_operario?perfil.referencia_id:perfil.id;
 
@@ -2710,7 +2724,15 @@ function DashJ({perfil,jsem,jpunt,cwk,setPage,tok}){
       setSrvJardinActivos(srvs.filter(s=>!srvActivo||s.id!==srvActivo?.id));// exclude the main active one
     }catch(_){}
   };
-  useEffect(()=>{if(tok){loadSrvActivo();loadCoordYServicios();}},[]);
+  useEffect(()=>{if(tok){
+    loadSrvActivo();
+    loadCoordYServicios();
+    // Ficha del jardinero (para tarifa por defecto cuando el servicio no la tenga)
+    if(jId){
+      const tQ=perfil?.es_operario?SB_KEY:tok;
+      sbGet("jardineros",`?id=eq.${jId}&select=id,nombre,modalidad,tarifa_hora,tarifa_mensual`,tQ).then(r=>{if(r&&r[0])setJardinero(r[0]);}).catch(()=>{});
+    }
+  }},[]);
 
   // Cronómetro — tick cada segundo solo si jornada activa y no pausada (re-render forzado)
   useEffect(()=>{
@@ -2718,23 +2740,24 @@ function DashJ({perfil,jsem,jpunt,cwk,setPage,tok}){
     const t=setInterval(()=>setTickCount(c=>c+1),1000);
     return()=>clearInterval(t);
   },[jornadaId,pausado,jornadaFin]);
-  // Cálculo de segundos reales en cada render basado en timestamps ISO (no contadores)
+  // Cálculo de segundos reales en cada render basado en timestamps ISO.
+  // Usamos parseTSUTC para evitar el bug de TZ que hacía arrancar el
+  // cronómetro con +2h cuando Postgres devolvía el timestamp sin offset.
   const calcularSegundosReales=()=>{
     if(!jornadaInicioISO)return 0;
-    const iniMs=new Date(jornadaInicioISO).getTime();
-    if(!iniMs||isNaN(iniMs))return 0;
+    const ini=parseTSUTC(jornadaInicioISO);
+    if(!ini)return 0;
     const ahora=Date.now();
-    let ms=ahora-iniMs;
+    let ms=ahora-ini.getTime();
     pausasArr.forEach(p=>{
       if(p.inicio&&p.fin){
-        const pi=new Date(p.inicio).getTime();
-        const pf=new Date(p.fin).getTime();
-        if(!isNaN(pi)&&!isNaN(pf))ms-=Math.max(0,pf-pi);
+        const pi=parseTSUTC(p.inicio);const pf=parseTSUTC(p.fin);
+        if(pi&&pf)ms-=Math.max(0,pf.getTime()-pi.getTime());
       }
     });
     if(pausado&&pausaActualISO){
-      const pa=new Date(pausaActualISO).getTime();
-      if(!isNaN(pa))ms-=Math.max(0,ahora-pa);
+      const pa=parseTSUTC(pausaActualISO);
+      if(pa)ms-=Math.max(0,ahora-pa.getTime());
     }
     return Math.max(0,Math.floor(ms/1000));
   };
@@ -2742,6 +2765,20 @@ function DashJ({perfil,jsem,jpunt,cwk,setPage,tok}){
 
   const fmtEl=s=>{const h=Math.floor(s/3600);const m=Math.floor((s%3600)/60);const ss=s%60;return `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(ss).padStart(2,"0")}`;};
   const fmtHM=mins=>{const h=Math.floor(mins/60);const m=Math.round(mins%60);return `${h}h ${m}min`;};
+
+  // Tarifa €/h aplicable: la del servicio (si admin la fijó) o la de la ficha
+  const tarifaJ=parseFloat(srvActivo?.tarifa_hora_aplicada)||parseFloat(srvActivo?.tarifa_hora)||parseFloat(jardinero?.tarifa_hora)||0;
+  const modPagoJ=srvActivo?.modalidad_pago||(jardinero?.modalidad?String(jardinero.modalidad).toLowerCase().includes("hora")?"por_horas":(String(jardinero.modalidad).toLowerCase().includes("fijo")?"precio_fijo_servicio":"por_horas"):"por_horas");
+  // Coste de la jornada actual (si en curso, estima en vivo; si terminada, usa duración)
+  const horasJornadaAct=tiempoJornada/3600;
+  const costeJornadaAct=modPagoJ==="por_horas"&&tarifaJ>0?Math.round(horasJornadaAct*tarifaJ*100)/100:0;
+  // Acumulado del servicio: srvActivo.horas_totales (suma de jornadas previas YA terminadas)
+  const horasPrev=parseFloat(srvActivo?.horas_totales)||0;
+  const costePrev=modPagoJ==="por_horas"&&tarifaJ>0?Math.round(horasPrev*tarifaJ*100)/100:0;
+  // Total = previas + jornada en curso (si está activa y no cerrada)
+  const horasTotalSrv=horasPrev+(jornadaId&&!jornadaFin?horasJornadaAct:0);
+  const costeTotalSrv=modPagoJ==="por_horas"&&tarifaJ>0?Math.round(horasTotalSrv*tarifaJ*100)/100:(modPagoJ==="precio_fijo_servicio"?(parseFloat(srvActivo?.precio_fijo_acordado)||0):0);
+  const fmtEur=v=>(Math.round((parseFloat(v)||0)*100)/100).toLocaleString("es-ES")+"€";
 
   const iniciarJornada=async()=>{
     if(saving2||!srvActivo)return;setSaving2(true);
@@ -2944,7 +2981,8 @@ function DashJ({perfil,jsem,jpunt,cwk,setPage,tok}){
               <div style={{width:10,height:10,borderRadius:999,background:pausado?"rgba(255,255,255,.3)":"#FF5555",boxShadow:pausado?"none":"0 0 10px #FF5555"}}/>
             </div>
             <div style={{position:"relative",fontFamily:"monospace",fontSize:52,fontWeight:300,letterSpacing:-2,lineHeight:1,marginTop:10,fontVariantNumeric:"tabular-nums"}}>{fmtEl(tiempoJornada)}</div>
-            {totalAcum>0&&<div style={{position:"relative",fontSize:11,color:"rgba(255,255,255,.6)",marginTop:6}}>Acumulado: <b style={{color:"white"}}>{fmtHM(totalAcum*60)}</b></div>}
+            {totalAcum>0&&<div style={{position:"relative",fontSize:11,color:"rgba(255,255,255,.6)",marginTop:6}}>Acumulado: <b style={{color:"white"}}>{fmtHM(totalAcum*60)}</b>{costePrev>0?<> · <b style={{color:"white"}}>{fmtEur(costePrev)}</b></>:""}</div>}
+            {modPagoJ==="por_horas"&&tarifaJ>0&&<div style={{position:"relative",fontSize:11,color:"rgba(255,255,255,.7)",marginTop:6}}>Hoy: <b style={{color:"white"}}>{fmtEur(costeJornadaAct)}</b> ({tarifaJ}€/h)</div>}
             <div style={{position:"relative",display:"flex",gap:8,marginTop:14}}>
               <button onClick={togglePausa} disabled={saving2} style={{flex:1,padding:12,borderRadius:12,border:0,background:"rgba(255,255,255,.15)",color:"white",fontFamily:T.sans,fontSize:13,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>{pausado?"▶️ Reanudar":"⏸️ Pausar"}</button>
               <button onClick={()=>setShowFinJornada(true)} style={{flex:1,padding:12,borderRadius:12,border:0,background:T.olive,color:T.ink,fontFamily:T.sans,fontSize:13,fontWeight:700,cursor:"pointer"}}>Terminar jornada</button>
@@ -2953,7 +2991,17 @@ function DashJ({perfil,jsem,jpunt,cwk,setPage,tok}){
         </>}
         {jornadaFin&&<div style={{background:T.olive+"22",borderRadius:16,padding:14,border:"1px solid "+T.olive+"44",display:"flex",alignItems:"center",gap:12,marginBottom:12}}>
           <div style={{width:36,height:36,borderRadius:999,background:T.olive,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><FmIcon name="check" size={18} stroke="white" sw={3}/></div>
-          <div><div style={{fontSize:13,fontWeight:700,color:T.ink}}>Jornada completada</div><div style={{fontSize:11,color:T.ink3,marginTop:2}}>{fmtHM(jornadaDurMin||0)}</div></div>
+          <div style={{flex:1}}>
+            <div style={{fontSize:13,fontWeight:700,color:T.ink}}>Jornada completada</div>
+            <div style={{fontSize:11,color:T.ink3,marginTop:2}}>{fmtHM(jornadaDurMin||0)}{modPagoJ==="por_horas"&&tarifaJ>0?<> · ganaste <b style={{color:T.ink}}>{fmtEur((jornadaDurMin/60)*tarifaJ)}</b></>:""}</div>
+            {horasPrev>0&&modPagoJ==="por_horas"&&tarifaJ>0&&<div style={{fontSize:11,color:T.ink3,marginTop:3}}>Total servicio: <b style={{color:T.ink}}>{fmtHM(horasTotalSrv*60)} · {fmtEur(costeTotalSrv)}</b></div>}
+          </div>
+        </div>}
+        {/* Antes de iniciar la primera jornada del día: aviso con ganancias acumuladas previas */}
+        {!jornadaId&&!jornadaFin&&horasPrev>0&&modPagoJ==="por_horas"&&tarifaJ>0&&<div style={{background:T.surface,border:"1px solid "+T.line,borderRadius:14,padding:"12px 14px",marginBottom:12}}>
+          <div style={{fontSize:10,color:T.ink3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase"}}>Llevas en este servicio</div>
+          <div style={{fontSize:18,fontWeight:700,color:T.ink,marginTop:4}}>{fmtHM(horasPrev*60)} <span style={{fontSize:13,color:T.terracotta}}>· {fmtEur(costePrev)}</span></div>
+          <div style={{fontSize:11,color:T.ink3,marginTop:2}}>{tarifaJ}€/h</div>
         </div>}
         {!jornadaId&&!jornadaFin&&!showNuevaJornada&&<button onClick={iniciarJornada} disabled={saving2} style={{width:"100%",padding:"14px 0",borderRadius:999,border:0,background:T.ink,color:"white",fontFamily:T.sans,fontSize:15,fontWeight:700,cursor:"pointer",marginBottom:14,display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>▶️ Iniciar jornada</button>}
 
@@ -3092,7 +3140,13 @@ function DashJ({perfil,jsem,jpunt,cwk,setPage,tok}){
       <div style={{fontSize:36,marginBottom:8}}>🌙</div>
       <h3>¿Terminas por hoy?</h3>
       <div style={{fontSize:24,fontWeight:700,color:"#EC683E",fontFamily:"monospace",margin:"16px 0"}}>{fmtEl(tiempoJornada)}</div>
-      <p style={{fontSize:13,color:"#8A8580",marginBottom:20}}>Llevas {fmtHM(Math.round(tiempoJornada/60))}</p>
+      <p style={{fontSize:13,color:"#8A8580",marginBottom:12}}>Llevas {fmtHM(Math.round(tiempoJornada/60))}</p>
+      {modPagoJ==="por_horas"&&tarifaJ>0&&<div style={{background:T.terracotta+"14",border:`1px solid ${T.terracotta}44`,borderRadius:12,padding:"12px 14px",marginBottom:16,textAlign:"left"}}>
+        <div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase"}}>Vas a ganar hoy</div>
+        <div style={{fontSize:22,fontWeight:700,color:T.terracotta,marginTop:4}}>{fmtEur(costeJornadaAct)}</div>
+        <div style={{fontSize:11,color:T.ink3,marginTop:2}}>{(horasJornadaAct).toFixed(2)}h × {tarifaJ}€/h</div>
+        {horasPrev>0&&<div style={{fontSize:11,color:T.ink3,marginTop:6,paddingTop:6,borderTop:"1px solid "+T.line}}>Total servicio: <b style={{color:T.ink}}>{fmtHM(horasTotalSrv*60)} · {fmtEur(costeTotalSrv)}</b></div>}
+      </div>}
       <button className="btn bp" style={{width:"100%",justifyContent:"center",padding:"14px",fontSize:15}} onClick={terminarJornada} disabled={saving2}>{saving2?"Guardando…":"✅ Terminar jornada"}</button>
       <button className="btn bg" style={{width:"100%",justifyContent:"center",marginTop:8}} onClick={()=>setShowFinJornada(false)}>Cancelar</button>
     </div></div>}
@@ -3102,9 +3156,12 @@ function DashJ({perfil,jsem,jpunt,cwk,setPage,tok}){
       <div style={{fontSize:36,marginBottom:8}}>✅</div>
       <h3>Completar servicio</h3>
       <p style={{fontSize:13,color:"#8A8580",marginBottom:16,lineHeight:1.5}}>"{srvActivo?.nombre}" — todas las tareas asignadas completadas.</p>
-      <div style={{background:"#F5F3F0",borderRadius:10,padding:"14px",marginBottom:20}}>
-        <div style={{fontSize:12,color:"#8A8580"}}>Total acumulado: <strong style={{color:"#EC683E"}}>{fmtHM(totalAcum*60)}</strong></div>
-        {srvExtras.length>0&&<div style={{fontSize:12,color:"#EC683E",marginTop:4}}>+ {srvExtras.length} tarea{srvExtras.length>1?"s":""} extra registrada{srvExtras.length>1?"s":""}</div>}
+      <div style={{background:"#F5F3F0",borderRadius:10,padding:"14px",marginBottom:20,textAlign:"left"}}>
+        <div style={{fontSize:11,color:"#8A8580",fontWeight:700,letterSpacing:.5,textTransform:"uppercase"}}>Total trabajado en este servicio</div>
+        <div style={{fontSize:22,fontWeight:700,color:"#1A1A1A",marginTop:4}}>{fmtHM(horasTotalSrv*60)}</div>
+        {modPagoJ==="por_horas"&&tarifaJ>0&&<div style={{fontSize:14,fontWeight:700,color:"#EC683E",marginTop:6}}>{fmtEur(costeTotalSrv)} <span style={{fontSize:11,fontWeight:500,color:"#8A8580"}}>({tarifaJ}€/h)</span></div>}
+        {modPagoJ==="precio_fijo_servicio"&&<div style={{fontSize:14,fontWeight:700,color:"#EC683E",marginTop:6}}>{fmtEur(srvActivo?.precio_fijo_acordado)} <span style={{fontSize:11,fontWeight:500,color:"#8A8580"}}>(precio fijo)</span></div>}
+        {srvExtras.length>0&&<div style={{fontSize:12,color:"#EC683E",marginTop:8,paddingTop:8,borderTop:"1px solid rgba(0,0,0,0.05)"}}>+ {srvExtras.length} tarea{srvExtras.length>1?"s":""} extra registrada{srvExtras.length>1?"s":""}</div>}
       </div>
       <button className="btn bp" style={{width:"100%",justifyContent:"center",padding:"14px",fontSize:15,background:"#A6BE59"}} onClick={completarServicio} disabled={saving2}>{saving2?"Finalizando…":"✅ Confirmar y notificar al admin"}</button>
       <button className="btn bg" style={{width:"100%",justifyContent:"center",marginTop:8}} onClick={()=>setShowFinSrv(false)}>Cancelar</button>
@@ -3892,7 +3949,7 @@ function JardinAdmin({perfil,tok,setPage}){
   // Servicios a medida
   const [srvs,setSrvs]=useState([]);const [showSrv,setShowSrv]=useState(false);const [selSrv,setSelSrv]=useState(null);
   const [jardineros,setJardineros]=useState([]);
-  const srvVacio={nombre:"",fecha_inicio:hoy,fecha_fin:hoy,jardinero_id:"",notas:""};
+  const srvVacio={nombre:"",fecha_inicio:hoy,fecha_fin:hoy,jardinero_id:"",notas:"",modalidad_pago:"",tarifa_hora:"",precio_fijo_acordado:"",permuta_descripcion:""};
   const [srvForm,setSrvForm]=useState(srvVacio);
   const [srvTareas,setSrvTareas]=useState([]);
   const [nuevaTarea,setNuevaTarea]=useState("");
@@ -3906,7 +3963,7 @@ function JardinAdmin({perfil,tok,setPage}){
       sbGet("jardin_puntual",`?semana=eq.${cwk}&select=*`,tok),
       sbGet("jardin_frecuencias","?select=*",tok),
       sbGet("jardin_servicios","?select=*,jardin_servicio_tareas(*)&order=created_at.desc",tok),
-      sbGet("jardineros","?activo=eq.true&select=id,nombre",tok).catch(()=>[]),
+      sbGet("jardineros","?activo=eq.true&select=id,nombre,modalidad,tarifa_hora,tarifa_mensual",tok).catch(()=>[]),
     ]);
     setJsem(js);setJpunt(jp);const fm={}; jf.forEach(x=>fm[x.tarea_id]=x.frecuencia); setJfrec(fm);
     setSrvs(sv);setJardineros(jds);setLoad(false);
@@ -3930,11 +3987,50 @@ function JardinAdmin({perfil,tok,setPage}){
   // ─ Servicios a medida ─
   const addTareaTemp=()=>{if(!nuevaTarea.trim())return;setSrvTareas(prev=>[...prev,nuevaTarea.trim()]);setNuevaTarea("");};
   const removeTareaTemp=i=>setSrvTareas(prev=>prev.filter((_,idx)=>idx!==i));
+
+  // Mapea la modalidad de la ficha del jardinero (label libre) al enum
+  // que usamos en jardin_servicios.modalidad_pago.
+  const modJardineroAEnum=(m)=>{
+    if(!m)return "por_horas";
+    const s=String(m).toLowerCase();
+    if(s.includes("hora"))return "por_horas";
+    if(s.includes("fijo")&&s.includes("mensu"))return "fijo_mensual";
+    if(s.includes("fijo"))return "precio_fijo_servicio";
+    if(s.includes("permuta"))return "permuta";
+    return "por_horas";
+  };
+  // Selección del jardinero: autorrellena modalidad y tarifa de su ficha
+  const selJardinero=(id)=>{
+    const j=jardineros.find(x=>String(x.id)===String(id));
+    const mod=modJardineroAEnum(j?.modalidad);
+    setSrvForm(prev=>({
+      ...prev,
+      jardinero_id:id,
+      modalidad_pago:mod,
+      tarifa_hora:mod==="por_horas"?String(j?.tarifa_hora||""):"",
+      precio_fijo_acordado:"",
+      permuta_descripcion:"",
+    }));
+  };
+  // Cambio de modalidad sin perder la tarifa por defecto del jardinero.
+  const selModalidadJ=(nuevaMod)=>{
+    setSrvForm(prev=>{
+      const j=jardineros.find(x=>String(x.id)===String(prev.jardinero_id));
+      return{
+        ...prev,
+        modalidad_pago:nuevaMod,
+        tarifa_hora:nuevaMod==="por_horas"?(prev.tarifa_hora||String(j?.tarifa_hora||"")):"",
+      };
+    });
+  };
   const crearServicio=async()=>{
     if(!srvForm.nombre||!srvForm.fecha_inicio||!srvForm.fecha_fin||!srvForm.jardinero_id||srvTareas.length===0||saving)return;
     setSaving(true);
     try{
       const jd=jardineros.find(j=>j.id===srvForm.jardinero_id);
+      const mod=srvForm.modalidad_pago||modJardineroAEnum(jd?.modalidad);
+      // Si admin no tipa tarifa, usar la de la ficha del jardinero
+      const tarifaH=parseFloat(srvForm.tarifa_hora)||parseFloat(jd?.tarifa_hora)||null;
       const [srv]=await sbPost("jardin_servicios",{
         nombre:srvForm.nombre,
         fecha_inicio:srvForm.fecha_inicio,
@@ -3945,6 +4041,14 @@ function JardinAdmin({perfil,tok,setPage}){
         notas:srvForm.notas||null,
         creado_por:perfil.nombre
       },tok);
+      // PATCH de campos opcionales (puede que el esquema no los tenga todos)
+      if(srv?.id){
+        const extra={modalidad_pago:mod};
+        if(mod==="por_horas")extra.tarifa_hora_aplicada=tarifaH;
+        if(mod==="precio_fijo_servicio")extra.precio_fijo_acordado=parseFloat(srvForm.precio_fijo_acordado)||null;
+        if(mod==="permuta")extra.permuta_descripcion=srvForm.permuta_descripcion||null;
+        await sbPatch("jardin_servicios",`id=eq.${srv.id}`,extra,tok).catch(()=>{});
+      }
       for(const txt of srvTareas){await sbPost("jardin_servicio_tareas",{servicio_id:srv.id,txt,done:false},tok);}
       const fi=new Date(srvForm.fecha_inicio+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"long"});
       const ff=new Date(srvForm.fecha_fin+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"long"});
@@ -4248,12 +4352,49 @@ function JardinAdmin({perfil,tok,setPage}){
                 <div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase",marginBottom:8}}>Jardinero asignado *</div>
                 {jardineros.length===0?<div style={{padding:"12px 14px",borderRadius:14,background:"#FEF1E6",border:"1px solid "+T.terracotta+"44",fontSize:13,color:T.ink2}}>⚠️ No hay jardineros registrados aún</div>
                 :<div style={{background:T.surface,border:"1px solid "+T.line,borderRadius:14,overflow:"hidden"}}>
-                  <select value={srvForm.jardinero_id} onChange={e=>setSrvForm(v=>({...v,jardinero_id:e.target.value}))} style={{width:"100%",padding:"13px 16px",background:"transparent",border:0,outline:"none",fontFamily:T.sans,fontSize:14,color:T.ink,cursor:"pointer"}}>
+                  <select value={srvForm.jardinero_id} onChange={e=>selJardinero(e.target.value)} style={{width:"100%",padding:"13px 16px",background:"transparent",border:0,outline:"none",fontFamily:T.sans,fontSize:14,color:T.ink,cursor:"pointer"}}>
                     <option value="">Seleccionar jardinero…</option>
                     {jardineros.map(j=><option key={j.id} value={j.id}>{j.nombre}</option>)}
                   </select>
                 </div>}
               </div>
+              {srvForm.jardinero_id&&(()=>{
+                const jSel=jardineros.find(x=>String(x.id)===String(srvForm.jardinero_id));
+                const tarifaPorDef=parseFloat(jSel?.tarifa_hora)||0;
+                return <>
+                <div>
+                  <div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase",marginBottom:8}}>Modalidad de pago</div>
+                  <div style={{background:T.surface,border:"1px solid "+T.line,borderRadius:14,overflow:"hidden"}}>
+                    <select value={srvForm.modalidad_pago} onChange={e=>selModalidadJ(e.target.value)} style={{width:"100%",padding:"13px 16px",background:"transparent",border:0,outline:"none",fontFamily:T.sans,fontSize:14,color:T.ink,cursor:"pointer"}}>
+                      <option value="por_horas">Por horas</option>
+                      <option value="precio_fijo_servicio">Precio fijo por servicio</option>
+                      <option value="fijo_mensual">Fijo mensual</option>
+                      <option value="permuta">Permuta</option>
+                    </select>
+                  </div>
+                </div>
+                {srvForm.modalidad_pago==="por_horas"&&<div>
+                  <div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase",marginBottom:8}}>Tarifa €/hora{tarifaPorDef>0?<span style={{textTransform:"none",letterSpacing:0,marginLeft:6,color:T.ink3,fontWeight:500}}>(por defecto: {tarifaPorDef}€)</span>:""}</div>
+                  <div style={{background:T.surface,border:"1px solid "+T.line,borderRadius:14,padding:"10px 14px"}}>
+                    <input type="number" inputMode="decimal" value={srvForm.tarifa_hora} onChange={e=>setSrvForm(v=>({...v,tarifa_hora:e.target.value}))} placeholder={tarifaPorDef>0?String(tarifaPorDef):"Ej: 15"} style={{width:"100%",background:"transparent",border:0,outline:"none",fontFamily:T.sans,fontSize:14,color:T.ink}}/>
+                  </div>
+                  {tarifaPorDef===0&&<div style={{fontSize:11,color:"#D4A017",marginTop:6}}>⚠️ Este jardinero no tiene tarifa por hora en su ficha. Pon una aquí o edita la ficha.</div>}
+                  {tarifaPorDef>0&&!srvForm.tarifa_hora&&<div style={{fontSize:11,color:T.ink3,marginTop:6}}>Se usará {tarifaPorDef}€ si lo dejas vacío.</div>}
+                </div>}
+                {srvForm.modalidad_pago==="precio_fijo_servicio"&&<div>
+                  <div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase",marginBottom:8}}>Importe acordado (€)</div>
+                  <div style={{background:T.surface,border:"1px solid "+T.line,borderRadius:14,padding:"10px 14px"}}>
+                    <input type="number" inputMode="decimal" value={srvForm.precio_fijo_acordado} onChange={e=>setSrvForm(v=>({...v,precio_fijo_acordado:e.target.value}))} placeholder="Ej: 250" style={{width:"100%",background:"transparent",border:0,outline:"none",fontFamily:T.sans,fontSize:14,color:T.ink}}/>
+                  </div>
+                </div>}
+                {srvForm.modalidad_pago==="permuta"&&<div>
+                  <div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase",marginBottom:8}}>Descripción del acuerdo</div>
+                  <div style={{background:T.surface,border:"1px solid "+T.line,borderRadius:14,padding:"10px 14px"}}>
+                    <input value={srvForm.permuta_descripcion} onChange={e=>setSrvForm(v=>({...v,permuta_descripcion:e.target.value}))} placeholder="Ej: 1 noche en la casa" style={{width:"100%",background:"transparent",border:0,outline:"none",fontFamily:T.sans,fontSize:14,color:T.ink}}/>
+                  </div>
+                </div>}
+                </>;
+              })()}
               <div>
                 <div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase",marginBottom:8}}>Notas (opcional)</div>
                 <textarea value={srvForm.notas} onChange={e=>setSrvForm(v=>({...v,notas:e.target.value}))} placeholder="Instrucciones especiales, zona de trabajo…" rows={2} style={{width:"100%",background:T.surface,border:"1px solid "+T.line,borderRadius:14,padding:"12px 14px",fontFamily:T.sans,fontSize:13,color:T.ink,resize:"none",outline:"none",boxSizing:"border-box"}}/>
@@ -4640,12 +4781,49 @@ function JardinAdmin({perfil,tok,setPage}){
               <div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase",marginBottom:8}}>Jardinero asignado *</div>
               {jardineros.length===0?<div style={{padding:"12px 14px",borderRadius:14,background:"#FEF1E6",border:"1px solid "+T.terracotta+"44",fontSize:13,color:T.ink2}}>⚠️ No hay jardineros registrados aún</div>
               :<div style={{background:T.surface,border:"1px solid "+T.line,borderRadius:14,overflow:"hidden"}}>
-                <select value={srvForm.jardinero_id} onChange={e=>setSrvForm(v=>({...v,jardinero_id:e.target.value}))} style={{width:"100%",padding:"13px 16px",background:"transparent",border:0,outline:"none",fontFamily:T.sans,fontSize:14,color:T.ink,cursor:"pointer"}}>
+                <select value={srvForm.jardinero_id} onChange={e=>selJardinero(e.target.value)} style={{width:"100%",padding:"13px 16px",background:"transparent",border:0,outline:"none",fontFamily:T.sans,fontSize:14,color:T.ink,cursor:"pointer"}}>
                   <option value="">Seleccionar jardinero…</option>
                   {jardineros.map(j=><option key={j.id} value={j.id}>{j.nombre}</option>)}
                 </select>
               </div>}
             </div>
+            {srvForm.jardinero_id&&(()=>{
+              const jSel=jardineros.find(x=>String(x.id)===String(srvForm.jardinero_id));
+              const tarifaPorDef=parseFloat(jSel?.tarifa_hora)||0;
+              return <>
+              <div>
+                <div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase",marginBottom:8}}>Modalidad de pago</div>
+                <div style={{background:T.surface,border:"1px solid "+T.line,borderRadius:14,overflow:"hidden"}}>
+                  <select value={srvForm.modalidad_pago} onChange={e=>selModalidadJ(e.target.value)} style={{width:"100%",padding:"13px 16px",background:"transparent",border:0,outline:"none",fontFamily:T.sans,fontSize:14,color:T.ink,cursor:"pointer"}}>
+                    <option value="por_horas">Por horas</option>
+                    <option value="precio_fijo_servicio">Precio fijo por servicio</option>
+                    <option value="fijo_mensual">Fijo mensual</option>
+                    <option value="permuta">Permuta</option>
+                  </select>
+                </div>
+              </div>
+              {srvForm.modalidad_pago==="por_horas"&&<div>
+                <div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase",marginBottom:8}}>Tarifa €/hora{tarifaPorDef>0?<span style={{textTransform:"none",letterSpacing:0,marginLeft:6,color:T.ink3,fontWeight:500}}>(por defecto: {tarifaPorDef}€)</span>:""}</div>
+                <div style={{background:T.surface,border:"1px solid "+T.line,borderRadius:14,padding:"10px 14px"}}>
+                  <input type="number" inputMode="decimal" value={srvForm.tarifa_hora} onChange={e=>setSrvForm(v=>({...v,tarifa_hora:e.target.value}))} placeholder={tarifaPorDef>0?String(tarifaPorDef):"Ej: 15"} style={{width:"100%",background:"transparent",border:0,outline:"none",fontFamily:T.sans,fontSize:14,color:T.ink}}/>
+                </div>
+                {tarifaPorDef===0&&<div style={{fontSize:11,color:"#D4A017",marginTop:6}}>⚠️ Este jardinero no tiene tarifa por hora en su ficha. Pon una aquí o edita la ficha.</div>}
+                {tarifaPorDef>0&&!srvForm.tarifa_hora&&<div style={{fontSize:11,color:T.ink3,marginTop:6}}>Se usará {tarifaPorDef}€ si lo dejas vacío.</div>}
+              </div>}
+              {srvForm.modalidad_pago==="precio_fijo_servicio"&&<div>
+                <div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase",marginBottom:8}}>Importe acordado (€)</div>
+                <div style={{background:T.surface,border:"1px solid "+T.line,borderRadius:14,padding:"10px 14px"}}>
+                  <input type="number" inputMode="decimal" value={srvForm.precio_fijo_acordado} onChange={e=>setSrvForm(v=>({...v,precio_fijo_acordado:e.target.value}))} placeholder="Ej: 250" style={{width:"100%",background:"transparent",border:0,outline:"none",fontFamily:T.sans,fontSize:14,color:T.ink}}/>
+                </div>
+              </div>}
+              {srvForm.modalidad_pago==="permuta"&&<div>
+                <div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase",marginBottom:8}}>Descripción del acuerdo</div>
+                <div style={{background:T.surface,border:"1px solid "+T.line,borderRadius:14,padding:"10px 14px"}}>
+                  <input value={srvForm.permuta_descripcion} onChange={e=>setSrvForm(v=>({...v,permuta_descripcion:e.target.value}))} placeholder="Ej: 1 noche en la casa" style={{width:"100%",background:"transparent",border:0,outline:"none",fontFamily:T.sans,fontSize:14,color:T.ink}}/>
+                </div>
+              </div>}
+              </>;
+            })()}
             <div>
               <div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase",marginBottom:8}}>Notas (opcional)</div>
               <textarea value={srvForm.notas} onChange={e=>setSrvForm(v=>({...v,notas:e.target.value}))} placeholder="Instrucciones especiales, zona de trabajo…" rows={2} style={{width:"100%",background:T.surface,border:"1px solid "+T.line,borderRadius:14,padding:"12px 14px",fontFamily:T.sans,fontSize:13,color:T.ink,resize:"none",outline:"none",boxSizing:"border-box"}}/>
@@ -7333,25 +7511,68 @@ function Jardineros({tok,rol}){
     }catch(_){}setSaving(false);
   };
   const toggleActivo=async(j)=>{await sbPatch("jardineros",`id=eq.${j.id}`,{activo:!j.activo},tok);await load_();};
+  // Calcula horas reales de una jornada: prioriza duracion_minutos guardado;
+  // si la jornada está abierta o ese campo es null, lo deduce de hora_inicio
+  // y hora_fin (o ahora si sigue abierta), descontando pausas. Con parseTSUTC
+  // para evitar el bug de TZ.
+  const calcHorasJornada=(jor)=>{
+    if(!jor)return 0;
+    const dm=parseFloat(jor.duracion_minutos);
+    if(dm>0)return dm/60;
+    const ini=parseTSUTC(jor.hora_inicio);
+    if(!ini)return 0;
+    const fin=jor.hora_fin?parseTSUTC(jor.hora_fin):new Date();
+    if(!fin)return 0;
+    let ms=fin.getTime()-ini.getTime();
+    (jor.pausas||[]).forEach(p=>{
+      if(p.inicio&&p.fin){
+        const pi=parseTSUTC(p.inicio)||new Date(p.inicio);
+        const pf=parseTSUTC(p.fin)||new Date(p.fin);
+        if(!isNaN(pi)&&!isNaN(pf))ms-=Math.max(0,pf.getTime()-pi.getTime());
+      }
+    });
+    if(jor.pausa_actual_iso&&!jor.hora_fin){
+      const pa=parseTSUTC(jor.pausa_actual_iso);
+      if(pa)ms-=Math.max(0,Date.now()-pa.getTime());
+    }
+    return Math.max(0,ms/3600000);
+  };
   const verAnalisis=async(j)=>{
     if(analisis?.id===j.id){setAnalisis(null);return;}
     setAnalisis(j);setAnalLoad(true);setAnalData(null);
     try{
       const hoy=new Date();const añoActual=hoy.getFullYear();const mesActual=String(hoy.getMonth()+1).padStart(2,"0");
-      const srvsDel=await sbGet("jardin_servicios",`?jardinero_id=eq.${j.id}&select=id`,tok).catch(()=>[]);
+      // Buscamos los servicios del jardinero en el año + sus jornadas en paralelo.
+      const srvsDel=await sbGet("jardin_servicios",`?jardinero_id=eq.${j.id}&select=id,modalidad_pago,modalidad,tarifa_hora_aplicada,tarifa_hora,coste_total,precio_fijo_acordado,fecha_inicio`,tok).catch(()=>[]);
       const srvIds=srvsDel.map(s=>s.id);
       let jornadas=[];
       if(srvIds.length>0){
         try{jornadas=await sbGet("jornadas_jardineria",`?servicio_id=in.(${srvIds.join(",")})&select=*`,tok);}catch(_){}
       }
-      const jorMes=jornadas.filter(x=>x.fecha?.slice(5,7)===mesActual);
-      const horasMes=jorMes.reduce((s,x)=>s+(parseFloat(x.horas)||0),0);
-      const costeMes=jorMes.reduce((s,x)=>s+(parseFloat(x.coste)||0),0);
-      const horasAño=jornadas.reduce((s,x)=>s+(parseFloat(x.horas)||0),0);
-      const costeAño=jornadas.reduce((s,x)=>s+(parseFloat(x.coste)||0),0);
-      const euroHoraReal=horasAño>0?Math.round(costeAño/horasAño*100)/100:0;
-      const barras=Array.from({length:12},(_,i)=>{const m=String(i+1).padStart(2,"0");const h=jornadas.filter(x=>x.fecha?.slice(5,7)===m).reduce((s,x)=>s+(parseFloat(x.horas)||0),0);return {name:MESES_CORTO[i],horas:Math.round(h*10)/10};});
-      setAnalData({horasMes:Math.round(horasMes*10)/10,costeMes:Math.round(costeMes),horasAño:Math.round(horasAño*10)/10,costeAño:Math.round(costeAño),euroHoraReal,barras});
+      const tarifaFicha=parseFloat(j.tarifa_hora)||0;
+      const tarifaJor=(jor)=>{
+        const s=srvsDel.find(x=>String(x.id)===String(jor.servicio_id));
+        return parseFloat(s?.tarifa_hora_aplicada)||parseFloat(s?.tarifa_hora)||tarifaFicha||0;
+      };
+      const filtMes=x=>{
+        const f=x.fecha||(x.hora_inicio?String(x.hora_inicio).slice(0,10):null);
+        return f&&f.slice(5,7)===mesActual&&f.slice(0,4)===String(añoActual);
+      };
+      const filtAño=x=>{
+        const f=x.fecha||(x.hora_inicio?String(x.hora_inicio).slice(0,10):null);
+        return f&&f.slice(0,4)===String(añoActual);
+      };
+      const horasMes=jornadas.filter(filtMes).reduce((s,x)=>s+calcHorasJornada(x),0);
+      const horasAño=jornadas.filter(filtAño).reduce((s,x)=>s+calcHorasJornada(x),0);
+      const costeMes=jornadas.filter(filtMes).reduce((s,x)=>s+calcHorasJornada(x)*tarifaJor(x),0);
+      const costeAño=jornadas.filter(filtAño).reduce((s,x)=>s+calcHorasJornada(x)*tarifaJor(x),0);
+      const euroHoraReal=horasAño>0?Math.round(costeAño/horasAño*100)/100:tarifaFicha;
+      const barras=Array.from({length:12},(_,i)=>{
+        const m=String(i+1).padStart(2,"0");
+        const h=jornadas.filter(x=>{const f=x.fecha||(x.hora_inicio?String(x.hora_inicio).slice(0,10):null);return f&&f.slice(0,4)===String(añoActual)&&f.slice(5,7)===m;}).reduce((s,x)=>s+calcHorasJornada(x),0);
+        return {name:MESES_CORTO[i],horas:Math.round(h*10)/10};
+      });
+      setAnalData({horasMes:Math.round(horasMes*10)/10,costeMes:Math.round(costeMes),horasAño:Math.round(horasAño*10)/10,costeAño:Math.round(costeAño),euroHoraReal,barras,nJornadas:jornadas.length});
     }catch(_){}setAnalLoad(false);
   };
 
@@ -9471,7 +9692,9 @@ function CalJardin({tok,perfil}){
         if(jorns.length>0){
           const j=jorns[0];setJornadaId(j.id);setPausasArr(j.pausas||[]);
           if(j.hora_fin){setJornadaFin(true);}else{
-            const ts=new Date(j.hora_inicio).getTime();
+            // parseTSUTC: trata el timestamp como UTC si Postgres lo devuelve sin offset.
+            const tsD=parseTSUTC(j.hora_inicio);
+            const ts=tsD?tsD.getTime():0;
             if(ts>0)localStorage.setItem(`fm_jornada_inicio_${s.id}`,ts.toString());
             const pArr=j.pausas||[];const lastP=pArr[pArr.length-1];setPausado(!!lastP&&!lastP.fin);
           }
