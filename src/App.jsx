@@ -9869,7 +9869,39 @@ function CalBase({tok,rol="admin"}){
         if(tokRsv!==SB_KEY)sbGet(table,query,SB_KEY).then(setter).catch(()=>{});
       });
     };
-    tryRead("reservas","?select=*&order=fecha.asc",setReservas);
+    tryRead("reservas","?select=*&order=fecha.asc",rs=>{
+      setReservas(rs);
+      // Fallback: si la tabla `reservas` no devuelve nada para limpieza/
+      // jardinero (probable por RLS que solo permite admin), derivamos
+      // eventos visibles desde `coordinacion_servicios` (tabla a la que
+      // operarios sí tienen acceso). Solo nos quedamos con la info que ya
+      // se enseña a estos roles: fecha + tipo_reserva (sin nombre/precio).
+      if((!rs||rs.length===0)&&(rol==="limpieza"||rol==="jardinero")){
+        sbGet("coordinacion_servicios","?select=reserva_id,tipo_reserva,fecha_checkout,fecha_checkin_siguiente,fecha_programada,tipo&limit=200",tokRsv)
+          .then(coords=>{
+            const fakes={};
+            coords.forEach(c=>{
+              const fecha=c.fecha_checkout||c.fecha_checkin_siguiente||c.fecha_programada;
+              if(!fecha||c.tipo_reserva==="airbnb")return; // los airbnb ya vienen por su tabla
+              if(!c.reserva_id)return;
+              if(!fakes[c.reserva_id]){
+                fakes[c.reserva_id]={
+                  id:c.reserva_id,
+                  fecha:String(fecha).slice(0,10),
+                  // Marcamos incluye_casa por defecto si la coord viene de
+                  // limpieza (suele ser eventos con casa); el detalle real
+                  // solo lo verá el admin.
+                  incluye_casa:!!(c.tipo&&String(c.tipo).includes("limpieza")),
+                  estado:"confirmada",
+                  _derived:true,
+                };
+              }
+            });
+            const arr=Object.values(fakes);
+            if(arr.length>0)setReservas(arr);
+          }).catch(()=>{});
+      }
+    });
     tryRead("reservas_airbnb","?select=*&order=fecha_entrada.asc",setAirbnbs);
   },[]);
 
