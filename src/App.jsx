@@ -620,6 +620,17 @@ hr.div{border:none;border-top:1px solid #E5E0D6;margin:16px 0}
   .mob-top{display:none!important}.mob-bar{display:block}
   .mob-fab-menu{display:flex}
   .app{flex-direction:column}.main{width:100%;flex:1;overflow-x:hidden}
+  /* Reserva espacio en la esquina superior derecha para el FAB hamburguesa
+     en cualquier cabecera con padding-top:54 (los headers de pantalla).
+     Así los botones de acción (+, campana, etc.) quedan a la izquierda
+     del FAB en la misma fila visual, replicando el AppHeader del diseño.
+     Se aplica al primer hijo directo de .main (la mayoría son fragments
+     que React aplana). */
+  .ph{padding-right:64px!important}
+  .fm-screen-header{padding-right:64px!important}
+  .main div[style*="padding: 54px 20px"]{padding-right:64px!important}
+  .main div[style*="padding:54px 20px"]{padding-right:64px!important}
+  .main div[style*="padding:'54px 20px"]{padding-right:64px!important}
   .ph{padding:18px 16px 14px}.ph h2{font-size:22px}
   .pb{padding:16px 14px 96px}
   .g2{grid-template-columns:1fr;gap:12px}
@@ -805,19 +816,20 @@ export default function App() {
     <div className="app">
       <Sidebar perfil={perfil} page={page} setPage={setPage} onLogout={logout}/>
       {/* FAB hamburguesa flotante (solo móvil) — abre el drawer lateral.
-          Posicionado top-right respetando el safe-area-inset-top de iOS. */}
+          Alineado verticalmente con los títulos de las pantallas (~54px de
+          padding-top) para que quede inline con los botones de acción de
+          cada cabecera, como el patrón AppHeader del diseño. */}
       {!drawerOpen&&<button className="mob-fab-menu" onClick={()=>setDrawerOpen(true)} aria-label="Menú" style={{
         position:'fixed',
-        top:'max(env(safe-area-inset-top, 12px), 12px)',
+        top:'max(calc(env(safe-area-inset-top, 0px) + 50px), 50px)',
         right:14,
-        width:44,height:44,borderRadius:999,
+        width:42,height:42,borderRadius:999,
         background:T.surface,border:'1px solid '+T.line,
         alignItems:'center',justifyContent:'center',
-        cursor:'pointer',zIndex:90,
-        boxShadow:'0 2px 10px rgba(40,30,20,0.12)'
+        cursor:'pointer',zIndex:90
       }}>
         <FmIcon name="menu" size={18} stroke={T.ink}/>
-        {(noVistos||0)>0&&<span style={{position:'absolute',top:6,right:6,width:9,height:9,borderRadius:999,background:'#F35757',border:'2px solid '+T.surface}}/>}
+        {(noVistos||0)>0&&<span style={{position:'absolute',top:5,right:5,width:9,height:9,borderRadius:999,background:'#F35757',border:'2px solid '+T.surface}}/>}
       </button>}
       {drawerOpen&&<div className="drawer-overlay" onClick={()=>setDrawerOpen(false)}/>}
       <div className={`drawer${drawerOpen?" open":""}`}>
@@ -8856,7 +8868,7 @@ function AlmacenPage({perfil,tok,rol}){
 const GASTO_CATS=["Personal","Suministros","Consumibles","Material & Reposición","Mantenimiento","Comisión gestor","Otros"];
 const GASTO_AUTO=["auto_comision","auto_limpieza","auto_jardineria","auto_recurrente"];
 
-function Gastos({tok}){
+function Gastos({tok,perfil}){
   const hoy=new Date();
   const hoyStr=hoy.toISOString().split("T")[0];
   const mesIni=`${hoy.getFullYear()}-${String(hoy.getMonth()+1).padStart(2,"0")}-01`;
@@ -8869,6 +8881,8 @@ function Gastos({tok}){
   const [catFiltro,setCatFiltro]=useState("todas");
   const [showForm,setShowForm]=useState(false);
   const [saving,setSaving]=useState(false);
+  // Detalle de gasto (overlay)
+  const [selGasto,setSelGasto]=useState(null);
 
   const formVacio={fecha:hoyStr,categoria:"Personal",concepto:"",importe:"",recurrente:false,frecuencia:"mensual",notas:""};
   const [form,setForm]=useState(formVacio);
@@ -8971,23 +8985,28 @@ function Gastos({tok}){
       {load?<div className="loading"><div className="spin"/><span>Cargando…</span></div>
       :filtrados.length===0?<div style={{textAlign:"center",padding:"40px 0",color:T.ink3,fontSize:13}}>Sin gastos en este período</div>
       :filtrados.map(g=>{const esAuto=GASTO_AUTO.includes(g.origen);const olbl=origenLbl(g.origen);const color=catColors[g.categoria]||T.ink3;
-        return<div key={g.id} style={{background:T.surface,borderRadius:16,padding:14,border:`1px solid ${T.line}`,marginBottom:8,display:"flex",gap:12,alignItems:"center"}}>
+        return<div key={g.id} onClick={()=>setSelGasto(g)} style={{background:T.surface,borderRadius:16,padding:14,border:`1px solid ${T.line}`,marginBottom:8,display:"flex",gap:12,alignItems:"center",cursor:"pointer"}}>
           <div style={{width:4,borderRadius:999,background:color,alignSelf:"stretch",flexShrink:0}}/>
           <div style={{flex:1,minWidth:0}}>
             <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:3,flexWrap:"wrap"}}>
               <span style={{display:"inline-flex",height:18,padding:"0 7px",borderRadius:999,background:color+"22",color:color,fontSize:9.5,fontWeight:700,textTransform:"capitalize"}}>{g.categoria||"—"}</span>
               {olbl&&<span style={{display:"inline-flex",height:18,padding:"0 7px",borderRadius:999,background:T.ink3+"22",color:T.ink3,fontSize:9.5,fontWeight:700}}>{olbl}</span>}
               {g.recurrente&&<span style={{display:"inline-flex",height:18,padding:"0 7px",borderRadius:999,background:T.softBlue+"22",color:"#2A5BA0",fontSize:9.5,fontWeight:700}}>Recurrente</span>}
+              {(g.reserva_vinculada_id||g.reserva_id)&&<span style={{display:"inline-flex",height:18,padding:"0 7px",borderRadius:999,background:T.lavender+"22",color:"#4A3A8A",fontSize:9.5,fontWeight:700}}>Vinculado</span>}
+              {g.factura_url&&<FmIcon name="mail" size={11} stroke={T.ink3}/>}
             </div>
             <div style={{fontSize:14,fontWeight:700,color:T.ink,letterSpacing:-.2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{g.concepto}</div>
             <div style={{fontSize:11,color:T.ink3,marginTop:3,display:"flex",alignItems:"center",gap:4}}><FmIcon name="calendar" size={10} stroke={T.ink3}/>{new Date(g.fecha+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"})}</div>
           </div>
           <div style={{textAlign:"right",flexShrink:0}}>
             <div style={{fontSize:16,fontWeight:700,color:T.ink,letterSpacing:-.3}}>{fmtE(g.importe)}</div>
-            {!esAuto&&<button onClick={()=>eliminar(g)} style={{marginTop:4,width:28,height:28,borderRadius:999,background:"#FEF2F2",border:"1px solid #FECACA",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}><FmIcon name="x" size={12} stroke="#D9443A"/></button>}
+            <FmIcon name="chevR" size={14} stroke={T.ink3}/>
           </div>
         </div>;})}
     </div>
+
+    {/* Detalle de gasto — overlay */}
+    {selGasto&&<GastoDetail gasto={selGasto} tok={tok} perfil={perfil} onClose={()=>setSelGasto(null)} onSaved={async(g)=>{await load_();setSelGasto(g||null);}} onDeleted={async()=>{await load_();setSelGasto(null);}}/>}
 
     {/* MODAL NUEVO GASTO — bottom sheet */}
     {showForm&&(
@@ -9055,6 +9074,273 @@ function Gastos({tok}){
       </div>
     )}
   </>;
+}
+
+// ─── DETALLE DE GASTO (overlay) ─────────────────────────────────────────────
+// Replica el patrón GastoDetailScreen del diseño (carpeta finca el molino (7)/
+// screens-admin-mobile.jsx): ColorBlock con categoría + importe, Card de
+// información, vínculo a reserva (event/airbnb), adjuntar factura.
+// Auto-gastos quedan en solo lectura con info banner; manuales se editan.
+function GastoDetail({gasto,tok,perfil,onClose,onSaved,onDeleted}){
+  const [g,setG]=useState(gasto);
+  useEffect(()=>{setG(gasto);},[gasto?.id]);
+  const esAuto=GASTO_AUTO.includes(g.origen);
+  const catColors={Personal:T.lavender,personal:T.lavender,"Comisión gestor":T.terracotta,comision:T.terracotta,Suministros:T.softBlue,suministros:T.softBlue,Consumibles:T.olive,consumibles:T.olive,Mantenimiento:T.gold,mantenimiento:T.gold,Marketing:"#F2995E",marketing:"#F2995E",Otros:T.ink3,otros:T.ink3,"Material & Reposición":T.peach||"#F2995E"};
+  const color=catColors[g.categoria]||T.ink3;
+  const fE=v=>(Math.round(parseFloat(v)||0)).toLocaleString("es-ES")+"€";
+  const [edit,setEdit]=useState(false);
+  const [form,setForm]=useState({
+    concepto:g.concepto||"",
+    importe:String(g.importe||""),
+    fecha:g.fecha||"",
+    categoria:g.categoria||"Personal",
+    notas:g.notas||"",
+    reserva_id:g.reserva_vinculada_id||g.reserva_id||"",
+    reserva_tipo:g.reserva_vinculada_tipo||(g.reserva_id?"evento":""),
+    factura_url:g.factura_url||"",
+  });
+  useEffect(()=>{
+    setForm({
+      concepto:g.concepto||"",
+      importe:String(g.importe||""),
+      fecha:g.fecha||"",
+      categoria:g.categoria||"Personal",
+      notas:g.notas||"",
+      reserva_id:g.reserva_vinculada_id||g.reserva_id||"",
+      reserva_tipo:g.reserva_vinculada_tipo||(g.reserva_id?"evento":""),
+      factura_url:g.factura_url||"",
+    });
+  },[g.id]);
+  const [reservas,setReservas]=useState([]);
+  const [airbnbs,setAirbnbs]=useState([]);
+  const [resQuery,setResQuery]=useState("");
+  const [showLinkPicker,setShowLinkPicker]=useState(false);
+  useEffect(()=>{
+    if(!showLinkPicker)return;
+    sbGet("reservas","?select=id,nombre,fecha,incluye_casa&order=fecha.desc&limit=80",tok).then(setReservas).catch(()=>{});
+    sbGet("reservas_airbnb","?select=id,huesped,fecha_entrada,fecha_salida&order=fecha_entrada.desc&limit=80",tok).then(setAirbnbs).catch(()=>{});
+  },[showLinkPicker]);
+  const [saving,setSaving]=useState(false);
+  const [uploading,setUploading]=useState(false);
+
+  const guardar=async()=>{
+    if(saving)return;setSaving(true);
+    try{
+      const patch={
+        concepto:form.concepto,
+        importe:parseFloat(form.importe)||0,
+        fecha:form.fecha,
+        categoria:form.categoria,
+        notas:form.notas||null,
+      };
+      // Vinculación a reserva — intenta varias columnas posibles para tolerar
+      // esquemas distintos (reserva_vinculada_id / reserva_id).
+      const linkPatch={};
+      if(form.reserva_id){linkPatch.reserva_vinculada_id=form.reserva_id;linkPatch.reserva_vinculada_tipo=form.reserva_tipo||"evento";}
+      else{linkPatch.reserva_vinculada_id=null;linkPatch.reserva_vinculada_tipo=null;}
+      if(form.factura_url!==undefined)linkPatch.factura_url=form.factura_url||null;
+      // Patch principal — si alguna columna no existe, reintenta sin extras
+      await sbPatch("gastos",`id=eq.${g.id}`,{...patch,...linkPatch},tok).catch(()=>
+        sbPatch("gastos",`id=eq.${g.id}`,patch,tok).catch(()=>{})
+      );
+      const updated={...g,...patch,...linkPatch};
+      setG(updated);setEdit(false);
+      onSaved&&onSaved(updated);
+    }catch(_){}
+    setSaving(false);
+  };
+  const eliminar=async()=>{
+    if(esAuto){alert("Este gasto es automático. Para eliminarlo modifica el servicio original.");return;}
+    if(!window.confirm(`¿Eliminar el gasto "${g.concepto}"?`))return;
+    try{await sbDelete("gastos",`id=eq.${g.id}`,tok);onDeleted&&onDeleted();}catch(_){}
+  };
+  const subirFactura=async(file)=>{
+    if(!file)return;setUploading(true);
+    try{
+      const url=await uploadFotoSeguro(file);
+      setForm(v=>({...v,factura_url:url}));
+    }catch(_){}
+    setUploading(false);
+  };
+
+  // Origen legible
+  const origenInfo=(()=>{
+    if(g.origen==="auto_comision")return{label:"Comisión automática",txt:"Generado al cobrar el saldo de una reserva con la comisión configurada."};
+    if(g.origen==="auto_limpieza")return{label:"Servicio de limpieza",txt:"Generado al verificar un servicio. Para modificar el coste o las horas, edita el servicio en Limpieza."};
+    if(g.origen==="auto_jardineria")return{label:"Servicio de jardinería",txt:"Generado al completar un servicio de jardín. Edítalo en Jardinería."};
+    if(g.origen==="auto_recurrente")return{label:"Gasto recurrente",txt:"Replicado automáticamente cada mes. Edita el gasto plantilla para cambiar futuras ocurrencias."};
+    return{label:"Entrada manual",txt:null};
+  })();
+
+  // Vínculo legible
+  const vinculo=(()=>{
+    const r=reservas.find(x=>String(x.id)===String(form.reserva_id));
+    if(r)return{txt:r.nombre+(r.fecha?" · "+new Date(r.fecha+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"}):""),tipo:"evento"};
+    const a=airbnbs.find(x=>String(x.id)===String(form.reserva_id));
+    if(a)return{txt:`Airbnb · ${a.huesped}`,tipo:"airbnb"};
+    if(form.reserva_id)return{txt:"Reserva vinculada",tipo:form.reserva_tipo||""};
+    return null;
+  })();
+
+  return(
+    <div style={{position:"fixed",inset:0,background:T.bg,zIndex:200,overflow:"auto",paddingBottom:120}}>
+      {/* Header */}
+      <div style={{padding:"54px 20px 12px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <button onClick={onClose} style={{width:36,height:36,borderRadius:999,background:T.surface,border:`1px solid ${T.line}`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}><FmIcon name="chevL" size={16} stroke={T.ink}/></button>
+        <div style={{fontSize:11,color:T.ink3,letterSpacing:.6,textTransform:"uppercase",fontWeight:700}}>Detalle gasto</div>
+        <div style={{width:36}}/>
+      </div>
+
+      {/* ColorBlock con categoría */}
+      <div style={{padding:"4px 20px 14px"}}>
+        <div style={{background:color,borderRadius:22,padding:22,color:T.ink}}>
+          <div style={{fontSize:11,color:"rgba(30,20,10,0.65)",letterSpacing:1,textTransform:"uppercase",fontWeight:700,marginBottom:6}}>{g.categoria||"—"}</div>
+          <div style={{fontSize:18,fontWeight:700,letterSpacing:-.4,lineHeight:1.15,marginBottom:12}}>{g.concepto||"Sin concepto"}</div>
+          <div style={{fontSize:40,fontWeight:800,letterSpacing:-1.8,lineHeight:.95,fontVariantNumeric:"tabular-nums"}}>{fE(g.importe)}</div>
+          <div style={{marginTop:14,display:"flex",gap:6,flexWrap:"wrap"}}>
+            <span style={{display:"inline-flex",alignItems:"center",height:22,padding:"0 9px",borderRadius:999,background:esAuto?T.ink:"rgba(30,20,10,0.18)",color:esAuto?"#fff":T.ink,fontSize:11,fontWeight:700}}>{esAuto?"Automático":"Manual"}</span>
+            {g.recurrente&&<span style={{display:"inline-flex",alignItems:"center",height:22,padding:"0 9px",borderRadius:999,background:"rgba(30,20,10,0.18)",color:T.ink,fontSize:11,fontWeight:700}}>Recurrente</span>}
+            {g.factura_url&&<span style={{display:"inline-flex",alignItems:"center",height:22,padding:"0 9px",borderRadius:999,background:"rgba(30,20,10,0.18)",color:T.ink,fontSize:11,fontWeight:700,gap:4}}><FmIcon name="mail" size={11} stroke={T.ink}/>Factura</span>}
+            {vinculo&&<span style={{display:"inline-flex",alignItems:"center",height:22,padding:"0 9px",borderRadius:999,background:"rgba(30,20,10,0.18)",color:T.ink,fontSize:11,fontWeight:700}}>Vinculado</span>}
+          </div>
+        </div>
+      </div>
+
+      {/* Información — edición o solo lectura */}
+      <div style={{padding:"0 20px 14px"}}>
+        <div style={{background:T.surface,borderRadius:18,padding:16,border:`1px solid ${T.line}`}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+            <div style={{fontSize:13,fontWeight:700,color:T.ink,letterSpacing:-.1,textTransform:"uppercase"}}>Información</div>
+            {!edit&&!esAuto&&<button onClick={()=>setEdit(true)} style={{background:"transparent",border:`1px solid ${T.line}`,borderRadius:999,padding:"6px 12px",fontSize:11,fontWeight:700,color:T.ink2,cursor:"pointer",fontFamily:T.sans,display:"inline-flex",alignItems:"center",gap:5}}><FmIcon name="edit" size={11} stroke={T.ink2}/>Editar</button>}
+          </div>
+          {!edit?(
+            <>
+              {[
+                ["Fecha",g.fecha?new Date(g.fecha+"T12:00:00").toLocaleDateString("es-ES",{weekday:"short",day:"numeric",month:"long",year:"numeric"}):"—"],
+                ["Categoría",g.categoria||"—"],
+                ["Origen",origenInfo.label],
+                ["Reserva vinculada",vinculo?vinculo.txt:"—"],
+                ["Factura",g.factura_url?"Adjuntada":"No adjuntada"],
+                ["ID interno",String(g.id||"").slice(-8).toUpperCase()],
+              ].map(([k,v],i,arr)=>(
+                <div key={k} style={{display:"flex",justifyContent:"space-between",padding:"10px 0",borderTop:i===0?"none":`1px solid ${T.line}`,fontSize:13,gap:10}}>
+                  <span style={{color:T.ink3,fontWeight:500,flexShrink:0}}>{k}</span>
+                  <span style={{color:T.ink,fontWeight:600,textAlign:"right",overflow:"hidden",textOverflow:"ellipsis"}}>{v}</span>
+                </div>
+              ))}
+              {g.notas&&<div style={{marginTop:10,padding:"10px 12px",background:T.bg,borderRadius:12,fontSize:13,color:T.ink2,lineHeight:1.5}}>{g.notas}</div>}
+            </>
+          ):(
+            <div style={{display:"flex",flexDirection:"column",gap:12}}>
+              <div className="fg" style={{margin:0}}><label>Concepto</label><input className="fi" value={form.concepto} onChange={e=>setForm(v=>({...v,concepto:e.target.value}))}/></div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                <div className="fg" style={{margin:0}}><label>Importe (€)</label><input type="number" inputMode="decimal" className="fi" value={form.importe} onChange={e=>setForm(v=>({...v,importe:e.target.value}))}/></div>
+                <div className="fg" style={{margin:0}}><label>Fecha</label><input type="date" className="fi" value={form.fecha} onChange={e=>setForm(v=>({...v,fecha:e.target.value}))}/></div>
+              </div>
+              <div className="fg" style={{margin:0}}><label>Categoría</label>
+                <select className="fi" value={form.categoria} onChange={e=>setForm(v=>({...v,categoria:e.target.value}))}>
+                  {GASTO_CATS.map(c=><option key={c}>{c}</option>)}
+                </select>
+              </div>
+              <div className="fg" style={{margin:0}}><label>Notas</label><textarea className="fi" rows={2} value={form.notas} onChange={e=>setForm(v=>({...v,notas:e.target.value}))} placeholder="Detalles adicionales…"/></div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Vincular a reserva */}
+      <div style={{padding:"0 20px 14px"}}>
+        <div style={{background:T.surface,borderRadius:18,padding:16,border:`1px solid ${T.line}`}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+            <div style={{fontSize:13,fontWeight:700,color:T.ink,letterSpacing:-.1,textTransform:"uppercase"}}>Vincular a reserva</div>
+            {form.reserva_id&&<button onClick={()=>setForm(v=>({...v,reserva_id:"",reserva_tipo:""}))} style={{background:"transparent",border:0,color:T.ink3,fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:T.sans}}>Quitar</button>}
+          </div>
+          {vinculo?(
+            <div style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",background:T.lavender+"14",border:`1px solid ${T.lavender}33`,borderRadius:12}}>
+              <div style={{width:32,height:32,borderRadius:10,background:T.lavender,display:"flex",alignItems:"center",justifyContent:"center"}}><FmIcon name={vinculo.tipo==="airbnb"?"home":"calendar"} size={14} stroke={T.ink}/></div>
+              <div style={{flex:1,minWidth:0,fontSize:13,fontWeight:600,color:T.ink}}>{vinculo.txt}</div>
+              <button onClick={()=>setShowLinkPicker(true)} style={{background:"transparent",border:`1px solid ${T.line}`,borderRadius:999,padding:"5px 10px",fontSize:11,fontWeight:700,color:T.ink2,cursor:"pointer",fontFamily:T.sans}}>Cambiar</button>
+            </div>
+          ):(
+            <button onClick={()=>setShowLinkPicker(true)} style={{width:"100%",padding:"12px 14px",borderRadius:14,border:`1px dashed ${T.line}`,background:T.bg,color:T.ink2,fontFamily:T.sans,fontWeight:600,fontSize:13,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}><FmIcon name="plus" size={14} stroke={T.ink2}/>Vincular a un evento o Airbnb</button>
+          )}
+          <div style={{fontSize:11,color:T.ink3,marginTop:8,lineHeight:1.5}}>Útil para imputar suministros (luz, agua) a una reserva concreta y ver su rentabilidad real.</div>
+        </div>
+      </div>
+
+      {/* Factura adjunta */}
+      <div style={{padding:"0 20px 14px"}}>
+        <div style={{background:T.surface,borderRadius:18,padding:16,border:`1px solid ${T.line}`}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+            <div style={{fontSize:13,fontWeight:700,color:T.ink,letterSpacing:-.1,textTransform:"uppercase"}}>Factura</div>
+            {form.factura_url&&<button onClick={()=>setForm(v=>({...v,factura_url:""}))} style={{background:"transparent",border:0,color:T.ink3,fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:T.sans}}>Quitar</button>}
+          </div>
+          {form.factura_url?(
+            <div style={{display:"flex",gap:12,alignItems:"center"}}>
+              <a href={form.factura_url} target="_blank" rel="noreferrer" style={{textDecoration:"none",flex:1,display:"flex",gap:12,alignItems:"center"}}>
+                <img src={form.factura_url} alt="Factura" style={{width:48,height:60,objectFit:"cover",borderRadius:8,border:`1px solid ${T.line}`,background:T.bg}}/>
+                <div><div style={{fontSize:13,fontWeight:600,color:T.ink}}>Ver factura</div><div style={{fontSize:11,color:T.ink3,marginTop:2}}>Toca para abrir</div></div>
+              </a>
+            </div>
+          ):(
+            <label style={{width:"100%",padding:"12px 14px",borderRadius:14,border:`1px dashed ${T.line}`,background:T.bg,color:T.ink2,fontFamily:T.sans,fontWeight:600,fontSize:13,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+              {uploading?"⏳ Subiendo…":<><FmIcon name="camera" size={14} stroke={T.ink2}/>Adjuntar foto/PDF de factura</>}
+              <input type="file" accept="image/*,application/pdf" style={{display:"none"}} onChange={e=>subirFactura(e.target.files?.[0])}/>
+            </label>
+          )}
+        </div>
+      </div>
+
+      {/* Banner info para auto-gastos */}
+      {esAuto&&origenInfo.txt&&<div style={{padding:"0 20px 14px"}}>
+        <div style={{padding:14,background:T.gold+"22",border:`1px solid ${T.gold}55`,borderRadius:16,display:"flex",gap:10}}>
+          <FmIcon name="info" size={18} stroke="#8A6B0F"/>
+          <div style={{fontSize:12.5,color:"#6B5108",lineHeight:1.5,fontWeight:500}}>{origenInfo.txt}</div>
+        </div>
+      </div>}
+
+      {/* Acciones inferiores */}
+      <div style={{padding:"6px 20px 24px",display:"flex",gap:8}}>
+        {edit?<>
+          <button onClick={()=>{setEdit(false);setForm({concepto:g.concepto||"",importe:String(g.importe||""),fecha:g.fecha||"",categoria:g.categoria||"Personal",notas:g.notas||"",reserva_id:g.reserva_vinculada_id||g.reserva_id||"",reserva_tipo:g.reserva_vinculada_tipo||(g.reserva_id?"evento":""),factura_url:g.factura_url||""});}} style={{flex:1,padding:"14px 0",borderRadius:999,border:`1px solid ${T.line}`,background:T.surface,color:T.ink,fontFamily:T.sans,fontWeight:600,fontSize:14,cursor:"pointer"}}>Cancelar</button>
+          <button onClick={guardar} disabled={saving} style={{flex:2,padding:"14px 0",borderRadius:999,border:0,background:T.ink,color:"#fff",fontFamily:T.sans,fontWeight:700,fontSize:14,cursor:"pointer"}}>{saving?"Guardando…":"Guardar cambios"}</button>
+        </>:<>
+          {/* Permitir guardar vinculación/factura sin entrar en edición */}
+          {((form.reserva_id||"")!==(g.reserva_vinculada_id||g.reserva_id||"")||(form.factura_url||"")!==(g.factura_url||""))&&
+            <button onClick={guardar} disabled={saving} style={{flex:2,padding:"14px 0",borderRadius:999,border:0,background:T.ink,color:"#fff",fontFamily:T.sans,fontWeight:700,fontSize:14,cursor:"pointer"}}>{saving?"Guardando…":"Guardar cambios"}</button>
+          }
+          {!esAuto&&<button onClick={eliminar} style={{flex:1,padding:"14px 0",borderRadius:999,border:`1px solid #FECACA`,background:"#FEF2F2",color:"#D9443A",fontFamily:T.sans,fontWeight:700,fontSize:14,cursor:"pointer"}}>Eliminar</button>}
+        </>}
+      </div>
+
+      {/* Picker de reserva */}
+      {showLinkPicker&&<div className="ov" onClick={()=>setShowLinkPicker(false)}>
+        <div className="modal" style={{maxWidth:540,maxHeight:"82vh",overflow:"auto"}} onClick={e=>e.stopPropagation()}>
+          <h3>Vincular a reserva</h3>
+          <input className="fi" placeholder="Buscar nombre o huésped…" value={resQuery} onChange={e=>setResQuery(e.target.value)} style={{marginBottom:12}}/>
+          <div style={{display:"flex",flexDirection:"column",gap:6}}>
+            <div style={{fontSize:10,color:T.ink3,fontWeight:700,letterSpacing:.6,textTransform:"uppercase",margin:"4px 2px"}}>Eventos</div>
+            {reservas.filter(r=>!resQuery||(r.nombre||"").toLowerCase().includes(resQuery.toLowerCase())).slice(0,15).map(r=>(
+              <button key={"e"+r.id} onClick={()=>{setForm(v=>({...v,reserva_id:r.id,reserva_tipo:"evento"}));setShowLinkPicker(false);}} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",borderRadius:12,border:`1px solid ${T.line}`,background:String(form.reserva_id)===String(r.id)?T.lavender+"22":T.surface,cursor:"pointer",textAlign:"left",fontFamily:T.sans}}>
+                <div style={{width:28,height:28,borderRadius:8,background:r.incluye_casa?T.terracotta+"33":T.gold+"33",display:"flex",alignItems:"center",justifyContent:"center"}}><FmIcon name="calendar" size={13} stroke={T.ink}/></div>
+                <div style={{flex:1,minWidth:0}}><div style={{fontSize:13,fontWeight:700,color:T.ink,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.nombre}</div><div style={{fontSize:11,color:T.ink3}}>{r.fecha?new Date(r.fecha+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short",year:"numeric"}):"Sin fecha"}{r.incluye_casa?" · Casa":""}</div></div>
+              </button>
+            ))}
+            {reservas.length===0&&<div style={{padding:10,fontSize:12,color:T.ink3}}>Sin eventos</div>}
+            <div style={{fontSize:10,color:T.ink3,fontWeight:700,letterSpacing:.6,textTransform:"uppercase",margin:"12px 2px 4px"}}>Airbnb</div>
+            {airbnbs.filter(a=>!resQuery||(a.huesped||"").toLowerCase().includes(resQuery.toLowerCase())).slice(0,15).map(a=>(
+              <button key={"a"+a.id} onClick={()=>{setForm(v=>({...v,reserva_id:a.id,reserva_tipo:"airbnb"}));setShowLinkPicker(false);}} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",borderRadius:12,border:`1px solid ${T.line}`,background:String(form.reserva_id)===String(a.id)?T.lavender+"22":T.surface,cursor:"pointer",textAlign:"left",fontFamily:T.sans}}>
+                <div style={{width:28,height:28,borderRadius:8,background:T.softBlue+"33",display:"flex",alignItems:"center",justifyContent:"center"}}><FmIcon name="home" size={13} stroke={T.ink}/></div>
+                <div style={{flex:1,minWidth:0}}><div style={{fontSize:13,fontWeight:700,color:T.ink,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{a.huesped}</div><div style={{fontSize:11,color:T.ink3}}>{a.fecha_entrada?new Date(a.fecha_entrada+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"}):"—"} → {a.fecha_salida?new Date(a.fecha_salida+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"}):"—"}</div></div>
+              </button>
+            ))}
+            {airbnbs.length===0&&<div style={{padding:10,fontSize:12,color:T.ink3}}>Sin Airbnb</div>}
+          </div>
+          <div className="mft"><button className="btn bg" onClick={()=>setShowLinkPicker(false)}>Cancelar</button></div>
+        </div>
+      </div>}
+    </div>
+  );
 }
 
 // ─── ANÁLISIS ───────────────────────────────────────────────────────────────
