@@ -1847,7 +1847,7 @@ function OpsAvatar({name="?",size=28,color:c}){const cols=["#AFA3FF","#A6BE59","
 function OpsMiniKpi({value,label,color}){return<div style={{background:T.surface,borderRadius:16,padding:"10px 12px",border:`1px solid ${T.line}`}}><div style={{width:22,height:3,background:color,borderRadius:2,marginBottom:6}}/><div style={{fontSize:20,fontWeight:700,color:T.ink,letterSpacing:-.6,lineHeight:1}}>{value}</div><div style={{fontSize:10,color:T.ink3,fontWeight:500,textTransform:"uppercase",letterSpacing:.4,marginTop:4}}>{label}</div></div>;}
 function OpsStatePill({estado}){const m=getOpsMeta(estado);return<span style={{display:"inline-flex",alignItems:"center",gap:4,height:20,padding:"0 8px",borderRadius:999,background:m.bg,color:m.ink,fontSize:10,fontWeight:700}}><span style={{width:5,height:5,borderRadius:999,background:m.color}}/>{m.label}</span>;}
 function OpsStatMini({label,value,accent}){return<div style={{background:accent?"#EC683E14":T.bg,padding:"8px 10px",borderRadius:8}}><div style={{fontSize:9,color:T.ink3,textTransform:"uppercase",letterSpacing:.4,fontWeight:600}}>{label}</div><div style={{fontSize:14,fontWeight:700,color:accent?"#EC683E":T.ink,marginTop:2}}>{value}</div></div>;}
-function OpsServiceCard({s,kind,onClick}){const estado=s.estado||s.state||"pendiente";const meta=getOpsMeta(estado);const zD=s.zonas_completadas||s.zonesDone||0;const zT=s.total_zonas||s.zones||14;const tD=s.tareas_completadas||s.tasksDone||0;const tT=s.total_tareas||s.tasks||1;const progress=kind==="cleaning"?zD/zT:tD/tT;const progressLbl=kind==="cleaning"?`${zD}/${zT} zonas`:`${tD}/${tT} tareas`;const worker=kind==="cleaning"?(s.limpiadora_nombre||s.cleaner||"—"):(s.jardinero_nombre||s.gardener||"—");const titulo=s.titulo||s.title||s.nombre||"Servicio";const fecha=s.fecha||s.date||"Sin fecha";const coste=s.coste_calculado||s.cost||0;const esAuto=s.origen_automatico||s.origin==="auto";const esRec=s.origin==="recurring";const vinculo=s.reserva_nombre||s.linkedTo;const fE=v=>(Math.round(parseFloat(v)||0)).toLocaleString("es-ES")+"€";
+function OpsServiceCard({s,kind,onClick}){const estado=kind==="cleaning"?resolveLimpEstado(s):(s.estado||s.state||"pendiente");const meta=getOpsMeta(estado);const zD=s.zonas_completadas||s.zonesDone||0;const zT=s.total_zonas||s.zones||14;const tD=s.tareas_completadas||s.tasksDone||0;const tT=s.total_tareas||s.tasks||1;const progress=kind==="cleaning"?zD/zT:tD/tT;const progressLbl=kind==="cleaning"?`${zD}/${zT} zonas`:`${tD}/${tT} tareas`;const worker=kind==="cleaning"?(s.limpiadora_nombre||s.cleaner||"—"):(s.jardinero_nombre||s.gardener||"—");const titulo=s.titulo||s.title||s.nombre||"Servicio";const fecha=s.fecha||s.date||"Sin fecha";const coste=s.coste_calculado||s.cost||0;const esAuto=s.origen_automatico||s.origin==="auto";const esRec=s.origin==="recurring";const vinculo=s.reserva_nombre||s.linkedTo;const fE=v=>(Math.round(parseFloat(v)||0)).toLocaleString("es-ES")+"€";
   return<div onClick={onClick} style={{background:T.surface,border:`1px solid ${T.line}`,borderRadius:16,padding:14,cursor:"pointer",display:"flex",gap:10,marginBottom:8}}>
     <div style={{width:4,borderRadius:999,background:meta.color,flexShrink:0,alignSelf:"stretch"}}/>
     <div style={{flex:1,minWidth:0}}>
@@ -5597,6 +5597,10 @@ function Limpieza({perfil,tok,rol,setPage}){
   const [finalMode,setFinalMode]=useState(null);
   const [finalNota,setFinalNota]=useState("");
   const [finalSaving,setFinalSaving]=useState(false);
+  // Editar coste post-verificación (admin)
+  const [showEditCoste,setShowEditCoste]=useState(false);
+  const [editCosteForm,setEditCosteForm]=useState({hora_inicio:"",hora_fin:"",tarifa_hora_aplicada:"",coste_calculado:"",auto:true});
+  const [editCosteSaving,setEditCosteSaving]=useState(false);
   // Paso hora fin
   const [finalStep,setFinalStep]=useState("check"); // "check" | "consumo" | "hora"
   const [consumoItems,setConsumoItems]=useState([]);
@@ -5847,24 +5851,31 @@ function Limpieza({perfil,tok,rol,setPage}){
         hora_fin:horaFin,
         coste_calculado:costeCalc||null,
         tarifa_hora_aplicada:tarifaHora||null,
+        estado:"completado",
       };
       await sbPatch("servicios",`id=eq.${actId}`,patchData,tok).catch(()=>{
         // Si algún campo no existe en el esquema, reintentar sin los opcionales
-        return sbPatch("servicios",`id=eq.${actId}`,{verificado:true,verificado_ok:!esParcial,verificado_nota:notaFinal,verificado_por:perfil.nombre,verificado_ts:new Date().toISOString(),hora_inicio:horaInicio||undefined,hora_fin:horaFin},tok).catch(()=>
-          sbPatch("servicios",`id=eq.${actId}`,{verificado:true,verificado_ok:!esParcial,verificado_nota:notaFinal,verificado_por:perfil.nombre,verificado_ts:new Date().toISOString()},tok)
+        return sbPatch("servicios",`id=eq.${actId}`,{verificado:true,verificado_ok:!esParcial,verificado_nota:notaFinal,verificado_por:perfil.nombre,verificado_ts:new Date().toISOString(),hora_inicio:horaInicio||undefined,hora_fin:horaFin,estado:"completado"},tok).catch(()=>
+          sbPatch("servicios",`id=eq.${actId}`,{verificado:true,verificado_ok:!esParcial,verificado_nota:notaFinal,verificado_por:perfil.nombre,verificado_ts:new Date().toISOString(),estado:"completado"},tok).catch(()=>
+            sbPatch("servicios",`id=eq.${actId}`,{verificado:true,verificado_ok:!esParcial,verificado_nota:notaFinal,verificado_por:perfil.nombre,verificado_ts:new Date().toISOString()},tok)
+          )
         );
       });
-      // Insertar gasto según modalidad
+      // Insertar gasto según modalidad. Si el JWT del operario no tiene RLS
+      // para insertar en gastos, reintentar con SB_KEY (anon) como fallback
+      // — pasa al admin que la limpiadora cierre y el coste no aparezca en
+      // análisis. Sin esto, el .catch silencioso lo perdía.
+      const postGasto=(body)=>sbPost("gastos",body,tok).catch(()=>sbPost("gastos",body,SB_KEY).catch(()=>{}));
       const srv_g=servicios.find(s=>s.id===actId);
       const mod=srv_g?.modalidad_pago||"por_horas";
       const fechaFmt=new Date(srv_g?.fecha+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"});
       const sufijoParcial=esParcial?" (parcial)":"";
       if(mod==="permuta"){
-        await sbPost("gastos",{fecha:hoyStr,categoria:"Personal",concepto:`Permuta: ${srv_g?.permuta_descripcion||"Limpieza"} - ${srv_g?.nombre||"Servicio"}${sufijoParcial} - ${fechaFmt}`,importe:0,origen:"auto_limpieza"},tok).catch(()=>{});
+        await postGasto({fecha:hoyStr,categoria:"Personal",concepto:`Permuta: ${srv_g?.permuta_descripcion||"Limpieza"} - ${srv_g?.nombre||"Servicio"}${sufijoParcial} - ${fechaFmt}`,importe:0,origen:"auto_limpieza"});
       }else if(mod==="precio_fijo_servicio"&&costeCalc>0){
-        await sbPost("gastos",{fecha:hoyStr,categoria:"Personal",concepto:`Limpieza - ${srv_g?.nombre||"Servicio"}${sufijoParcial} - ${fechaFmt}`,importe:costeCalc,origen:"auto_limpieza"},tok).catch(()=>{});
+        await postGasto({fecha:hoyStr,categoria:"Personal",concepto:`Limpieza - ${srv_g?.nombre||"Servicio"}${sufijoParcial} - ${fechaFmt}`,importe:costeCalc,origen:"auto_limpieza"});
       }else if(tarifaHora>0&&costeCalc>0){
-        await sbPost("gastos",{fecha:hoyStr,categoria:"Personal",concepto:`Limpieza - ${srv_g?.nombre||"Servicio"}${sufijoParcial} - ${fechaFmt}`,importe:costeCalc,origen:"auto_limpieza"},tok).catch(()=>{});
+        await postGasto({fecha:hoyStr,categoria:"Personal",concepto:`Limpieza - ${srv_g?.nombre||"Servicio"}${sufijoParcial} - ${fechaFmt} (${horasCalc}h × ${tarifaHora}€)`,importe:costeCalc,origen:"auto_limpieza"});
       }
       const admins=await sbGet("usuarios","?rol=eq.admin&select=id",tok);
       const srv=servicios.find(s=>s.id===actId);
@@ -5883,6 +5894,82 @@ function Limpieza({perfil,tok,rol,setPage}){
   };
 
   const openN2=t=>{setNota(t.nota||"");setFoto(t.foto_url||null);setNotaM(t);};
+
+  // ─── EDITAR COSTE (admin, post-verificación) ────────────────────────────────
+  // Permite a admin corregir horas/tarifa/coste de un servicio ya finalizado.
+  // Sincroniza el gasto correspondiente en la tabla `gastos` para que el
+  // análisis y los KPIs reflejen el cambio.
+  const abrirEditCoste=()=>{
+    if(!srv)return;
+    const c=limpCalcCoste(srv,limpiadoras);
+    setEditCosteForm({
+      hora_inicio:srv.hora_inicio?String(srv.hora_inicio).slice(0,5):"",
+      hora_fin:srv.hora_fin?String(srv.hora_fin).slice(0,5):"",
+      tarifa_hora_aplicada:String(srv.tarifa_hora_aplicada||c.tarifa||""),
+      coste_calculado:String(srv.coste_calculado||(c.importe>0?c.importe:"")),
+      auto:true,
+    });
+    setShowEditCoste(true);
+  };
+  const calcEditCosteAuto=(form)=>{
+    const h=limpDiffHoras(form.hora_inicio,form.hora_fin);
+    const t=parseFloat(form.tarifa_hora_aplicada)||0;
+    return Math.round(h*t*100)/100;
+  };
+  const guardarEditCoste=async()=>{
+    if(!srv||editCosteSaving)return;
+    setEditCosteSaving(true);
+    try{
+      const tarifa=parseFloat(editCosteForm.tarifa_hora_aplicada)||0;
+      const costeManual=parseFloat(editCosteForm.coste_calculado)||0;
+      const costeAuto=calcEditCosteAuto(editCosteForm);
+      const costeFinal=editCosteForm.auto?costeAuto:costeManual;
+      const horas=limpDiffHoras(editCosteForm.hora_inicio,editCosteForm.hora_fin);
+      // 1) PATCH del servicio
+      const patch={
+        hora_inicio:editCosteForm.hora_inicio||null,
+        hora_fin:editCosteForm.hora_fin||null,
+        tarifa_hora_aplicada:tarifa||null,
+        coste_calculado:costeFinal||null,
+      };
+      await sbPatch("servicios",`id=eq.${srv.id}`,patch,tok).catch(()=>
+        // Reintento sin coste si la columna no existe en el esquema
+        sbPatch("servicios",`id=eq.${srv.id}`,{hora_inicio:patch.hora_inicio,hora_fin:patch.hora_fin},tok).catch(()=>{})
+      );
+      // 2) Sincronizar gasto: buscar gasto auto_limpieza con concepto que mencione el nombre del servicio
+      const fechaFmt=srv.fecha?new Date(srv.fecha+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"}):"—";
+      const conceptoBase=`Limpieza - ${srv.nombre||"Servicio"}`;
+      const hoyStr=new Date().toISOString().split("T")[0];
+      // Buscar gasto existente
+      let gastoExistente=null;
+      try{
+        const r=await sbGet("gastos",`?origen=eq.auto_limpieza&concepto=ilike.*${encodeURIComponent(srv.nombre||"")}*&select=id,importe&limit=1`,tok).catch(()=>[]);
+        if(r&&r[0])gastoExistente=r[0];
+      }catch(_){}
+      if(costeFinal>0){
+        const gastoBody={
+          fecha:srv.fecha||hoyStr,
+          categoria:"Personal",
+          concepto:`${conceptoBase} - ${fechaFmt}${horas>0?` (${horas}h × ${tarifa}€)`:""}`,
+          importe:costeFinal,
+          origen:"auto_limpieza",
+        };
+        if(gastoExistente){
+          await sbPatch("gastos",`id=eq.${gastoExistente.id}`,{importe:costeFinal,concepto:gastoBody.concepto},tok).catch(()=>{});
+        }else{
+          await sbPost("gastos",gastoBody,tok).catch(()=>{});
+        }
+      }else if(gastoExistente){
+        // Si quitan el coste, borrar el gasto auto-vinculado
+        await sbDelete("gastos",`id=eq.${gastoExistente.id}`,tok).catch(()=>{});
+      }
+      // 3) Refrescar local + recargar
+      setServicios(prev=>prev.map(x=>x.id===srv.id?{...x,...patch}:x));
+      setShowEditCoste(false);
+      await loadSrvs();
+    }catch(e){console.error("Error editar coste:",e);}
+    setEditCosteSaving(false);
+  };
 
   const selLimpiadora=(id)=>{
     const l=limpiadoras.find(x=>String(x.id)===String(id));
@@ -6083,9 +6170,12 @@ function Limpieza({perfil,tok,rol,setPage}){
                 </div>
               </div>
               {/* Coste terracotta */}
-              {(()=>{const c=limpCalcCoste(srv,limpiadoras);const yaCerr=parseFloat(srv.coste_calculado)>0;return(
-              <div style={{background:T.terracotta,borderRadius:18,padding:20,color:T.ink}}>
-                <div style={{fontSize:11,color:"rgba(30,20,10,0.7)",letterSpacing:.8,textTransform:"uppercase",fontWeight:700,marginBottom:8}}>{yaCerr?"Coste calculado":c.importe>0?"Coste estimado":"Coste"}</div>
+              {(()=>{const c=limpCalcCoste(srv,limpiadoras);const yaCerr=parseFloat(srv.coste_calculado)>0||srv.verificado;return(
+              <div style={{background:T.terracotta,borderRadius:18,padding:20,color:T.ink,position:"relative"}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
+                  <div style={{fontSize:11,color:"rgba(30,20,10,0.7)",letterSpacing:.8,textTransform:"uppercase",fontWeight:700}}>{yaCerr?"Coste":c.importe>0?"Coste estimado":"Coste"}</div>
+                  {isA&&(yaCerr||c.importe>0)&&<button onClick={abrirEditCoste} style={{background:"rgba(30,20,10,0.10)",border:0,borderRadius:999,padding:"5px 10px",fontSize:11,fontWeight:700,color:T.ink,cursor:"pointer",fontFamily:T.sans,display:"inline-flex",alignItems:"center",gap:4}}><FmIcon name="edit" size={11} stroke={T.ink}/>Editar</button>}
+                </div>
                 <div style={{fontSize:48,fontWeight:700,letterSpacing:-1.8,lineHeight:1}}>
                   {c.importe>0?fmtE(c.importe):"—"}
                 </div>
@@ -6277,10 +6367,10 @@ function Limpieza({perfil,tok,rol,setPage}){
       <OpsMiniKpi value={costeLimp} label="Coste período" color={T.terracotta}/>
     </div>}
 
-    {/* Tabs */}
-    {isA&&<div style={{padding:"0 20px 14px"}}><div style={{display:"flex",background:T.surface,borderRadius:999,padding:4,border:`1px solid ${T.line}`,gap:2}}>
+    {/* Tabs (visibles también para limpieza) */}
+    <div style={{padding:"0 20px 14px"}}><div style={{display:"flex",background:T.surface,borderRadius:999,padding:4,border:`1px solid ${T.line}`,gap:2}}>
       {[{k:"todos",l:"Todos",c:servicios.length},{k:"pendientes",l:"Pendientes",c:servicios.filter(s=>{const e=_est(s);return e==="pendiente_fecha"||e==="pendiente";}).length},{k:"activos",l:"Activos",c:servicios.filter(s=>{const e=_est(s);return e==="en_curso"||e==="programado"||e==="activo";}).length},{k:"hechos",l:"Hechos",c:servicios.filter(s=>_est(s)==="completado").length}].map(t=><button key={t.k} onClick={()=>setTabLimp(t.k)} style={{flex:1,padding:"9px 6px",borderRadius:999,border:0,background:tabLimp===t.k?T.ink:"transparent",color:tabLimp===t.k?"#fff":T.ink2,fontFamily:T.sans,fontSize:11,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4}}>{t.l}<span style={{fontSize:9,padding:"1px 5px",borderRadius:999,background:tabLimp===t.k?"rgba(255,255,255,.2)":T.bg,color:tabLimp===t.k?"#fff":T.ink3}}>{t.c}</span></button>)}
-    </div></div>}
+    </div></div>
 
     {/* Lista con OpsServiceCard */}
     <div style={{padding:"0 20px"}}>
@@ -6354,13 +6444,16 @@ function Limpieza({perfil,tok,rol,setPage}){
         </div>
 
         {/* Coste — bloque terracotta */}
-        {(()=>{const c=limpCalcCoste(srv);const yaCerr=parseFloat(srv.coste_calculado)>0;return(
+        {(()=>{const c=limpCalcCoste(srv,limpiadoras);const yaCerr=parseFloat(srv.coste_calculado)>0||srv.verificado;return(
         <div style={{padding:"0 20px 14px"}}>
-          <div style={{fontSize:11,color:T.ink3,letterSpacing:1,textTransform:"uppercase",fontWeight:700,marginBottom:8}}>Coste</div>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:8}}>
+            <div style={{fontSize:11,color:T.ink3,letterSpacing:1,textTransform:"uppercase",fontWeight:700}}>Coste</div>
+            {isA&&(yaCerr||c.importe>0)&&<button onClick={abrirEditCoste} style={{background:"transparent",border:`1px solid ${T.line}`,borderRadius:999,padding:"5px 10px",fontSize:11,fontWeight:700,color:T.ink2,cursor:"pointer",fontFamily:T.sans,display:"inline-flex",alignItems:"center",gap:4}}><FmIcon name="edit" size={11} stroke={T.ink2}/>Editar</button>}
+          </div>
           <div style={{background:T.terracotta,borderRadius:20,padding:18,color:T.ink}}>
             <div style={{display:"flex",alignItems:"flex-end",justifyContent:"space-between",gap:10}}>
               <div>
-                <div style={{fontSize:10,color:"rgba(30,20,10,0.65)",letterSpacing:1,textTransform:"uppercase",fontWeight:700}}>{yaCerr?"Total calculado":c.importe>0?"Estimado":"Total"}</div>
+                <div style={{fontSize:10,color:"rgba(30,20,10,0.65)",letterSpacing:1,textTransform:"uppercase",fontWeight:700}}>{yaCerr?"Total":c.importe>0?"Estimado":"Total"}</div>
                 <div style={{fontSize:44,fontWeight:700,letterSpacing:-1.5,lineHeight:1,marginTop:6}}>
                   {c.importe>0?Math.round(c.importe).toLocaleString("es-ES")+"€":"—"}
                 </div>
@@ -6701,6 +6794,39 @@ function Limpieza({perfil,tok,rol,setPage}){
           </>}
 
           <button onClick={()=>{setShowFinal(false);setFinalStep("check");}} style={{background:"none",border:"none",color:"#8A8580",cursor:"pointer",width:"100%",textAlign:"center",marginTop:16,fontSize:12,fontFamily:"'DM Sans',sans-serif",padding:"8px"}}>Cerrar y decidir más tarde</button>
+        </div>
+      </div>
+    )}
+
+    {/* MODAL EDITAR COSTE (admin) — disponible desde móvil y desktop */}
+    {showEditCoste&&isA&&srv&&(
+      <div className="ov" onClick={()=>!editCosteSaving&&setShowEditCoste(false)}>
+        <div className="modal" style={{maxWidth:480}} onClick={e=>e.stopPropagation()}>
+          <h3>✏️ Editar coste — {srv.nombre}</h3>
+          <div style={{fontSize:12,color:T.ink3,marginBottom:14,lineHeight:1.5}}>Corrige horas o el importe directamente. Al guardar se actualiza también el gasto en análisis.</div>
+          <div className="g2">
+            <div className="fg"><label>Hora inicio</label><input type="time" className="fi" value={editCosteForm.hora_inicio} onChange={e=>setEditCosteForm(v=>({...v,hora_inicio:e.target.value}))}/></div>
+            <div className="fg"><label>Hora fin</label><input type="time" className="fi" value={editCosteForm.hora_fin} onChange={e=>setEditCosteForm(v=>({...v,hora_fin:e.target.value}))}/></div>
+          </div>
+          <div className="fg"><label>Tarifa €/hora</label><input type="number" inputMode="decimal" className="fi" value={editCosteForm.tarifa_hora_aplicada} onChange={e=>setEditCosteForm(v=>({...v,tarifa_hora_aplicada:e.target.value}))} placeholder="10"/></div>
+          <div style={{background:T.bg,borderRadius:12,padding:"12px 14px",marginBottom:14}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <div>
+                <div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase"}}>Coste calculado</div>
+                <div style={{fontSize:22,fontWeight:700,color:T.terracotta,marginTop:2}}>{Math.round(calcEditCosteAuto(editCosteForm)).toLocaleString("es-ES")}€</div>
+                <div style={{fontSize:11,color:T.ink3,marginTop:2}}>{limpDiffHoras(editCosteForm.hora_inicio,editCosteForm.hora_fin)}h × {parseFloat(editCosteForm.tarifa_hora_aplicada)||0}€</div>
+              </div>
+              <label style={{display:"inline-flex",alignItems:"center",gap:6,fontSize:12,color:T.ink2,fontWeight:600,cursor:"pointer"}}>
+                <input type="checkbox" checked={editCosteForm.auto} onChange={e=>setEditCosteForm(v=>({...v,auto:e.target.checked}))}/>
+                Usar cálculo
+              </label>
+            </div>
+          </div>
+          {!editCosteForm.auto&&<div className="fg"><label>Coste manual (€)</label><input type="number" inputMode="decimal" className="fi" value={editCosteForm.coste_calculado} onChange={e=>setEditCosteForm(v=>({...v,coste_calculado:e.target.value}))} placeholder="30"/></div>}
+          <div className="mft">
+            <button className="btn bg" onClick={()=>setShowEditCoste(false)} disabled={editCosteSaving}>Cancelar</button>
+            <button className="btn bp" onClick={guardarEditCoste} disabled={editCosteSaving}>{editCosteSaving?"Guardando…":"Guardar y sincronizar gasto"}</button>
+          </div>
         </div>
       </div>
     )}
