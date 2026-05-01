@@ -1975,7 +1975,7 @@ function RvEventDetail({reserva,tok,perfil,rol,isA,onClose,onChanged,isDesktopPa
     setContacto(null);
     if(localR?.contacto_id)sbGet("contactos",`?id=eq.${localR.contacto_id}&select=*`,tok).then(r=>setContacto(r?.[0]||null)).catch(()=>setContacto(null));
     sbGet("coordinacion_servicios",`?reserva_id=eq.${localR.id}&select=*&order=created_at.asc&limit=5`,tok).then(setServicios).catch(()=>{});
-    sbGet("v_servicios_resumen",`?reserva_id=eq.${localR.id}&select=*&order=id.asc`,tok).then(rows=>{console.log("[serviciosExtra OK]","reserva_id=",localR.id,"→",rows?.length||0,"filas",rows);setServiciosExtra(rows||[]);setServiciosExtraOpen(null);}).catch(e=>{console.error("[serviciosExtra ERROR]","reserva_id=",localR.id,e);setServiciosExtra([]);});
+    sbGet("v_servicios_resumen",`?reserva_id=eq.${localR.id}&select=*&order=id.asc`,tok).then(rows=>{setServiciosExtra(rows||[]);setServiciosExtraOpen(null);}).catch(()=>setServiciosExtra([]));
   },[localR?.id,localR?.contacto_id]);
   useEffect(()=>{
     if(serviciosExtraOpen===null&&serviciosExtra.length>0){
@@ -2167,10 +2167,6 @@ function RvEventDetail({reserva,tok,perfil,rol,isA,onClose,onChanged,isDesktopPa
           })}
         </div></>}
 
-        {/* DEBUG temporal — borrar tras diagnosticar */}
-        <div style={{margin:"6px 0 12px",padding:"8px 10px",background:"#FEF8E4",border:"1px solid #ECD22755",borderRadius:8,fontSize:11,color:"#8A6B0F",fontFamily:"monospace"}}>
-          DEBUG serviciosExtra · reserva_id={String(localR.id)} · count={serviciosExtra.length}
-        </div>
         {/* Servicios contratados (servicios adicionales de esta reserva) */}
         {serviciosExtra.length>0&&(()=>{
           const totC=serviciosExtra.reduce((s,x)=>s+(parseFloat(x.precio_cliente)||0),0);
