@@ -1980,6 +1980,12 @@ function RvEventDetail({reserva,tok,perfil,rol,isA,onClose,onChanged,isDesktopPa
   const [servCancelMode,setServCancelMode]=useState(false);
   const [servCancelMotivo,setServCancelMotivo]=useState("");
   const [catalogoOpen,setCatalogoOpen]=useState(false);
+  const [movimientosServ,setMovimientosServ]=useState([]);
+  const [showMovSheet,setShowMovSheet]=useState(null);
+  const [movForm,setMovForm]=useState({tipo:"cobro_cliente",importe:"",fecha:"",concepto:"",metodo_pago:"",referencia:"",notas:""});
+  const [movSaving,setMovSaving]=useState(false);
+  const [movErr,setMovErr]=useState("");
+  const [movWarn,setMovWarn]=useState(false);
 
   useEffect(()=>{
     setContacto(null);
@@ -2009,7 +2015,8 @@ function RvEventDetail({reserva,tok,perfil,rol,isA,onClose,onChanged,isDesktopPa
     try{
       const [row]=await sbGet("servicios_reserva",`?id=eq.${s.id}&select=*`,tok).catch(()=>[]);
       if(!row)return;
-      const movs=await sbGet("movimientos_servicio",`?servicio_reserva_id=eq.${s.id}&select=id&limit=1`,tok).catch(()=>[]);
+      const movsAll=await sbGet("movimientos_servicio",`?servicio_reserva_id=eq.${s.id}&select=*&order=fecha.desc.nullslast,created_at.desc`,tok).catch(()=>[]);
+      setMovimientosServ(movsAll||[]);
       setServForm({
         catalogo_servicio_id:row.catalogo_servicio_id||"",
         nombre:row.nombre||"",categoria:row.categoria||"",descripcion:row.descripcion||"",
@@ -2021,11 +2028,11 @@ function RvEventDetail({reserva,tok,perfil,rol,isA,onClose,onChanged,isDesktopPa
         condiciones_cliente:row.condiciones_cliente||"",
         estado:row.estado||"ofertado",fecha_contratacion:row.fecha_contratacion||"",notas:row.notas||"",
       });
-      setShowServSheet({mode:"edit",id:s.id,hasMovs:movs.length>0,estadoAnt:row.estado,fechaContratAnt:row.fecha_contratacion});
+      setShowServSheet({mode:"edit",id:s.id,hasMovs:(movsAll||[]).length>0,estadoAnt:row.estado,fechaContratAnt:row.fecha_contratacion});
       ensureCatalogoServ();
     }catch(_){}
   };
-  const cerrarServSheet=()=>{setShowServSheet(null);setServErr("");setServCantWarn(false);setServCancelMode(false);setServCancelMotivo("");setCatalogoOpen(false);};
+  const cerrarServSheet=()=>{setShowServSheet(null);setServErr("");setServCantWarn(false);setServCancelMode(false);setServCancelMotivo("");setCatalogoOpen(false);setMovimientosServ([]);};
   const fillFromPlantilla=(p)=>{
     setServForm(prev=>({
       ...prev,
@@ -2112,6 +2119,89 @@ function RvEventDetail({reserva,tok,perfil,rol,isA,onClose,onChanged,isDesktopPa
       setReloadKeyServ(k=>k+1);
     }catch(e){setServErr("No se pudo eliminar.");}
     setServSaving(false);
+  };
+
+  // ─ Movimientos del servicio: handlers ─────────────────────────
+  const TIPOS_MOV_LBL={cobro_cliente:"Cobro cliente",pago_proveedor:"Pago proveedor",reembolso_cliente:"Reembolso cliente",reembolso_proveedor:"Reembolso proveedor"};
+  const METODOS_PAGO_SUG=["Transferencia","Bizum","Efectivo","Tarjeta","Cheque"];
+  const _ladoFromTipo=(t)=>(t==="cobro_cliente"||t==="reembolso_cliente")?"cliente":"proveedor";
+  const _esReembolso=(t)=>t==="reembolso_cliente"||t==="reembolso_proveedor";
+  const _esEntrada=(t)=>t==="cobro_cliente"||t==="reembolso_proveedor";
+  const reloadMovimientos=async(servicioId)=>{
+    if(!servicioId)return;
+    try{const rows=await sbGet("movimientos_servicio",`?servicio_reserva_id=eq.${servicioId}&select=*&order=fecha.desc.nullslast,created_at.desc`,tok);setMovimientosServ(rows||[]);}catch(_){}
+  };
+  const abrirMovAdd=(tipoInicial)=>{
+    setMovErr("");setMovWarn(false);
+    setMovForm({tipo:tipoInicial,importe:"",fecha:new Date().toISOString().split("T")[0],concepto:"",metodo_pago:"",referencia:"",notas:""});
+    setShowMovSheet({mode:"add",lado:_ladoFromTipo(tipoInicial)});
+  };
+  const abrirMovEdit=(m)=>{
+    setMovErr("");setMovWarn(false);
+    setMovForm({
+      tipo:m.tipo||"cobro_cliente",
+      importe:m.importe!=null?String(m.importe):"",
+      fecha:m.fecha||new Date().toISOString().split("T")[0],
+      concepto:m.concepto||"",metodo_pago:m.metodo_pago||"",referencia:m.referencia||"",notas:m.notas||"",
+    });
+    setShowMovSheet({mode:"edit",id:m.id,lado:_ladoFromTipo(m.tipo)});
+  };
+  const cerrarMovSheet=()=>{setShowMovSheet(null);setMovErr("");setMovWarn(false);};
+  const guardarMov=async()=>{
+    if(movSaving)return;
+    const importe=parseFloat(movForm.importe)||0;
+    if(importe<=0){setMovErr("El importe debe ser mayor que 0");return;}
+    if(!movForm.fecha){setMovErr("La fecha es obligatoria");return;}
+    if(!_esReembolso(movForm.tipo)&&!movWarn){
+      const cant=parseFloat(servForm.cantidad)||1;
+      let limite=0,actual=0;
+      if(movForm.tipo==="cobro_cliente"){
+        limite=(parseFloat(servForm.precio_cliente)||0)*cant;
+        actual=movimientosServ.filter(m=>m.tipo==="cobro_cliente").reduce((s,m)=>s+(parseFloat(m.importe)||0),0);
+      }else if(movForm.tipo==="pago_proveedor"){
+        limite=(parseFloat(servForm.coste_proveedor)||0)*cant;
+        actual=movimientosServ.filter(m=>m.tipo==="pago_proveedor").reduce((s,m)=>s+(parseFloat(m.importe)||0),0);
+      }
+      if(showMovSheet.mode==="edit"){
+        const cur=movimientosServ.find(m=>m.id===showMovSheet.id);
+        if(cur&&cur.tipo===movForm.tipo)actual-=parseFloat(cur.importe)||0;
+      }
+      if(limite>0&&(actual+importe)>limite){
+        setMovWarn(true);setMovErr("");return;
+      }
+    }
+    setMovErr("");setMovSaving(true);
+    const payload={
+      servicio_reserva_id:showServSheet.id,
+      reserva_id:localR.id,
+      tipo:movForm.tipo,importe,fecha:movForm.fecha,
+      concepto:movForm.concepto||null,metodo_pago:movForm.metodo_pago||null,
+      referencia:movForm.referencia||null,notas:movForm.notas||null,
+      created_by:perfil?.id||null,
+    };
+    try{
+      if(showMovSheet.mode==="add")await sbPost("movimientos_servicio",payload,tok);
+      else{
+        const {servicio_reserva_id:_a,reserva_id:_b,created_by:_c,...patchPayload}=payload;
+        await sbPatch("movimientos_servicio",`id=eq.${showMovSheet.id}`,patchPayload,tok);
+      }
+      cerrarMovSheet();
+      await reloadMovimientos(showServSheet.id);
+      setReloadKeyServ(k=>k+1);
+    }catch(e){setMovErr("Error al guardar el movimiento. Intenta de nuevo.");}
+    setMovSaving(false);
+  };
+  const borrarMov=async()=>{
+    if(!showMovSheet||showMovSheet.mode!=="edit"||movSaving)return;
+    if(!window.confirm("¿Eliminar este movimiento? No se puede deshacer."))return;
+    setMovSaving(true);
+    try{
+      await sbDelete("movimientos_servicio",`id=eq.${showMovSheet.id}`,tok);
+      cerrarMovSheet();
+      await reloadMovimientos(showServSheet.id);
+      setReloadKeyServ(k=>k+1);
+    }catch(e){setMovErr("No se pudo eliminar.");}
+    setMovSaving(false);
   };
 
   useEffect(()=>{if(!busqContacto||busqContacto.length<2){setContactosBusq([]);return;}sbGet("contactos",`?or=(nombre.ilike.*${busqContacto}*,telefono.ilike.*${busqContacto}*)&limit=10`,tok).then(r=>setContactosBusq(r||[])).catch(()=>setContactosBusq([]));},[busqContacto]);
@@ -2574,6 +2664,64 @@ function RvEventDetail({reserva,tok,perfil,rol,isA,onClose,onChanged,isDesktopPa
                 <button onClick={guardarServ} disabled={servSaving||!servForm.nombre.trim()} style={{flex:2,padding:"14px 0",borderRadius:999,border:0,background:servSaving||!servForm.nombre.trim()?T.ink+"55":T.ink,color:"#fff",fontFamily:T.sans,fontWeight:700,fontSize:14,cursor:servSaving||!servForm.nombre.trim()?"not-allowed":"pointer"}}>{servSaving?"Guardando…":(showServSheet.mode==="add"?"Crear servicio":"Guardar cambios")}</button>
               </div>
 
+              {/* Sección Movimientos (solo en modo edit) */}
+              {showServSheet.mode==="edit"&&(()=>{
+                const cant=parseFloat(servForm.cantidad)||1;
+                const totC=(parseFloat(servForm.precio_cliente)||0)*cant;
+                const totP=(parseFloat(servForm.coste_proveedor)||0)*cant;
+                const tieneProv=totP>0;
+                const cobrCli=movimientosServ.filter(m=>m.tipo==="cobro_cliente").reduce((s,m)=>s+(parseFloat(m.importe)||0),0);
+                const pagProv=movimientosServ.filter(m=>m.tipo==="pago_proveedor").reduce((s,m)=>s+(parseFloat(m.importe)||0),0);
+                const pendCli=Math.max(0,totC-cobrCli);
+                const pendProv=Math.max(0,totP-pagProv);
+                const movsOrden=[...movimientosServ].sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||"")||(b.created_at||"").localeCompare(a.created_at||""));
+                return<div style={{marginTop:18,paddingTop:16,borderTop:`1px solid ${T.line}`,display:"flex",flexDirection:"column",gap:10}}>
+                  <div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase"}}>Movimientos</div>
+
+                  <div style={{display:"grid",gridTemplateColumns:tieneProv?"1fr 1fr":"1fr",gap:8}}>
+                    <div style={{background:T.surface,border:`1px solid ${T.line}`,borderRadius:12,padding:"10px 12px"}}>
+                      <div style={{fontSize:9.5,color:T.ink3,fontWeight:700,letterSpacing:.4,textTransform:"uppercase"}}>Cliente</div>
+                      <div style={{fontSize:13,fontWeight:700,color:T.ink,marginTop:2}}>{fE(cobrCli)} <span style={{color:T.ink3,fontWeight:500}}>/ {fE(totC)}</span></div>
+                      {pendCli>0&&<div style={{fontSize:10.5,color:"#8A6B0F",fontWeight:700,marginTop:1}}>Pendiente {fE(pendCli)}</div>}
+                    </div>
+                    {tieneProv&&<div style={{background:T.surface,border:`1px solid ${T.line}`,borderRadius:12,padding:"10px 12px"}}>
+                      <div style={{fontSize:9.5,color:T.ink3,fontWeight:700,letterSpacing:.4,textTransform:"uppercase"}}>Proveedor</div>
+                      <div style={{fontSize:13,fontWeight:700,color:T.ink,marginTop:2}}>{fE(pagProv)} <span style={{color:T.ink3,fontWeight:500}}>/ {fE(totP)}</span></div>
+                      {pendProv>0&&<div style={{fontSize:10.5,color:"#9A2A22",fontWeight:700,marginTop:1}}>Por pagar {fE(pendProv)}</div>}
+                    </div>}
+                  </div>
+
+                  {movsOrden.length===0?(
+                    <div style={{padding:"14px 12px",background:T.surface,border:`1px dashed ${T.line}`,borderRadius:12,fontSize:12,color:T.ink3,textAlign:"center"}}>Sin movimientos registrados</div>
+                  ):(
+                    <div style={{maxHeight:280,overflowY:"auto",background:T.surface,border:`1px solid ${T.line}`,borderRadius:12,padding:4}}>
+                      {movsOrden.map((m,i)=>{
+                        const entra=_esEntrada(m.tipo);
+                        const reemb=_esReembolso(m.tipo);
+                        const colBg=entra?T.olive+"40":T.coral+"40";
+                        const colTxt=entra?"#4A7A2E":"#9A2A22";
+                        return<div key={m.id} onClick={()=>abrirMovEdit(m)} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 10px",borderRadius:10,cursor:"pointer",borderBottom:i<movsOrden.length-1?`1px solid ${T.line}`:0}}>
+                          <div style={{width:30,height:30,borderRadius:8,background:colBg,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><FmIcon name="euro" size={13} stroke={T.ink}/></div>
+                          <div style={{flex:1,minWidth:0}}>
+                            <div style={{display:"flex",alignItems:"center",gap:5,flexWrap:"wrap"}}>
+                              <div style={{fontSize:12,fontWeight:700,color:T.ink}}>{TIPOS_MOV_LBL[m.tipo]||m.tipo}</div>
+                              {reemb&&<span style={{display:"inline-flex",alignItems:"center",height:14,padding:"0 5px",borderRadius:999,background:T.gold+"33",color:"#8A6B0F",fontSize:8.5,fontWeight:700,letterSpacing:.4}}>REEMB</span>}
+                            </div>
+                            <div style={{fontSize:10.5,color:T.ink3,marginTop:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{[m.fecha?new Date(m.fecha+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short",year:"numeric"}):"—",m.metodo_pago,m.concepto].filter(Boolean).join(" · ")}</div>
+                          </div>
+                          <div style={{fontSize:13,fontWeight:700,color:colTxt,fontVariantNumeric:"tabular-nums",flexShrink:0}}>{entra?"+":"−"}{fE(m.importe)}</div>
+                        </div>;
+                      })}
+                    </div>
+                  )}
+
+                  <div style={{display:"flex",gap:8}}>
+                    <button onClick={()=>abrirMovAdd("cobro_cliente")} style={{flex:1,padding:"11px 0",borderRadius:999,border:`1px solid ${T.olive}66`,background:T.olive+"22",color:"#4A7A2E",fontFamily:T.sans,fontWeight:700,fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5}}><FmIcon name="plus" size={12} stroke="#4A7A2E" sw={2.4}/>Cobro cliente</button>
+                    {tieneProv&&<button onClick={()=>abrirMovAdd("pago_proveedor")} style={{flex:1,padding:"11px 0",borderRadius:999,border:`1px solid ${T.coral}66`,background:T.coral+"22",color:"#9A2A22",fontFamily:T.sans,fontWeight:700,fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5}}><FmIcon name="plus" size={12} stroke="#9A2A22" sw={2.4}/>Pago proveedor</button>}
+                  </div>
+                </div>;
+              })()}
+
               {showServSheet.mode==="edit"&&showServSheet.estadoAnt!=="cancelado"&&<div style={{display:"flex",gap:8,marginTop:6}}>
                 <button onClick={()=>{setServCancelMode(true);setServErr("");}} style={{flex:1,padding:"12px 0",borderRadius:999,border:`1px solid ${T.coral}55`,background:T.coral+"14",color:"#9A2A22",fontFamily:T.sans,fontWeight:700,fontSize:13,cursor:"pointer"}}>⚠️ Cancelar servicio</button>
                 <button onClick={borrarServ} disabled={showServSheet.hasMovs||servSaving} title={showServSheet.hasMovs?"No se puede borrar: tiene movimientos. Cancélalo en su lugar.":""} style={{flex:1,padding:"12px 0",borderRadius:999,border:`1px solid ${showServSheet.hasMovs?T.line:"#FECACA"}`,background:showServSheet.hasMovs?T.surface:"#FEF2F2",color:showServSheet.hasMovs?T.ink3:"#D9443A",fontFamily:T.sans,fontWeight:700,fontSize:13,cursor:showServSheet.hasMovs?"not-allowed":"pointer",opacity:showServSheet.hasMovs?.6:1}}>🗑 Borrar</button>
@@ -2582,6 +2730,90 @@ function RvEventDetail({reserva,tok,perfil,rol,isA,onClose,onChanged,isDesktopPa
           )}
         </div>
       </div>}
+      {/* Modal secundario: alta/edición de movimiento (encima del sheet de servicio) */}
+      {showMovSheet&&isA&&showServSheet&&(()=>{
+        const lado=showMovSheet.lado;
+        const opcionesTipo=lado==="cliente"?[{k:"cobro_cliente",l:"Cobro",c:T.olive,fg:"#4A7A2E"},{k:"reembolso_cliente",l:"Reembolso",c:T.gold,fg:"#8A6B0F"}]:[{k:"pago_proveedor",l:"Pago",c:T.coral,fg:"#9A2A22"},{k:"reembolso_proveedor",l:"Reembolso",c:T.gold,fg:"#8A6B0F"}];
+        return<div style={{position:"fixed",inset:0,background:"rgba(20,15,10,.6)",zIndex:1002,display:"flex",alignItems:"flex-end",fontFamily:T.sans}} onClick={cerrarMovSheet}>
+          <div style={{width:"100%",background:T.bg,borderTopLeftRadius:24,borderTopRightRadius:24,maxHeight:"92vh",overflow:"auto",paddingBottom:34}} onClick={e=>e.stopPropagation()}>
+            <div style={{padding:"14px 20px 0",display:"flex",justifyContent:"center"}}><div style={{width:44,height:4,borderRadius:999,background:T.line}}/></div>
+            <div style={{padding:"14px 20px 16px",display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:`1px solid ${T.line}`}}>
+              <div>
+                <div style={{fontSize:12,color:T.ink3,fontWeight:500,marginBottom:2}}>{lado==="cliente"?"Lado cliente":"Lado proveedor"}</div>
+                <div style={{fontSize:22,fontWeight:700,color:T.ink,letterSpacing:-.6}}>{showMovSheet.mode==="add"?"Nuevo movimiento":"Editar movimiento"}</div>
+              </div>
+              <button onClick={cerrarMovSheet} style={{width:32,height:32,borderRadius:999,background:T.surface,border:`1px solid ${T.line}`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}><FmIcon name="x" size={15} stroke={T.ink}/></button>
+            </div>
+            <div style={{padding:"16px 20px",display:"flex",flexDirection:"column",gap:14}}>
+
+              <div>
+                <div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase",marginBottom:8}}>Tipo</div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
+                  {opcionesTipo.map(o=>{
+                    const on=movForm.tipo===o.k;
+                    return<button key={o.k} onClick={()=>{setMovForm(v=>({...v,tipo:o.k}));setMovWarn(false);setMovErr("");}} style={{padding:"11px 8px",borderRadius:12,border:`1px solid ${on?T.ink:T.line}`,background:on?T.ink:T.surface,color:on?"#fff":T.ink,fontFamily:T.sans,fontSize:12,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}><span style={{width:7,height:7,borderRadius:999,background:o.c}}/>{o.l}</button>;
+                  })}
+                </div>
+              </div>
+
+              <div style={{display:"grid",gridTemplateColumns:"2fr 1fr",gap:10}}>
+                <div>
+                  <div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase",marginBottom:8}}>Importe (€) *</div>
+                  <input type="number" inputMode="decimal" autoFocus value={movForm.importe} onChange={e=>{setMovForm(v=>({...v,importe:e.target.value}));setMovWarn(false);setMovErr("");}} placeholder="0" style={{width:"100%",background:T.surface,border:`1px solid ${T.line}`,borderRadius:14,padding:"13px 16px",fontFamily:T.sans,fontSize:22,fontWeight:700,color:T.ink,outline:"none",boxSizing:"border-box",letterSpacing:-.4}}/>
+                </div>
+                <div>
+                  <div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase",marginBottom:8}}>Fecha *</div>
+                  <input type="date" value={movForm.fecha} onChange={e=>setMovForm(v=>({...v,fecha:e.target.value}))} style={{width:"100%",background:T.surface,border:`1px solid ${T.line}`,borderRadius:14,padding:"13px 14px",fontFamily:T.sans,fontSize:13,color:T.ink,outline:"none",boxSizing:"border-box"}}/>
+                </div>
+              </div>
+
+              {movWarn&&(()=>{
+                const cant=parseFloat(servForm.cantidad)||1;
+                const limite=movForm.tipo==="cobro_cliente"?(parseFloat(servForm.precio_cliente)||0)*cant:(parseFloat(servForm.coste_proveedor)||0)*cant;
+                const ya=movimientosServ.filter(m=>m.tipo===movForm.tipo&&(showMovSheet.mode!=="edit"||m.id!==showMovSheet.id)).reduce((s,m)=>s+(parseFloat(m.importe)||0),0);
+                const pend=Math.max(0,limite-ya);
+                return<div style={{padding:"12px 14px",background:T.gold+"22",border:`1px solid ${T.gold}66`,borderRadius:12,fontSize:12.5,color:"#6B5108",lineHeight:1.5}}>
+                  ⚠️ Estás registrando <strong>{fE(parseFloat(movForm.importe)||0)}</strong> pero el pendiente es <strong>{fE(pend)}</strong>. Pulsa Guardar de nuevo si es lo que quieres.
+                </div>;
+              })()}
+
+              <div>
+                <div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase",marginBottom:8}}>Método de pago</div>
+                <input value={movForm.metodo_pago} onChange={e=>setMovForm(v=>({...v,metodo_pago:e.target.value}))} placeholder="Transferencia, Bizum, Efectivo…" style={{width:"100%",background:T.surface,border:`1px solid ${T.line}`,borderRadius:14,padding:"13px 16px",fontFamily:T.sans,fontSize:13,color:T.ink,outline:"none",boxSizing:"border-box"}}/>
+                <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:8}}>
+                  {METODOS_PAGO_SUG.map(mp=>{const on=movForm.metodo_pago===mp;return<button key={mp} onClick={()=>setMovForm(v=>({...v,metodo_pago:mp}))} style={{padding:"6px 11px",borderRadius:999,border:`1px solid ${on?T.ink:T.line}`,background:on?T.ink:T.surface,color:on?"#fff":T.ink2,fontFamily:T.sans,fontSize:11,fontWeight:700,cursor:"pointer"}}>{mp}</button>;})}
+                </div>
+              </div>
+
+              <div>
+                <div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase",marginBottom:8}}>Concepto (opcional)</div>
+                <input value={movForm.concepto} onChange={e=>setMovForm(v=>({...v,concepto:e.target.value}))} placeholder="Ej: 1ª factura, anticipo, finiquito…" style={{width:"100%",background:T.surface,border:`1px solid ${T.line}`,borderRadius:14,padding:"13px 16px",fontFamily:T.sans,fontSize:13,color:T.ink,outline:"none",boxSizing:"border-box"}}/>
+              </div>
+
+              <div>
+                <div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase",marginBottom:8}}>Referencia (opcional)</div>
+                <input value={movForm.referencia} onChange={e=>setMovForm(v=>({...v,referencia:e.target.value}))} placeholder="Ej: nº factura, ID transferencia…" style={{width:"100%",background:T.surface,border:`1px solid ${T.line}`,borderRadius:14,padding:"13px 16px",fontFamily:T.sans,fontSize:13,color:T.ink,outline:"none",boxSizing:"border-box"}}/>
+              </div>
+
+              <div>
+                <div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase",marginBottom:8}}>Notas (opcional)</div>
+                <textarea value={movForm.notas} onChange={e=>setMovForm(v=>({...v,notas:e.target.value}))} placeholder="Notas internas…" rows={2} style={{width:"100%",background:T.surface,border:`1px solid ${T.line}`,borderRadius:14,padding:"12px 14px",fontFamily:T.sans,fontSize:13,color:T.ink,resize:"none",outline:"none",boxSizing:"border-box"}}/>
+              </div>
+
+              {movErr&&<div style={{fontSize:12,color:"#9A2A22",fontWeight:600,padding:"8px 12px",background:T.coral+"14",border:`1px solid ${T.coral}33`,borderRadius:10}}>{movErr}</div>}
+
+              <div style={{display:"flex",gap:8,paddingTop:4}}>
+                <button onClick={cerrarMovSheet} style={{flex:1,padding:"14px 0",borderRadius:999,border:`1px solid ${T.line}`,background:T.surface,color:T.ink,fontFamily:T.sans,fontWeight:600,fontSize:14,cursor:"pointer"}}>Cancelar</button>
+                <button onClick={guardarMov} disabled={movSaving||!(parseFloat(movForm.importe)>0)||!movForm.fecha} style={{flex:2,padding:"14px 0",borderRadius:999,border:0,background:movSaving||!(parseFloat(movForm.importe)>0)||!movForm.fecha?T.ink+"55":T.ink,color:"#fff",fontFamily:T.sans,fontWeight:700,fontSize:14,cursor:movSaving||!(parseFloat(movForm.importe)>0)||!movForm.fecha?"not-allowed":"pointer"}}>{movSaving?"Guardando…":(movWarn?"Guardar de todas formas":(showMovSheet.mode==="add"?"Registrar movimiento":"Guardar cambios"))}</button>
+              </div>
+
+              {showMovSheet.mode==="edit"&&<div style={{display:"flex",marginTop:6}}>
+                <button onClick={borrarMov} disabled={movSaving} style={{flex:1,padding:"12px 0",borderRadius:999,border:`1px solid #FECACA`,background:"#FEF2F2",color:"#D9443A",fontFamily:T.sans,fontWeight:700,fontSize:13,cursor:movSaving?"not-allowed":"pointer"}}>🗑 Borrar movimiento</button>
+              </div>}
+            </div>
+          </div>
+        </div>;
+      })()}
     </div>
   );
 }
