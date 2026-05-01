@@ -1970,19 +1970,150 @@ function RvEventDetail({reserva,tok,perfil,rol,isA,onClose,onChanged,isDesktopPa
   const [contactosBusq,setContactosBusq]=useState([]);
   const [serviciosExtra,setServiciosExtra]=useState([]);
   const [serviciosExtraOpen,setServiciosExtraOpen]=useState(null);
+  const [reloadKeyServ,setReloadKeyServ]=useState(0);
+  const [catalogoServ,setCatalogoServ]=useState([]);
+  const [showServSheet,setShowServSheet]=useState(null);
+  const [servForm,setServForm]=useState({catalogo_servicio_id:"",nombre:"",categoria:"",descripcion:"",precio_cliente:"",coste_proveedor:"",cantidad:"1",unidad:"",proveedor_nombre_libre:"",condiciones_proveedor:"",condiciones_cliente:"",estado:"ofertado",fecha_contratacion:"",notas:""});
+  const [servSaving,setServSaving]=useState(false);
+  const [servErr,setServErr]=useState("");
+  const [servCantWarn,setServCantWarn]=useState(false);
+  const [servCancelMode,setServCancelMode]=useState(false);
+  const [servCancelMotivo,setServCancelMotivo]=useState("");
+  const [catalogoOpen,setCatalogoOpen]=useState(false);
 
   useEffect(()=>{
     setContacto(null);
     if(localR?.contacto_id)sbGet("contactos",`?id=eq.${localR.contacto_id}&select=*`,tok).then(r=>setContacto(r?.[0]||null)).catch(()=>setContacto(null));
     sbGet("coordinacion_servicios",`?reserva_id=eq.${localR.id}&select=*&order=created_at.asc&limit=5`,tok).then(setServicios).catch(()=>{});
     sbGet("v_servicios_resumen",`?reserva_id=eq.${localR.id}&select=*&order=id.asc`,tok).then(rows=>{setServiciosExtra(rows||[]);setServiciosExtraOpen(null);}).catch(()=>setServiciosExtra([]));
-  },[localR?.id,localR?.contacto_id]);
+  },[localR?.id,localR?.contacto_id,reloadKeyServ]);
   useEffect(()=>{
     if(serviciosExtraOpen===null&&serviciosExtra.length>0){
       const auto=serviciosExtra.some(s=>(parseFloat(s.pendiente_cobro)||0)>0||(parseFloat(s.pendiente_pago)||0)>0||s.estado==="ofertado");
       setServiciosExtraOpen(auto);
     }
   },[serviciosExtra,serviciosExtraOpen]);
+  // ─ Servicios adicionales: handlers ───────────────────────────
+  const SERV_FORM_VACIO={catalogo_servicio_id:"",nombre:"",categoria:"",descripcion:"",precio_cliente:"",coste_proveedor:"",cantidad:"1",unidad:"",proveedor_nombre_libre:"",condiciones_proveedor:"",condiciones_cliente:"",estado:"ofertado",fecha_contratacion:"",notas:""};
+  const ensureCatalogoServ=async()=>{
+    if(catalogoServ.length>0)return;
+    try{const rows=await sbGet("catalogo_servicios","?activo=eq.true&select=*&order=favorito.desc.nullslast,orden.asc.nullslast,nombre.asc",tok);setCatalogoServ(rows||[]);}catch(_){}
+  };
+  const abrirAddServ=()=>{
+    setServForm(SERV_FORM_VACIO);setServErr("");setServCantWarn(false);setServCancelMode(false);setServCancelMotivo("");setCatalogoOpen(false);
+    setShowServSheet({mode:"add"});
+    ensureCatalogoServ();
+  };
+  const abrirEditServ=async(s)=>{
+    setServErr("");setServCantWarn(false);setServCancelMode(false);setServCancelMotivo("");setCatalogoOpen(false);
+    try{
+      const [row]=await sbGet("servicios_reserva",`?id=eq.${s.id}&select=*`,tok).catch(()=>[]);
+      if(!row)return;
+      const movs=await sbGet("movimientos_servicio",`?servicio_reserva_id=eq.${s.id}&select=id&limit=1`,tok).catch(()=>[]);
+      setServForm({
+        catalogo_servicio_id:row.catalogo_servicio_id||"",
+        nombre:row.nombre||"",categoria:row.categoria||"",descripcion:row.descripcion||"",
+        precio_cliente:row.precio_cliente!=null?String(row.precio_cliente):"",
+        coste_proveedor:row.coste_proveedor!=null?String(row.coste_proveedor):"",
+        cantidad:row.cantidad!=null?String(row.cantidad):"1",unidad:row.unidad||"",
+        proveedor_nombre_libre:row.proveedor_nombre_libre||"",
+        condiciones_proveedor:row.condiciones_proveedor||"",
+        condiciones_cliente:row.condiciones_cliente||"",
+        estado:row.estado||"ofertado",fecha_contratacion:row.fecha_contratacion||"",notas:row.notas||"",
+      });
+      setShowServSheet({mode:"edit",id:s.id,hasMovs:movs.length>0,estadoAnt:row.estado,fechaContratAnt:row.fecha_contratacion});
+      ensureCatalogoServ();
+    }catch(_){}
+  };
+  const cerrarServSheet=()=>{setShowServSheet(null);setServErr("");setServCantWarn(false);setServCancelMode(false);setServCancelMotivo("");setCatalogoOpen(false);};
+  const fillFromPlantilla=(p)=>{
+    setServForm(prev=>({
+      ...prev,
+      catalogo_servicio_id:p.id,
+      nombre:p.nombre||prev.nombre,
+      categoria:p.categoria||prev.categoria,
+      descripcion:p.descripcion||prev.descripcion,
+      precio_cliente:p.precio_cliente_default!=null?String(p.precio_cliente_default):prev.precio_cliente,
+      coste_proveedor:p.coste_proveedor_default!=null?String(p.coste_proveedor_default):prev.coste_proveedor,
+      unidad:p.unidad||prev.unidad,
+      condiciones_proveedor:p.condiciones_proveedor_default||prev.condiciones_proveedor,
+      condiciones_cliente:p.condiciones_cliente_default||prev.condiciones_cliente,
+    }));
+    setCatalogoOpen(false);
+  };
+  const guardarServ=async()=>{
+    if(servSaving)return;
+    if(!servForm.nombre.trim()){setServErr("El nombre es obligatorio");return;}
+    const pCli=parseFloat(servForm.precio_cliente)||0;
+    const pCost=parseFloat(servForm.coste_proveedor)||0;
+    if(pCli<0||pCost<0){setServErr("Los importes no pueden ser negativos");return;}
+    let cant=parseFloat(servForm.cantidad);
+    if(isNaN(cant))cant=1;
+    if(cant<=0){setServErr("La cantidad debe ser mayor que 0");return;}
+    if(cant>9999){cant=9999;setServCantWarn(true);}
+    setServErr("");setServSaving(true);
+    const nuevoEstado=servForm.estado||"ofertado";
+    let fechaCon=servForm.fecha_contratacion||null;
+    if(nuevoEstado==="aceptado"&&!fechaCon){
+      fechaCon=new Date().toISOString().split("T")[0];
+    }
+    const payload={
+      reserva_id:localR.id,
+      catalogo_servicio_id:servForm.catalogo_servicio_id||null,
+      nombre:servForm.nombre.trim(),
+      categoria:servForm.categoria||null,
+      descripcion:servForm.descripcion||null,
+      precio_cliente:pCli,coste_proveedor:pCost,
+      cantidad:cant,unidad:servForm.unidad||null,
+      proveedor_nombre_libre:servForm.proveedor_nombre_libre||null,
+      condiciones_proveedor:servForm.condiciones_proveedor||null,
+      condiciones_cliente:servForm.condiciones_cliente||null,
+      estado:nuevoEstado,fecha_contratacion:fechaCon,
+      notas:servForm.notas||null,
+    };
+    try{
+      if(showServSheet.mode==="add"){
+        const ords=await sbGet("servicios_reserva",`?reserva_id=eq.${localR.id}&select=orden&order=orden.desc.nullslast&limit=1`,tok).catch(()=>[]);
+        payload.orden=(parseFloat(ords[0]?.orden)||0)+1;
+        await sbPost("servicios_reserva",payload,tok);
+      }else{
+        await sbPatch("servicios_reserva",`id=eq.${showServSheet.id}`,payload,tok);
+      }
+      cerrarServSheet();
+      setServiciosExtraOpen(true);
+      setReloadKeyServ(k=>k+1);
+    }catch(e){setServErr("Error al guardar. Intenta de nuevo.");}
+    setServSaving(false);
+  };
+  const confirmarCancelarServ=async()=>{
+    if(!servCancelMotivo.trim()){setServErr("El motivo es obligatorio");return;}
+    if(servSaving)return;
+    setServErr("");setServSaving(true);
+    try{
+      await sbPatch("servicios_reserva",`id=eq.${showServSheet.id}`,{
+        estado:"cancelado",
+        motivo_cancelacion:servCancelMotivo.trim(),
+        fecha_cancelacion:new Date().toISOString().split("T")[0],
+      },tok);
+      cerrarServSheet();
+      setServiciosExtraOpen(true);
+      setReloadKeyServ(k=>k+1);
+    }catch(e){setServErr("No se pudo cancelar. Intenta de nuevo.");}
+    setServSaving(false);
+  };
+  const borrarServ=async()=>{
+    if(!showServSheet||showServSheet.hasMovs||servSaving)return;
+    if(!window.confirm(`¿Eliminar "${servForm.nombre}"? Esta acción no se puede deshacer.`))return;
+    setServSaving(true);
+    try{
+      await sbDelete("servicios_reserva",`id=eq.${showServSheet.id}`,tok);
+      cerrarServSheet();
+      setServiciosExtraOpen(true);
+      setReloadKeyServ(k=>k+1);
+    }catch(e){setServErr("No se pudo eliminar.");}
+    setServSaving(false);
+  };
+
   useEffect(()=>{if(!busqContacto||busqContacto.length<2){setContactosBusq([]);return;}sbGet("contactos",`?or=(nombre.ilike.*${busqContacto}*,telefono.ilike.*${busqContacto}*)&limit=10`,tok).then(r=>setContactosBusq(r||[])).catch(()=>setContactosBusq([]));},[busqContacto]);
 
   const fecha=localR.fecha?new Date(localR.fecha+"T12:00:00"):null;
@@ -2168,7 +2299,7 @@ function RvEventDetail({reserva,tok,perfil,rol,isA,onClose,onChanged,isDesktopPa
         </div></>}
 
         {/* Servicios contratados (servicios adicionales de esta reserva) */}
-        {serviciosExtra.length>0&&(()=>{
+        {(serviciosExtra.length>0||isA)&&(()=>{
           const totC=serviciosExtra.reduce((s,x)=>s+(parseFloat(x.precio_cliente)||0),0);
           const totCob=serviciosExtra.reduce((s,x)=>s+(parseFloat(x.cobrado_cliente)||0),0);
           const totCost=serviciosExtra.reduce((s,x)=>s+(parseFloat(x.coste_proveedor)||0),0);
@@ -2182,24 +2313,28 @@ function RvEventDetail({reserva,tok,perfil,rol,isA,onClose,onChanged,isDesktopPa
           return<>
             <div style={{fontSize:10.5,color:T.ink3,letterSpacing:.6,fontWeight:700,textTransform:"uppercase",marginBottom:10,marginTop:6}}>Servicios contratados</div>
             <div style={{background:T.surface,border:`1px solid ${T.line}`,borderRadius:18,marginBottom:12,overflow:"hidden"}}>
-              <button onClick={()=>setServiciosExtraOpen(!isOpen)} style={{width:"100%",background:"transparent",border:0,padding:"12px 14px",display:"flex",alignItems:"center",gap:12,cursor:"pointer",fontFamily:T.sans,textAlign:"left"}}>
-                <div style={{width:36,height:36,borderRadius:10,background:T.terracotta+"40",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><FmIcon name="sparkle" size={16} stroke={T.ink}/></div>
-                <div style={{flex:1,minWidth:0}}>
-                  <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
-                    <div style={{fontSize:13,fontWeight:700,color:T.ink}}>Servicios contratados</div>
-                    {accion&&<span style={{display:"inline-flex",alignItems:"center",gap:4,height:18,padding:"0 8px",borderRadius:999,background:T.gold,color:T.ink,fontSize:9.5,fontWeight:700}}><FmIcon name="warn" size={9} stroke={T.ink} sw={2.4}/>Acción</span>}
+              <div style={{display:"flex",alignItems:"center"}}>
+                <button onClick={()=>setServiciosExtraOpen(!isOpen)} style={{flex:1,background:"transparent",border:0,padding:"12px 14px",display:"flex",alignItems:"center",gap:12,cursor:"pointer",fontFamily:T.sans,textAlign:"left"}}>
+                  <div style={{width:36,height:36,borderRadius:10,background:T.terracotta+"40",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><FmIcon name="sparkle" size={16} stroke={T.ink}/></div>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                      <div style={{fontSize:13,fontWeight:700,color:T.ink}}>Servicios contratados</div>
+                      {accion&&<span style={{display:"inline-flex",alignItems:"center",gap:4,height:18,padding:"0 8px",borderRadius:999,background:T.gold,color:T.ink,fontSize:9.5,fontWeight:700}}><FmIcon name="warn" size={9} stroke={T.ink} sw={2.4}/>Acción</span>}
+                    </div>
+                    <div style={{fontSize:11,color:T.ink3,marginTop:2}}>{serviciosExtra.length===0?"Aún sin servicios contratados":`${serviciosExtra.length} servicio${serviciosExtra.length!==1?"s":""} · ${fE(totCob)}/${fE(totC)} cobrado${pendPag>0?` · ${fE(pendPag)} por pagar`:""}`}</div>
                   </div>
-                  <div style={{fontSize:11,color:T.ink3,marginTop:2}}>{serviciosExtra.length} servicio{serviciosExtra.length!==1?"s":""} · {fE(totCob)}/{fE(totC)} cobrado{pendPag>0?` · ${fE(pendPag)} por pagar`:""}</div>
-                </div>
-                <FmIcon name={isOpen?"chevD":"chevR"} size={14} stroke={T.ink3}/>
-              </button>
+                </button>
+                {isA&&<button onClick={(e)=>{e.stopPropagation();abrirAddServ();}} style={{marginRight:10,height:32,padding:"0 12px",borderRadius:999,background:T.ink,color:"#fff",border:0,fontFamily:T.sans,fontSize:11,fontWeight:700,cursor:"pointer",display:"inline-flex",alignItems:"center",gap:5,flexShrink:0}}><FmIcon name="plus" size={12} stroke="#fff" sw={2.4}/>Añadir</button>}
+                <button onClick={()=>setServiciosExtraOpen(!isOpen)} style={{padding:"12px 14px 12px 4px",background:"transparent",border:0,cursor:"pointer",display:"flex",alignItems:"center"}}><FmIcon name={isOpen?"chevD":"chevR"} size={14} stroke={T.ink3}/></button>
+              </div>
               {isOpen&&<div style={{borderTop:`1px solid ${T.line}`,padding:6}}>
-                {serviciosExtra.map((s,i)=>{
+                {[...serviciosExtra].sort((a,b)=>(a.estado==="cancelado"?1:0)-(b.estado==="cancelado"?1:0)).map((s,i,arr)=>{
                   const meta=ESTADO_META[s.estado]||{l:s.estado||"—",bg:T.ink3+"22",fg:T.ink3,dot:T.ink3};
                   const tieneProv=(parseFloat(s.coste_proveedor)||0)>0;
                   const pCob=parseFloat(s.pendiente_cobro)||0;
                   const pPag=parseFloat(s.pendiente_pago)||0;
-                  return<div key={s.id} style={{padding:"10px 10px",borderBottom:i<serviciosExtra.length-1?`1px solid ${T.line}`:0,display:"flex",gap:12,alignItems:"flex-start"}}>
+                  const opa=s.estado==="cancelado"?.55:1;
+                  return<div key={s.id} onClick={isA?()=>abrirEditServ(s):undefined} style={{padding:"10px 10px",borderBottom:i<arr.length-1?`1px solid ${T.line}`:0,display:"flex",gap:12,alignItems:"flex-start",cursor:isA?"pointer":"default",opacity:opa,transition:"opacity .15s"}}>
                     <div style={{width:32,height:32,borderRadius:9,background:(tieneProv?T.lavender:T.olive)+"40",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,marginTop:2}}><FmIcon name="sparkle" size={14} stroke={T.ink}/></div>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap",marginBottom:3}}>
@@ -2310,6 +2445,141 @@ function RvEventDetail({reserva,tok,perfil,rol,isA,onClose,onChanged,isDesktopPa
               <button onClick={async()=>{const pf=parseFloat(formPrecios.precio_finca)||0;const pc=formPrecios.incluye_casa?parseFloat(formPrecios.precio_casa)||0:0;const nt=pf+pc;await sbPatch("reservas",`id=eq.${localR.id}`,{precio_finca:pf,precio_casa:pc,precio_total:nt,precio:nt,incluye_casa:formPrecios.incluye_casa},tok);const u={...localR,precio_finca:pf,precio_casa:pc,precio_total:nt,precio:nt,incluye_casa:formPrecios.incluye_casa};setLocalR(u);onChanged&&onChanged(u);setEditPrecios(false);}} style={{flex:2,padding:"14px 0",borderRadius:999,border:0,background:T.ink,color:"#fff",fontFamily:T.sans,fontWeight:700,fontSize:14,cursor:"pointer"}}>Guardar precios</button>
             </div>
           </div>
+        </div>
+      </div>}
+      {/* Sheet servicios contratados (alta/edición) */}
+      {showServSheet&&isA&&<div style={{position:"fixed",inset:0,background:"rgba(20,15,10,.6)",zIndex:1001,display:"flex",alignItems:"flex-end",fontFamily:T.sans}} onClick={cerrarServSheet}>
+        <div style={{width:"100%",background:T.bg,borderTopLeftRadius:24,borderTopRightRadius:24,maxHeight:"92vh",overflow:"auto",paddingBottom:34}} onClick={e=>e.stopPropagation()}>
+          <div style={{padding:"14px 20px 0",display:"flex",justifyContent:"center"}}><div style={{width:44,height:4,borderRadius:999,background:T.line}}/></div>
+          <div style={{padding:"14px 20px 16px",display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:`1px solid ${T.line}`}}>
+            <div>
+              <div style={{fontSize:12,color:T.ink3,fontWeight:500,marginBottom:2}}>{localR.nombre}</div>
+              <div style={{fontSize:22,fontWeight:700,color:T.ink,letterSpacing:-.6}}>{servCancelMode?"Cancelar servicio":(showServSheet.mode==="add"?"Nuevo servicio":"Editar servicio")}</div>
+            </div>
+            <button onClick={cerrarServSheet} style={{width:32,height:32,borderRadius:999,background:T.surface,border:`1px solid ${T.line}`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}><FmIcon name="x" size={15} stroke={T.ink}/></button>
+          </div>
+
+          {servCancelMode?(
+            <div style={{padding:"16px 20px",display:"flex",flexDirection:"column",gap:14}}>
+              <div style={{background:T.coral+"14",border:`1px solid ${T.coral}33`,borderRadius:14,padding:"12px 14px",fontSize:13,color:"#9A2A22",lineHeight:1.5}}>Vas a marcar <strong>"{servForm.nombre}"</strong> como cancelado. El servicio se queda en el listado en gris para que no se pierda el rastro.</div>
+              <div>
+                <div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase",marginBottom:8}}>Motivo de la cancelación *</div>
+                <textarea autoFocus value={servCancelMotivo} onChange={e=>setServCancelMotivo(e.target.value)} placeholder="Ej: novios anulan ceremonia, presupuesto reducido, cambio de proveedor…" rows={4} style={{width:"100%",background:T.surface,border:`1px solid ${T.line}`,borderRadius:14,padding:"12px 14px",fontFamily:T.sans,fontSize:14,color:T.ink,resize:"none",outline:"none",boxSizing:"border-box"}}/>
+              </div>
+              {servErr&&<div style={{fontSize:12,color:"#9A2A22",fontWeight:600}}>{servErr}</div>}
+              <div style={{display:"flex",gap:8,paddingTop:4}}>
+                <button onClick={()=>{setServCancelMode(false);setServErr("");}} style={{flex:1,padding:"14px 0",borderRadius:999,border:`1px solid ${T.line}`,background:T.surface,color:T.ink,fontFamily:T.sans,fontWeight:600,fontSize:14,cursor:"pointer"}}>← Volver</button>
+                <button onClick={confirmarCancelarServ} disabled={servSaving||!servCancelMotivo.trim()} style={{flex:2,padding:"14px 0",borderRadius:999,border:0,background:servSaving||!servCancelMotivo.trim()?T.coral+"55":T.coral,color:"#fff",fontFamily:T.sans,fontWeight:700,fontSize:14,cursor:servSaving||!servCancelMotivo.trim()?"not-allowed":"pointer"}}>{servSaving?"Cancelando…":"Confirmar cancelación"}</button>
+              </div>
+            </div>
+          ):(
+            <div style={{padding:"16px 20px",display:"flex",flexDirection:"column",gap:14}}>
+
+              {showServSheet.mode==="add"&&<div>
+                <button onClick={()=>setCatalogoOpen(o=>!o)} style={{width:"100%",padding:"12px 14px",borderRadius:14,border:`1px ${catalogoOpen?"solid":"dashed"} ${T.line}`,background:T.surface,color:T.ink,fontFamily:T.sans,fontSize:13,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:8,justifyContent:"space-between"}}>
+                  <span style={{display:"inline-flex",alignItems:"center",gap:8}}><FmIcon name="sparkle" size={14} stroke={T.ink}/>Elegir desde catálogo</span>
+                  <FmIcon name={catalogoOpen?"chevD":"chevR"} size={13} stroke={T.ink3}/>
+                </button>
+                {catalogoOpen&&<div style={{marginTop:8,background:T.surface,border:`1px solid ${T.line}`,borderRadius:14,padding:6,maxHeight:240,overflow:"auto"}}>
+                  {catalogoServ.length===0&&<div style={{padding:14,fontSize:12,color:T.ink3,textAlign:"center"}}>Cargando catálogo…</div>}
+                  {catalogoServ.map((p,i)=>{
+                    const sel=servForm.catalogo_servicio_id===p.id;
+                    return<button key={p.id} onClick={()=>fillFromPlantilla(p)} style={{width:"100%",padding:"10px 12px",borderRadius:10,border:0,background:sel?T.terracotta+"22":"transparent",cursor:"pointer",display:"flex",alignItems:"center",gap:10,fontFamily:T.sans,textAlign:"left",marginBottom:i<catalogoServ.length-1?2:0}}>
+                      {p.favorito&&<span style={{fontSize:11}}>⭐</span>}
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontSize:13,fontWeight:700,color:T.ink}}>{p.nombre}</div>
+                        <div style={{fontSize:10.5,color:T.ink3}}>{[p.categoria,p.precio_cliente_default!=null?`${fE(p.precio_cliente_default)} cliente`:null,p.coste_proveedor_default>0?`${fE(p.coste_proveedor_default)} coste`:null].filter(Boolean).join(" · ")}</div>
+                      </div>
+                    </button>;
+                  })}
+                </div>}
+                <div style={{height:8}}/>
+                <div style={{height:1,background:T.line,marginBottom:6}}/>
+                <div style={{fontSize:10.5,color:T.ink3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase"}}>O escribe los datos a mano</div>
+              </div>}
+
+              <div>
+                <div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase",marginBottom:8}}>Nombre *</div>
+                <input value={servForm.nombre} onChange={e=>setServForm(v=>({...v,nombre:e.target.value}))} placeholder="Ej: Catering 120 pax" style={{width:"100%",background:T.surface,border:`1px solid ${T.line}`,borderRadius:14,padding:"13px 16px",fontFamily:T.sans,fontSize:14,fontWeight:600,color:T.ink,outline:"none",boxSizing:"border-box"}}/>
+              </div>
+
+              <div>
+                <div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase",marginBottom:8}}>Categoría</div>
+                <input value={servForm.categoria} onChange={e=>setServForm(v=>({...v,categoria:e.target.value}))} placeholder="Ej: Catering, Sonido, Decoración…" style={{width:"100%",background:T.surface,border:`1px solid ${T.line}`,borderRadius:14,padding:"13px 16px",fontFamily:T.sans,fontSize:13,color:T.ink,outline:"none",boxSizing:"border-box"}}/>
+              </div>
+
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                <div>
+                  <div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase",marginBottom:8}}>Precio cliente (€)</div>
+                  <input type="number" inputMode="decimal" value={servForm.precio_cliente} onChange={e=>setServForm(v=>({...v,precio_cliente:e.target.value}))} placeholder="0" style={{width:"100%",background:T.surface,border:`1px solid ${T.line}`,borderRadius:14,padding:"13px 16px",fontFamily:T.sans,fontSize:18,fontWeight:700,color:T.ink,outline:"none",boxSizing:"border-box"}}/>
+                </div>
+                <div>
+                  <div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase",marginBottom:8}}>Coste proveedor (€)</div>
+                  <input type="number" inputMode="decimal" value={servForm.coste_proveedor} onChange={e=>setServForm(v=>({...v,coste_proveedor:e.target.value}))} placeholder="0" style={{width:"100%",background:T.surface,border:`1px solid ${T.line}`,borderRadius:14,padding:"13px 16px",fontFamily:T.sans,fontSize:18,fontWeight:700,color:T.ink,outline:"none",boxSizing:"border-box"}}/>
+                </div>
+              </div>
+
+              <div style={{display:"grid",gridTemplateColumns:servForm.unidad?"1fr 1fr":"1fr",gap:10}}>
+                <div>
+                  <div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase",marginBottom:8}}>Unidad</div>
+                  <input value={servForm.unidad} onChange={e=>setServForm(v=>({...v,unidad:e.target.value}))} placeholder="ej: ud, h, kg, pax" style={{width:"100%",background:T.surface,border:`1px solid ${T.line}`,borderRadius:14,padding:"13px 16px",fontFamily:T.sans,fontSize:13,color:T.ink,outline:"none",boxSizing:"border-box"}}/>
+                </div>
+                {servForm.unidad&&<div>
+                  <div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase",marginBottom:8}}>Cantidad</div>
+                  <input type="number" inputMode="decimal" min="0.01" max="9999" value={servForm.cantidad} onChange={e=>{setServForm(v=>({...v,cantidad:e.target.value}));setServCantWarn(false);}} placeholder="1" style={{width:"100%",background:T.surface,border:`1px solid ${servCantWarn?T.coral:T.line}`,borderRadius:14,padding:"13px 16px",fontFamily:T.sans,fontSize:18,fontWeight:700,color:T.ink,outline:"none",boxSizing:"border-box"}}/>
+                  {servCantWarn&&<div style={{fontSize:11,color:"#9A2A22",fontWeight:600,marginTop:4}}>Cantidad máxima: 9999. Ajustada automáticamente.</div>}
+                </div>}
+              </div>
+
+              <div>
+                <div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase",marginBottom:8}}>Estado</div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6}}>
+                  {[{k:"ofertado",l:"Ofertado",c:T.gold},{k:"aceptado",l:"Aceptado",c:T.softBlue},{k:"completado",l:"Completado",c:T.olive}].map(o=>{
+                    const on=servForm.estado===o.k;
+                    return<button key={o.k} onClick={()=>setServForm(v=>({...v,estado:o.k}))} style={{padding:"10px 6px",borderRadius:12,border:`1px solid ${on?T.ink:T.line}`,background:on?T.ink:T.surface,color:on?"#fff":T.ink,fontFamily:T.sans,fontSize:12,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5}}><span style={{width:6,height:6,borderRadius:999,background:o.c}}/>{o.l}</button>;
+                  })}
+                </div>
+              </div>
+
+              <div>
+                <div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase",marginBottom:8}}>Proveedor (opcional)</div>
+                <input value={servForm.proveedor_nombre_libre} onChange={e=>setServForm(v=>({...v,proveedor_nombre_libre:e.target.value}))} placeholder="Ej: Catering Sabor Sur, DJ Carlos…" style={{width:"100%",background:T.surface,border:`1px solid ${T.line}`,borderRadius:14,padding:"13px 16px",fontFamily:T.sans,fontSize:13,color:T.ink,outline:"none",boxSizing:"border-box"}}/>
+              </div>
+
+              <div>
+                <div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase",marginBottom:8}}>Descripción (opcional)</div>
+                <textarea value={servForm.descripcion} onChange={e=>setServForm(v=>({...v,descripcion:e.target.value}))} placeholder="Detalles del servicio…" rows={2} style={{width:"100%",background:T.surface,border:`1px solid ${T.line}`,borderRadius:14,padding:"12px 14px",fontFamily:T.sans,fontSize:13,color:T.ink,resize:"none",outline:"none",boxSizing:"border-box"}}/>
+              </div>
+
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                <div>
+                  <div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase",marginBottom:8}}>Condiciones cliente</div>
+                  <textarea value={servForm.condiciones_cliente} onChange={e=>setServForm(v=>({...v,condiciones_cliente:e.target.value}))} placeholder="Ej: 50% al firmar, resto el día del evento" rows={2} style={{width:"100%",background:T.surface,border:`1px solid ${T.line}`,borderRadius:14,padding:"12px 14px",fontFamily:T.sans,fontSize:12,color:T.ink,resize:"none",outline:"none",boxSizing:"border-box"}}/>
+                </div>
+                <div>
+                  <div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase",marginBottom:8}}>Condiciones proveedor</div>
+                  <textarea value={servForm.condiciones_proveedor} onChange={e=>setServForm(v=>({...v,condiciones_proveedor:e.target.value}))} placeholder="Ej: pago a 30 días vista" rows={2} style={{width:"100%",background:T.surface,border:`1px solid ${T.line}`,borderRadius:14,padding:"12px 14px",fontFamily:T.sans,fontSize:12,color:T.ink,resize:"none",outline:"none",boxSizing:"border-box"}}/>
+                </div>
+              </div>
+
+              <div>
+                <div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase",marginBottom:8}}>Notas internas</div>
+                <textarea value={servForm.notas} onChange={e=>setServForm(v=>({...v,notas:e.target.value}))} placeholder="Notas privadas (no visibles al cliente)" rows={2} style={{width:"100%",background:T.surface,border:`1px solid ${T.line}`,borderRadius:14,padding:"12px 14px",fontFamily:T.sans,fontSize:13,color:T.ink,resize:"none",outline:"none",boxSizing:"border-box"}}/>
+              </div>
+
+              {servErr&&<div style={{fontSize:12,color:"#9A2A22",fontWeight:600,padding:"8px 12px",background:T.coral+"14",border:`1px solid ${T.coral}33`,borderRadius:10}}>{servErr}</div>}
+
+              <div style={{display:"flex",gap:8,paddingTop:4}}>
+                <button onClick={cerrarServSheet} style={{flex:1,padding:"14px 0",borderRadius:999,border:`1px solid ${T.line}`,background:T.surface,color:T.ink,fontFamily:T.sans,fontWeight:600,fontSize:14,cursor:"pointer"}}>Cancelar</button>
+                <button onClick={guardarServ} disabled={servSaving||!servForm.nombre.trim()} style={{flex:2,padding:"14px 0",borderRadius:999,border:0,background:servSaving||!servForm.nombre.trim()?T.ink+"55":T.ink,color:"#fff",fontFamily:T.sans,fontWeight:700,fontSize:14,cursor:servSaving||!servForm.nombre.trim()?"not-allowed":"pointer"}}>{servSaving?"Guardando…":(showServSheet.mode==="add"?"Crear servicio":"Guardar cambios")}</button>
+              </div>
+
+              {showServSheet.mode==="edit"&&showServSheet.estadoAnt!=="cancelado"&&<div style={{display:"flex",gap:8,marginTop:6}}>
+                <button onClick={()=>{setServCancelMode(true);setServErr("");}} style={{flex:1,padding:"12px 0",borderRadius:999,border:`1px solid ${T.coral}55`,background:T.coral+"14",color:"#9A2A22",fontFamily:T.sans,fontWeight:700,fontSize:13,cursor:"pointer"}}>⚠️ Cancelar servicio</button>
+                <button onClick={borrarServ} disabled={showServSheet.hasMovs||servSaving} title={showServSheet.hasMovs?"No se puede borrar: tiene movimientos. Cancélalo en su lugar.":""} style={{flex:1,padding:"12px 0",borderRadius:999,border:`1px solid ${showServSheet.hasMovs?T.line:"#FECACA"}`,background:showServSheet.hasMovs?T.surface:"#FEF2F2",color:showServSheet.hasMovs?T.ink3:"#D9443A",fontFamily:T.sans,fontWeight:700,fontSize:13,cursor:showServSheet.hasMovs?"not-allowed":"pointer",opacity:showServSheet.hasMovs?.6:1}}>🗑 Borrar</button>
+              </div>}
+            </div>
+          )}
         </div>
       </div>}
     </div>
