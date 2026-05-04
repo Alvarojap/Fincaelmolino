@@ -9,10 +9,12 @@
 -- REGLAS DE TRANSICIÓN (en este orden):
 --   1. estado='cancelado'         → no-op (terminal, nunca tocar)
 --   2. estado_manual=true         → no-op (admin tiene la última palabra)
---   3. cobrado>=total_cliente Y pagado>=total_proveedor (con al menos un
---      cobro positivo y total_cliente>0) → 'completado'
---   4. al menos un cobro_cliente con importe>0           → 'aceptado'
---   5. ningún cobro positivo      → no-op (no degradar a 'ofertado')
+--   3. cobrado_NET>=total_cliente Y pagado_NET>=total_proveedor (con al
+--      menos un cobro positivo y total_cliente>0) → 'completado'
+--   4. al menos un cobro_cliente con importe>0     → 'aceptado'
+--   5. estado actual='completado' pero ya no cumple → 'aceptado'
+--      (degradación para mantener consistencia tras borrar cobros)
+--   6. ofertado/aceptado sin cobros → no-op (no degradar a 'ofertado')
 --
 -- Cuando pasa a 'aceptado', si fecha_contratacion está vacía la pone a hoy.
 -- Las sumas son brutas (sin restar reembolsos), igual convención que la vista
@@ -112,9 +114,15 @@ BEGIN
     ) INTO v_tiene_cobro;
 
     -- 7) Determinar nuevo estado según reglas
+    --    a) Cumple criterios de completado → 'completado'
+    --    b) Hay cobro positivo (gross) pero no cumple → 'aceptado'
+    --    c) NO cumple y NO hay cobro pero estado actual es 'completado'
+    --       → degradar a 'aceptado' para evitar inconsistencia (un
+    --       servicio sin cobros no puede seguir marcado completado)
+    --    d) Resto: ofertado/aceptado sin cobros → mantener (no degradar
+    --       a ofertado automáticamente)
     --    Nota: completado requiere también total_cliente > 0 para evitar
-    --    que un servicio "gratis" (precio=0) se marque completado al insertar
-    --    un movimiento cualquiera.
+    --    que un servicio "gratis" (precio=0) se marque completado.
     IF v_tiene_cobro
        AND v_total_cliente > 0
        AND v_cobrado >= v_total_cliente
@@ -123,8 +131,12 @@ BEGIN
       v_nuevo_estado := 'completado';
     ELSIF v_tiene_cobro THEN
       v_nuevo_estado := 'aceptado';
+    ELSIF v_servicio.estado = 'completado' THEN
+      -- Caso c: era completado pero se han borrado los cobros. Bajar a
+      -- aceptado para no quedarse en estado falso.
+      v_nuevo_estado := 'aceptado';
     ELSE
-      -- Sin cobros positivos → no forzar a 'ofertado'. Mantener actual.
+      -- ofertado/aceptado sin cobros → no tocar
       RETURN;
     END IF;
 
