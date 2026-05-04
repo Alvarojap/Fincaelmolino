@@ -2258,6 +2258,18 @@ function RvEventDetail({reserva,tok,perfil,rol,isA,onClose,onChanged,isDesktopPa
     }catch(_){}setCobroSaving(false);
   };
 
+  // D2: servicios facturables (aceptado o completado) que cuentan al cobro/rentabilidad globales.
+  // serviciosExtra ya viene de v_servicios_resumen con precio_cliente/coste_proveedor multiplicados por cantidad.
+  const _servActivos = serviciosExtra.filter(s => s.estado==="aceptado" || s.estado==="completado");
+  const totServFact   = _servActivos.reduce((s,x)=>s+(parseFloat(x.precio_cliente)||0),0);
+  const totServCob    = _servActivos.reduce((s,x)=>s+(parseFloat(x.cobrado_cliente)||0),0);
+  const totServCost   = _servActivos.reduce((s,x)=>s+(parseFloat(x.coste_proveedor)||0),0);
+  const hayServAct    = _servActivos.length > 0;
+  const totalGlobal   = total + totServFact;
+  const cobradoGlobal = pagado + totServCob;
+  const pendGlobal    = Math.max(0, totalGlobal - cobradoGlobal);
+  const pctGlobal     = totalGlobal > 0 ? Math.round(cobradoGlobal / totalGlobal * 100) : 0;
+
   return(
     <div style={{position:isDesktopPanel?"relative":"fixed",inset:isDesktopPanel?"auto":0,background:T.bg,zIndex:isDesktopPanel?"auto":200,overflow:"auto",paddingBottom:100}}>
       {/* Hero oscuro — solo móvil */}
@@ -2292,18 +2304,36 @@ function RvEventDetail({reserva,tok,perfil,rol,isA,onClose,onChanged,isDesktopPa
         {total>0&&<div style={{background:T.surface,border:`1px solid ${T.line}`,borderRadius:20,padding:16,marginBottom:12}}>
           <div style={{display:"flex",alignItems:"baseline",justifyContent:"space-between",marginBottom:12}}>
             <div style={{fontSize:11,color:T.ink3,letterSpacing:.6,fontWeight:700,textTransform:"uppercase"}}>Estado de cobro</div>
-            <div style={{fontSize:11,color:T.ink3,fontWeight:600}}>{pct}% cobrado</div>
+            <div style={{fontSize:11,color:T.ink3,fontWeight:600}}>{pctGlobal}% cobrado</div>
           </div>
           <div style={{display:"flex",gap:10,alignItems:"baseline",marginBottom:10}}>
-            <div><div style={{fontSize:10,color:T.ink3,fontWeight:600,letterSpacing:.3,textTransform:"uppercase"}}>Cobrado</div><div style={{fontFamily:T.sans,fontSize:26,fontWeight:700,color:T.olive,letterSpacing:-.7,lineHeight:1}}>{fE(pagado)}</div></div>
+            <div><div style={{fontSize:10,color:T.ink3,fontWeight:600,letterSpacing:.3,textTransform:"uppercase"}}>Cobrado</div><div style={{fontFamily:T.sans,fontSize:26,fontWeight:700,color:T.olive,letterSpacing:-.7,lineHeight:1}}>{fE(cobradoGlobal)}</div></div>
             <div style={{color:T.ink4,fontSize:22,fontWeight:300}}>/</div>
-            <div><div style={{fontSize:10,color:T.ink3,fontWeight:600,letterSpacing:.3,textTransform:"uppercase"}}>Total</div><div style={{fontFamily:T.sans,fontSize:20,fontWeight:700,color:T.ink,letterSpacing:-.5,lineHeight:1}}>{fE(total)}</div></div>
+            <div><div style={{fontSize:10,color:T.ink3,fontWeight:600,letterSpacing:.3,textTransform:"uppercase"}}>Total</div><div style={{fontFamily:T.sans,fontSize:20,fontWeight:700,color:T.ink,letterSpacing:-.5,lineHeight:1}}>{fE(totalGlobal)}</div></div>
           </div>
           <div style={{height:12,borderRadius:999,background:T.bg,overflow:"hidden",marginBottom:14}}>
-            <div style={{width:pct+"%",height:"100%",background:pct===100?T.olive:`linear-gradient(90deg,${T.olive},${T.gold})`}}/>
+            <div style={{width:pctGlobal+"%",height:"100%",background:pctGlobal===100?T.olive:`linear-gradient(90deg,${T.olive},${T.gold})`}}/>
           </div>
-          {isA&&(pending>0||localR.seña_cobrada||localR.saldo_cobrado)&&<div style={{background:T.bg,borderRadius:12,padding:"10px 12px",marginBottom:10,display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,flexWrap:"wrap"}}>
-            <div>{pending>0?<><div style={{fontSize:11,color:T.ink3,fontWeight:600}}>Pendiente</div><div style={{fontSize:17,fontWeight:700,color:T.ink,letterSpacing:-.4}}>{fE(pending)}</div></>:<><div style={{fontSize:11,color:T.ink3,fontWeight:600}}>Estado</div><div style={{fontSize:13,fontWeight:700,color:T.olive}}>✓ Pagado completo</div></>}</div>
+          {isA&&(pendGlobal>0||localR.seña_cobrada||localR.saldo_cobrado)&&<div style={{background:T.bg,borderRadius:12,padding:"10px 12px",marginBottom:10,display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,flexWrap:"wrap"}}>
+            <div>{(()=>{
+              if(pending>0&&pendGlobal>pending)return<>
+                <div style={{fontSize:11,color:T.ink3,fontWeight:600}}>Pendiente</div>
+                <div style={{fontSize:17,fontWeight:700,color:T.ink,letterSpacing:-.4}}>{fE(pendGlobal)}</div>
+                <div style={{fontSize:10,color:T.ink3,fontWeight:600,marginTop:2}}>Alquiler {fE(pending)} · Servicios {fE(pendGlobal-pending)}</div>
+              </>;
+              if(pending>0)return<>
+                <div style={{fontSize:11,color:T.ink3,fontWeight:600}}>Pendiente</div>
+                <div style={{fontSize:17,fontWeight:700,color:T.ink,letterSpacing:-.4}}>{fE(pending)}</div>
+              </>;
+              if(pendGlobal>0)return<>
+                <div style={{fontSize:11,color:T.ink3,fontWeight:600}}>Pendiente en servicios</div>
+                <div style={{fontSize:17,fontWeight:700,color:T.ink,letterSpacing:-.4}}>{fE(pendGlobal)}</div>
+              </>;
+              return<>
+                <div style={{fontSize:11,color:T.ink3,fontWeight:600}}>Estado</div>
+                <div style={{fontSize:13,fontWeight:700,color:T.olive}}>✓ Pagado completo</div>
+              </>;
+            })()}</div>
             <div style={{display:"flex",gap:6,flexWrap:"wrap",justifyContent:"flex-end"}}>
               {(localR.estado_pago==="pendiente"||!localR.estado_pago)&&localR.estado!=="cancelada"&&<button onClick={()=>setShowSeña(true)} style={{padding:"10px 14px",borderRadius:999,background:T.ink,color:"#fff",border:0,fontWeight:700,fontSize:12,cursor:"pointer",fontFamily:T.sans}}>Registrar seña</button>}
               {localR.estado_pago==="seña_cobrada"&&<button onClick={()=>setShowPagoTotal(true)} style={{padding:"10px 14px",borderRadius:999,background:T.olive,color:T.ink,border:0,fontWeight:700,fontSize:12,cursor:"pointer",fontFamily:T.sans}}>Cobrar saldo</button>}
@@ -2314,6 +2344,7 @@ function RvEventDetail({reserva,tok,perfil,rol,isA,onClose,onChanged,isDesktopPa
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
             <RvDesgloseRow label="Finca" value={parseFloat(localR.precio_finca||localR.precio)||0} color={T.olive}/>
             {parseFloat(localR.precio_casa||0)>0&&<RvDesgloseRow label="Casa rural" value={parseFloat(localR.precio_casa)} color={T.softBlue}/>}
+            {hayServAct&&<RvDesgloseRow label="Servicios adicionales" value={totServFact} color={T.terracotta}/>}
             {isA&&<button onClick={()=>{setFormPrecios({precio_finca:String(localR.precio_finca||localR.precio||""),precio_casa:String(localR.precio_casa||""),incluye_casa:!!localR.incluye_casa});setEditPrecios(true);}} style={{marginTop:4,background:"transparent",border:`1px solid ${T.line}`,borderRadius:11,padding:"9px 0",color:T.ink2,fontFamily:T.sans,fontSize:12,fontWeight:700,cursor:"pointer",display:"inline-flex",alignItems:"center",justifyContent:"center",gap:6}}><FmIcon name="edit" size={14} stroke={T.ink2}/>{total>0?"Editar precios":"Añadir precios"}</button>}
           </div>
         </div>}
@@ -2323,16 +2354,27 @@ function RvEventDetail({reserva,tok,perfil,rol,isA,onClose,onChanged,isDesktopPa
         </div>}
 
         {/* Rentabilidad */}
-        {total>0&&(()=>{const cL=0,cJ=0,cLav=0,com=Math.round(total*.10);const totalC=cL+cJ+cLav+com;const ben=total-totalC;const marginPct=Math.round(ben/total*100);const fE2=v=>Math.round(v).toLocaleString("es-ES")+"€";return(
+        {total>0&&(()=>{
+          const cL=0,cJ=0,cLav=0;
+          const cS=totServCost;
+          const ingresos=total+totServFact;
+          const com=Math.round(ingresos*.10);  // comisión = 10% del total global (alquiler + servicios facturables)
+          const totalC=cL+cJ+cLav+com+cS;
+          const ben=ingresos-totalC;
+          const marginPct=ingresos>0?Math.round(ben/ingresos*100):0;
+          const fE2=v=>Math.round(v).toLocaleString("es-ES")+"€";
+          const items=[["Limpieza",cL],["Jardín",cJ],["Lavand.",cLav],["Comisión",com]];
+          if(cS>0)items.push(["Servicios",cS]);
+          return(
         <div style={{background:T.olive,borderRadius:20,padding:16,marginBottom:12,color:T.ink}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
             <div><div style={{fontSize:10.5,fontWeight:700,letterSpacing:.6,textTransform:"uppercase",opacity:.75}}>Rentabilidad</div>
               <div style={{fontFamily:T.sans,fontSize:28,fontWeight:700,letterSpacing:-.9,lineHeight:1}}>+{marginPct}%</div>
-              <div style={{fontSize:12,fontWeight:600,opacity:.8,marginTop:4}}>Margen estimado · {fE2(ben)}</div>
+              <div style={{fontSize:12,fontWeight:600,opacity:.8,marginTop:4}}>Margen estimado · {fE2(ben)}{hayServAct?` · sobre ${fE2(ingresos)}`:""}</div>
             </div>
           </div>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:6,background:"rgba(26,26,26,.08)",padding:8,borderRadius:12}}>
-            {[["Limpieza",cL],["Jardín",cJ],["Lavand.",cLav],["Comisión",com]].map(([k,v])=>(
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit, minmax(64px, 1fr))",gap:6,background:"rgba(26,26,26,.08)",padding:8,borderRadius:12}}>
+            {items.map(([k,v])=>(
               <div key={k} style={{textAlign:"center"}}><div style={{fontSize:9,fontWeight:700,letterSpacing:.3,textTransform:"uppercase",color:T.ink,opacity:.7}}>{k}</div><div style={{fontSize:13,fontWeight:700,color:T.ink,fontFamily:T.sans,letterSpacing:-.2}}>{fE2(v)}</div></div>
             ))}
           </div>
