@@ -72,16 +72,30 @@ BEGIN
     -- 3) Bloqueo manual: si admin ha forzado el estado, respetarlo
     IF v_servicio.estado_manual = true THEN RETURN; END IF;
 
-    -- 4) Sumas brutas (gross, sin restar reembolsos — coincide con la vista)
-    SELECT COALESCE(SUM(importe), 0) INTO v_cobrado
+    -- 4) Sumas NET: cobros menos reembolsos del mismo lado.
+    --    Coincide exactamente con v_servicios_resumen, que también suma
+    --    cobros y resta reembolsos. Con esto trigger y vista van alineados.
+    SELECT COALESCE(SUM(
+             CASE
+               WHEN tipo = 'cobro_cliente'     THEN importe
+               WHEN tipo = 'reembolso_cliente' THEN -importe
+               ELSE 0
+             END
+           ), 0) INTO v_cobrado
       FROM movimientos_servicio
      WHERE servicio_reserva_id = p_servicio_id
-       AND tipo = 'cobro_cliente';
+       AND tipo IN ('cobro_cliente', 'reembolso_cliente');
 
-    SELECT COALESCE(SUM(importe), 0) INTO v_pagado
+    SELECT COALESCE(SUM(
+             CASE
+               WHEN tipo = 'pago_proveedor'      THEN importe
+               WHEN tipo = 'reembolso_proveedor' THEN -importe
+               ELSE 0
+             END
+           ), 0) INTO v_pagado
       FROM movimientos_servicio
      WHERE servicio_reserva_id = p_servicio_id
-       AND tipo = 'pago_proveedor';
+       AND tipo IN ('pago_proveedor', 'reembolso_proveedor');
 
     -- 5) Totales aplicando cantidad (defensivo contra NULLs y ceros)
     v_total_cliente := COALESCE(v_servicio.precio_cliente, 0)
