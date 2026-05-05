@@ -448,6 +448,7 @@ const ICON_PATHS={
   menu:`<line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/>`,
   close:`<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>`,
   back:`<polyline points="15 18 9 12 15 6"/>`,
+  briefcase:`<rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16"/>`,
 };
 function Icon({name,size=20,color="currentColor",sw=1.8}){
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" style={{display:"inline-block",verticalAlign:"middle",flexShrink:0}} dangerouslySetInnerHTML={{__html:ICON_PATHS[name]||""}}/>;
@@ -813,6 +814,7 @@ export default function App() {
     "nueva-res": <NuevaReserva {...P}/>,
     contactos:   <Contactos   {...P}/>,
     visitas:     <Visitas     {...P}/>,
+    proveedores: <Proveedores {...P}/>,
     airbnb:      <ReservasAirbnb {...P}/>,
     chat:        <Chat        {...P}/>,
     notifs:      <Notifs      {...P}/>,
@@ -1057,6 +1059,7 @@ function Sidebar({perfil,page,setPage,onLogout,inDrawer,onClose}){
       {(isA||isC)&&<><p className="nav-sec">Comercial</p>
         {nItem("users","Contactos","contactos")}
         {nItem("visits","Visitas","visitas")}
+        {isA&&nItem("briefcase","Proveedores","proveedores")}
       </>}
       {(isA||isC)&&<><p className="nav-sec">Reservas</p>
         {nItem("calendar","Calendario","calendario")}
@@ -13180,6 +13183,83 @@ function Visitas({perfil,tok,rol,setPage,navTarget,setNavTarget}){
 
     </div>
   );
+}
+
+// ─── PROVEEDORES ─────────────────────────────────────────────────────────────
+// D5.A.2 — listado mínimo: cabecera + estado vacío + lista cruda (nombre+tel).
+// CRUD, modal, buscador y filtros llegan en D5.A.3+.
+function Proveedores({perfil,tok,rol,setPage}){
+  const isA=rol==="admin";
+  const[provs,setProvs]=useState([]);
+  const[load,setLoad]=useState(true);
+  const[err,setErr]=useState(null);
+
+  useEffect(()=>{
+    if(!isA||!tok){setLoad(false);return;}
+    (async()=>{
+      try{
+        const rows=await sbGet("proveedores","?activo=eq.true&select=*&order=orden.asc.nullslast,nombre.asc",tok);
+        setProvs(rows||[]);setErr(null);
+      }catch(_){setErr("No se pudieron cargar los proveedores. Revisa permisos o conexión.");}
+      setLoad(false);
+    })();
+  },[tok,isA]);
+
+  // Defensa por si alguien fuerza la ruta sin ser admin (la entrada del sidebar
+  // ya queda oculta en Sidebar). RLS en BD también lo bloquea.
+  if(!isA)return <div style={{padding:"54px 20px",textAlign:"center",color:T.ink3,fontSize:13}}>Esta sección es sólo para administradores.</div>;
+
+  return <div style={{background:T.bg,minHeight:"100%",paddingBottom:100}}>
+    {/* Header */}
+    <div style={{padding:"54px 20px 16px",display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:10}}>
+      <div style={{flex:1}}>
+        <div style={{fontSize:12,color:T.ink3,fontWeight:500,marginBottom:2}}>Comercial · Catálogo de colaboradores</div>
+        <div style={{fontSize:30,fontWeight:700,color:T.ink,letterSpacing:-1,lineHeight:1.02}}>Proveedores</div>
+      </div>
+      <button title="Nuevo proveedor (próximamente)" style={{width:40,height:40,borderRadius:999,background:T.terracotta,color:"white",border:0,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",boxShadow:"0 6px 14px rgba(236,104,62,.3)",flexShrink:0}}>
+        <FmIcon name="plus" size={18} stroke="white"/>
+      </button>
+    </div>
+
+    {/* Body */}
+    <div style={{padding:"0 20px"}}>
+      {load&&(
+        <div style={{padding:"40px 0",textAlign:"center",color:T.ink3,fontSize:13,fontWeight:500}}>Cargando…</div>
+      )}
+
+      {!load&&err&&(
+        <div style={{background:T.surface,border:`1px solid ${T.coral}40`,borderRadius:16,padding:"16px",display:"flex",alignItems:"center",gap:12}}>
+          <div style={{width:36,height:36,borderRadius:12,background:T.coral+"22",color:T.coral,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+            <FmIcon name="warn" size={16} stroke={T.coral}/>
+          </div>
+          <div style={{flex:1,fontSize:13,color:T.ink,fontWeight:500,lineHeight:1.45}}>{err}</div>
+        </div>
+      )}
+
+      {!load&&!err&&provs.length===0&&(
+        <div style={{background:T.surface,border:`1px solid ${T.line}`,borderRadius:20,padding:"36px 24px",textAlign:"center",marginTop:8}}>
+          <div style={{width:56,height:56,borderRadius:18,background:T.bg,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 16px"}}>
+            <FmIcon name="box" size={22} stroke={T.ink3} sw={1.6}/>
+          </div>
+          <div style={{fontSize:16,fontWeight:700,color:T.ink,letterSpacing:-.3,marginBottom:6}}>Aún no tienes proveedores</div>
+          <div style={{fontSize:13,color:T.ink3,fontWeight:500,lineHeight:1.5,maxWidth:300,margin:"0 auto"}}>Añade el primero para empezar a vincularlos a tus servicios.</div>
+        </div>
+      )}
+
+      {!load&&!err&&provs.length>0&&(
+        <div style={{display:"flex",flexDirection:"column",gap:8}}>
+          {provs.map(p=>(
+            <div key={p.id} style={{background:T.surface,borderRadius:16,padding:"14px 16px",border:`1px solid ${T.line}`,display:"flex",alignItems:"center",gap:12}}>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:14,fontWeight:600,color:T.ink,letterSpacing:-.2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.nombre}</div>
+                {p.telefono&&<div style={{fontSize:12,color:T.ink3,fontWeight:500,marginTop:3}}>{p.telefono}</div>}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  </div>;
 }
 
 function NotaVisita({sel,onGuardar,puedeEditar}){
