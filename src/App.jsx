@@ -13186,8 +13186,8 @@ function Visitas({perfil,tok,rol,setPage,navTarget,setNavTarget}){
 }
 
 // ─── PROVEEDORES ─────────────────────────────────────────────────────────────
-// D5.A.4 — alta y edición vía bottom sheet (mismo patrón que el modal de
-// servicio adicional). Borrado llega en D5.A.5.
+// D5.A.5 — CRUD completo: alta, edición y borrado (con window.confirm).
+// Borrar deshabilitado mientras hay guardado en vuelo y viceversa.
 function Proveedores({perfil,tok,rol,setPage}){
   const isA=rol==="admin";
   const FORM_VACIO={nombre:"",contacto_nombre:"",telefono:"",email:"",cif:"",direccion:"",condiciones:"",notas:"",activo:true};
@@ -13201,6 +13201,7 @@ function Proveedores({perfil,tok,rol,setPage}){
   const[saving,setSaving]=useState(false);
   const[sheetErr,setSheetErr]=useState("");
   const[reloadKey,setReloadKey]=useState(0);
+  const[deleting,setDeleting]=useState(false);
 
   // Iniciales: primera letra de las dos primeras palabras del nombre.
   // "Catering Sabor del Sur" → "CS"; "DJ Carlos Sonido & Luz" → "DC".
@@ -13248,6 +13249,24 @@ function Proveedores({perfil,tok,rol,setPage}){
       setSheetErr("No se pudo guardar. Inténtalo de nuevo.");
     }
     setSaving(false);
+  };
+
+  const borrarProveedor=async()=>{
+    if(!showSheet||showSheet.mode!=="edit"||deleting||saving)return;
+    // TODO D5.B.x: cuando exista la tabla proveedor_servicios,
+    // verificar aquí si el proveedor tiene servicios vinculados antes
+    // de borrar. Si los tiene, deshabilitar el botón con tooltip
+    // "No se puede borrar: tiene servicios vinculados. Desvincúlalos
+    // o márcalo como inactivo."
+    if(!window.confirm(`¿Eliminar al proveedor "${form.nombre}"? Esta acción no se puede deshacer.`))return;
+    setDeleting(true);setSheetErr("");
+    try{
+      await sbDelete("proveedores",`id=eq.${showSheet.id}`,tok);
+      setShowSheet(null);setReloadKey(k=>k+1);
+    }catch(_){
+      setSheetErr("No se pudo eliminar el proveedor. Inténtalo de nuevo.");
+    }
+    setDeleting(false);
   };
 
   // Defensa por si alguien fuerza la ruta sin ser admin (la entrada del sidebar
@@ -13433,6 +13452,11 @@ function Proveedores({perfil,tok,rol,setPage}){
             <button onClick={()=>!saving&&setShowSheet(null)} style={{flex:1,padding:"14px 0",borderRadius:999,border:`1px solid ${T.line}`,background:T.surface,color:T.ink,fontFamily:T.sans,fontWeight:600,fontSize:14,cursor:saving?"not-allowed":"pointer",opacity:saving?.6:1}}>Cancelar</button>
             <button onClick={guardarProveedor} disabled={saving||!form.nombre.trim()} style={{flex:2,padding:"14px 0",borderRadius:999,border:0,background:saving||!form.nombre.trim()?T.ink+"55":T.ink,color:"#fff",fontFamily:T.sans,fontWeight:700,fontSize:14,cursor:saving||!form.nombre.trim()?"not-allowed":"pointer"}}>{saving?"Guardando…":(showSheet.mode==="add"?"Crear proveedor":"Guardar cambios")}</button>
           </div>
+
+          {/* Borrar proveedor — sólo en modo edición */}
+          {showSheet.mode==="edit"&&(
+            <button onClick={borrarProveedor} disabled={deleting||saving} style={{width:"100%",marginTop:12,padding:"12px 0",borderRadius:999,border:`1px solid ${T.coral}55`,background:T.coral+"14",color:"#9A2A22",fontFamily:T.sans,fontWeight:700,fontSize:13,cursor:deleting||saving?"not-allowed":"pointer",opacity:deleting||saving?.6:1}}>{deleting?"Eliminando…":"🗑 Borrar proveedor"}</button>
+          )}
 
         </div>
       </div>
