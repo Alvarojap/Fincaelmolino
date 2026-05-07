@@ -13570,7 +13570,11 @@ function Catalogo({perfil,tok,rol,setPage}){
         await sbPatch("catalogo_servicios",`id=eq.${showSheet.id}`,payload,tok);
       }
       setShowSheet(null);setReloadKey(k=>k+1);
-    }catch(_){
+    }catch(e){
+      // DEBUG temporal (D5.B.3 hotfix): logueamos el error real para diagnosticar
+      // por qué falla el alta. Quitar este console.error en cuanto identifiquemos
+      // y arreglemos la causa raíz.
+      console.error("Error guardarServ:", e);
       setSheetErr("No se pudo guardar el servicio. Inténtalo de nuevo.");
     }
     setSaving(false);
