@@ -449,6 +449,7 @@ const ICON_PATHS={
   close:`<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>`,
   back:`<polyline points="15 18 9 12 15 6"/>`,
   briefcase:`<rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16"/>`,
+  sparkle:`<path d="M12 3v6M12 15v6M3 12h6M15 12h6"/>`,
 };
 function Icon({name,size=20,color="currentColor",sw=1.8}){
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" style={{display:"inline-block",verticalAlign:"middle",flexShrink:0}} dangerouslySetInnerHTML={{__html:ICON_PATHS[name]||""}}/>;
@@ -815,6 +816,7 @@ export default function App() {
     contactos:   <Contactos   {...P}/>,
     visitas:     <Visitas     {...P}/>,
     proveedores: <Proveedores {...P}/>,
+    catalogo:    <Catalogo    {...P}/>,
     airbnb:      <ReservasAirbnb {...P}/>,
     chat:        <Chat        {...P}/>,
     notifs:      <Notifs      {...P}/>,
@@ -1060,6 +1062,7 @@ function Sidebar({perfil,page,setPage,onLogout,inDrawer,onClose}){
         {nItem("users","Contactos","contactos")}
         {nItem("visits","Visitas","visitas")}
         {isA&&nItem("briefcase","Proveedores","proveedores")}
+        {isA&&nItem("sparkle","Catálogo","catalogo")}
       </>}
       {(isA||isC)&&<><p className="nav-sec">Reservas</p>
         {nItem("calendar","Calendario","calendario")}
@@ -13461,6 +13464,107 @@ function Proveedores({perfil,tok,rol,setPage}){
         </div>
       </div>
     </div>}
+  </div>;
+}
+
+// ─── CATÁLOGO ────────────────────────────────────────────────────────────────
+// D5.B.2 — listado read-only del catálogo de servicios. Cards por servicio
+// con icono sparkle terracotta + precios apilados a la derecha. Empty state
+// cuando la BD está vacía (estado actual tras la limpieza de D5.B.1). Click
+// sobre card sólo loguea — modal de servicio + vinculación llegan en D5.B.3.
+function Catalogo({perfil,tok,rol,setPage}){
+  const isA=rol==="admin";
+  const fE=v=>(Math.round(parseFloat(v)||0)).toLocaleString("es-ES")+"€";
+  const[servs,setServs]=useState([]);
+  const[load,setLoad]=useState(true);
+  const[err,setErr]=useState(null);
+
+  useEffect(()=>{
+    if(!isA||!tok){setLoad(false);return;}
+    (async()=>{
+      try{
+        const rows=await sbGet("catalogo_servicios","?activo=eq.true&select=*&order=favorito.desc.nullslast,categoria.asc,nombre.asc",tok);
+        setServs(rows||[]);setErr(null);
+      }catch(_){setErr("No se pudo cargar el catálogo. Revisa permisos o conexión.");}
+      setLoad(false);
+    })();
+  },[tok,isA]);
+
+  // Defensa por si alguien fuerza la ruta sin ser admin (la entrada del sidebar
+  // ya queda oculta en Sidebar). RLS en BD también lo bloquea.
+  if(!isA)return <div style={{padding:"54px 20px",textAlign:"center",color:T.ink3,fontSize:13}}>Esta sección es sólo para administradores.</div>;
+
+  return <div style={{background:T.bg,minHeight:"100%",paddingBottom:100}}>
+    {/* Header */}
+    <div style={{padding:"54px 20px 16px",display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:10}}>
+      <div style={{flex:1}}>
+        <div style={{fontSize:12,color:T.ink3,fontWeight:500,marginBottom:2}}>Comercial · Servicios que ofreces</div>
+        <div style={{fontSize:30,fontWeight:700,color:T.ink,letterSpacing:-1,lineHeight:1.02}}>Catálogo</div>
+      </div>
+      <button title="Nuevo servicio (próximamente)" style={{width:40,height:40,borderRadius:999,background:T.terracotta,color:"white",border:0,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",boxShadow:"0 6px 14px rgba(236,104,62,.3)",flexShrink:0}}>
+        <FmIcon name="plus" size={18} stroke="white"/>
+      </button>
+    </div>
+
+    {/* Body */}
+    <div style={{padding:"0 20px"}}>
+      {load&&(
+        <div style={{padding:"40px 0",textAlign:"center",color:T.ink3,fontSize:13,fontWeight:500}}>Cargando…</div>
+      )}
+
+      {!load&&err&&(
+        <div style={{background:T.surface,border:`1px solid ${T.coral}40`,borderRadius:16,padding:"16px",display:"flex",alignItems:"center",gap:12}}>
+          <div style={{width:36,height:36,borderRadius:12,background:T.coral+"22",color:T.coral,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+            <FmIcon name="warn" size={16} stroke={T.coral}/>
+          </div>
+          <div style={{flex:1,fontSize:13,color:T.ink,fontWeight:500,lineHeight:1.45}}>{err}</div>
+        </div>
+      )}
+
+      {/* Empty BD: catálogo vacío (estado tras D5.B.1) */}
+      {!load&&!err&&servs.length===0&&(
+        <div style={{background:T.surface,border:`1px solid ${T.line}`,borderRadius:20,padding:"36px 24px",textAlign:"center",marginTop:8}}>
+          <div style={{width:56,height:56,borderRadius:18,background:T.bg,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 16px"}}>
+            <FmIcon name="sparkle" size={22} stroke={T.ink3} sw={1.6}/>
+          </div>
+          <div style={{fontSize:16,fontWeight:700,color:T.ink,letterSpacing:-.3,marginBottom:6}}>Aún no tienes servicios en tu catálogo</div>
+          <div style={{fontSize:13,color:T.ink3,fontWeight:500,lineHeight:1.5,maxWidth:300,margin:"0 auto"}}>Crea el primero para empezar a ofrecerlo en tus reservas.</div>
+        </div>
+      )}
+
+      {/* Listado de servicios */}
+      {!load&&!err&&servs.length>0&&(
+        <div style={{display:"flex",flexDirection:"column",gap:8}}>
+          {servs.map(s=>{
+            const tieneCliente=s.precio_cliente_default!=null;
+            const tieneCoste=s.coste_proveedor_default!=null;
+            return <div key={s.id} onClick={()=>console.log("Servicio seleccionado:",s.id)} style={{background:T.surface,borderRadius:16,padding:"14px 16px",border:`1px solid ${T.line}`,display:"flex",alignItems:"center",gap:12,cursor:"pointer"}}>
+              {/* Icono */}
+              <div style={{width:40,height:40,borderRadius:12,background:T.terracotta+"22",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                <FmIcon name="sparkle" size={18} stroke={T.terracotta} sw={2}/>
+              </div>
+              {/* Info */}
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:s.categoria?3:0}}>
+                  {s.favorito&&<span style={{fontSize:11,lineHeight:1}}>⭐</span>}
+                  <div style={{fontSize:14,fontWeight:600,color:T.ink,letterSpacing:-.2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{s.nombre}</div>
+                  {!s.activo&&<span style={{fontSize:9,fontWeight:700,letterSpacing:.5,textTransform:"uppercase",color:T.ink3,background:T.surfaceAlt,padding:"2px 6px",borderRadius:999,flexShrink:0}}>Inactivo</span>}
+                </div>
+                {s.categoria&&<div style={{fontSize:9,fontWeight:700,letterSpacing:.6,textTransform:"uppercase",color:T.ink3,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{s.categoria}</div>}
+              </div>
+              {/* Precios */}
+              {(tieneCliente||tieneCoste)&&(
+                <div style={{textAlign:"right",flexShrink:0}}>
+                  {tieneCliente&&<div style={{fontSize:13,fontWeight:700,color:T.ink,fontFamily:T.mono}}>{fE(s.precio_cliente_default)}<span style={{fontSize:9,color:T.ink3,fontWeight:600,marginLeft:4,fontFamily:T.sans}}>cliente</span></div>}
+                  {tieneCoste&&<div style={{fontSize:12,fontWeight:600,color:T.ink2,fontFamily:T.mono,marginTop:2}}>{fE(s.coste_proveedor_default)}<span style={{fontSize:9,color:T.ink3,fontWeight:600,marginLeft:4,fontFamily:T.sans}}>coste</span></div>}
+                </div>
+              )}
+              <FmIcon name="chevR" size={14} stroke={T.ink3} sw={2}/>
+            </div>;
+          })}
+        </div>
+      )}
+    </div>
   </div>;
 }
 
