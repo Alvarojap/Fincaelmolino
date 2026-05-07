@@ -13186,14 +13186,21 @@ function Visitas({perfil,tok,rol,setPage,navTarget,setNavTarget}){
 }
 
 // ─── PROVEEDORES ─────────────────────────────────────────────────────────────
-// D5.A.3 — listado enriquecido (avatar+contacto+tel+email) + buscador cliente.
-// Modal de edición y borrado llegan en D5.A.4 / D5.A.5.
+// D5.A.4 — alta y edición vía bottom sheet (mismo patrón que el modal de
+// servicio adicional). Borrado llega en D5.A.5.
 function Proveedores({perfil,tok,rol,setPage}){
   const isA=rol==="admin";
+  const FORM_VACIO={nombre:"",contacto_nombre:"",telefono:"",email:"",cif:"",direccion:"",condiciones:"",notas:"",activo:true};
+  const rowToForm=p=>({nombre:p.nombre||"",contacto_nombre:p.contacto_nombre||"",telefono:p.telefono||"",email:p.email||"",cif:p.cif||"",direccion:p.direccion||"",condiciones:p.condiciones||"",notas:p.notas||"",activo:p.activo!==false});
   const[provs,setProvs]=useState([]);
   const[load,setLoad]=useState(true);
   const[err,setErr]=useState(null);
   const[q,setQ]=useState("");
+  const[showSheet,setShowSheet]=useState(null);
+  const[form,setForm]=useState(FORM_VACIO);
+  const[saving,setSaving]=useState(false);
+  const[sheetErr,setSheetErr]=useState("");
+  const[reloadKey,setReloadKey]=useState(0);
 
   // Iniciales: primera letra de las dos primeras palabras del nombre.
   // "Catering Sabor del Sur" → "CS"; "DJ Carlos Sonido & Luz" → "DC".
@@ -13211,7 +13218,37 @@ function Proveedores({perfil,tok,rol,setPage}){
       }catch(_){setErr("No se pudieron cargar los proveedores. Revisa permisos o conexión.");}
       setLoad(false);
     })();
-  },[tok,isA]);
+  },[tok,isA,reloadKey]);
+
+  const guardarProveedor=async()=>{
+    if(!form.nombre.trim()||saving)return;
+    const emailV=form.email.trim();
+    if(emailV&&!/^\S+@\S+\.\S+$/.test(emailV)){setSheetErr("Email no válido");return;}
+    setSaving(true);setSheetErr("");
+    try{
+      const payload={
+        nombre:form.nombre.trim(),
+        contacto_nombre:form.contacto_nombre.trim()||null,
+        telefono:form.telefono.trim()||null,
+        email:emailV||null,
+        cif:form.cif.trim()||null,
+        direccion:form.direccion.trim()||null,
+        condiciones:form.condiciones.trim()||null,
+        notas:form.notas.trim()||null,
+        activo:!!form.activo,
+      };
+      if(showSheet.mode==="add"){
+        payload.created_by=perfil?.id||null;
+        await sbPost("proveedores",payload,tok);
+      }else{
+        await sbPatch("proveedores",`id=eq.${showSheet.id}`,payload,tok);
+      }
+      setShowSheet(null);setReloadKey(k=>k+1);
+    }catch(_){
+      setSheetErr("No se pudo guardar. Inténtalo de nuevo.");
+    }
+    setSaving(false);
+  };
 
   // Defensa por si alguien fuerza la ruta sin ser admin (la entrada del sidebar
   // ya queda oculta en Sidebar). RLS en BD también lo bloquea.
@@ -13227,7 +13264,7 @@ function Proveedores({perfil,tok,rol,setPage}){
         <div style={{fontSize:12,color:T.ink3,fontWeight:500,marginBottom:2}}>Comercial · Catálogo de colaboradores</div>
         <div style={{fontSize:30,fontWeight:700,color:T.ink,letterSpacing:-1,lineHeight:1.02}}>Proveedores</div>
       </div>
-      <button title="Nuevo proveedor (próximamente)" style={{width:40,height:40,borderRadius:999,background:T.terracotta,color:"white",border:0,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",boxShadow:"0 6px 14px rgba(236,104,62,.3)",flexShrink:0}}>
+      <button onClick={()=>{setForm(FORM_VACIO);setSheetErr("");setShowSheet({mode:"add"});}} title="Nuevo proveedor" style={{width:40,height:40,borderRadius:999,background:T.terracotta,color:"white",border:0,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",boxShadow:"0 6px 14px rgba(236,104,62,.3)",flexShrink:0}}>
         <FmIcon name="plus" size={18} stroke="white"/>
       </button>
     </div>
@@ -13294,7 +13331,7 @@ function Proveedores({perfil,tok,rol,setPage}){
           {filtered.map(p=>{
             const ini=provIni(p.nombre);
             const color=provColor(p.id);
-            return <div key={p.id} onClick={()=>console.log("Proveedor seleccionado:",p.id)} style={{background:T.surface,borderRadius:16,padding:"14px 16px",border:`1px solid ${T.line}`,display:"flex",alignItems:"center",gap:12,cursor:"pointer"}}>
+            return <div key={p.id} onClick={()=>{setForm(rowToForm(p));setSheetErr("");setShowSheet({mode:"edit",id:p.id});}} style={{background:T.surface,borderRadius:16,padding:"14px 16px",border:`1px solid ${T.line}`,display:"flex",alignItems:"center",gap:12,cursor:"pointer"}}>
               <div style={{width:40,height:40,borderRadius:12,background:color+"22",color:color,fontWeight:800,fontSize:13,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,letterSpacing:.5}}>{ini}</div>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontSize:14,fontWeight:600,color:T.ink,letterSpacing:-.2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.nombre}</div>
@@ -13314,6 +13351,92 @@ function Proveedores({perfil,tok,rol,setPage}){
         </div>
       )}
     </div>
+
+    {/* Modal alta/edición */}
+    {showSheet&&<div style={{position:"fixed",inset:0,background:"rgba(20,15,10,.6)",zIndex:1001,display:"flex",alignItems:"flex-end",fontFamily:T.sans}} onClick={()=>!saving&&setShowSheet(null)}>
+      <div style={{width:"100%",background:T.bg,borderTopLeftRadius:24,borderTopRightRadius:24,maxHeight:"92vh",overflow:"auto",paddingBottom:34}} onClick={e=>e.stopPropagation()}>
+        {/* Drag handle */}
+        <div style={{padding:"14px 20px 0",display:"flex",justifyContent:"center"}}>
+          <div style={{width:44,height:4,borderRadius:999,background:T.line}}/>
+        </div>
+        {/* Header */}
+        <div style={{padding:"14px 20px 16px",display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:`1px solid ${T.line}`}}>
+          <div>
+            <div style={{fontSize:12,color:T.ink3,fontWeight:500,marginBottom:2}}>{showSheet.mode==="add"?"Alta":"Edición"}</div>
+            <div style={{fontSize:22,fontWeight:700,color:T.ink,letterSpacing:-.6}}>{showSheet.mode==="add"?"Nuevo proveedor":"Editar proveedor"}</div>
+          </div>
+          <button onClick={()=>!saving&&setShowSheet(null)} style={{width:32,height:32,borderRadius:999,background:T.surface,border:`1px solid ${T.line}`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}><FmIcon name="x" size={15} stroke={T.ink}/></button>
+        </div>
+
+        {/* Body */}
+        <div style={{padding:"16px 20px",display:"flex",flexDirection:"column",gap:14}}>
+
+          <div>
+            <div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase",marginBottom:8}}>Nombre *</div>
+            <input value={form.nombre} onChange={e=>setForm(v=>({...v,nombre:e.target.value}))} placeholder="Ej: Catering Sabor del Sur" style={{width:"100%",background:T.surface,border:`1px solid ${T.line}`,borderRadius:14,padding:"13px 16px",fontFamily:T.sans,fontSize:14,fontWeight:600,color:T.ink,outline:"none",boxSizing:"border-box"}}/>
+          </div>
+
+          <div>
+            <div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase",marginBottom:8}}>Persona de contacto</div>
+            <input value={form.contacto_nombre} onChange={e=>setForm(v=>({...v,contacto_nombre:e.target.value}))} placeholder="Ej: María Hernández" style={{width:"100%",background:T.surface,border:`1px solid ${T.line}`,borderRadius:14,padding:"13px 16px",fontFamily:T.sans,fontSize:14,color:T.ink,outline:"none",boxSizing:"border-box"}}/>
+          </div>
+
+          <div>
+            <div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase",marginBottom:8}}>Teléfono</div>
+            <input type="tel" value={form.telefono} onChange={e=>setForm(v=>({...v,telefono:e.target.value}))} placeholder="Ej: +34 968 12 34 56" style={{width:"100%",background:T.surface,border:`1px solid ${T.line}`,borderRadius:14,padding:"13px 16px",fontFamily:T.sans,fontSize:14,color:T.ink,outline:"none",boxSizing:"border-box"}}/>
+          </div>
+
+          {(()=>{
+            const emailV=form.email.trim();
+            const emailErr=emailV&&!/^\S+@\S+\.\S+$/.test(emailV)?"Email no válido":"";
+            return <div>
+              <div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase",marginBottom:8}}>Email</div>
+              <input type="email" value={form.email} onChange={e=>setForm(v=>({...v,email:e.target.value}))} placeholder="Ej: contacto@empresa.es" style={{width:"100%",background:T.surface,border:`1px solid ${emailErr?T.coral:T.line}`,borderRadius:14,padding:"13px 16px",fontFamily:T.sans,fontSize:14,color:T.ink,outline:"none",boxSizing:"border-box"}}/>
+              {emailErr&&<div style={{fontSize:11,color:"#9A2A22",fontWeight:600,marginTop:6}}>{emailErr}</div>}
+            </div>;
+          })()}
+
+          <div>
+            <div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase",marginBottom:8}}>CIF / NIF</div>
+            <input value={form.cif} onChange={e=>setForm(v=>({...v,cif:e.target.value}))} placeholder="Ej: B73456789" style={{width:"100%",background:T.surface,border:`1px solid ${T.line}`,borderRadius:14,padding:"13px 16px",fontFamily:T.mono,fontSize:14,color:T.ink,outline:"none",boxSizing:"border-box"}}/>
+          </div>
+
+          <div>
+            <div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase",marginBottom:8}}>Dirección</div>
+            <textarea value={form.direccion} onChange={e=>setForm(v=>({...v,direccion:e.target.value}))} placeholder="Calle, número, código postal, ciudad" rows={2} style={{width:"100%",background:T.surface,border:`1px solid ${T.line}`,borderRadius:14,padding:"12px 14px",fontFamily:T.sans,fontSize:13,color:T.ink,resize:"none",outline:"none",boxSizing:"border-box"}}/>
+          </div>
+
+          <div>
+            <div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase",marginBottom:8}}>Condiciones comerciales</div>
+            <textarea value={form.condiciones} onChange={e=>setForm(v=>({...v,condiciones:e.target.value}))} placeholder="Ej: 15% descuento +50 personas. Pago 50% al confirmar." rows={3} style={{width:"100%",background:T.surface,border:`1px solid ${T.line}`,borderRadius:14,padding:"12px 14px",fontFamily:T.sans,fontSize:13,color:T.ink,resize:"none",outline:"none",boxSizing:"border-box"}}/>
+          </div>
+
+          <div>
+            <div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase",marginBottom:8}}>Notas internas</div>
+            <textarea value={form.notas} onChange={e=>setForm(v=>({...v,notas:e.target.value}))} placeholder="Notas privadas no compartidas con cliente" rows={3} style={{width:"100%",background:T.surface,border:`1px solid ${T.line}`,borderRadius:14,padding:"12px 14px",fontFamily:T.sans,fontSize:13,color:T.ink,resize:"none",outline:"none",boxSizing:"border-box"}}/>
+          </div>
+
+          {/* Toggle activo */}
+          <div style={{padding:"14px 16px",borderRadius:14,background:T.surface,border:`1px solid ${T.line}`,display:"flex",alignItems:"center",gap:14}}>
+            <div style={{flex:1}}>
+              <div style={{fontSize:13,fontWeight:700,color:T.ink,marginBottom:2}}>Proveedor activo</div>
+              <div style={{fontSize:11,color:T.ink3,fontWeight:500}}>Los inactivos no aparecen en el listado.</div>
+            </div>
+            <button onClick={()=>setForm(v=>({...v,activo:!v.activo}))} style={{width:46,height:26,borderRadius:999,background:form.activo?T.ink:T.lineStrong,position:"relative",border:"none",cursor:"pointer",flexShrink:0}}>
+              <span style={{position:"absolute",top:2,left:form.activo?22:2,width:22,height:22,borderRadius:999,background:"#fff",transition:"left .15s"}}/>
+            </button>
+          </div>
+
+          {sheetErr&&<div style={{fontSize:12,color:"#9A2A22",fontWeight:600,padding:"8px 12px",background:T.coral+"14",border:`1px solid ${T.coral}33`,borderRadius:10}}>{sheetErr}</div>}
+
+          <div style={{display:"flex",gap:8,paddingTop:4}}>
+            <button onClick={()=>!saving&&setShowSheet(null)} style={{flex:1,padding:"14px 0",borderRadius:999,border:`1px solid ${T.line}`,background:T.surface,color:T.ink,fontFamily:T.sans,fontWeight:600,fontSize:14,cursor:saving?"not-allowed":"pointer",opacity:saving?.6:1}}>Cancelar</button>
+            <button onClick={guardarProveedor} disabled={saving||!form.nombre.trim()} style={{flex:2,padding:"14px 0",borderRadius:999,border:0,background:saving||!form.nombre.trim()?T.ink+"55":T.ink,color:"#fff",fontFamily:T.sans,fontWeight:700,fontSize:14,cursor:saving||!form.nombre.trim()?"not-allowed":"pointer"}}>{saving?"Guardando…":(showSheet.mode==="add"?"Crear proveedor":"Guardar cambios")}</button>
+          </div>
+
+        </div>
+      </div>
+    </div>}
   </div>;
 }
 
