@@ -13186,13 +13186,21 @@ function Visitas({perfil,tok,rol,setPage,navTarget,setNavTarget}){
 }
 
 // ─── PROVEEDORES ─────────────────────────────────────────────────────────────
-// D5.A.2 — listado mínimo: cabecera + estado vacío + lista cruda (nombre+tel).
-// CRUD, modal, buscador y filtros llegan en D5.A.3+.
+// D5.A.3 — listado enriquecido (avatar+contacto+tel+email) + buscador cliente.
+// Modal de edición y borrado llegan en D5.A.4 / D5.A.5.
 function Proveedores({perfil,tok,rol,setPage}){
   const isA=rol==="admin";
   const[provs,setProvs]=useState([]);
   const[load,setLoad]=useState(true);
   const[err,setErr]=useState(null);
+  const[q,setQ]=useState("");
+
+  // Iniciales: primera letra de las dos primeras palabras del nombre.
+  // "Catering Sabor del Sur" → "CS"; "DJ Carlos Sonido & Luz" → "DC".
+  const provIni=n=>{const p=(n||"").trim().split(/\s+/).filter(Boolean);return p.length?p.slice(0,2).map(w=>w[0]).join("").toUpperCase():"??";};
+  // Color determinístico por id (mismo proveedor → mismo color siempre).
+  const PROV_PAL=[T.terracotta,T.olive,T.lavender,T.softBlue,T.gold,T.peach,T.coral];
+  const provColor=id=>{let h=0;const s=String(id||"");for(let i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))>>>0;return PROV_PAL[h%PROV_PAL.length];};
 
   useEffect(()=>{
     if(!isA||!tok){setLoad(false);return;}
@@ -13209,6 +13217,9 @@ function Proveedores({perfil,tok,rol,setPage}){
   // ya queda oculta en Sidebar). RLS en BD también lo bloquea.
   if(!isA)return <div style={{padding:"54px 20px",textAlign:"center",color:T.ink3,fontSize:13}}>Esta sección es sólo para administradores.</div>;
 
+  const term=q.trim().toLowerCase();
+  const filtered=!term?provs:provs.filter(p=>["nombre","contacto_nombre","email","telefono"].some(k=>(p[k]||"").toLowerCase().includes(term)));
+
   return <div style={{background:T.bg,minHeight:"100%",paddingBottom:100}}>
     {/* Header */}
     <div style={{padding:"54px 20px 16px",display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:10}}>
@@ -13220,6 +13231,24 @@ function Proveedores({perfil,tok,rol,setPage}){
         <FmIcon name="plus" size={18} stroke="white"/>
       </button>
     </div>
+
+    {/* Buscador — oculto durante carga, error y empty BD */}
+    {!load&&!err&&provs.length>0&&(
+      <div style={{padding:"0 20px 10px"}}>
+        <div style={{display:"flex",alignItems:"center",gap:10,background:T.surface,border:`1px solid ${T.line}`,borderRadius:16,padding:"11px 14px"}}>
+          <FmIcon name="search" size={16} stroke={T.ink3}/>
+          <input value={q} onChange={e=>setQ(e.target.value)} placeholder="Buscar por nombre, contacto, teléfono o email" style={{flex:1,border:0,outline:"none",background:"transparent",fontFamily:T.sans,fontSize:13,color:T.ink}}/>
+          {q&&<button onClick={()=>setQ("")} style={{background:"transparent",border:0,cursor:"pointer",display:"flex"}}><FmIcon name="x" size={14} stroke={T.ink3}/></button>}
+        </div>
+      </div>
+    )}
+
+    {/* Resumen */}
+    {!load&&!err&&provs.length>0&&(
+      <div style={{padding:"0 20px 12px",fontSize:11,fontWeight:700,color:T.ink3,textTransform:"uppercase",letterSpacing:.5}}>
+        {term?`${filtered.length} de ${provs.length} resultados`:`${provs.length} ${provs.length===1?"proveedor":"proveedores"}`}
+      </div>
+    )}
 
     {/* Body */}
     <div style={{padding:"0 20px"}}>
@@ -13236,6 +13265,7 @@ function Proveedores({perfil,tok,rol,setPage}){
         </div>
       )}
 
+      {/* Empty BD: no hay proveedores en absoluto */}
       {!load&&!err&&provs.length===0&&(
         <div style={{background:T.surface,border:`1px solid ${T.line}`,borderRadius:20,padding:"36px 24px",textAlign:"center",marginTop:8}}>
           <div style={{width:56,height:56,borderRadius:18,background:T.bg,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 16px"}}>
@@ -13246,16 +13276,41 @@ function Proveedores({perfil,tok,rol,setPage}){
         </div>
       )}
 
-      {!load&&!err&&provs.length>0&&(
+      {/* Empty búsqueda: hay proveedores pero el filtro no encuentra */}
+      {!load&&!err&&provs.length>0&&filtered.length===0&&(
+        <div style={{background:T.surface,border:`1px solid ${T.line}`,borderRadius:20,padding:"32px 24px",textAlign:"center",marginTop:4}}>
+          <div style={{width:48,height:48,borderRadius:14,background:T.bg,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 14px"}}>
+            <FmIcon name="search" size={18} stroke={T.ink3} sw={1.6}/>
+          </div>
+          <div style={{fontSize:15,fontWeight:700,color:T.ink,letterSpacing:-.2,marginBottom:6}}>Sin resultados para "{q}"</div>
+          <div style={{fontSize:12.5,color:T.ink3,fontWeight:500,lineHeight:1.5,marginBottom:14}}>Prueba con otro término o limpia el buscador.</div>
+          <button onClick={()=>setQ("")} style={{background:"transparent",border:`1px solid ${T.line}`,borderRadius:999,padding:"7px 14px",fontFamily:T.sans,fontSize:12,fontWeight:600,color:T.ink2,cursor:"pointer"}}>Limpiar búsqueda</button>
+        </div>
+      )}
+
+      {/* Lista filtrada */}
+      {!load&&!err&&filtered.length>0&&(
         <div style={{display:"flex",flexDirection:"column",gap:8}}>
-          {provs.map(p=>(
-            <div key={p.id} style={{background:T.surface,borderRadius:16,padding:"14px 16px",border:`1px solid ${T.line}`,display:"flex",alignItems:"center",gap:12}}>
+          {filtered.map(p=>{
+            const ini=provIni(p.nombre);
+            const color=provColor(p.id);
+            return <div key={p.id} onClick={()=>console.log("Proveedor seleccionado:",p.id)} style={{background:T.surface,borderRadius:16,padding:"14px 16px",border:`1px solid ${T.line}`,display:"flex",alignItems:"center",gap:12,cursor:"pointer"}}>
+              <div style={{width:40,height:40,borderRadius:12,background:color+"22",color:color,fontWeight:800,fontSize:13,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,letterSpacing:.5}}>{ini}</div>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontSize:14,fontWeight:600,color:T.ink,letterSpacing:-.2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.nombre}</div>
-                {p.telefono&&<div style={{fontSize:12,color:T.ink3,fontWeight:500,marginTop:3}}>{p.telefono}</div>}
+                {p.contacto_nombre&&<div style={{fontSize:12,color:T.ink3,fontWeight:500,marginTop:3,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.contacto_nombre}</div>}
+                {p.telefono&&<div style={{fontSize:11.5,color:T.ink3,fontWeight:500,marginTop:5,display:"flex",alignItems:"center",gap:6}}>
+                  <FmIcon name="phone" size={11} stroke={T.ink3} sw={1.8}/>
+                  <span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.telefono}</span>
+                </div>}
+                {p.email&&<div style={{fontSize:11.5,color:T.ink3,fontWeight:500,marginTop:3,display:"flex",alignItems:"center",gap:6}}>
+                  <FmIcon name="mail" size={11} stroke={T.ink3} sw={1.8}/>
+                  <span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.email}</span>
+                </div>}
               </div>
-            </div>
-          ))}
+              <FmIcon name="chevR" size={14} stroke={T.ink3} sw={2}/>
+            </div>;
+          })}
         </div>
       )}
     </div>
