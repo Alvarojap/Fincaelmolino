@@ -13468,16 +13468,45 @@ function Proveedores({perfil,tok,rol,setPage}){
 }
 
 // ─── CATÁLOGO ────────────────────────────────────────────────────────────────
-// D5.B.2 — listado read-only del catálogo de servicios. Cards por servicio
-// con icono sparkle terracotta + precios apilados a la derecha. Empty state
-// cuando la BD está vacía (estado actual tras la limpieza de D5.B.1). Click
-// sobre card sólo loguea — modal de servicio + vinculación llegan en D5.B.3.
+// D5.B.3 — CRUD completo del catálogo + vinculación de proveedores (N:N).
+// Modal de alta/edición con sección "Proveedores vinculados" sólo en edit.
+// Sub-modal sobre el modal para vincular (zIndex 1003). Marcar preferido =
+// secuencia demote→promote con revert si falla. Borrado con CASCADE manual
+// gestionado en BD (FK proveedor_servicios.catalogo_servicio_id).
 function Catalogo({perfil,tok,rol,setPage}){
   const isA=rol==="admin";
   const fE=v=>(Math.round(parseFloat(v)||0)).toLocaleString("es-ES")+"€";
+  const FORM_VACIO_CATALOGO={nombre:"",categoria:"",descripcion:"",precio_cliente_default:"",coste_proveedor_default:"",unidad:"",notas:"",favorito:false,activo:true};
+  const FORM_VINC_VACIO={proveedor_id:"",precio_orientativo:""};
+  const rowToFormCatalogo=s=>({nombre:s.nombre||"",categoria:s.categoria||"",descripcion:s.descripcion||"",precio_cliente_default:s.precio_cliente_default!=null?String(s.precio_cliente_default):"",coste_proveedor_default:s.coste_proveedor_default!=null?String(s.coste_proveedor_default):"",unidad:s.unidad||"",notas:s.notas||"",favorito:!!s.favorito,activo:s.activo!==false});
+  // Helpers de avatar (idénticos a los de Proveedores → mismo color por id)
+  const provIni=n=>{const p=(n||"").trim().split(/\s+/).filter(Boolean);return p.length?p.slice(0,2).map(w=>w[0]).join("").toUpperCase():"??";};
+  const PROV_PAL=[T.terracotta,T.olive,T.lavender,T.softBlue,T.gold,T.peach,T.coral];
+  const provColor=id=>{let h=0;const s=String(id||"");for(let i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))>>>0;return PROV_PAL[h%PROV_PAL.length];};
+  // Parser de precios: vacío→null, válido→number, inválido→error
+  const parsePrecio=s=>{const t=(s||"").trim();if(!t)return{ok:true,value:null};const n=parseFloat(t.replace(",","."));if(isNaN(n)||n<0)return{ok:false,value:null};return{ok:true,value:n};};
+
   const[servs,setServs]=useState([]);
   const[load,setLoad]=useState(true);
   const[err,setErr]=useState(null);
+  // Modal alta/edición de servicio
+  const[showSheet,setShowSheet]=useState(null);
+  const[form,setForm]=useState(FORM_VACIO_CATALOGO);
+  const[saving,setSaving]=useState(false);
+  const[deleting,setDeleting]=useState(false);
+  const[sheetErr,setSheetErr]=useState("");
+  const[reloadKey,setReloadKey]=useState(0);
+  // Sección vinculados dentro del modal
+  const[vinculados,setVinculados]=useState([]);
+  const[loadVinc,setLoadVinc]=useState(false);
+  const[vincErr,setVincErr]=useState("");
+  // Sub-modal de vinculación
+  const[showVincular,setShowVincular]=useState(false);
+  const[provsAll,setProvsAll]=useState([]);
+  const[loadProvsAll,setLoadProvsAll]=useState(false);
+  const[formVincular,setFormVincular]=useState(FORM_VINC_VACIO);
+  const[savingVinc,setSavingVinc]=useState(false);
+  const[vincSubmitErr,setVincSubmitErr]=useState("");
 
   useEffect(()=>{
     if(!isA||!tok){setLoad(false);return;}
@@ -13488,7 +13517,168 @@ function Catalogo({perfil,tok,rol,setPage}){
       }catch(_){setErr("No se pudo cargar el catálogo. Revisa permisos o conexión.");}
       setLoad(false);
     })();
-  },[tok,isA]);
+  },[tok,isA,reloadKey]);
+
+  const cargarVinculados=async(servId)=>{
+    setLoadVinc(true);setVincErr("");
+    try{
+      // Intento 1: PostgREST embed (FK declarada en BD permite embed)
+      const rows=await sbGet("proveedor_servicios",`?catalogo_servicio_id=eq.${servId}&select=*,proveedor:proveedores(id,nombre,activo)&order=preferido.desc,created_at.asc`,tok);
+      setVinculados(rows||[]);
+    }catch(_){
+      // Fallback: 2 queries (1 a vinc + 1 a proveedores con id=in.(...))
+      try{
+        const vs=await sbGet("proveedor_servicios",`?catalogo_servicio_id=eq.${servId}&select=*&order=preferido.desc,created_at.asc`,tok);
+        const ids=(vs||[]).map(v=>v.proveedor_id).filter(Boolean);
+        let provById={};
+        if(ids.length){
+          const ps=await sbGet("proveedores",`?id=in.(${ids.join(",")})&select=id,nombre,activo`,tok);
+          provById=Object.fromEntries((ps||[]).map(p=>[p.id,p]));
+        }
+        setVinculados((vs||[]).map(v=>({...v,proveedor:provById[v.proveedor_id]||null})));
+      }catch(_2){
+        setVincErr("No se pudieron cargar los proveedores vinculados.");
+        setVinculados([]);
+      }
+    }
+    setLoadVinc(false);
+  };
+
+  const guardarServ=async()=>{
+    if(!form.nombre.trim()||saving||deleting)return;
+    const pcli=parsePrecio(form.precio_cliente_default);
+    const ppro=parsePrecio(form.coste_proveedor_default);
+    if(!pcli.ok){setSheetErr("Precio cliente no válido");return;}
+    if(!ppro.ok){setSheetErr("Coste proveedor no válido");return;}
+    setSaving(true);setSheetErr("");
+    try{
+      const payload={
+        nombre:form.nombre.trim(),
+        categoria:form.categoria.trim()||null,
+        descripcion:form.descripcion.trim()||null,
+        precio_cliente_default:pcli.value,
+        coste_proveedor_default:ppro.value,
+        unidad:form.unidad.trim()||null,
+        notas:form.notas.trim()||null,
+        favorito:!!form.favorito,
+        activo:!!form.activo,
+      };
+      if(showSheet.mode==="add"){
+        payload.created_by=perfil?.id||null;
+        await sbPost("catalogo_servicios",payload,tok);
+      }else{
+        await sbPatch("catalogo_servicios",`id=eq.${showSheet.id}`,payload,tok);
+      }
+      setShowSheet(null);setReloadKey(k=>k+1);
+    }catch(_){
+      setSheetErr("No se pudo guardar el servicio. Inténtalo de nuevo.");
+    }
+    setSaving(false);
+  };
+
+  const borrarServ=async()=>{
+    if(!showSheet||showSheet.mode!=="edit"||deleting||saving)return;
+    const n=vinculados.length;
+    let msg;
+    if(n===0)msg=`¿Eliminar "${form.nombre}"?`;
+    else if(n===1)msg=`¿Eliminar "${form.nombre}"? Esto desvinculará al proveedor asociado.`;
+    else msg=`¿Eliminar "${form.nombre}"? Esto desvinculará a sus ${n} proveedores asociados.`;
+    if(!window.confirm(msg))return;
+    setDeleting(true);setSheetErr("");
+    try{
+      await sbDelete("catalogo_servicios",`id=eq.${showSheet.id}`,tok);
+      setShowSheet(null);setReloadKey(k=>k+1);
+    }catch(_){
+      setSheetErr("No se pudo eliminar el servicio. Inténtalo de nuevo.");
+    }
+    setDeleting(false);
+  };
+
+  const desvincularProveedor=async(v)=>{
+    const nombre=v.proveedor?.nombre||"este proveedor";
+    const precioStr=v.precio_orientativo!=null?`\nPrecio orientativo registrado: ${fE(v.precio_orientativo)}`:"";
+    if(!window.confirm(`¿Desvincular a "${nombre}"?${precioStr}`))return;
+    setVincErr("");
+    try{
+      await sbDelete("proveedor_servicios",`id=eq.${v.id}`,tok);
+      setVinculados(prev=>prev.filter(x=>x.id!==v.id));
+    }catch(_){
+      setVincErr("No se pudo desvincular. Inténtalo de nuevo.");
+    }
+  };
+
+  const marcarPreferido=async(v)=>{
+    if(v.preferido)return;
+    const actual=vinculados.find(x=>x.preferido&&x.id!==v.id);
+    setVincErr("");
+    try{
+      // Paso 1: demote actual (si existe)
+      if(actual){
+        await sbPatch("proveedor_servicios",`id=eq.${actual.id}`,{preferido:false},tok);
+      }
+      // Paso 2: promote nuevo
+      try{
+        await sbPatch("proveedor_servicios",`id=eq.${v.id}`,{preferido:true},tok);
+        setVinculados(prev=>prev.map(x=>{
+          if(actual&&x.id===actual.id)return{...x,preferido:false};
+          if(x.id===v.id)return{...x,preferido:true};
+          return x;
+        }));
+      }catch(_2){
+        // Revert: intentar restaurar al original como preferido
+        if(actual){
+          try{await sbPatch("proveedor_servicios",`id=eq.${actual.id}`,{preferido:true},tok);}catch(_3){}
+        }
+        setVincErr("No se pudo marcar como preferido. Inténtalo de nuevo.");
+      }
+    }catch(_){
+      setVincErr("No se pudo cambiar el preferido. Inténtalo de nuevo.");
+    }
+  };
+
+  const abrirVincular=async()=>{
+    setFormVincular(FORM_VINC_VACIO);setVincSubmitErr("");setShowVincular(true);
+    setLoadProvsAll(true);
+    try{
+      const ps=await sbGet("proveedores","?activo=eq.true&select=id,nombre&order=nombre.asc",tok);
+      setProvsAll(ps||[]);
+    }catch(_){
+      setProvsAll([]);
+    }
+    setLoadProvsAll(false);
+  };
+
+  const vincularProveedor=async()=>{
+    if(savingVinc)return;
+    if(!formVincular.proveedor_id){setVincSubmitErr("Selecciona un proveedor");return;}
+    const precioRaw=(formVincular.precio_orientativo||"").trim().replace(",",".");
+    let precio=null;
+    if(precioRaw){
+      precio=parseFloat(precioRaw);
+      if(isNaN(precio)||precio<0){setVincSubmitErr("Precio orientativo no válido");return;}
+    }
+    setSavingVinc(true);setVincSubmitErr("");
+    try{
+      const payload={
+        proveedor_id:formVincular.proveedor_id,
+        catalogo_servicio_id:showSheet.id,
+        preferido:false,
+        precio_orientativo:precio,
+      };
+      await sbPost("proveedor_servicios",payload,tok);
+      setShowVincular(false);
+      setFormVincular(FORM_VINC_VACIO);
+      await cargarVinculados(showSheet.id);
+    }catch(_){
+      setVincSubmitErr("No se pudo vincular. Inténtalo de nuevo.");
+    }
+    setSavingVinc(false);
+  };
+
+  useEffect(()=>{
+    if(!showSheet||showSheet.mode!=="edit"||!tok){setVinculados([]);setVincErr("");return;}
+    cargarVinculados(showSheet.id);
+  },[showSheet,tok]);
 
   // Defensa por si alguien fuerza la ruta sin ser admin (la entrada del sidebar
   // ya queda oculta en Sidebar). RLS en BD también lo bloquea.
@@ -13501,7 +13691,7 @@ function Catalogo({perfil,tok,rol,setPage}){
         <div style={{fontSize:12,color:T.ink3,fontWeight:500,marginBottom:2}}>Comercial · Servicios que ofreces</div>
         <div style={{fontSize:30,fontWeight:700,color:T.ink,letterSpacing:-1,lineHeight:1.02}}>Catálogo</div>
       </div>
-      <button title="Nuevo servicio (próximamente)" style={{width:40,height:40,borderRadius:999,background:T.terracotta,color:"white",border:0,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",boxShadow:"0 6px 14px rgba(236,104,62,.3)",flexShrink:0}}>
+      <button onClick={()=>{setForm(FORM_VACIO_CATALOGO);setSheetErr("");setShowSheet({mode:"add"});}} title="Nuevo servicio" style={{width:40,height:40,borderRadius:999,background:T.terracotta,color:"white",border:0,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",boxShadow:"0 6px 14px rgba(236,104,62,.3)",flexShrink:0}}>
         <FmIcon name="plus" size={18} stroke="white"/>
       </button>
     </div>
@@ -13538,7 +13728,7 @@ function Catalogo({perfil,tok,rol,setPage}){
           {servs.map(s=>{
             const tieneCliente=s.precio_cliente_default!=null;
             const tieneCoste=s.coste_proveedor_default!=null;
-            return <div key={s.id} onClick={()=>console.log("Servicio seleccionado:",s.id)} style={{background:T.surface,borderRadius:16,padding:"14px 16px",border:`1px solid ${T.line}`,display:"flex",alignItems:"center",gap:12,cursor:"pointer"}}>
+            return <div key={s.id} onClick={()=>{setForm(rowToFormCatalogo(s));setSheetErr("");setShowSheet({mode:"edit",id:s.id});}} style={{background:T.surface,borderRadius:16,padding:"14px 16px",border:`1px solid ${T.line}`,display:"flex",alignItems:"center",gap:12,cursor:"pointer"}}>
               {/* Icono */}
               <div style={{width:40,height:40,borderRadius:12,background:T.terracotta+"22",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
                 <FmIcon name="sparkle" size={18} stroke={T.terracotta} sw={2}/>
@@ -13565,6 +13755,192 @@ function Catalogo({perfil,tok,rol,setPage}){
         </div>
       )}
     </div>
+
+    {/* Modal alta/edición de servicio */}
+    {showSheet&&<div style={{position:"fixed",inset:0,background:"rgba(20,15,10,.6)",zIndex:1001,display:"flex",alignItems:"flex-end",fontFamily:T.sans}} onClick={()=>!saving&&!deleting&&setShowSheet(null)}>
+      <div style={{width:"100%",background:T.bg,borderTopLeftRadius:24,borderTopRightRadius:24,maxHeight:"92vh",overflow:"auto",paddingBottom:34}} onClick={e=>e.stopPropagation()}>
+        <div style={{padding:"14px 20px 0",display:"flex",justifyContent:"center"}}>
+          <div style={{width:44,height:4,borderRadius:999,background:T.line}}/>
+        </div>
+        <div style={{padding:"14px 20px 16px",display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:`1px solid ${T.line}`}}>
+          <div>
+            <div style={{fontSize:12,color:T.ink3,fontWeight:500,marginBottom:2}}>Catálogo · {showSheet.mode==="add"?"Alta":"Edición"}</div>
+            <div style={{fontSize:22,fontWeight:700,color:T.ink,letterSpacing:-.6}}>{showSheet.mode==="add"?"Nuevo servicio":"Editar servicio"}</div>
+          </div>
+          <button onClick={()=>!saving&&!deleting&&setShowSheet(null)} style={{width:32,height:32,borderRadius:999,background:T.surface,border:`1px solid ${T.line}`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}><FmIcon name="x" size={15} stroke={T.ink}/></button>
+        </div>
+
+        <div style={{padding:"16px 20px",display:"flex",flexDirection:"column",gap:14}}>
+
+          <div>
+            <div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase",marginBottom:8}}>Nombre *</div>
+            <input value={form.nombre} onChange={e=>setForm(v=>({...v,nombre:e.target.value}))} placeholder="Ej: Iluminación micro LED" style={{width:"100%",background:T.surface,border:`1px solid ${T.line}`,borderRadius:14,padding:"13px 16px",fontFamily:T.sans,fontSize:14,fontWeight:600,color:T.ink,outline:"none",boxSizing:"border-box"}}/>
+          </div>
+
+          <div>
+            <div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase",marginBottom:8}}>Categoría</div>
+            <input value={form.categoria} onChange={e=>setForm(v=>({...v,categoria:e.target.value}))} placeholder="Ej: Iluminación, Sonido, Mobiliario, Catering, Decoración" style={{width:"100%",background:T.surface,border:`1px solid ${T.line}`,borderRadius:14,padding:"13px 16px",fontFamily:T.sans,fontSize:13,color:T.ink,outline:"none",boxSizing:"border-box"}}/>
+          </div>
+
+          <div>
+            <div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase",marginBottom:8}}>Descripción</div>
+            <textarea value={form.descripcion} onChange={e=>setForm(v=>({...v,descripcion:e.target.value}))} placeholder="Detalles del servicio" rows={2} style={{width:"100%",background:T.surface,border:`1px solid ${T.line}`,borderRadius:14,padding:"12px 14px",fontFamily:T.sans,fontSize:13,color:T.ink,resize:"none",outline:"none",boxSizing:"border-box"}}/>
+          </div>
+
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+            <div>
+              <div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase",marginBottom:8}}>Precio cliente (€)</div>
+              <input type="text" inputMode="decimal" value={form.precio_cliente_default} onChange={e=>setForm(v=>({...v,precio_cliente_default:e.target.value}))} placeholder="0" style={{width:"100%",background:T.surface,border:`1px solid ${T.line}`,borderRadius:14,padding:"13px 16px",fontFamily:T.sans,fontSize:18,fontWeight:700,color:T.ink,outline:"none",boxSizing:"border-box"}}/>
+            </div>
+            <div>
+              <div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase",marginBottom:8}}>Coste proveedor (€)</div>
+              <input type="text" inputMode="decimal" value={form.coste_proveedor_default} onChange={e=>setForm(v=>({...v,coste_proveedor_default:e.target.value}))} placeholder="0" style={{width:"100%",background:T.surface,border:`1px solid ${T.line}`,borderRadius:14,padding:"13px 16px",fontFamily:T.sans,fontSize:18,fontWeight:700,color:T.ink,outline:"none",boxSizing:"border-box"}}/>
+            </div>
+          </div>
+
+          <div>
+            <div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase",marginBottom:8}}>Unidad</div>
+            <input value={form.unidad} onChange={e=>setForm(v=>({...v,unidad:e.target.value}))} placeholder="ej: ud, h, kg, pax" style={{width:"100%",background:T.surface,border:`1px solid ${T.line}`,borderRadius:14,padding:"13px 16px",fontFamily:T.sans,fontSize:13,color:T.ink,outline:"none",boxSizing:"border-box"}}/>
+          </div>
+
+          <div>
+            <div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase",marginBottom:8}}>Notas internas</div>
+            <textarea value={form.notas} onChange={e=>setForm(v=>({...v,notas:e.target.value}))} placeholder="Notas privadas no compartidas con cliente" rows={2} style={{width:"100%",background:T.surface,border:`1px solid ${T.line}`,borderRadius:14,padding:"12px 14px",fontFamily:T.sans,fontSize:13,color:T.ink,resize:"none",outline:"none",boxSizing:"border-box"}}/>
+          </div>
+
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+            <div style={{padding:"12px 14px",borderRadius:14,background:T.surface,border:`1px solid ${T.line}`,display:"flex",alignItems:"center",gap:10}}>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:12.5,fontWeight:700,color:T.ink}}>Favorito</div>
+                <div style={{fontSize:10.5,fontWeight:600,color:form.favorito?T.gold:T.ink3}}>{form.favorito?"sí":"no"}</div>
+              </div>
+              <button onClick={()=>setForm(v=>({...v,favorito:!v.favorito}))} style={{width:38,height:22,borderRadius:999,background:form.favorito?T.ink:T.lineStrong,position:"relative",border:"none",cursor:"pointer",flexShrink:0}}>
+                <span style={{position:"absolute",top:2,left:form.favorito?18:2,width:18,height:18,borderRadius:999,background:"#fff",transition:"left .15s"}}/>
+              </button>
+            </div>
+            <div style={{padding:"12px 14px",borderRadius:14,background:T.surface,border:`1px solid ${T.line}`,display:"flex",alignItems:"center",gap:10}}>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:12.5,fontWeight:700,color:T.ink}}>Activo</div>
+                <div style={{fontSize:10.5,fontWeight:600,color:form.activo?T.olive:T.ink3}}>{form.activo?"sí":"no"}</div>
+              </div>
+              <button onClick={()=>setForm(v=>({...v,activo:!v.activo}))} style={{width:38,height:22,borderRadius:999,background:form.activo?T.ink:T.lineStrong,position:"relative",border:"none",cursor:"pointer",flexShrink:0}}>
+                <span style={{position:"absolute",top:2,left:form.activo?18:2,width:18,height:18,borderRadius:999,background:"#fff",transition:"left .15s"}}/>
+              </button>
+            </div>
+          </div>
+
+          {/* Sección PROVEEDORES VINCULADOS — sólo en edit */}
+          {showSheet.mode==="edit"&&<div style={{marginTop:6,paddingTop:14,borderTop:`1px solid ${T.line}`,display:"flex",flexDirection:"column",gap:10}}>
+            <div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase"}}>Proveedores vinculados {vinculados.length>0&&`(${vinculados.length})`}</div>
+
+            {loadVinc&&<div style={{padding:"12px 0",fontSize:12,color:T.ink3,textAlign:"center"}}>Cargando…</div>}
+
+            {!loadVinc&&vinculados.length===0&&<div style={{padding:"14px 12px",background:T.surface,border:`1px dashed ${T.line}`,borderRadius:12,fontSize:12,color:T.ink3,textAlign:"center"}}>Sin proveedores vinculados</div>}
+
+            {!loadVinc&&vinculados.length>0&&<div style={{background:T.surface,border:`1px solid ${T.line}`,borderRadius:12,padding:4}}>
+              {vinculados.map((v,i)=>{
+                const nombre=v.proveedor?.nombre||"—";
+                const ini=provIni(nombre);
+                const color=provColor(v.proveedor?.id||v.proveedor_id);
+                return <div key={v.id} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 10px",borderBottom:i<vinculados.length-1?`1px solid ${T.line}`:0}}>
+                  <div style={{width:32,height:32,borderRadius:10,background:color+"22",color:color,fontSize:11,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,letterSpacing:.5}}>{ini}</div>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:13,fontWeight:700,color:T.ink,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{nombre}</div>
+                    {v.precio_orientativo!=null&&<div style={{fontSize:10.5,color:T.ink3,fontWeight:500,fontFamily:T.mono,marginTop:1}}>{fE(v.precio_orientativo)} <span style={{fontFamily:T.sans}}>orientativo</span></div>}
+                  </div>
+                  {v.preferido?(
+                    <div title="Preferido" style={{width:28,height:28,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,flexShrink:0}}>⭐</div>
+                  ):(
+                    <button onClick={()=>marcarPreferido(v)} title="Marcar como preferido" style={{width:28,height:28,borderRadius:8,background:"transparent",border:0,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:16,color:T.ink3,flexShrink:0,lineHeight:1}}>☆</button>
+                  )}
+                  <button onClick={()=>desvincularProveedor(v)} title="Desvincular" style={{width:26,height:26,borderRadius:8,background:"transparent",border:0,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",flexShrink:0}}>
+                    <FmIcon name="x" size={13} stroke={T.ink3} sw={2}/>
+                  </button>
+                </div>;
+              })}
+            </div>}
+
+            {vincErr&&<div style={{fontSize:11.5,color:"#9A2A22",fontWeight:600,padding:"8px 10px",background:T.coral+"14",border:`1px solid ${T.coral}33`,borderRadius:10}}>{vincErr}</div>}
+
+            <button onClick={abrirVincular} style={{padding:"10px 14px",borderRadius:999,border:`1px dashed ${T.line}`,background:T.surface,color:T.ink2,fontFamily:T.sans,fontSize:12.5,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+              <FmIcon name="plus" size={12} stroke={T.ink2} sw={2.4}/> Vincular proveedor
+            </button>
+          </div>}
+
+          {sheetErr&&<div style={{fontSize:12,color:"#9A2A22",fontWeight:600,padding:"8px 12px",background:T.coral+"14",border:`1px solid ${T.coral}33`,borderRadius:10}}>{sheetErr}</div>}
+
+          <div style={{display:"flex",gap:8,paddingTop:4}}>
+            <button onClick={()=>!saving&&!deleting&&setShowSheet(null)} style={{flex:1,padding:"14px 0",borderRadius:999,border:`1px solid ${T.line}`,background:T.surface,color:T.ink,fontFamily:T.sans,fontWeight:600,fontSize:14,cursor:saving||deleting?"not-allowed":"pointer",opacity:saving||deleting?.6:1}}>Cancelar</button>
+            <button onClick={guardarServ} disabled={saving||deleting||!form.nombre.trim()} style={{flex:2,padding:"14px 0",borderRadius:999,border:0,background:saving||deleting||!form.nombre.trim()?T.ink+"55":T.ink,color:"#fff",fontFamily:T.sans,fontWeight:700,fontSize:14,cursor:saving||deleting||!form.nombre.trim()?"not-allowed":"pointer"}}>{saving?"Guardando…":(showSheet.mode==="add"?"Crear servicio":"Guardar cambios")}</button>
+          </div>
+
+          {showSheet.mode==="edit"&&(
+            <button onClick={borrarServ} disabled={deleting||saving} style={{width:"100%",marginTop:12,padding:"12px 0",borderRadius:999,border:`1px solid ${T.coral}55`,background:T.coral+"14",color:"#9A2A22",fontFamily:T.sans,fontWeight:700,fontSize:13,cursor:deleting||saving?"not-allowed":"pointer",opacity:deleting||saving?.6:1}}>{deleting?"Eliminando…":"🗑 Borrar servicio"}</button>
+          )}
+
+        </div>
+      </div>
+    </div>}
+
+    {/* Sub-modal: vincular proveedor (sobre el modal de servicio) */}
+    {showVincular&&<div style={{position:"fixed",inset:0,background:"rgba(20,15,10,.6)",zIndex:1003,display:"flex",alignItems:"flex-end",fontFamily:T.sans}} onClick={()=>!savingVinc&&setShowVincular(false)}>
+      <div style={{width:"100%",background:T.bg,borderTopLeftRadius:24,borderTopRightRadius:24,maxHeight:"80vh",overflow:"auto",paddingBottom:34}} onClick={e=>e.stopPropagation()}>
+        <div style={{padding:"14px 20px 0",display:"flex",justifyContent:"center"}}>
+          <div style={{width:44,height:4,borderRadius:999,background:T.line}}/>
+        </div>
+        <div style={{padding:"14px 20px 16px",display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:`1px solid ${T.line}`,gap:10}}>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontSize:12,color:T.ink3,fontWeight:500,marginBottom:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>Catálogo · {form.nombre}</div>
+            <div style={{fontSize:20,fontWeight:700,color:T.ink,letterSpacing:-.5}}>Vincular proveedor</div>
+          </div>
+          <button onClick={()=>!savingVinc&&setShowVincular(false)} style={{width:32,height:32,borderRadius:999,background:T.surface,border:`1px solid ${T.line}`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",flexShrink:0}}><FmIcon name="x" size={15} stroke={T.ink}/></button>
+        </div>
+
+        <div style={{padding:"16px 20px",display:"flex",flexDirection:"column",gap:14}}>
+          {loadProvsAll&&<div style={{padding:"24px 0",textAlign:"center",color:T.ink3,fontSize:13}}>Cargando proveedores…</div>}
+
+          {!loadProvsAll&&(()=>{
+            const vincIds=new Set(vinculados.map(v=>v.proveedor_id));
+            const candidatos=provsAll.filter(p=>!vincIds.has(p.id));
+            if(candidatos.length===0){
+              return <div style={{background:T.surface,border:`1px solid ${T.line}`,borderRadius:14,padding:"20px 16px",textAlign:"center"}}>
+                <div style={{fontSize:14,fontWeight:700,color:T.ink,marginBottom:6}}>Sin candidatos</div>
+                <div style={{fontSize:12,color:T.ink3,fontWeight:500,lineHeight:1.5}}>Todos los proveedores activos ya están vinculados a este servicio. Crea uno nuevo desde la pantalla de Proveedores.</div>
+              </div>;
+            }
+            return <>
+              <div>
+                <div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase",marginBottom:8}}>Proveedor</div>
+                <div style={{maxHeight:240,overflowY:"auto",background:T.surface,border:`1px solid ${T.line}`,borderRadius:14,padding:6}}>
+                  {candidatos.map((p,i)=>{
+                    const sel=formVincular.proveedor_id===p.id;
+                    const color=provColor(p.id);
+                    const ini=provIni(p.nombre);
+                    return <button key={p.id} onClick={()=>setFormVincular(v=>({...v,proveedor_id:p.id}))} style={{width:"100%",padding:"10px 12px",borderRadius:10,border:0,background:sel?T.terracotta+"22":"transparent",cursor:"pointer",display:"flex",alignItems:"center",gap:10,fontFamily:T.sans,textAlign:"left",marginBottom:i<candidatos.length-1?2:0}}>
+                      <div style={{width:28,height:28,borderRadius:8,background:color+"22",color:color,fontSize:10,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,letterSpacing:.5}}>{ini}</div>
+                      <div style={{flex:1,minWidth:0,fontSize:13,fontWeight:600,color:T.ink,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.nombre}</div>
+                      {sel&&<FmIcon name="check" size={14} stroke={T.terracotta} sw={2.4}/>}
+                    </button>;
+                  })}
+                </div>
+              </div>
+
+              <div>
+                <div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase",marginBottom:8}}>Precio orientativo (€) · opcional</div>
+                <input type="text" inputMode="decimal" value={formVincular.precio_orientativo} onChange={e=>setFormVincular(v=>({...v,precio_orientativo:e.target.value}))} placeholder="Ej: 350,50" style={{width:"100%",background:T.surface,border:`1px solid ${T.line}`,borderRadius:14,padding:"13px 16px",fontFamily:T.sans,fontSize:14,color:T.ink,outline:"none",boxSizing:"border-box"}}/>
+              </div>
+
+              {vincSubmitErr&&<div style={{fontSize:12,color:"#9A2A22",fontWeight:600,padding:"8px 12px",background:T.coral+"14",border:`1px solid ${T.coral}33`,borderRadius:10}}>{vincSubmitErr}</div>}
+
+              <div style={{display:"flex",gap:8,paddingTop:4}}>
+                <button onClick={()=>!savingVinc&&setShowVincular(false)} style={{flex:1,padding:"14px 0",borderRadius:999,border:`1px solid ${T.line}`,background:T.surface,color:T.ink,fontFamily:T.sans,fontWeight:600,fontSize:14,cursor:savingVinc?"not-allowed":"pointer",opacity:savingVinc?.6:1}}>Cancelar</button>
+                <button onClick={vincularProveedor} disabled={savingVinc||!formVincular.proveedor_id} style={{flex:2,padding:"14px 0",borderRadius:999,border:0,background:savingVinc||!formVincular.proveedor_id?T.ink+"55":T.ink,color:"#fff",fontFamily:T.sans,fontWeight:700,fontSize:14,cursor:savingVinc||!formVincular.proveedor_id?"not-allowed":"pointer"}}>{savingVinc?"Vinculando…":"Vincular"}</button>
+              </div>
+            </>;
+          })()}
+        </div>
+      </div>
+    </div>}
   </div>;
 }
 
