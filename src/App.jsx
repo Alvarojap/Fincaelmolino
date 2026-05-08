@@ -13554,27 +13554,28 @@ function Catalogo({perfil,tok,rol,setPage}){
     try{
       const payload={
         nombre:form.nombre.trim(),
-        categoria:form.categoria.trim()||null,
+        // categoria es NOT NULL en BD → string vacío en vez de null si no se rellena.
+        // Fix futuro: hacer la columna NULL-able vía migración y permitir servicios sin categoría.
+        categoria:form.categoria.trim()||"",
         descripcion:form.descripcion.trim()||null,
-        precio_cliente_default:pcli.value,
-        coste_proveedor_default:ppro.value,
+        // precio_cliente_default y coste_proveedor_default son NOT NULL DEFAULT 0 en BD.
+        // Si el campo está vacío mandamos 0, no null (que rompería la constraint).
+        precio_cliente_default:pcli.value??0,
+        coste_proveedor_default:ppro.value??0,
         unidad:form.unidad.trim()||null,
         notas:form.notas.trim()||null,
         favorito:!!form.favorito,
         activo:!!form.activo,
       };
+      // Nota: catalogo_servicios NO tiene columna created_by (a diferencia de
+      // la tabla proveedores). No la incluimos en el payload de alta.
       if(showSheet.mode==="add"){
-        payload.created_by=perfil?.id||null;
         await sbPost("catalogo_servicios",payload,tok);
       }else{
         await sbPatch("catalogo_servicios",`id=eq.${showSheet.id}`,payload,tok);
       }
       setShowSheet(null);setReloadKey(k=>k+1);
-    }catch(e){
-      // DEBUG temporal (D5.B.3 hotfix): logueamos el error real para diagnosticar
-      // por qué falla el alta. Quitar este console.error en cuanto identifiquemos
-      // y arreglemos la causa raíz.
-      console.error("Error guardarServ:", e);
+    }catch(_){
       setSheetErr("No se pudo guardar el servicio. Inténtalo de nuevo.");
     }
     setSaving(false);
