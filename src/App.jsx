@@ -13468,11 +13468,11 @@ function Proveedores({perfil,tok,rol,setPage}){
 }
 
 // ─── CATÁLOGO ────────────────────────────────────────────────────────────────
-// D5.B.3 — CRUD completo del catálogo + vinculación de proveedores (N:N).
+// D5.B.4 — CRUD + filtros (buscador, chips de categoría, ⭐ favoritos) +
+// autocomplete de categoría en el modal (sugerencias de categorías ya usadas).
 // Modal de alta/edición con sección "Proveedores vinculados" sólo en edit.
 // Sub-modal sobre el modal para vincular (zIndex 1003). Marcar preferido =
-// secuencia demote→promote con revert si falla. Borrado con CASCADE manual
-// gestionado en BD (FK proveedor_servicios.catalogo_servicio_id).
+// secuencia demote→promote con revert si falla.
 function Catalogo({perfil,tok,rol,setPage}){
   const isA=rol==="admin";
   const fE=v=>(Math.round(parseFloat(v)||0)).toLocaleString("es-ES")+"€";
@@ -13507,6 +13507,11 @@ function Catalogo({perfil,tok,rol,setPage}){
   const[formVincular,setFormVincular]=useState(FORM_VINC_VACIO);
   const[savingVinc,setSavingVinc]=useState(false);
   const[vincSubmitErr,setVincSubmitErr]=useState("");
+  // Filtros y buscador (D5.B.4)
+  const[q,setQ]=useState("");
+  const[filtroCategoria,setFiltroCategoria]=useState("");
+  const[filtroFavorito,setFiltroFavorito]=useState(false);
+  const[categoriaFocus,setCategoriaFocus]=useState(false);
 
   useEffect(()=>{
     if(!isA||!tok){setLoad(false);return;}
@@ -13689,6 +13694,22 @@ function Catalogo({perfil,tok,rol,setPage}){
   // ya queda oculta en Sidebar). RLS en BD también lo bloquea.
   if(!isA)return <div style={{padding:"54px 20px",textAlign:"center",color:T.ink3,fontSize:13}}>Esta sección es sólo para administradores.</div>;
 
+  // Filtros, búsqueda y categorías únicas para chips + autocomplete
+  const term=q.trim().toLowerCase();
+  const categoriasUnicas=[...new Set(servs.map(s=>s.categoria).filter(Boolean))].sort();
+  const filtered=servs.filter(s=>{
+    if(filtroCategoria&&s.categoria!==filtroCategoria)return false;
+    if(filtroFavorito&&!s.favorito)return false;
+    if(term){
+      const m=(s.nombre||"").toLowerCase().includes(term)||
+              (s.categoria||"").toLowerCase().includes(term)||
+              (s.descripcion||"").toLowerCase().includes(term);
+      if(!m)return false;
+    }
+    return true;
+  });
+  const hayFiltro=!!q||!!filtroCategoria||filtroFavorito;
+
   return <div style={{background:T.bg,minHeight:"100%",paddingBottom:100}}>
     {/* Header */}
     <div style={{padding:"54px 20px 16px",display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:10}}>
@@ -13700,6 +13721,35 @@ function Catalogo({perfil,tok,rol,setPage}){
         <FmIcon name="plus" size={18} stroke="white"/>
       </button>
     </div>
+
+    {/* Buscador — oculto durante carga, error y empty BD */}
+    {!load&&!err&&servs.length>0&&(
+      <div style={{padding:"0 20px 10px"}}>
+        <div style={{display:"flex",alignItems:"center",gap:10,background:T.surface,border:`1px solid ${T.line}`,borderRadius:16,padding:"11px 14px"}}>
+          <FmIcon name="search" size={16} stroke={T.ink3}/>
+          <input value={q} onChange={e=>setQ(e.target.value)} placeholder="Buscar por nombre, categoría o descripción" style={{flex:1,border:0,outline:"none",background:"transparent",fontFamily:T.sans,fontSize:13,color:T.ink}}/>
+          {q&&<button onClick={()=>setQ("")} style={{background:"transparent",border:0,cursor:"pointer",display:"flex"}}><FmIcon name="x" size={14} stroke={T.ink3}/></button>}
+        </div>
+      </div>
+    )}
+
+    {/* Chips: ⭐ Favoritos + categorías existentes */}
+    {!load&&!err&&servs.length>0&&(
+      <div style={{padding:"0 20px 10px",display:"flex",gap:6,overflowX:"auto"}}>
+        <button onClick={()=>setFiltroFavorito(!filtroFavorito)} style={{flexShrink:0,height:30,padding:"0 12px",borderRadius:999,border:`1px solid ${filtroFavorito?T.ink:T.line}`,background:filtroFavorito?T.ink:T.surface,color:filtroFavorito?"white":T.ink2,fontFamily:T.sans,fontSize:12,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:4}}>⭐ Favoritos</button>
+        {categoriasUnicas.map(cat=>{
+          const on=filtroCategoria===cat;
+          return <button key={cat} onClick={()=>setFiltroCategoria(on?"":cat)} style={{flexShrink:0,height:30,padding:"0 12px",borderRadius:999,border:`1px solid ${on?T.ink:T.line}`,background:on?T.ink:T.surface,color:on?"white":T.ink2,fontFamily:T.sans,fontSize:12,fontWeight:700,cursor:"pointer"}}>{cat}</button>;
+        })}
+      </div>
+    )}
+
+    {/* Resumen */}
+    {!load&&!err&&servs.length>0&&(
+      <div style={{padding:"0 20px 12px",fontSize:11,fontWeight:700,color:T.ink3,textTransform:"uppercase",letterSpacing:.5}}>
+        {hayFiltro?`${filtered.length} de ${servs.length} resultados`:`${servs.length} ${servs.length===1?"servicio":"servicios"}`}
+      </div>
+    )}
 
     {/* Body */}
     <div style={{padding:"0 20px"}}>
@@ -13727,10 +13777,22 @@ function Catalogo({perfil,tok,rol,setPage}){
         </div>
       )}
 
-      {/* Listado de servicios */}
-      {!load&&!err&&servs.length>0&&(
+      {/* Empty filtrado: hay servicios en BD pero los filtros no encuentran nada */}
+      {!load&&!err&&servs.length>0&&filtered.length===0&&(
+        <div style={{background:T.surface,border:`1px solid ${T.line}`,borderRadius:20,padding:"32px 24px",textAlign:"center",marginTop:4}}>
+          <div style={{width:48,height:48,borderRadius:14,background:T.bg,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 14px"}}>
+            <FmIcon name="search" size={18} stroke={T.ink3} sw={1.6}/>
+          </div>
+          <div style={{fontSize:15,fontWeight:700,color:T.ink,letterSpacing:-.2,marginBottom:6}}>Sin resultados para los filtros aplicados</div>
+          <div style={{fontSize:12.5,color:T.ink3,fontWeight:500,lineHeight:1.5,marginBottom:14}}>Prueba con otro término o quita algún filtro.</div>
+          <button onClick={()=>{setQ("");setFiltroCategoria("");setFiltroFavorito(false);}} style={{background:"transparent",border:`1px solid ${T.line}`,borderRadius:999,padding:"7px 14px",fontFamily:T.sans,fontSize:12,fontWeight:600,color:T.ink2,cursor:"pointer"}}>Limpiar filtros</button>
+        </div>
+      )}
+
+      {/* Listado de servicios filtrados */}
+      {!load&&!err&&filtered.length>0&&(
         <div style={{display:"flex",flexDirection:"column",gap:8}}>
-          {servs.map(s=>{
+          {filtered.map(s=>{
             const tieneCliente=s.precio_cliente_default!=null;
             const tieneCoste=s.coste_proveedor_default!=null;
             return <div key={s.id} onClick={()=>{setForm(rowToFormCatalogo(s));setSheetErr("");setShowSheet({mode:"edit",id:s.id});}} style={{background:T.surface,borderRadius:16,padding:"14px 16px",border:`1px solid ${T.line}`,display:"flex",alignItems:"center",gap:12,cursor:"pointer"}}>
@@ -13784,7 +13846,21 @@ function Catalogo({perfil,tok,rol,setPage}){
 
           <div>
             <div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase",marginBottom:8}}>Categoría</div>
-            <input value={form.categoria} onChange={e=>setForm(v=>({...v,categoria:e.target.value}))} placeholder="Ej: Iluminación, Sonido, Mobiliario, Catering, Decoración" style={{width:"100%",background:T.surface,border:`1px solid ${T.line}`,borderRadius:14,padding:"13px 16px",fontFamily:T.sans,fontSize:13,color:T.ink,outline:"none",boxSizing:"border-box"}}/>
+            <input value={form.categoria} onChange={e=>setForm(v=>({...v,categoria:e.target.value}))} onFocus={()=>setCategoriaFocus(true)} onBlur={()=>setCategoriaFocus(false)} placeholder="Ej: Iluminación, Sonido, Mobiliario, Catering, Decoración" style={{width:"100%",background:T.surface,border:`1px solid ${T.line}`,borderRadius:14,padding:"13px 16px",fontFamily:T.sans,fontSize:13,color:T.ink,outline:"none",boxSizing:"border-box"}}/>
+            {/* Autocomplete: sugerencias de categorías ya usadas en el catálogo */}
+            {categoriaFocus&&(()=>{
+              const t=form.categoria.trim().toLowerCase();
+              const sug=categoriasUnicas.filter(c=>(!t||c.toLowerCase().includes(t))&&c.toLowerCase()!==t);
+              if(sug.length===0)return null;
+              return <div style={{marginTop:6,maxHeight:160,overflowY:"auto",background:T.surface,border:`1px solid ${T.line}`,borderRadius:12,padding:4}}>
+                {sug.map((c,i)=>(
+                  <button key={c} onMouseDown={e=>{e.preventDefault();setForm(v=>({...v,categoria:c}));setCategoriaFocus(false);}} style={{width:"100%",padding:"8px 10px",borderRadius:8,border:0,background:"transparent",cursor:"pointer",display:"flex",alignItems:"center",gap:8,fontFamily:T.sans,textAlign:"left",fontSize:12.5,fontWeight:600,color:T.ink2,marginBottom:i<sug.length-1?2:0}}>
+                    <FmIcon name="sparkle" size={11} stroke={T.ink3} sw={2}/>
+                    {c}
+                  </button>
+                ))}
+              </div>;
+            })()}
           </div>
 
           <div>
