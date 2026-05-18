@@ -1992,6 +1992,36 @@ function RvEventDetail({reserva,tok,perfil,rol,isA,onClose,onChanged,isDesktopPa
   const [movSaving,setMovSaving]=useState(false);
   const [movErr,setMovErr]=useState("");
   const [movWarn,setMovWarn]=useState(false);
+  // ─ Cotizaciones (D5.C.2) ─
+  const FORM_COTIZ_VACIO={importe:"",fecha_cotizacion:"",condiciones:"",notas:"",estado:"pendiente"};
+  // Helpers de avatar idénticos a Proveedores/Catalogo (mismo color por id)
+  const provIniCot=n=>{const p=(n||"").trim().split(/\s+/).filter(Boolean);return p.length?p.slice(0,2).map(w=>w[0]).join("").toUpperCase():"??";};
+  const PROV_PAL_COT=[T.terracotta,T.olive,T.lavender,T.softBlue,T.gold,T.peach,T.coral];
+  const provColorCot=id=>{let h=0;const s=String(id||"");for(let i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))>>>0;return PROV_PAL_COT[h%PROV_PAL_COT.length];};
+  const parsePrecioCot=s=>{const t=(s||"").trim();if(!t)return{ok:true,value:null};const n=parseFloat(t.replace(",","."));if(isNaN(n)||n<0)return{ok:false,value:null};return{ok:true,value:n};};
+  // Metadata de estados de cotización
+  const COTIZ_ESTADO_META={
+    pendiente:{label:"Pendiente",bg:"#FAEBC8",fg:"#7A5A12",dot:T.gold},
+    recibida:{label:"Recibida",bg:"#E1ECF8",fg:"#2D5A93",dot:T.softBlue},
+    descartada:{label:"Descartada",bg:T.surfaceAlt,fg:T.ink3,dot:T.ink4},
+    ganadora:{label:"Ganadora",bg:"#ECF1DC",fg:"#5C6F26",dot:T.olive},
+    cancelada:{label:"Cancelada",bg:T.surfaceAlt,fg:T.ink3,dot:T.ink4},
+  };
+  const[cotizaciones,setCotizaciones]=useState([]);
+  const[loadCotiz,setLoadCotiz]=useState(false);
+  const[cotizErr,setCotizErr]=useState("");
+  const[reloadKeyCotiz,setReloadKeyCotiz]=useState(0);
+  // Sub-modal "Pedir cotización"
+  const[showPedirCotiz,setShowPedirCotiz]=useState(false);
+  const[mostrarTodosProvs,setMostrarTodosProvs]=useState(false);
+  const[provsCandidatos,setProvsCandidatos]=useState([]);
+  const[loadProvsCand,setLoadProvsCand]=useState(false);
+  const[savingPedir,setSavingPedir]=useState(false);
+  // Sub-modal "Registrar respuesta / Editar"
+  const[showEditarCotiz,setShowEditarCotiz]=useState(null); // null o cotización
+  const[formCotiz,setFormCotiz]=useState(FORM_COTIZ_VACIO);
+  const[savingCotiz,setSavingCotiz]=useState(false);
+  const[cotizSubmitErr,setCotizSubmitErr]=useState("");
 
   useEffect(()=>{
     setContacto(null);
@@ -2126,6 +2156,154 @@ function RvEventDetail({reserva,tok,perfil,rol,isA,onClose,onChanged,isDesktopPa
     }catch(e){setServErr("No se pudo eliminar.");}
     setServSaving(false);
   };
+
+  // ─ Cotizaciones: handlers (D5.C.2) ────────────────────────────
+  const cargarCotizaciones=async(servId)=>{
+    setLoadCotiz(true);setCotizErr("");
+    try{
+      const rows=await sbGet("cotizaciones_servicio",`?servicio_reserva_id=eq.${servId}&select=*,proveedor:proveedores(id,nombre,activo)&order=created_at.asc`,tok);
+      setCotizaciones(rows||[]);
+    }catch(_){
+      try{
+        const cs=await sbGet("cotizaciones_servicio",`?servicio_reserva_id=eq.${servId}&select=*&order=created_at.asc`,tok);
+        const ids=[...new Set((cs||[]).map(c=>c.proveedor_id).filter(Boolean))];
+        let provById={};
+        if(ids.length){
+          const ps=await sbGet("proveedores",`?id=in.(${ids.join(",")})&select=id,nombre,activo`,tok);
+          provById=Object.fromEntries((ps||[]).map(p=>[p.id,p]));
+        }
+        setCotizaciones((cs||[]).map(c=>({...c,proveedor:provById[c.proveedor_id]||null})));
+      }catch(_2){
+        setCotizErr("No se pudieron cargar las cotizaciones.");
+        setCotizaciones([]);
+      }
+    }
+    setLoadCotiz(false);
+  };
+
+  const cargarProvsCandidatos=async(mostrarTodos)=>{
+    setLoadProvsCand(true);
+    try{
+      const catId=servForm.catalogo_servicio_id;
+      if(catId&&!mostrarTodos){
+        const vinc=await sbGet("proveedor_servicios",`?catalogo_servicio_id=eq.${catId}&select=proveedor:proveedores(id,nombre,activo)`,tok);
+        setProvsCandidatos((vinc||[]).map(v=>v.proveedor).filter(p=>p&&p.activo));
+      }else{
+        const all=await sbGet("proveedores","?activo=eq.true&select=id,nombre,activo&order=nombre.asc",tok);
+        setProvsCandidatos(all||[]);
+      }
+    }catch(_){
+      setProvsCandidatos([]);
+    }
+    setLoadProvsCand(false);
+  };
+
+  const abrirPedirCotiz=async()=>{
+    setMostrarTodosProvs(false);setShowPedirCotiz(true);
+    await cargarProvsCandidatos(false);
+  };
+
+  const toggleMostrarTodosProvs=async()=>{
+    const nuevo=!mostrarTodosProvs;
+    setMostrarTodosProvs(nuevo);
+    await cargarProvsCandidatos(nuevo);
+  };
+
+  const pedirCotizacion=async(provId)=>{
+    if(savingPedir)return;
+    setSavingPedir(true);
+    try{
+      await sbPost("cotizaciones_servicio",{
+        servicio_reserva_id:showServSheet.id,
+        proveedor_id:provId,
+        estado:"pendiente",
+        importe:null,
+        fecha_cotizacion:null,
+        condiciones:null,
+        created_by:perfil?.id||null,
+      },tok);
+      setShowPedirCotiz(false);
+      setReloadKeyCotiz(k=>k+1);
+    }catch(_){
+      setCotizErr("No se pudo registrar la cotización. Inténtalo de nuevo.");
+    }
+    setSavingPedir(false);
+  };
+
+  const abrirEditarCotiz=(cotiz)=>{
+    const hoy=new Date().toISOString().slice(0,10);
+    const estadoSugerido=cotiz.estado==="pendiente"?"recibida":cotiz.estado;
+    setFormCotiz({
+      importe:cotiz.importe!=null?String(cotiz.importe):"",
+      fecha_cotizacion:cotiz.fecha_cotizacion||hoy,
+      condiciones:cotiz.condiciones||"",
+      notas:cotiz.notas||"",
+      estado:estadoSugerido,
+    });
+    setCotizSubmitErr("");
+    setShowEditarCotiz(cotiz);
+  };
+
+  const guardarCotiz=async()=>{
+    if(!showEditarCotiz||savingCotiz)return;
+    const pr=parsePrecioCot(formCotiz.importe);
+    if(!pr.ok){setCotizSubmitErr("Importe no válido");return;}
+    setSavingCotiz(true);setCotizSubmitErr("");
+    try{
+      await sbPatch("cotizaciones_servicio",`id=eq.${showEditarCotiz.id}`,{
+        importe:pr.value,
+        fecha_cotizacion:formCotiz.fecha_cotizacion||null,
+        condiciones:formCotiz.condiciones.trim()||null,
+        notas:formCotiz.notas.trim()||null,
+        estado:formCotiz.estado,
+      },tok);
+      setShowEditarCotiz(null);
+      setReloadKeyCotiz(k=>k+1);
+    }catch(_){
+      setCotizSubmitErr("No se pudo guardar. Inténtalo de nuevo.");
+    }
+    setSavingCotiz(false);
+  };
+
+  const descartarCotiz=async(cotiz)=>{
+    setCotizErr("");
+    try{
+      await sbPatch("cotizaciones_servicio",`id=eq.${cotiz.id}`,{estado:"descartada"},tok);
+      setCotizaciones(prev=>prev.map(x=>x.id===cotiz.id?{...x,estado:"descartada"}:x));
+    }catch(_){
+      setCotizErr("No se pudo descartar.");
+    }
+  };
+
+  const recuperarCotiz=async(cotiz)=>{
+    setCotizErr("");
+    try{
+      await sbPatch("cotizaciones_servicio",`id=eq.${cotiz.id}`,{estado:"recibida"},tok);
+      setCotizaciones(prev=>prev.map(x=>x.id===cotiz.id?{...x,estado:"recibida"}:x));
+    }catch(_){
+      setCotizErr("No se pudo recuperar.");
+    }
+  };
+
+  const eliminarCotiz=async(cotiz)=>{
+    const nombre=cotiz.proveedor?.nombre||"este proveedor";
+    if(!window.confirm(`¿Eliminar la cotización de "${nombre}"? Esto borra el registro permanentemente.`))return;
+    setCotizErr("");
+    try{
+      await sbDelete("cotizaciones_servicio",`id=eq.${cotiz.id}`,tok);
+      setCotizaciones(prev=>prev.filter(x=>x.id!==cotiz.id));
+    }catch(_){
+      setCotizErr("No se pudo eliminar la cotización.");
+    }
+  };
+
+  useEffect(()=>{
+    if(!showServSheet||showServSheet.mode!=="edit"||!tok||!isA){
+      setCotizaciones([]);setCotizErr("");
+      return;
+    }
+    cargarCotizaciones(showServSheet.id);
+  },[showServSheet,tok,isA,reloadKeyCotiz]);
 
   // ─ Movimientos del servicio: handlers ─────────────────────────
   const TIPOS_MOV_LBL={cobro_cliente:"Cobro cliente",pago_proveedor:"Pago proveedor",reembolso_cliente:"Reembolso cliente",reembolso_proveedor:"Reembolso proveedor"};
@@ -2770,6 +2948,63 @@ function RvEventDetail({reserva,tok,perfil,rol,isA,onClose,onChanged,isDesktopPa
                 </div>;
               })()}
 
+              {/* Sección COTIZACIONES — sólo en estado ofertado (D5.C.2) */}
+              {showServSheet.mode==="edit"&&servForm.estado==="ofertado"&&<div style={{marginTop:18,paddingTop:16,borderTop:`1px solid ${T.line}`,display:"flex",flexDirection:"column",gap:10}}>
+                <div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase"}}>Cotizaciones {cotizaciones.length>0&&`(${cotizaciones.length})`}</div>
+
+                {loadCotiz&&<div style={{padding:"12px 0",fontSize:12,color:T.ink3,textAlign:"center"}}>Cargando…</div>}
+
+                {!loadCotiz&&cotizaciones.length===0&&<div style={{padding:"14px 12px",background:T.surface,border:`1px dashed ${T.line}`,borderRadius:12,fontSize:12,color:T.ink3,textAlign:"center"}}>Sin cotizaciones todavía</div>}
+
+                {!loadCotiz&&cotizaciones.length>0&&<div style={{display:"flex",flexDirection:"column",gap:8}}>
+                  {cotizaciones.map(c=>{
+                    const nombre=c.proveedor?.nombre||"—";
+                    const ini=provIniCot(nombre);
+                    const color=provColorCot(c.proveedor?.id||c.proveedor_id);
+                    const meta=COTIZ_ESTADO_META[c.estado]||COTIZ_ESTADO_META.pendiente;
+                    const lectura=c.estado==="ganadora"||c.estado==="cancelada";
+                    const fechaFmt=c.fecha_cotizacion?new Date(c.fecha_cotizacion+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short",year:"numeric"}):null;
+                    return <div key={c.id} style={{background:T.surface,border:`1px solid ${T.line}`,borderRadius:12,padding:12,display:"flex",flexDirection:"column",gap:8}}>
+                      <div style={{display:"flex",alignItems:"center",gap:10}}>
+                        <div style={{width:30,height:30,borderRadius:9,background:color+"22",color:color,fontSize:10.5,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,letterSpacing:.5}}>{ini}</div>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                            <span style={{fontSize:13,fontWeight:700,color:T.ink,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",textDecoration:c.estado==="cancelada"?"line-through":"none"}}>{nombre}</span>
+                            {c.estado==="ganadora"&&<span style={{fontSize:11}}>⭐</span>}
+                            <span style={{display:"inline-flex",alignItems:"center",gap:4,padding:"2px 7px",borderRadius:999,background:meta.bg,color:meta.fg,fontSize:9.5,fontWeight:800,textTransform:"uppercase",letterSpacing:.4}}><span style={{width:5,height:5,borderRadius:999,background:meta.dot}}/>{meta.label}</span>
+                          </div>
+                          {fechaFmt&&<div style={{fontSize:10.5,color:T.ink3,fontWeight:500,marginTop:2}}>{fechaFmt}</div>}
+                        </div>
+                        <div style={{textAlign:"right",flexShrink:0}}>
+                          {c.importe!=null?(
+                            <div style={{fontSize:16,fontWeight:800,color:T.ink,fontFamily:T.sans,letterSpacing:-.3,lineHeight:1}}>{fE(c.importe)}</div>
+                          ):(
+                            <div style={{fontSize:10.5,color:T.ink3,fontWeight:600,fontStyle:"italic"}}>Sin importe aún</div>
+                          )}
+                        </div>
+                      </div>
+                      {c.condiciones&&<div style={{padding:"8px 10px",borderRadius:9,background:T.surfaceAlt,fontSize:11.5,color:T.ink2,lineHeight:1.4,fontWeight:500,display:"-webkit-box",WebkitBoxOrient:"vertical",WebkitLineClamp:2,overflow:"hidden"}}>{c.condiciones}</div>}
+                      <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                        {c.estado==="pendiente"&&<button onClick={()=>abrirEditarCotiz(c)} style={{flex:1,minWidth:120,padding:"8px 12px",borderRadius:999,border:0,background:T.ink,color:"#fff",fontFamily:T.sans,fontSize:12,fontWeight:700,cursor:"pointer"}}>Registrar respuesta</button>}
+                        {c.estado==="recibida"&&<>
+                          <button onClick={()=>abrirEditarCotiz(c)} style={{flex:1,minWidth:80,padding:"8px 12px",borderRadius:999,border:`1px solid ${T.line}`,background:T.surface,color:T.ink,fontFamily:T.sans,fontSize:12,fontWeight:700,cursor:"pointer"}}>Editar</button>
+                          <button onClick={()=>descartarCotiz(c)} style={{padding:"8px 12px",borderRadius:999,border:`1px solid ${T.line}`,background:T.surface,color:T.ink3,fontFamily:T.sans,fontSize:12,fontWeight:600,cursor:"pointer"}}>Descartar</button>
+                        </>}
+                        {c.estado==="descartada"&&<button onClick={()=>recuperarCotiz(c)} style={{flex:1,minWidth:80,padding:"8px 12px",borderRadius:999,border:`1px solid ${T.line}`,background:T.surface,color:T.ink2,fontFamily:T.sans,fontSize:12,fontWeight:700,cursor:"pointer"}}>Recuperar</button>}
+                        {lectura&&<div style={{flex:1,fontSize:11,color:T.ink3,fontStyle:"italic",alignSelf:"center"}}>Solo lectura</div>}
+                        <button onClick={()=>eliminarCotiz(c)} title="Eliminar cotización" style={{width:32,height:32,borderRadius:999,border:`1px solid ${T.coral}55`,background:T.coral+"14",color:"#9A2A22",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",flexShrink:0}}><FmIcon name="x" size={13} stroke="#9A2A22" sw={2.2}/></button>
+                      </div>
+                    </div>;
+                  })}
+                </div>}
+
+                {cotizErr&&<div style={{fontSize:11.5,color:"#9A2A22",fontWeight:600,padding:"8px 10px",background:T.coral+"14",border:`1px solid ${T.coral}33`,borderRadius:10}}>{cotizErr}</div>}
+
+                <button onClick={abrirPedirCotiz} style={{padding:"10px 14px",borderRadius:999,border:`1px dashed ${T.line}`,background:T.surface,color:T.ink2,fontFamily:T.sans,fontSize:12.5,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+                  <FmIcon name="plus" size={12} stroke={T.ink2} sw={2.4}/> Pedir cotización
+                </button>
+              </div>}
+
               {showServSheet.mode==="edit"&&showServSheet.estadoAnt!=="cancelado"&&<div style={{display:"flex",gap:8,marginTop:6}}>
                 <button onClick={()=>{setServCancelMode(true);setServErr("");}} style={{flex:1,padding:"12px 0",borderRadius:999,border:`1px solid ${T.coral}55`,background:T.coral+"14",color:"#9A2A22",fontFamily:T.sans,fontWeight:700,fontSize:13,cursor:"pointer"}}>⚠️ Cancelar servicio</button>
                 <button onClick={borrarServ} disabled={showServSheet.hasMovs||servSaving} title={showServSheet.hasMovs?"No se puede borrar: tiene movimientos. Cancélalo en su lugar.":""} style={{flex:1,padding:"12px 0",borderRadius:999,border:`1px solid ${showServSheet.hasMovs?T.line:"#FECACA"}`,background:showServSheet.hasMovs?T.surface:"#FEF2F2",color:showServSheet.hasMovs?T.ink3:"#D9443A",fontFamily:T.sans,fontWeight:700,fontSize:13,cursor:showServSheet.hasMovs?"not-allowed":"pointer",opacity:showServSheet.hasMovs?.6:1}}>🗑 Borrar</button>
@@ -2862,6 +3097,126 @@ function RvEventDetail({reserva,tok,perfil,rol,isA,onClose,onChanged,isDesktopPa
           </div>
         </div>;
       })()}
+
+      {/* Sub-modal: Pedir cotización (zIndex sobre el modal de servicio) */}
+      {showPedirCotiz&&isA&&showServSheet&&<div style={{position:"fixed",inset:0,background:"rgba(20,15,10,.6)",zIndex:1003,display:"flex",alignItems:"flex-end",fontFamily:T.sans}} onClick={()=>!savingPedir&&setShowPedirCotiz(false)}>
+        <div style={{width:"100%",background:T.bg,borderTopLeftRadius:24,borderTopRightRadius:24,maxHeight:"85vh",overflow:"auto",paddingBottom:34}} onClick={e=>e.stopPropagation()}>
+          <div style={{padding:"14px 20px 0",display:"flex",justifyContent:"center"}}><div style={{width:44,height:4,borderRadius:999,background:T.line}}/></div>
+          <div style={{padding:"14px 20px 16px",display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:`1px solid ${T.line}`,gap:10}}>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:12,color:T.ink3,fontWeight:500,marginBottom:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{servForm.nombre||"Servicio"}</div>
+              <div style={{fontSize:20,fontWeight:700,color:T.ink,letterSpacing:-.5}}>Pedir cotización</div>
+            </div>
+            <button onClick={()=>!savingPedir&&setShowPedirCotiz(false)} style={{width:32,height:32,borderRadius:999,background:T.surface,border:`1px solid ${T.line}`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",flexShrink:0}}><FmIcon name="x" size={15} stroke={T.ink}/></button>
+          </div>
+
+          <div style={{padding:"16px 20px",display:"flex",flexDirection:"column",gap:14}}>
+            {servForm.catalogo_servicio_id&&(
+              <div style={{padding:"12px 14px",borderRadius:14,background:T.surface,border:`1px solid ${T.line}`,display:"flex",alignItems:"center",gap:14}}>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:12.5,fontWeight:700,color:T.ink}}>Mostrar todos los proveedores</div>
+                  <div style={{fontSize:10.5,color:T.ink3,fontWeight:500,marginTop:2}}>{mostrarTodosProvs?"Listando todos los proveedores activos":"Solo los vinculados a este servicio del catálogo"}</div>
+                </div>
+                <button onClick={toggleMostrarTodosProvs} style={{width:38,height:22,borderRadius:999,background:mostrarTodosProvs?T.ink:T.lineStrong,position:"relative",border:"none",cursor:"pointer",flexShrink:0}}>
+                  <span style={{position:"absolute",top:2,left:mostrarTodosProvs?18:2,width:18,height:18,borderRadius:999,background:"#fff",transition:"left .15s"}}/>
+                </button>
+              </div>
+            )}
+
+            {loadProvsCand&&<div style={{padding:"24px 0",textAlign:"center",color:T.ink3,fontSize:13}}>Cargando proveedores…</div>}
+
+            {!loadProvsCand&&(()=>{
+              const yaIds=new Set(cotizaciones.map(c=>c.proveedor_id));
+              const candidatos=provsCandidatos.filter(p=>!yaIds.has(p.id));
+              if(candidatos.length===0){
+                const hint=servForm.catalogo_servicio_id&&!mostrarTodosProvs
+                  ?"No hay proveedores vinculados disponibles. Prueba con \"Mostrar todos\" o vincula uno desde Catálogo."
+                  :"Todos los proveedores activos ya tienen una cotización para este servicio.";
+                return <div style={{background:T.surface,border:`1px solid ${T.line}`,borderRadius:14,padding:"20px 16px",textAlign:"center"}}>
+                  <div style={{fontSize:14,fontWeight:700,color:T.ink,marginBottom:6}}>No hay proveedores disponibles</div>
+                  <div style={{fontSize:12,color:T.ink3,fontWeight:500,lineHeight:1.5}}>{hint}</div>
+                </div>;
+              }
+              return <div>
+                <div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase",marginBottom:8}}>Selecciona un proveedor</div>
+                <div style={{maxHeight:240,overflowY:"auto",background:T.surface,border:`1px solid ${T.line}`,borderRadius:14,padding:6}}>
+                  {candidatos.map((p,i)=>{
+                    const color=provColorCot(p.id);
+                    const ini=provIniCot(p.nombre);
+                    return <button key={p.id} disabled={savingPedir} onClick={()=>pedirCotizacion(p.id)} style={{width:"100%",padding:"10px 12px",borderRadius:10,border:0,background:"transparent",cursor:savingPedir?"not-allowed":"pointer",display:"flex",alignItems:"center",gap:10,fontFamily:T.sans,textAlign:"left",marginBottom:i<candidatos.length-1?2:0,opacity:savingPedir?.5:1}}>
+                      <div style={{width:28,height:28,borderRadius:8,background:color+"22",color:color,fontSize:10,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,letterSpacing:.5}}>{ini}</div>
+                      <div style={{flex:1,minWidth:0,fontSize:13,fontWeight:600,color:T.ink,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.nombre}</div>
+                      <FmIcon name="chevR" size={13} stroke={T.ink3} sw={2}/>
+                    </button>;
+                  })}
+                </div>
+              </div>;
+            })()}
+          </div>
+        </div>
+      </div>}
+
+      {/* Sub-modal: Registrar respuesta / Editar cotización (zIndex 1004) */}
+      {showEditarCotiz&&isA&&<div style={{position:"fixed",inset:0,background:"rgba(20,15,10,.6)",zIndex:1004,display:"flex",alignItems:"flex-end",fontFamily:T.sans}} onClick={()=>!savingCotiz&&setShowEditarCotiz(null)}>
+        <div style={{width:"100%",background:T.bg,borderTopLeftRadius:24,borderTopRightRadius:24,maxHeight:"92vh",overflow:"auto",paddingBottom:34}} onClick={e=>e.stopPropagation()}>
+          <div style={{padding:"14px 20px 0",display:"flex",justifyContent:"center"}}><div style={{width:44,height:4,borderRadius:999,background:T.line}}/></div>
+          <div style={{padding:"14px 20px 16px",display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:`1px solid ${T.line}`,gap:10}}>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:12,color:T.ink3,fontWeight:500,marginBottom:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>Cotización · {showEditarCotiz.proveedor?.nombre||"—"}</div>
+              <div style={{fontSize:20,fontWeight:700,color:T.ink,letterSpacing:-.5}}>{showEditarCotiz.estado==="pendiente"?"Registrar respuesta":"Editar cotización"}</div>
+            </div>
+            <button onClick={()=>!savingCotiz&&setShowEditarCotiz(null)} style={{width:32,height:32,borderRadius:999,background:T.surface,border:`1px solid ${T.line}`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",flexShrink:0}}><FmIcon name="x" size={15} stroke={T.ink}/></button>
+          </div>
+
+          <div style={{padding:"16px 20px",display:"flex",flexDirection:"column",gap:14}}>
+
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+              <div>
+                <div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase",marginBottom:8}}>Importe (€)</div>
+                <input type="text" inputMode="decimal" value={formCotiz.importe} onChange={e=>setFormCotiz(v=>({...v,importe:e.target.value}))} placeholder="0" style={{width:"100%",background:T.surface,border:`1px solid ${T.line}`,borderRadius:14,padding:"13px 16px",fontFamily:T.sans,fontSize:18,fontWeight:700,color:T.ink,outline:"none",boxSizing:"border-box"}}/>
+              </div>
+              <div>
+                <div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase",marginBottom:8}}>Fecha</div>
+                <input type="date" value={formCotiz.fecha_cotizacion} onChange={e=>setFormCotiz(v=>({...v,fecha_cotizacion:e.target.value}))} style={{width:"100%",background:T.surface,border:`1px solid ${T.line}`,borderRadius:14,padding:"13px 16px",fontFamily:T.sans,fontSize:13,color:T.ink,outline:"none",boxSizing:"border-box"}}/>
+              </div>
+            </div>
+
+            <div>
+              <div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase",marginBottom:8}}>Condiciones</div>
+              <textarea value={formCotiz.condiciones} onChange={e=>setFormCotiz(v=>({...v,condiciones:e.target.value}))} placeholder="Plazos, exclusiones, IVA, etc." rows={3} style={{width:"100%",background:T.surface,border:`1px solid ${T.line}`,borderRadius:14,padding:"12px 14px",fontFamily:T.sans,fontSize:13,color:T.ink,resize:"none",outline:"none",boxSizing:"border-box"}}/>
+            </div>
+
+            <div>
+              <div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase",marginBottom:8}}>Notas internas</div>
+              <textarea value={formCotiz.notas} onChange={e=>setFormCotiz(v=>({...v,notas:e.target.value}))} placeholder="Notas privadas no compartidas con el proveedor" rows={2} style={{width:"100%",background:T.surface,border:`1px solid ${T.line}`,borderRadius:14,padding:"12px 14px",fontFamily:T.sans,fontSize:13,color:T.ink,resize:"none",outline:"none",boxSizing:"border-box"}}/>
+            </div>
+
+            <div>
+              <div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase",marginBottom:8}}>Estado</div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
+                {[
+                  {k:"pendiente",l:"Pendiente",c:T.gold},
+                  {k:"recibida",l:"Recibida",c:T.softBlue},
+                  {k:"descartada",l:"Descartada",c:T.ink4},
+                  {k:"cancelada",l:"Cancelada",c:T.ink4},
+                ].map(o=>{
+                  const on=formCotiz.estado===o.k;
+                  return <button key={o.k} onClick={()=>setFormCotiz(v=>({...v,estado:o.k}))} style={{padding:"10px 6px",borderRadius:12,border:`1px solid ${on?T.ink:T.line}`,background:on?T.ink:T.surface,color:on?"#fff":T.ink,fontFamily:T.sans,fontSize:12,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5}}><span style={{width:6,height:6,borderRadius:999,background:o.c}}/>{o.l}</button>;
+                })}
+              </div>
+              <div style={{fontSize:10.5,color:T.ink3,marginTop:6,fontStyle:"italic"}}>Para marcar como ganadora, usa el botón dedicado en D5.C.3 (próximo commit).</div>
+            </div>
+
+            {cotizSubmitErr&&<div style={{fontSize:12,color:"#9A2A22",fontWeight:600,padding:"8px 12px",background:T.coral+"14",border:`1px solid ${T.coral}33`,borderRadius:10}}>{cotizSubmitErr}</div>}
+
+            <div style={{display:"flex",gap:8,paddingTop:4}}>
+              <button onClick={()=>!savingCotiz&&setShowEditarCotiz(null)} style={{flex:1,padding:"14px 0",borderRadius:999,border:`1px solid ${T.line}`,background:T.surface,color:T.ink,fontFamily:T.sans,fontWeight:600,fontSize:14,cursor:savingCotiz?"not-allowed":"pointer",opacity:savingCotiz?.6:1}}>Cancelar</button>
+              <button onClick={guardarCotiz} disabled={savingCotiz} style={{flex:2,padding:"14px 0",borderRadius:999,border:0,background:savingCotiz?T.ink+"55":T.ink,color:"#fff",fontFamily:T.sans,fontWeight:700,fontSize:14,cursor:savingCotiz?"not-allowed":"pointer"}}>{savingCotiz?"Guardando…":"Guardar"}</button>
+            </div>
+
+          </div>
+        </div>
+      </div>}
     </div>
   );
 }
