@@ -1955,6 +1955,7 @@ function buildRvCalMap(reservas,airbnbs,year,month){const map={};reservas.filter
 // ─── DETALLE RESERVA EVENTO (overlay) ────────────────────────────────────────
 function RvEventDetail({reserva,tok,perfil,rol,isA,onClose,onChanged,isDesktopPanel=false}){
   const [localR,setLocalR]=useState(reserva);
+  const [comisionPct,setComisionPct]=useState(10);
   useEffect(()=>{setLocalR(reserva);},[reserva?.id]);
   const total=getPrecioReserva(localR);
   const señaImp=parseFloat(localR.seña_importe)||0;
@@ -2022,6 +2023,10 @@ function RvEventDetail({reserva,tok,perfil,rol,isA,onClose,onChanged,isDesktopPa
   const[formCotiz,setFormCotiz]=useState(FORM_COTIZ_VACIO);
   const[savingCotiz,setSavingCotiz]=useState(false);
   const[cotizSubmitErr,setCotizSubmitErr]=useState("");
+  // Cerrar precios (D5.C.3)
+  const[precioClienteInput,setPrecioClienteInput]=useState("");
+  const[savingPrecioCliente,setSavingPrecioCliente]=useState(false);
+  const[precioClienteErr,setPrecioClienteErr]=useState("");
 
   useEffect(()=>{
     setContacto(null);
@@ -2035,6 +2040,12 @@ function RvEventDetail({reserva,tok,perfil,rol,isA,onClose,onChanged,isDesktopPa
       setServiciosExtraOpen(auto);
     }
   },[serviciosExtra,serviciosExtraOpen]);
+  useEffect(()=>{
+    sbGet("configuracion","?select=*",tok)
+      .then(rows=>{const cfg={};(rows||[]).forEach(c=>cfg[c.clave]=c.valor);
+        const v=parseFloat(cfg.comision_pct); if(isFinite(v))setComisionPct(v);})
+      .catch(()=>{});
+  },[tok]);
   // ─ Servicios adicionales: handlers ───────────────────────────
   const SERV_FORM_VACIO={catalogo_servicio_id:"",nombre:"",categoria:"",descripcion:"",precio_cliente:"",coste_proveedor:"",cantidad:"1",unidad:"",proveedor_nombre_libre:"",condiciones_proveedor:"",condiciones_cliente:"",estado:"ofertado",fecha_contratacion:"",notas:""};
   const ensureCatalogoServ=async()=>{
@@ -2297,6 +2308,61 @@ function RvEventDetail({reserva,tok,perfil,rol,isA,onClose,onChanged,isDesktopPa
     }
   };
 
+  const elegirGanadoraCotiz=async(cotiz)=>{
+    if(!showServSheet||cotiz.estado==="ganadora")return;
+    const nombre=cotiz.proveedor?.nombre||"este proveedor";
+    if(!window.confirm(`¿Marcar la cotización de "${nombre}" como ganadora? Las otras cotizaciones recibidas se descartarán automáticamente.`))return;
+    setCotizErr("");
+    try{
+      await sbPatch("cotizaciones_servicio",`id=eq.${cotiz.id}`,{estado:"ganadora"},tok);
+      const aDescartar=cotizaciones.filter(c=>c.id!==cotiz.id&&(c.estado==="recibida"||c.estado==="pendiente"));
+      for(const c of aDescartar){
+        await sbPatch("cotizaciones_servicio",`id=eq.${c.id}`,{estado:"descartada"},tok);
+      }
+      await sbPatch("servicios_reserva",`id=eq.${showServSheet.id}`,{coste_proveedor:cotiz.importe},tok);
+      setServForm(prev=>({...prev,coste_proveedor:cotiz.importe!=null?String(cotiz.importe):""}));
+      setReloadKeyCotiz(k=>k+1);
+      setReloadKeyServ(k=>k+1);
+    }catch(_){
+      setCotizErr("No se pudo marcar como ganadora.");
+    }
+  };
+
+  const quitarGanadoraCotiz=async(cotiz)=>{
+    if(!showServSheet||cotiz.estado!=="ganadora")return;
+    const nombre=cotiz.proveedor?.nombre||"este proveedor";
+    if(!window.confirm(`¿Quitar "${nombre}" como ganadora? Los precios del servicio volverán a estar sin definir. Las otras cotizaciones descartadas no se reactivan automáticamente.`))return;
+    setCotizErr("");
+    try{
+      await sbPatch("cotizaciones_servicio",`id=eq.${cotiz.id}`,{estado:"recibida"},tok);
+      await sbPatch("servicios_reserva",`id=eq.${showServSheet.id}`,{coste_proveedor:null,precio_cliente:null},tok);
+      setServForm(prev=>({...prev,coste_proveedor:"",precio_cliente:""}));
+      setPrecioClienteInput("");
+      setPrecioClienteErr("");
+      setReloadKeyCotiz(k=>k+1);
+      setReloadKeyServ(k=>k+1);
+    }catch(_){
+      setCotizErr("No se pudo quitar como ganadora.");
+    }
+  };
+
+  const guardarPrecioCliente=async()=>{
+    if(!showServSheet||savingPrecioCliente)return;
+    const raw=(precioClienteInput||"").replace(",",".").trim();
+    const val=parseFloat(raw);
+    if(!raw||!isFinite(val)||val<=0){setPrecioClienteErr("Importe no válido");return;}
+    setSavingPrecioCliente(true);setPrecioClienteErr("");
+    try{
+      await sbPatch("servicios_reserva",`id=eq.${showServSheet.id}`,{precio_cliente:val},tok);
+      setServForm(prev=>({...prev,precio_cliente:String(val)}));
+      setPrecioClienteInput("");
+      setReloadKeyServ(k=>k+1);
+    }catch(_){
+      setPrecioClienteErr("No se pudo guardar. Inténtalo de nuevo.");
+    }
+    setSavingPrecioCliente(false);
+  };
+
   useEffect(()=>{
     if(!showServSheet||showServSheet.mode!=="edit"||!tok||!isA){
       setCotizaciones([]);setCotizErr("");
@@ -2410,8 +2476,11 @@ function RvEventDetail({reserva,tok,perfil,rol,isA,onClose,onChanged,isDesktopPa
       const precioTotal=parseFloat(localR.precio_total)||parseFloat(localR.precio)||0;
       await addHistorial("reserva",localR.id,`Pago total registrado: ${precioTotal.toLocaleString("es-ES")}€`,perfil?.nombre||"Admin",tok);
       const cfgRows=await sbGet("configuracion","?select=*",tok).catch(()=>[]);const cfg={};cfgRows.forEach(c=>cfg[c.clave]=c.valor);
-      const comPct=parseFloat(cfg.comision_pct)||10;const comision=Math.round(precioTotal*comPct/100*100)/100;
-      if(comision>0)await sbPost("gastos",{fecha:hoy,categoria:"comision",concepto:`Comisión gestor - ${localR.nombre}`,importe:comision,origen:"auto_comision"},tok).catch(()=>{});
+      const comPct=parseFloat(cfg.comision_pct)||10;const baseComision=precioTotal+totServFact;const comision=Math.round(baseComision*comPct/100*100)/100;
+      const _concepto=`Comisión gestor - ${localR.nombre}`;
+      const previas=await sbGet("gastos",`?origen=eq.auto_comision&or=(reserva_vinculada_id.eq.${localR.id},concepto.eq.${encodeURIComponent(_concepto)})&select=id`,tok).catch(()=>[]);
+      for(const g of (previas||[])) await sbDelete("gastos",`id=eq.${g.id}`,tok).catch(()=>{});
+      if(comision>0)await sbPost("gastos",{fecha:hoy,categoria:"comision",concepto:_concepto,importe:comision,origen:"auto_comision",reserva_vinculada_id:localR.id,reserva_vinculada_tipo:"evento"},tok).catch(()=>{});
       const u={...localR,saldo_cobrado:true,saldo_fecha:hoy,estado_pago:"pagado_completo"};
       setLocalR(u);onChanged&&onChanged(u);setShowPagoTotal(false);}catch(_){}setCobroSaving(false);
   };
@@ -2542,7 +2611,7 @@ function RvEventDetail({reserva,tok,perfil,rol,isA,onClose,onChanged,isDesktopPa
           const cL=0,cJ=0,cLav=0;
           const cS=totServCost;
           const ingresos=total+totServFact;
-          const com=Math.round(ingresos*.10);  // comisión = 10% del total global (alquiler + servicios facturables)
+          const com=Math.round(ingresos*comisionPct/100*100)/100;  // comisión = comision_pct del total global (alquiler + servicios facturables)
           const totalC=cL+cJ+cLav+com+cS;
           const ben=ingresos-totalC;
           const marginPct=ingresos>0?Math.round(ben/ingresos*100):0;
@@ -2616,13 +2685,14 @@ function RvEventDetail({reserva,tok,perfil,rol,isA,onClose,onChanged,isDesktopPa
 
         {/* Servicios contratados (servicios adicionales de esta reserva) */}
         {(serviciosExtra.length>0||isA)&&(()=>{
-          const totC=serviciosExtra.reduce((s,x)=>s+(parseFloat(x.precio_cliente)||0),0);
-          const totCob=serviciosExtra.reduce((s,x)=>s+(parseFloat(x.cobrado_cliente)||0),0);
-          const totCost=serviciosExtra.reduce((s,x)=>s+(parseFloat(x.coste_proveedor)||0),0);
-          const totPag=serviciosExtra.reduce((s,x)=>s+(parseFloat(x.pagado_proveedor)||0),0);
+          const _se=serviciosExtra.filter(x=>x.estado!=="cancelado");
+          const totC=_se.reduce((s,x)=>s+(parseFloat(x.precio_cliente)||0),0);
+          const totCob=_se.reduce((s,x)=>s+(parseFloat(x.cobrado_cliente)||0),0);
+          const totCost=_se.reduce((s,x)=>s+(parseFloat(x.coste_proveedor)||0),0);
+          const totPag=_se.reduce((s,x)=>s+(parseFloat(x.pagado_proveedor)||0),0);
           const pendCob=Math.max(0,totC-totCob);
           const pendPag=Math.max(0,totCost-totPag);
-          const margen=serviciosExtra.reduce((s,x)=>s+(parseFloat(x.margen_total)||0),0);
+          const margen=_se.reduce((s,x)=>s+(parseFloat(x.margen_total)||0),0);
           const accion=pendCob>0||pendPag>0||serviciosExtra.some(s=>s.estado==="ofertado");
           const isOpen=serviciosExtraOpen===true;
           const ESTADO_META={ofertado:{l:"Ofertado",bg:T.gold+"22",fg:"#8A6B0F",dot:T.gold},aceptado:{l:"Aceptado",bg:T.softBlue+"22",fg:"#2A5BA0",dot:T.softBlue},completado:{l:"Completado",bg:T.olive+"22",fg:"#4A7A2E",dot:T.olive},cancelado:{l:"Cancelado",bg:T.coral+"22",fg:"#9A2A22",dot:T.coral}};
@@ -2896,8 +2966,8 @@ function RvEventDetail({reserva,tok,perfil,rol,isA,onClose,onChanged,isDesktopPa
                 const totC=(parseFloat(servForm.precio_cliente)||0)*cant;
                 const totP=(parseFloat(servForm.coste_proveedor)||0)*cant;
                 const tieneProv=totP>0;
-                const cobrCli=movimientosServ.filter(m=>m.tipo==="cobro_cliente").reduce((s,m)=>s+(parseFloat(m.importe)||0),0);
-                const pagProv=movimientosServ.filter(m=>m.tipo==="pago_proveedor").reduce((s,m)=>s+(parseFloat(m.importe)||0),0);
+                const cobrCli=movimientosServ.reduce((s,m)=>s+(m.tipo==="cobro_cliente"?(parseFloat(m.importe)||0):m.tipo==="reembolso_cliente"?-(parseFloat(m.importe)||0):0),0);
+                const pagProv=movimientosServ.reduce((s,m)=>s+(m.tipo==="pago_proveedor"?(parseFloat(m.importe)||0):m.tipo==="reembolso_proveedor"?-(parseFloat(m.importe)||0):0),0);
                 const pendCli=Math.max(0,totC-cobrCli);
                 const pendProv=Math.max(0,totP-pagProv);
                 const movsOrden=[...movimientosServ].sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||"")||(b.created_at||"").localeCompare(a.created_at||""));
@@ -2948,6 +3018,36 @@ function RvEventDetail({reserva,tok,perfil,rol,isA,onClose,onChanged,isDesktopPa
                 </div>;
               })()}
 
+              {/* Cerrar precios — sólo si hay ganadora y precio_cliente aún NULL (D5.C.3) */}
+              {showServSheet.mode==="edit"&&servForm.estado==="ofertado"&&servForm.precio_cliente===""&&cotizaciones.some(c=>c.estado==="ganadora")&&(()=>{
+                const costeProv=parseFloat(servForm.coste_proveedor)||0;
+                const raw=(precioClienteInput||"").replace(",",".").trim();
+                const pCli=parseFloat(raw);
+                const validInput=raw!==""&&isFinite(pCli)&&pCli>0;
+                const margen=validInput?pCli-costeProv:0;
+                const margenPct=validInput&&pCli>0?(margen/pCli)*100:0;
+                const margenColor=!validInput?T.ink3:(margen>0?"#4A7A2E":(margen<0?"#9A2A22":T.ink3));
+                return <div style={{marginTop:18,paddingTop:16,borderTop:`1px solid ${T.line}`,display:"flex",flexDirection:"column",gap:10}}>
+                  <div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase"}}>Cerrar precios</div>
+                  <div style={{fontSize:11.5,color:T.ink3,lineHeight:1.45}}>Tienes una cotización ganadora. Ajusta el margen y guarda el precio del cliente para enviar el presupuesto.</div>
+                  <div style={{background:T.olive+"0F",border:`1px solid ${T.olive}66`,borderRadius:14,padding:14,display:"flex",flexDirection:"column",gap:12}}>
+                    <div>
+                      <div style={{fontSize:10.5,color:T.ink3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase",marginBottom:4}}>Coste proveedor</div>
+                      <div style={{fontSize:22,fontWeight:800,color:T.ink,fontFamily:T.sans,letterSpacing:-.4,fontVariantNumeric:"tabular-nums"}}>{fE(costeProv)}</div>
+                    </div>
+                    <div>
+                      <div style={{fontSize:10.5,color:T.ink3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase",marginBottom:4}}>Precio cliente</div>
+                      <input type="text" inputMode="decimal" value={precioClienteInput} onChange={e=>{setPrecioClienteInput(e.target.value);setPrecioClienteErr("");}} placeholder="0" style={{width:"100%",background:"#fff",border:`1px solid ${T.line}`,borderRadius:12,padding:"10px 14px",fontFamily:T.sans,fontSize:22,fontWeight:700,color:T.ink,outline:"none",boxSizing:"border-box",fontVariantNumeric:"tabular-nums"}}/>
+                    </div>
+                    <div style={{fontSize:12,fontWeight:700,color:margenColor}}>
+                      {validInput?`Margen: ${fE(margen)} (${margenPct.toFixed(1)}%)`:"Sin margen calculado"}
+                    </div>
+                    {precioClienteErr&&<div style={{fontSize:11.5,color:"#9A2A22",fontWeight:600,padding:"8px 10px",background:T.coral+"14",border:`1px solid ${T.coral}33`,borderRadius:10}}>{precioClienteErr}</div>}
+                    <button onClick={guardarPrecioCliente} disabled={savingPrecioCliente||!validInput} style={{width:"100%",padding:"12px 0",borderRadius:999,border:0,background:savingPrecioCliente||!validInput?T.ink+"55":T.ink,color:"#fff",fontFamily:T.sans,fontWeight:700,fontSize:13.5,cursor:savingPrecioCliente||!validInput?"not-allowed":"pointer"}}>{savingPrecioCliente?"Guardando…":"Guardar precio cliente"}</button>
+                  </div>
+                </div>;
+              })()}
+
               {/* Sección COTIZACIONES — sólo en estado ofertado (D5.C.2) */}
               {showServSheet.mode==="edit"&&servForm.estado==="ofertado"&&<div style={{marginTop:18,paddingTop:16,borderTop:`1px solid ${T.line}`,display:"flex",flexDirection:"column",gap:10}}>
                 <div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase"}}>Cotizaciones {cotizaciones.length>0&&`(${cotizaciones.length})`}</div>
@@ -2962,7 +3062,6 @@ function RvEventDetail({reserva,tok,perfil,rol,isA,onClose,onChanged,isDesktopPa
                     const ini=provIniCot(nombre);
                     const color=provColorCot(c.proveedor?.id||c.proveedor_id);
                     const meta=COTIZ_ESTADO_META[c.estado]||COTIZ_ESTADO_META.pendiente;
-                    const lectura=c.estado==="ganadora"||c.estado==="cancelada";
                     const fechaFmt=c.fecha_cotizacion?new Date(c.fecha_cotizacion+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short",year:"numeric"}):null;
                     return <div key={c.id} style={{background:T.surface,border:`1px solid ${T.line}`,borderRadius:12,padding:12,display:"flex",flexDirection:"column",gap:8}}>
                       <div style={{display:"flex",alignItems:"center",gap:10}}>
@@ -2984,14 +3083,16 @@ function RvEventDetail({reserva,tok,perfil,rol,isA,onClose,onChanged,isDesktopPa
                         </div>
                       </div>
                       {c.condiciones&&<div style={{padding:"8px 10px",borderRadius:9,background:T.surfaceAlt,fontSize:11.5,color:T.ink2,lineHeight:1.4,fontWeight:500,display:"-webkit-box",WebkitBoxOrient:"vertical",WebkitLineClamp:2,overflow:"hidden"}}>{c.condiciones}</div>}
-                      <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                      <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
                         {c.estado==="pendiente"&&<button onClick={()=>abrirEditarCotiz(c)} style={{flex:1,minWidth:120,padding:"8px 12px",borderRadius:999,border:0,background:T.ink,color:"#fff",fontFamily:T.sans,fontSize:12,fontWeight:700,cursor:"pointer"}}>Registrar respuesta</button>}
                         {c.estado==="recibida"&&<>
-                          <button onClick={()=>abrirEditarCotiz(c)} style={{flex:1,minWidth:80,padding:"8px 12px",borderRadius:999,border:`1px solid ${T.line}`,background:T.surface,color:T.ink,fontFamily:T.sans,fontSize:12,fontWeight:700,cursor:"pointer"}}>Editar</button>
-                          <button onClick={()=>descartarCotiz(c)} style={{padding:"8px 12px",borderRadius:999,border:`1px solid ${T.line}`,background:T.surface,color:T.ink3,fontFamily:T.sans,fontSize:12,fontWeight:600,cursor:"pointer"}}>Descartar</button>
+                          <button onClick={()=>elegirGanadoraCotiz(c)} style={{flex:1,minWidth:120,padding:"8px 12px",borderRadius:999,border:0,background:T.olive,color:"#fff",fontFamily:T.sans,fontSize:12,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4}}>⭐ Elegir ganadora</button>
+                          <button onClick={()=>abrirEditarCotiz(c)} style={{padding:"8px 10px",borderRadius:999,border:`1px solid ${T.line}`,background:T.surface,color:T.ink,fontFamily:T.sans,fontSize:12,fontWeight:700,cursor:"pointer"}}>Editar</button>
+                          <button onClick={()=>descartarCotiz(c)} style={{padding:"8px 10px",borderRadius:999,border:`1px solid ${T.line}`,background:T.surface,color:T.ink3,fontFamily:T.sans,fontSize:12,fontWeight:600,cursor:"pointer"}}>Descartar</button>
                         </>}
                         {c.estado==="descartada"&&<button onClick={()=>recuperarCotiz(c)} style={{flex:1,minWidth:80,padding:"8px 12px",borderRadius:999,border:`1px solid ${T.line}`,background:T.surface,color:T.ink2,fontFamily:T.sans,fontSize:12,fontWeight:700,cursor:"pointer"}}>Recuperar</button>}
-                        {lectura&&<div style={{flex:1,fontSize:11,color:T.ink3,fontStyle:"italic",alignSelf:"center"}}>Solo lectura</div>}
+                        {c.estado==="ganadora"&&<button onClick={()=>quitarGanadoraCotiz(c)} style={{flex:1,minWidth:120,padding:"8px 12px",borderRadius:999,border:`1px solid ${T.line}`,background:T.surface,color:T.ink2,fontFamily:T.sans,fontSize:12,fontWeight:700,cursor:"pointer"}}>Quitar como ganadora</button>}
+                        {c.estado==="cancelada"&&<div style={{flex:1,fontSize:11,color:T.ink3,fontStyle:"italic",alignSelf:"center"}}>Solo lectura</div>}
                         <button onClick={()=>eliminarCotiz(c)} title="Eliminar cotización" style={{width:32,height:32,borderRadius:999,border:`1px solid ${T.coral}55`,background:T.coral+"14",color:"#9A2A22",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",flexShrink:0}}><FmIcon name="x" size={13} stroke="#9A2A22" sw={2.2}/></button>
                       </div>
                     </div>;
@@ -3204,7 +3305,6 @@ function RvEventDetail({reserva,tok,perfil,rol,isA,onClose,onChanged,isDesktopPa
                   return <button key={o.k} onClick={()=>setFormCotiz(v=>({...v,estado:o.k}))} style={{padding:"10px 6px",borderRadius:12,border:`1px solid ${on?T.ink:T.line}`,background:on?T.ink:T.surface,color:on?"#fff":T.ink,fontFamily:T.sans,fontSize:12,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5}}><span style={{width:6,height:6,borderRadius:999,background:o.c}}/>{o.l}</button>;
                 })}
               </div>
-              <div style={{fontSize:10.5,color:T.ink3,marginTop:6,fontStyle:"italic"}}>Para marcar como ganadora, usa el botón dedicado en D5.C.3 (próximo commit).</div>
             </div>
 
             {cotizSubmitErr&&<div style={{fontSize:12,color:"#9A2A22",fontWeight:600,padding:"8px 12px",background:T.coral+"14",border:`1px solid ${T.coral}33`,borderRadius:10}}>{cotizSubmitErr}</div>}
