@@ -1953,7 +1953,7 @@ function buildRvCalCells(year,month){const dias=new Date(year,month,0).getDate()
 function buildRvCalMap(reservas,airbnbs,year,month){const map={};reservas.filter(r=>r.estado!=="cancelada"&&r.fecha).forEach(r=>{const f=new Date(r.fecha+"T12:00:00");if(f.getFullYear()===year&&f.getMonth()===month){const d=f.getDate();map[d]={kind:"event",color:r.incluye_casa?T.terracotta:T.gold,label:r.nombre,ref:r};if(r.incluye_casa){if(d>1&&!map[d-1])map[d-1]={kind:"block",color:T.terracotta+"60"};if(d<31&&!map[d+1])map[d+1]={kind:"block",color:T.terracotta+"60"};}}});airbnbs.forEach(a=>{if(!a.fecha_entrada||!a.fecha_salida)return;const d=new Date(a.fecha_entrada+"T12:00:00");const fin=new Date(a.fecha_salida+"T12:00:00");while(d<fin){if(d.getFullYear()===year&&d.getMonth()===month){const dia=d.getDate();if(!map[dia])map[dia]={kind:"bnb",color:T.softBlue,label:a.huesped?.split(" ")[0],ref:a};}d.setDate(d.getDate()+1);}});return map;}
 
 // ─── DETALLE RESERVA EVENTO (overlay) ────────────────────────────────────────
-function RvEventDetail({reserva,tok,perfil,rol,isA,onClose,onChanged,isDesktopPanel=false}){
+function RvEventDetail({reserva,tok,perfil,rol,isA,onClose,onChanged,onDeleted,esEvento=true,isDesktopPanel=false}){
   const [localR,setLocalR]=useState(reserva);
   const [comisionPct,setComisionPct]=useState(10);
   useEffect(()=>{setLocalR(reserva);},[reserva?.id]);
@@ -2035,6 +2035,11 @@ function RvEventDetail({reserva,tok,perfil,rol,isA,onClose,onChanged,isDesktopPa
   const [cancelDevServ,setCancelDevServ]=useState("");
   const [cancelSaving,setCancelSaving]=useState(false);
   const [cancelErr,setCancelErr]=useState("");
+  // Eliminar reserva permanentemente (Commit 2)
+  const [showEliminarRsv,setShowEliminarRsv]=useState(false);
+  const [eliminarConfirmTxt,setEliminarConfirmTxt]=useState("");
+  const [eliminarSaving,setEliminarSaving]=useState(false);
+  const [eliminarErr,setEliminarErr]=useState("");
 
   useEffect(()=>{
     setContacto(null);
@@ -2521,6 +2526,7 @@ function RvEventDetail({reserva,tok,perfil,rol,isA,onClose,onChanged,isDesktopPa
 
   // Cancelación de reserva en cascada con devoluciones (Commit 1)
   const confirmarCancelarReserva=async()=>{
+    if(!esEvento)return; // defensa en profundidad: nunca operar sobre un Airbnb
     if(cancelSaving)return;
     if(!cancelMotivo.trim()){setCancelErr("El motivo es obligatorio");return;}
     setCancelErr("");setCancelSaving(true);
@@ -2587,6 +2593,51 @@ function RvEventDetail({reserva,tok,perfil,rol,isA,onClose,onChanged,isDesktopPa
       setReloadKeyServ(k=>k+1);
     }catch(e){setCancelErr("No se pudo cancelar la reserva. Revisa e inténtalo de nuevo.");}
     finally{setCancelSaving(false);}
+  };
+
+  // Eliminar reserva permanentemente: hard-delete con cascada completa (Commit 2).
+  // Borra hijos antes que padres. Todo con .catch salvo el sbDelete final de reservas.
+  const eliminarReservaPermanente=async()=>{
+    if(!esEvento)return; // defensa en profundidad: nunca operar sobre un Airbnb
+    if(eliminarSaving)return;
+    setEliminarErr("");setEliminarSaving(true);
+    try{
+      // 1) Movimientos de servicios (por cada servicio y, defensivo, por reserva)
+      for(const x of serviciosExtra){await sbDelete("movimientos_servicio",`servicio_reserva_id=eq.${x.id}`,tok).catch(()=>{});}
+      await sbDelete("movimientos_servicio",`reserva_id=eq.${localR.id}`,tok).catch(()=>{});
+      // 2) Cotizaciones de cada servicio
+      for(const x of serviciosExtra){await sbDelete("cotizaciones_servicio",`servicio_reserva_id=eq.${x.id}`,tok).catch(()=>{});}
+      // 3) Servicios adicionales de la reserva
+      await sbDelete("servicios_reserva",`reserva_id=eq.${localR.id}`,tok).catch(()=>{});
+      // 4) Cascada coordinación / limpieza / jardín (BORRANDO jardín, no marcando)
+      const coords=await sbGet("coordinacion_servicios",`?reserva_id=eq.${localR.id}&select=*`,tok).catch(()=>[]);
+      for(const c of coords){
+        if(c.servicio_id){await sbDelete("servicio_tareas",`servicio_id=eq.${c.servicio_id}`,tok).catch(()=>{});await sbDelete("servicios",`id=eq.${c.servicio_id}`,tok).catch(()=>{});}
+        if(c.jardin_servicio_id)await sbDelete("jardin_servicios",`id=eq.${c.jardin_servicio_id}`,tok).catch(()=>{});
+        await sbDelete("coordinacion_servicios",`id=eq.${c.id}`,tok).catch(()=>{});
+      }
+      // 5) Gastos vinculados + comisión histórica por concepto
+      await sbDelete("gastos",`reserva_vinculada_id=eq.${localR.id}`,tok).catch(()=>{});
+      const _concepto=`Comisión gestor - ${localR.nombre}`;
+      const comisGastos=await sbGet("gastos",`?origen=eq.auto_comision&concepto=eq.${encodeURIComponent(_concepto)}&select=id`,tok).catch(()=>[]);
+      for(const g of (comisGastos||[])) await sbDelete("gastos",`id=eq.${g.id}`,tok).catch(()=>{});
+      // 6) Lavandería
+      await sbDelete("lavanderia",`reserva_vinculada_id=eq.${localR.id}`,tok).catch(()=>{});
+      // 7) Historial y documentos de la reserva (entidad_id/entidad_tipo confirmados)
+      await sbDelete("historial",`entidad_id=eq.${localR.id}&entidad_tipo=eq.reserva`,tok).catch(()=>{});
+      await sbDelete("documentos",`entidad_id=eq.${localR.id}&entidad_tipo=eq.reserva`,tok).catch(()=>{});
+      // 8) Visitas: NO se borran, se desvinculan (reserva_id -> null)
+      await sbPatch("visitas",`reserva_id=eq.${localR.id}`,{reserva_id:null},tok).catch(()=>{});
+      // 9) Finalmente la reserva — sin catch: si falla, salta al catch y muestra error
+      await sbDelete("reservas",`id=eq.${localR.id}`,tok);
+      // 10) Salir del detalle (la reserva ya no existe). NO llamamos onChanged(null):
+      //     el patrón onChanged del padre hace r.id y reventaría con null. Usamos onDeleted
+      //     para que el padre quite la fila de su lista, y luego cerramos.
+      setShowEliminarRsv(false);
+      onDeleted&&onDeleted(localR.id);
+      onClose&&onClose();
+    }catch(e){setEliminarErr("No se pudo eliminar la reserva. Revisa e inténtalo de nuevo.");}
+    finally{setEliminarSaving(false);}
   };
 
   // D2: servicios facturables (aceptado o completado) que cuentan al cobro/rentabilidad globales.
@@ -2834,9 +2885,10 @@ function RvEventDetail({reserva,tok,perfil,rol,isA,onClose,onChanged,isDesktopPa
         <Historial entidad_tipo="reserva" entidad_id={localR.id} tok={tok} perfil={perfil||{nombre:"Admin"}}/>
         <Documentos entidad_tipo="reserva" entidad_id={localR.id} tok={tok} perfil={perfil||{nombre:"Admin"}}/>
         <VisitasCoordinacion reservaId={localR.id} reservaNombre={localR.nombre} tok={tok} perfil={perfil||{nombre:"Admin"}}/>
-        {isA&&localR.estado!=="cancelada"&&<div style={{marginTop:16,paddingTop:14,borderTop:`1px solid ${T.line}`}}>
+        {isA&&esEvento&&<div style={{marginTop:16,paddingTop:14,borderTop:`1px solid ${T.line}`}}>
           <div style={{fontSize:10.5,color:T.danger,letterSpacing:.6,fontWeight:700,textTransform:"uppercase",marginBottom:8}}>Zona de peligro</div>
-          <button onClick={()=>{setCancelErr("");setShowCancelarRsv(true);}} style={{width:"100%",padding:"13px 16px",borderRadius:14,border:`1px solid ${T.danger}55`,background:T.danger+"10",color:T.danger,fontWeight:700,fontSize:13,cursor:"pointer",fontFamily:T.sans,display:"flex",alignItems:"center",justifyContent:"center",gap:8}}><FmIcon name="warn" size={14} stroke={T.danger} sw={2.2}/>Cancelar reserva</button>
+          {localR.estado!=="cancelada"&&<button onClick={()=>{setCancelErr("");setShowCancelarRsv(true);}} style={{width:"100%",padding:"13px 16px",borderRadius:14,border:`1px solid ${T.danger}55`,background:T.danger+"10",color:T.danger,fontWeight:700,fontSize:13,cursor:"pointer",fontFamily:T.sans,display:"flex",alignItems:"center",justifyContent:"center",gap:8}}><FmIcon name="warn" size={14} stroke={T.danger} sw={2.2}/>Cancelar reserva</button>}
+          <button onClick={()=>{setEliminarErr("");setEliminarConfirmTxt("");setShowEliminarRsv(true);}} style={{width:"100%",marginTop:10,padding:"6px 0",background:"transparent",border:0,color:T.danger,fontFamily:T.sans,fontSize:12,fontWeight:600,cursor:"pointer",textDecoration:"underline",opacity:.75}}>Eliminar permanentemente</button>
         </div>}
         {isA&&<button onClick={onClose} style={{width:"100%",padding:"13px 16px",borderRadius:14,border:`1px solid ${T.line}`,background:T.surface,color:T.danger,fontWeight:700,fontSize:13,cursor:"pointer",fontFamily:T.sans,marginTop:8}}>← Volver a reservas</button>}
       </div>
@@ -3458,6 +3510,43 @@ function RvEventDetail({reserva,tok,perfil,rol,isA,onClose,onChanged,isDesktopPa
           </div>
         </div>;
       })()}
+
+      {/* Sheet eliminar reserva permanentemente (admin) — Commit 2 */}
+      {showEliminarRsv&&isA&&<div style={{position:"fixed",inset:0,background:"rgba(20,15,10,.6)",zIndex:1002,display:"flex",alignItems:"flex-end",fontFamily:T.sans}} onClick={()=>!eliminarSaving&&setShowEliminarRsv(false)}>
+        <div style={{width:"100%",background:T.bg,borderTopLeftRadius:24,borderTopRightRadius:24,maxHeight:"92vh",overflow:"auto",paddingBottom:34}} onClick={e=>e.stopPropagation()}>
+          <div style={{padding:"14px 20px 0",display:"flex",justifyContent:"center"}}><div style={{width:44,height:4,borderRadius:999,background:T.line}}/></div>
+          <div style={{padding:"14px 20px 16px",display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:`1px solid ${T.line}`}}>
+            <div>
+              <div style={{fontSize:12,color:T.ink3,fontWeight:500,marginBottom:2}}>{localR.nombre}</div>
+              <div style={{fontSize:22,fontWeight:700,color:T.danger,letterSpacing:-.6}}>Eliminar permanentemente</div>
+            </div>
+            <button onClick={()=>!eliminarSaving&&setShowEliminarRsv(false)} style={{width:32,height:32,borderRadius:999,background:T.surface,border:`1px solid ${T.line}`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}><FmIcon name="x" size={15} stroke={T.ink}/></button>
+          </div>
+          <div style={{padding:"16px 20px",display:"flex",flexDirection:"column",gap:14}}>
+            <div style={{background:T.danger+"14",border:`2px solid ${T.danger}`,borderRadius:14,padding:"14px 16px",fontSize:13,color:T.danger,lineHeight:1.55,fontWeight:600}}>
+              ⚠️ Acción <strong>IRREVERSIBLE</strong>. Se borra la reserva y TODO lo asociado, sin recuperación:
+              <ul style={{margin:"8px 0 0 18px",padding:0,fontWeight:500}}>
+                <li>Servicios adicionales y sus movimientos</li>
+                <li>Cotizaciones</li>
+                <li>Comisión y gastos vinculados</li>
+                <li>Coordinación, limpieza y jardín</li>
+                <li>Lavandería</li>
+                <li>Historial y documentos</li>
+              </ul>
+              <div style={{marginTop:8,fontWeight:500}}>Las visitas asociadas no se borran: solo se desvinculan.</div>
+            </div>
+            <div>
+              <div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase",marginBottom:8}}>Escribe <span style={{color:T.danger}}>ELIMINAR</span> para confirmar</div>
+              <input value={eliminarConfirmTxt} onChange={e=>{setEliminarConfirmTxt(e.target.value);setEliminarErr("");}} placeholder="ELIMINAR" autoComplete="off" style={{width:"100%",background:T.surface,border:`1px solid ${eliminarConfirmTxt==="ELIMINAR"?T.danger:T.line}`,borderRadius:14,padding:"13px 16px",fontFamily:T.sans,fontSize:15,fontWeight:700,letterSpacing:1,color:T.ink,outline:"none",boxSizing:"border-box"}}/>
+            </div>
+            {eliminarErr&&<div style={{fontSize:12,color:"#9A2A22",fontWeight:600,padding:"8px 12px",background:T.coral+"14",border:`1px solid ${T.coral}33`,borderRadius:10}}>{eliminarErr}</div>}
+            <div style={{display:"flex",gap:8,paddingTop:4}}>
+              <button onClick={()=>!eliminarSaving&&setShowEliminarRsv(false)} style={{flex:1,padding:"14px 0",borderRadius:999,border:`1px solid ${T.line}`,background:T.surface,color:T.ink,fontFamily:T.sans,fontWeight:600,fontSize:14,cursor:eliminarSaving?"not-allowed":"pointer"}}>Cancelar</button>
+              <button onClick={eliminarReservaPermanente} disabled={eliminarConfirmTxt!=="ELIMINAR"||eliminarSaving} style={{flex:2,padding:"14px 0",borderRadius:999,border:0,background:eliminarConfirmTxt!=="ELIMINAR"||eliminarSaving?T.danger+"55":T.danger,color:"#fff",fontFamily:T.sans,fontWeight:700,fontSize:14,cursor:eliminarConfirmTxt!=="ELIMINAR"||eliminarSaving?"not-allowed":"pointer"}}>{eliminarSaving?"Eliminando…":"Eliminar definitivamente"}</button>
+            </div>
+          </div>
+        </div>
+      </div>}
     </div>
   );
 }
@@ -3624,7 +3713,7 @@ function AppSidebarDesktop({page,setPage,perfil}){
 }
 
 function sMeta(s){const m={Visita:{bg:"#E9F0FC",ink:"#2B4B80",dot:"#7FB2FF"},Confirmada:{bg:"#FBF3C7",ink:"#7A6B15",dot:"#ECD227"},"Seña OK":{bg:"#F8DCC4",ink:"#8F4A1C",dot:"#EC683E"},Pagado:{bg:"#DCE8BC",ink:"#4D6B1F",dot:"#7E9B3E"},Finalizada:{bg:"#EEEAE3",ink:"#7A766F",dot:"#BFB9AE"},Cancelada:{bg:"#F5E0DE",ink:"#9B3C33",dot:"#D9443A"},Cobrado:{bg:"#DCE8BC",ink:"#4D6B1F",dot:"#7E9B3E"},Pendiente:{bg:"#FBDCDC",ink:"#9B3C33",dot:"#F35757"}};return m[s]||m.Visita;}
-function ReservasDesktopLayout({reservas,airbnbs,setPage,page,perfil,tok,abrirReserva,selAb,setSelAb,sel,setSel,contactoVinc,setShowTipoRes,setEditPrecios,setShowSeña}){
+function ReservasDesktopLayout({reservas,setReservas,airbnbs,setPage,page,perfil,tok,abrirReserva,selAb,setSelAb,sel,setSel,contactoVinc,setShowTipoRes,setEditPrecios,setShowSeña}){
   const[tab,setTab]=useState("activas");const[busq,setBusq]=useState("");
   const fE=v=>(Math.round(parseFloat(v)||0)).toLocaleString("es-ES")+"€";
   const lista=tab==="activas"?reservas.filter(r=>!["cancelada","finalizada"].includes(r.estado||"")):tab==="airbnb"?airbnbs:tab==="finalizadas"?reservas.filter(r=>r.estado==="finalizada"):reservas.filter(r=>r.estado==="cancelada");
@@ -3658,7 +3747,7 @@ function ReservasDesktopLayout({reservas,airbnbs,setPage,page,perfil,tok,abrirRe
     {/* Panel detalle — usa RvEventDetail en modo desktop */}
     <div style={{flex:1,overflow:"auto",background:T.bg,minWidth:0}}>
       {!selActivo?<div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100%",flexDirection:"column",gap:14,color:T.ink3}}><FmIcon name="calendar" size={44} stroke={T.line}/><div style={{fontSize:15,fontWeight:500}}>Selecciona una reserva</div><div style={{fontSize:12,color:T.ink4}}>Verás aquí los detalles, cobros y rentabilidad</div></div>
-      :<RvEventDetail reserva={selActivo} tok={tok} perfil={perfil} rol="admin" isA={true} isDesktopPanel={true} onClose={()=>{tab==="airbnb"?setSelAb(null):setSel(null);}} onChanged={u=>{if(tab==="airbnb")setSelAb(u);else{setSel(u);}}}/> }
+      :<RvEventDetail reserva={selActivo} tok={tok} perfil={perfil} rol="admin" isA={true} isDesktopPanel={true} onClose={()=>{tab==="airbnb"?setSelAb(null):setSel(null);}} onChanged={u=>{if(tab==="airbnb")setSelAb(u);else{setSel(u);}}} onDeleted={id=>{setReservas(prev=>prev.filter(r=>r.id!==id));setSel(null);}} esEvento={tab!=="airbnb"}/> }
     </div>
   </div>;
 }
@@ -12311,7 +12400,7 @@ function Reservas({tok,rol,perfil,navTarget,setNavTarget,setPage}){
 
   if(load)return <div className="loading"><div className="spin"/><span>Cargando…</span></div>;
 
-  if(isDesktopR)return<ReservasDesktopLayout reservas={reservas} airbnbs={airbnbs} setPage={setPage} page="reservas" perfil={perfil} tok={tok} abrirReserva={abrirReserva} selAb={selAb} setSelAb={setSelAb} sel={sel} setSel={setSel} contactoVinc={contactoVinc} setShowTipoRes={setShowTipoRes} setEditPrecios={setEditPrecios} setShowSeña={setShowSeña}/>;
+  if(isDesktopR)return<ReservasDesktopLayout reservas={reservas} setReservas={setReservas} airbnbs={airbnbs} setPage={setPage} page="reservas" perfil={perfil} tok={tok} abrirReserva={abrirReserva} selAb={selAb} setSelAb={setSelAb} sel={sel} setSel={setSel} contactoVinc={contactoVinc} setShowTipoRes={setShowTipoRes} setEditPrecios={setEditPrecios} setShowSeña={setShowSeña}/>;
 
   const activas=reservas.filter(r=>ACTIVOS.includes(r.estado));
   const finalizadas=reservas.filter(r=>r.estado==="finalizada");
@@ -12345,7 +12434,7 @@ function Reservas({tok,rol,perfil,navTarget,setNavTarget,setPage}){
       {tabR==="canceladas"&&canceladas.map(r=><RvEventRow key={r.id} r={r} cancel onOpen={()=>abrirReserva(r)}/>)}
     </div>
     {/* Overlays de detalle */}
-    {sel&&tabR!=="airbnb"&&<RvEventDetail reserva={sel} tok={tok} perfil={perfil} rol={rol} isA={isA} onClose={()=>setSel(null)} onChanged={r=>{setReservas(prev=>prev.map(x=>x.id===r.id?r:x));setSel(r);}}/>}
+    {sel&&tabR!=="airbnb"&&<RvEventDetail reserva={sel} tok={tok} perfil={perfil} rol={rol} isA={isA} onClose={()=>setSel(null)} onChanged={r=>{setReservas(prev=>prev.map(x=>x.id===r.id?r:x));setSel(r);}} onDeleted={id=>{setReservas(prev=>prev.filter(r=>r.id!==id));setSel(null);}} esEvento={true}/>}
     {selAb&&<RvBnbDetail reserva={selAb} tok={tok} perfil={perfil} onClose={()=>setSelAb(null)} onChanged={a=>{setAirbnbs(prev=>prev.map(x=>x.id===a.id?a:x));setSelAb(a);}}/>}
     {/* MODAL SEÑA */}
     {showSeña&&sel&&<div style={{position:"fixed",inset:0,background:"rgba(20,15,10,.6)",zIndex:999,display:"flex",alignItems:"flex-end",fontFamily:T.sans}}>
