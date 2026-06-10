@@ -2027,6 +2027,14 @@ function RvEventDetail({reserva,tok,perfil,rol,isA,onClose,onChanged,isDesktopPa
   const[precioClienteInput,setPrecioClienteInput]=useState("");
   const[savingPrecioCliente,setSavingPrecioCliente]=useState(false);
   const[precioClienteErr,setPrecioClienteErr]=useState("");
+  // Cancelación de reserva (Commit 1)
+  const [showCancelarRsv,setShowCancelarRsv]=useState(false);
+  const [cancelMotivo,setCancelMotivo]=useState("");
+  const [cancelTipo,setCancelTipo]=useState("sin_devolucion"); // sin_devolucion|parcial|total
+  const [cancelDevAlq,setCancelDevAlq]=useState("");
+  const [cancelDevServ,setCancelDevServ]=useState("");
+  const [cancelSaving,setCancelSaving]=useState(false);
+  const [cancelErr,setCancelErr]=useState("");
 
   useEffect(()=>{
     setContacto(null);
@@ -2511,6 +2519,76 @@ function RvEventDetail({reserva,tok,perfil,rol,isA,onClose,onChanged,isDesktopPa
     }catch(_){}setCobroSaving(false);
   };
 
+  // Cancelación de reserva en cascada con devoluciones (Commit 1)
+  const confirmarCancelarReserva=async()=>{
+    if(cancelSaving)return;
+    if(!cancelMotivo.trim()){setCancelErr("El motivo es obligatorio");return;}
+    setCancelErr("");setCancelSaving(true);
+    const hoy=new Date().toISOString().split("T")[0];
+    const clamp=(v,max)=>Math.max(0,Math.min(parseFloat(v)||0,max));
+    try{
+      // 2) Cobrados por lado
+      const cobrAlq=pagado;
+      const cobrServTodos=serviciosExtra.reduce((s,x)=>s+(parseFloat(x.cobrado_cliente)||0),0);
+      // 3) Importes a devolver según tipo
+      let devAlq=0,devServ=0;
+      if(cancelTipo==="total"){devAlq=cobrAlq;devServ=cobrServTodos;}
+      else if(cancelTipo==="parcial"){devAlq=clamp(cancelDevAlq,cobrAlq);devServ=clamp(cancelDevServ,cobrServTodos);}
+      devAlq=Math.round(devAlq*100)/100;devServ=Math.round(devServ*100)/100;
+      // 4) Reembolsos de servicios, proporcionales a lo cobrado en cada uno
+      if(devServ>0){
+        const conCobro=serviciosExtra.filter(x=>(parseFloat(x.cobrado_cliente)||0)>0);
+        const baseTotal=conCobro.reduce((s,x)=>s+(parseFloat(x.cobrado_cliente)||0),0);
+        if(baseTotal>0){
+          let acum=0;
+          for(let i=0;i<conCobro.length;i++){
+            const x=conCobro[i];
+            const parte=i===conCobro.length-1
+              ?Math.round((devServ-acum)*100)/100
+              :Math.round(devServ*((parseFloat(x.cobrado_cliente)||0)/baseTotal)*100)/100;
+            if(i!==conCobro.length-1)acum+=parte;
+            if(parte>0)await sbPost("movimientos_servicio",{
+              servicio_reserva_id:x.id,reserva_id:localR.id,tipo:"reembolso_cliente",
+              importe:parte,fecha:hoy,concepto:"Devolución por cancelación de reserva",
+              metodo_pago:null,referencia:null,notas:null,created_by:perfil?.id||null,
+            },tok).catch(()=>{});
+          }
+        }
+      }
+      // 5) Cancelar servicios adicionales no cancelados aún
+      for(const x of serviciosExtra.filter(s=>s.estado!=="cancelado")){
+        await sbPatch("servicios_reserva",`id=eq.${x.id}`,{estado:"cancelado",motivo_cancelacion:"Reserva cancelada",fecha_cancelacion:hoy},tok).catch(()=>{});
+      }
+      // 6) Cascada coordinación / limpieza / jardín (lógica recuperada de cambiarE)
+      const coords=await sbGet("coordinacion_servicios",`?reserva_id=eq.${localR.id}&select=*`,tok).catch(()=>[]);
+      for(const c of coords){
+        if(c.servicio_id){await sbDelete("servicio_tareas",`servicio_id=eq.${c.servicio_id}`,tok).catch(()=>{});await sbDelete("servicios",`id=eq.${c.servicio_id}`,tok).catch(()=>{});}
+        if(c.jardin_servicio_id)await sbPatch("jardin_servicios",`id=eq.${c.jardin_servicio_id}`,{estado:"cancelado"},tok).catch(()=>{});
+        await sbDelete("coordinacion_servicios",`id=eq.${c.id}`,tok).catch(()=>{});
+      }
+      // 7) Comisión sobre neto retenido (mismo anti-dup que regPago)
+      const retenido=(cobrAlq-devAlq)+(cobrServTodos-devServ);
+      const _concepto=`Comisión gestor - ${localR.nombre}`;
+      const previas=await sbGet("gastos",`?origen=eq.auto_comision&or=(reserva_vinculada_id.eq.${localR.id},concepto.eq.${encodeURIComponent(_concepto)})&select=id`,tok).catch(()=>[]);
+      for(const g of (previas||[])) await sbDelete("gastos",`id=eq.${g.id}`,tok).catch(()=>{});
+      let comision=0;
+      if(retenido>0){
+        comision=Math.round(retenido*comisionPct/100*100)/100;
+        if(comision>0)await sbPost("gastos",{fecha:hoy,categoria:"comision",concepto:_concepto,importe:comision,origen:"auto_comision",reserva_vinculada_id:localR.id,reserva_vinculada_tipo:"evento"},tok).catch(()=>{});
+      }
+      // 8) Marcar la reserva (conservamos flags de cobro; la devolución queda en columnas devolucion_*)
+      await sbPatch("reservas",`id=eq.${localR.id}`,{estado:"cancelada",motivo_cancelacion:cancelMotivo.trim(),fecha_cancelacion:hoy,tipo_cancelacion:cancelTipo,devolucion_alquiler:devAlq,devolucion_servicios:devServ,updated_at:new Date().toISOString()},tok);
+      // 9) Historial
+      await addHistorial("reserva",localR.id,`Reserva cancelada: ${cancelMotivo.trim()} · Devuelto: ${devAlq}€ alquiler + ${devServ}€ servicios · Comisión: ${retenido>0?comision+"€":"anulada"}`,perfil?.nombre||"Admin",tok).catch(()=>{});
+      // 10) Estado local + cierre
+      const u={...localR,estado:"cancelada",motivo_cancelacion:cancelMotivo.trim(),fecha_cancelacion:hoy,tipo_cancelacion:cancelTipo,devolucion_alquiler:devAlq,devolucion_servicios:devServ};
+      setLocalR(u);onChanged&&onChanged(u);
+      setShowCancelarRsv(false);
+      setReloadKeyServ(k=>k+1);
+    }catch(e){setCancelErr("No se pudo cancelar la reserva. Revisa e inténtalo de nuevo.");}
+    finally{setCancelSaving(false);}
+  };
+
   // D2: servicios facturables (aceptado o completado) que cuentan al cobro/rentabilidad globales.
   // serviciosExtra ya viene de v_servicios_resumen con precio_cliente/coste_proveedor multiplicados por cantidad.
   const _servActivos = serviciosExtra.filter(s => s.estado==="aceptado" || s.estado==="completado");
@@ -2756,6 +2834,10 @@ function RvEventDetail({reserva,tok,perfil,rol,isA,onClose,onChanged,isDesktopPa
         <Historial entidad_tipo="reserva" entidad_id={localR.id} tok={tok} perfil={perfil||{nombre:"Admin"}}/>
         <Documentos entidad_tipo="reserva" entidad_id={localR.id} tok={tok} perfil={perfil||{nombre:"Admin"}}/>
         <VisitasCoordinacion reservaId={localR.id} reservaNombre={localR.nombre} tok={tok} perfil={perfil||{nombre:"Admin"}}/>
+        {isA&&localR.estado!=="cancelada"&&<div style={{marginTop:16,paddingTop:14,borderTop:`1px solid ${T.line}`}}>
+          <div style={{fontSize:10.5,color:T.danger,letterSpacing:.6,fontWeight:700,textTransform:"uppercase",marginBottom:8}}>Zona de peligro</div>
+          <button onClick={()=>{setCancelErr("");setShowCancelarRsv(true);}} style={{width:"100%",padding:"13px 16px",borderRadius:14,border:`1px solid ${T.danger}55`,background:T.danger+"10",color:T.danger,fontWeight:700,fontSize:13,cursor:"pointer",fontFamily:T.sans,display:"flex",alignItems:"center",justifyContent:"center",gap:8}}><FmIcon name="warn" size={14} stroke={T.danger} sw={2.2}/>Cancelar reserva</button>
+        </div>}
         {isA&&<button onClick={onClose} style={{width:"100%",padding:"13px 16px",borderRadius:14,border:`1px solid ${T.line}`,background:T.surface,color:T.danger,fontWeight:700,fontSize:13,cursor:"pointer",fontFamily:T.sans,marginTop:8}}>← Volver a reservas</button>}
       </div>
 
@@ -3317,6 +3399,65 @@ function RvEventDetail({reserva,tok,perfil,rol,isA,onClose,onChanged,isDesktopPa
           </div>
         </div>
       </div>}
+
+      {/* Sheet cancelar reserva (admin) — Commit 1 */}
+      {showCancelarRsv&&isA&&(()=>{
+        const cobrAlq=pagado;
+        const cobrServTodos=serviciosExtra.reduce((s,x)=>s+(parseFloat(x.cobrado_cliente)||0),0);
+        const clamp=(v,max)=>Math.max(0,Math.min(parseFloat(v)||0,max));
+        let devAlq=0,devServ=0;
+        if(cancelTipo==="total"){devAlq=cobrAlq;devServ=cobrServTodos;}
+        else if(cancelTipo==="parcial"){devAlq=clamp(cancelDevAlq,cobrAlq);devServ=clamp(cancelDevServ,cobrServTodos);}
+        const retenido=(cobrAlq-devAlq)+(cobrServTodos-devServ);
+        const comisionPrev=retenido>0?Math.round(retenido*comisionPct/100*100)/100:0;
+        const TIPOS=[{k:"sin_devolucion",l:"Sin devol."},{k:"parcial",l:"Parcial"},{k:"total",l:"Total"}];
+        return <div style={{position:"fixed",inset:0,background:"rgba(20,15,10,.6)",zIndex:1001,display:"flex",alignItems:"flex-end",fontFamily:T.sans}} onClick={()=>!cancelSaving&&setShowCancelarRsv(false)}>
+          <div style={{width:"100%",background:T.bg,borderTopLeftRadius:24,borderTopRightRadius:24,maxHeight:"92vh",overflow:"auto",paddingBottom:34}} onClick={e=>e.stopPropagation()}>
+            <div style={{padding:"14px 20px 0",display:"flex",justifyContent:"center"}}><div style={{width:44,height:4,borderRadius:999,background:T.line}}/></div>
+            <div style={{padding:"14px 20px 16px",display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:`1px solid ${T.line}`}}>
+              <div>
+                <div style={{fontSize:12,color:T.ink3,fontWeight:500,marginBottom:2}}>{localR.nombre}</div>
+                <div style={{fontSize:22,fontWeight:700,color:T.danger,letterSpacing:-.6}}>Cancelar reserva</div>
+              </div>
+              <button onClick={()=>!cancelSaving&&setShowCancelarRsv(false)} style={{width:32,height:32,borderRadius:999,background:T.surface,border:`1px solid ${T.line}`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}><FmIcon name="x" size={15} stroke={T.ink}/></button>
+            </div>
+            <div style={{padding:"16px 20px",display:"flex",flexDirection:"column",gap:14}}>
+              <div style={{background:T.danger+"10",border:`1px solid ${T.danger}33`,borderRadius:14,padding:"12px 14px",fontSize:13,color:T.danger,lineHeight:1.5}}>Esto cancela la reserva, sus servicios adicionales y los automáticos (limpieza/jardín). Las devoluciones se registran como reembolsos. No se deshace desde aquí.</div>
+              <div>
+                <div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase",marginBottom:8}}>Motivo de la cancelación *</div>
+                <textarea autoFocus value={cancelMotivo} onChange={e=>{setCancelMotivo(e.target.value);setCancelErr("");}} placeholder="Ej: los novios anulan, fuerza mayor…" rows={3} style={{width:"100%",background:T.surface,border:`1px solid ${T.line}`,borderRadius:14,padding:"12px 14px",fontFamily:T.sans,fontSize:14,color:T.ink,resize:"none",outline:"none",boxSizing:"border-box"}}/>
+              </div>
+              <div>
+                <div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase",marginBottom:8}}>Devolución</div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6}}>
+                  {TIPOS.map(o=>{const on=cancelTipo===o.k;return<button key={o.k} onClick={()=>setCancelTipo(o.k)} style={{padding:"10px 6px",borderRadius:12,border:`1px solid ${on?T.ink:T.line}`,background:on?T.ink:T.surface,color:on?"#fff":T.ink,fontFamily:T.sans,fontSize:12,fontWeight:700,cursor:"pointer"}}>{o.l}</button>;})}
+                </div>
+              </div>
+              {cancelTipo==="parcial"&&<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                <div>
+                  <div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase",marginBottom:8}}>Devolver alquiler (máx {fE(cobrAlq)})</div>
+                  <input type="number" inputMode="decimal" value={cancelDevAlq} onChange={e=>setCancelDevAlq(e.target.value)} placeholder="0" style={{width:"100%",background:T.surface,border:`1px solid ${T.line}`,borderRadius:14,padding:"12px 14px",fontFamily:T.sans,fontSize:16,fontWeight:700,color:T.ink,outline:"none",boxSizing:"border-box"}}/>
+                </div>
+                <div>
+                  <div style={{fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase",marginBottom:8}}>Devolver servicios (máx {fE(cobrServTodos)})</div>
+                  <input type="number" inputMode="decimal" value={cancelDevServ} onChange={e=>setCancelDevServ(e.target.value)} placeholder="0" style={{width:"100%",background:T.surface,border:`1px solid ${T.line}`,borderRadius:14,padding:"12px 14px",fontFamily:T.sans,fontSize:16,fontWeight:700,color:T.ink,outline:"none",boxSizing:"border-box"}}/>
+                </div>
+              </div>}
+              <div style={{background:T.surface,border:`1px solid ${T.line}`,borderRadius:14,padding:"12px 14px",display:"flex",flexDirection:"column",gap:6}}>
+                <div style={{display:"flex",justifyContent:"space-between",fontSize:12,color:T.ink3}}><span>Cobrado (alquiler + servicios)</span><span style={{fontWeight:700,color:T.ink}}>{fE(cobrAlq+cobrServTodos)}</span></div>
+                <div style={{display:"flex",justifyContent:"space-between",fontSize:12,color:T.ink3}}><span>A devolver</span><span style={{fontWeight:700,color:T.danger}}>−{fE(devAlq+devServ)}</span></div>
+                <div style={{display:"flex",justifyContent:"space-between",fontSize:13,fontWeight:700,color:T.ink,borderTop:`1px solid ${T.line}`,paddingTop:6}}><span>Retenido</span><span>{fE(retenido)}</span></div>
+                <div style={{display:"flex",justifyContent:"space-between",fontSize:12,color:T.ink3}}><span>Comisión ({comisionPct}%)</span><span style={{fontWeight:700,color:T.ink}}>{retenido>0?fE(comisionPrev):"Anulada"}</span></div>
+              </div>
+              {cancelErr&&<div style={{fontSize:12,color:"#9A2A22",fontWeight:600,padding:"8px 12px",background:T.coral+"14",border:`1px solid ${T.coral}33`,borderRadius:10}}>{cancelErr}</div>}
+              <div style={{display:"flex",gap:8,paddingTop:4}}>
+                <button onClick={()=>!cancelSaving&&setShowCancelarRsv(false)} style={{flex:1,padding:"14px 0",borderRadius:999,border:`1px solid ${T.line}`,background:T.surface,color:T.ink,fontFamily:T.sans,fontWeight:600,fontSize:14,cursor:cancelSaving?"not-allowed":"pointer"}}>Cancelar</button>
+                <button onClick={confirmarCancelarReserva} disabled={!cancelMotivo.trim()||cancelSaving} style={{flex:2,padding:"14px 0",borderRadius:999,border:0,background:!cancelMotivo.trim()||cancelSaving?T.danger+"55":T.danger,color:"#fff",fontFamily:T.sans,fontWeight:700,fontSize:14,cursor:!cancelMotivo.trim()||cancelSaving?"not-allowed":"pointer"}}>{cancelSaving?"Cancelando…":"Confirmar cancelación"}</button>
+              </div>
+            </div>
+          </div>
+        </div>;
+      })()}
     </div>
   );
 }
