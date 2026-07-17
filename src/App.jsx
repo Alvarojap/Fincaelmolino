@@ -420,7 +420,7 @@ function Wordmark({size=17,color="#1A1A1A"}){
 }
 
 const FmIcon=({name,size=20,stroke="currentColor",sw=2})=>{
-  const P={eye:<><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></>,chevL:<><path d="m15 6-6 6 6 6"/></>,chevR:<><path d="m9 6 6 6-6 6"/></>,chevD:<><path d="m6 9 6 6 6-6"/></>,plus:<><path d="M12 5v14M5 12h14"/></>,check:<><path d="m5 12 5 5L20 7"/></>,x:<><path d="M6 6l12 12M18 6 6 18"/></>,search:<><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></>,filter:<><path d="M3 5h18l-7 9v5l-4 2v-7L3 5Z"/></>,bell:<><path d="M18 16v-5a6 6 0 1 0-12 0v5l-2 2h16l-2-2Z"/><path d="M10 20a2 2 0 0 0 4 0"/></>,home:<><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v10h14V10"/></>,calendar:<><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></>,users:<><circle cx="9" cy="8" r="3.5"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17" cy="9" r="2.5"/><path d="M15 20c.1-2.2 1.5-4 4-4 1.3 0 2.4.5 3 1.5"/></>,box:<><path d="M3 7.5 12 3l9 4.5v9L12 21l-9-4.5v-9Z"/><path d="M3 7.5 12 12l9-4.5M12 12v9"/></>,chart:<><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></>,settings:<><circle cx="12" cy="12" r="3"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></>,edit:<><path d="M4 20h4L20 8l-4-4L4 16v4Z"/></>,arrow:<><path d="M5 12h14M13 6l6 6-6 6"/></>,warn:<><path d="M12 3 2 21h20L12 3Z"/><path d="M12 10v5M12 18h.01"/></>,phone:<><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2Z"/></>,mail:<><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></>,more:<><circle cx="5" cy="12" r="1.6" fill={stroke} stroke="none"/><circle cx="12" cy="12" r="1.6" fill={stroke} stroke="none"/><circle cx="19" cy="12" r="1.6" fill={stroke} stroke="none"/></>,clock:<><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></>,euro:<><path d="M17 6a7 7 0 1 0 0 12"/><path d="M4 10h9M4 14h9"/></>,leaf:<><path d="M20 4c-10 0-16 4-16 12a4 4 0 0 0 4 4c8 0 12-6 12-16Z"/><path d="M4 20 14 10"/></>,camera:<><path d="M4 8h3l2-2h6l2 2h3a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2Z"/><circle cx="12" cy="13" r="4"/></>,menu:<><path d="M4 6h16M4 12h16M4 18h16"/></>,key:<><circle cx="8" cy="14" r="4"/><path d="m11 12 9-9M17 6l2 2M15 8l2 2"/></>,sparkle:<><path d="M12 3v6M12 15v6M3 12h6M15 12h6"/></>,whatsapp:<><path d="M4 20l1.5-4A8 8 0 1 1 8 18l-4 2Z"/><path d="M9 10c0 3 2 5 5 5l1-1-2-1-1 1c-1-.5-2-1.5-2.5-2.5l1-1-1-2-1 1c0 .2 0 .3 0 .5Z"/></>};
+  const P={eye:<><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></>,chevL:<><path d="m15 6-6 6 6 6"/></>,chevR:<><path d="m9 6 6 6-6 6"/></>,chevD:<><path d="m6 9 6 6 6-6"/></>,plus:<><path d="M12 5v14M5 12h14"/></>,check:<><path d="m5 12 5 5L20 7"/></>,x:<><path d="M6 6l12 12M18 6 6 18"/></>,search:<><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></>,filter:<><path d="M3 5h18l-7 9v5l-4 2v-7L3 5Z"/></>,bell:<><path d="M18 16v-5a6 6 0 1 0-12 0v5l-2 2h16l-2-2Z"/><path d="M10 20a2 2 0 0 0 4 0"/></>,home:<><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v10h14V10"/></>,calendar:<><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></>,users:<><circle cx="9" cy="8" r="3.5"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17" cy="9" r="2.5"/><path d="M15 20c.1-2.2 1.5-4 4-4 1.3 0 2.4.5 3 1.5"/></>,box:<><path d="M3 7.5 12 3l9 4.5v9L12 21l-9-4.5v-9Z"/><path d="M3 7.5 12 12l9-4.5M12 12v9"/></>,chart:<><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></>,settings:<><circle cx="12" cy="12" r="3"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></>,edit:<><path d="M4 20h4L20 8l-4-4L4 16v4Z"/></>,arrow:<><path d="M5 12h14M13 6l6 6-6 6"/></>,download:<><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 20h14"/></>,warn:<><path d="M12 3 2 21h20L12 3Z"/><path d="M12 10v5M12 18h.01"/></>,phone:<><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2Z"/></>,mail:<><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></>,more:<><circle cx="5" cy="12" r="1.6" fill={stroke} stroke="none"/><circle cx="12" cy="12" r="1.6" fill={stroke} stroke="none"/><circle cx="19" cy="12" r="1.6" fill={stroke} stroke="none"/></>,clock:<><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></>,euro:<><path d="M17 6a7 7 0 1 0 0 12"/><path d="M4 10h9M4 14h9"/></>,leaf:<><path d="M20 4c-10 0-16 4-16 12a4 4 0 0 0 4 4c8 0 12-6 12-16Z"/><path d="M4 20 14 10"/></>,camera:<><path d="M4 8h3l2-2h6l2 2h3a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2Z"/><circle cx="12" cy="13" r="4"/></>,menu:<><path d="M4 6h16M4 12h16M4 18h16"/></>,key:<><circle cx="8" cy="14" r="4"/><path d="m11 12 9-9M17 6l2 2M15 8l2 2"/></>,sparkle:<><path d="M12 3v6M12 15v6M3 12h6M15 12h6"/></>,whatsapp:<><path d="M4 20l1.5-4A8 8 0 1 1 8 18l-4 2Z"/><path d="M9 10c0 3 2 5 5 5l1-1-2-1-1 1c-1-.5-2-1.5-2.5-2.5l1-1-1-2-1 1c0 .2 0 .3 0 .5Z"/></>};
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round">{P[name]||null}</svg>;
 };
 
@@ -450,6 +450,7 @@ const ICON_PATHS={
   back:`<polyline points="15 18 9 12 15 6"/>`,
   briefcase:`<rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16"/>`,
   sparkle:`<path d="M12 3v6M12 15v6M3 12h6M15 12h6"/>`,
+  presupuesto:`<path d="M6 2h9l5 5v13a2 2 0 01-2 2H6a2 2 0 01-2-2V4a2 2 0 012-2z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/>`,
 };
 function Icon({name,size=20,color="currentColor",sw=1.8}){
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" style={{display:"inline-block",verticalAlign:"middle",flexShrink:0}} dangerouslySetInnerHTML={{__html:ICON_PATHS[name]||""}}/>;
@@ -817,6 +818,7 @@ export default function App() {
     visitas:     <Visitas     {...P}/>,
     proveedores: <Proveedores {...P}/>,
     catalogo:    <Catalogo    {...P}/>,
+    presupuestos: <Presupuestos {...P}/>,
     airbnb:      <ReservasAirbnb {...P}/>,
     chat:        <Chat        {...P}/>,
     notifs:      <Notifs      {...P}/>,
@@ -1063,6 +1065,7 @@ function Sidebar({perfil,page,setPage,onLogout,inDrawer,onClose}){
         {nItem("visits","Visitas","visitas")}
         {isA&&nItem("briefcase","Proveedores","proveedores")}
         {isA&&nItem("sparkle","Catálogo","catalogo")}
+        {isA&&nItem("presupuesto","Presupuestos","presupuestos")}
       </>}
       {(isA||isC)&&<><p className="nav-sec">Reservas</p>
         {nItem("calendar","Calendario","calendario")}
@@ -9088,6 +9091,18 @@ function Jardineros({tok,rol}){
     }catch(_){}setSaving(false);
   };
   const toggleActivo=async(j)=>{await sbPatch("jardineros",`id=eq.${j.id}`,{activo:!j.activo},tok);await load_();};
+  // Edición de ficha de jardinero (Commit A)
+  const [editJ,setEditJ]=useState(null);
+  const [savingEditJ,setSavingEditJ]=useState(false);
+  const abrirEditarJardinero=(j)=>setEditJ({id:j.id,nombre:j.nombre||"",modalidad:j.modalidad||"Fijo mensual",tarifa_hora:j.tarifa_hora!=null?String(j.tarifa_hora):""});
+  const guardarEditarJardinero=async()=>{
+    if(!editJ||savingEditJ||!editJ.nombre.trim())return;
+    setSavingEditJ(true);
+    try{
+      await sbPatch("jardineros",`id=eq.${editJ.id}`,{nombre:editJ.nombre.trim(),modalidad:editJ.modalidad,tarifa_hora:editJ.modalidad==="Por horas"?(parseFloat(editJ.tarifa_hora)||null):null},tok);
+      setEditJ(null);await load_();
+    }catch(_){}setSavingEditJ(false);
+  };
   // Calcula horas reales de una jornada: prioriza duracion_minutos guardado;
   // si la jornada está abierta o ese campo es null, lo deduce de hora_inicio
   // y hora_fin (o ahora si sigue abierta), descontando pausas. Con parseTSUTC
@@ -9175,6 +9190,7 @@ function Jardineros({tok,rol}){
               {j.notas&&<div style={{fontSize:11,color:"#8A8580",marginTop:4}}>{j.notas}</div>}
             </div>
             <div style={{display:"flex",gap:6,flexShrink:0}}>
+              <button className="btn bg sm" onClick={()=>abrirEditarJardinero(j)} style={{display:"inline-flex",alignItems:"center",gap:4}}><FmIcon name="edit" size={12} stroke="currentColor"/>Editar</button>
               <button className="btn bg sm" onClick={()=>verAnalisis(j)}>{abierto?"▲ Cerrar":"📊 Análisis"}</button>
               <button className="btn bg sm" onClick={()=>toggleActivo(j)}>{j.activo?"Desactivar":"Activar"}</button>
             </div>
@@ -9217,6 +9233,15 @@ function Jardineros({tok,rol}){
         <div className="mft"><button className="btn bg" onClick={()=>setShowJForm(false)}>Cancelar</button><button className="btn bp" onClick={crearJardinero} disabled={saving||!jForm.nombre||jForm.pin.length!==4||jForm.pin!==jForm.pinConfirm}>{saving?"Guardando…":"🌿 Crear"}</button></div>
       </div>
     </div>}
+    {editJ&&<div className="ov" onClick={()=>setEditJ(null)}>
+      <div className="modal" onClick={e=>e.stopPropagation()}>
+        <h3>✏️ Editar jardinero</h3>
+        <div className="fg"><label>Nombre *</label><input className="fi" value={editJ.nombre} onChange={e=>setEditJ(v=>({...v,nombre:e.target.value}))} placeholder="Ej: Carlos García"/></div>
+        <div className="fg"><label>Modalidad</label><select className="fi" value={editJ.modalidad} onChange={e=>setEditJ(v=>({...v,modalidad:e.target.value}))}>{MODAL_JARDINERO.map(m=><option key={m}>{m}</option>)}</select></div>
+        {editJ.modalidad==="Por horas"&&<div className="fg"><label>Tarifa por hora (€)</label><input type="number" inputMode="decimal" className="fi" value={editJ.tarifa_hora} onChange={e=>setEditJ(v=>({...v,tarifa_hora:e.target.value}))} placeholder="Ej: 15"/></div>}
+        <div className="mft"><button className="btn bg" onClick={()=>setEditJ(null)}>Cancelar</button><button className="btn bp" onClick={guardarEditarJardinero} disabled={savingEditJ||!editJ.nombre.trim()}>{savingEditJ?"Guardando…":"Guardar cambios"}</button></div>
+      </div>
+    </div>}
   </>;
 }
 
@@ -9249,6 +9274,18 @@ function LimpiadorasPage({tok,rol}){
     }catch(_){}setSaving(false);
   };
   const toggleActiva=async l=>{await sbPatch("limpiadoras",`id=eq.${l.id}`,{activa:!l.activa},tok);await load_();};
+  // Edición de ficha de limpiadora (Commit A)
+  const [editL,setEditL]=useState(null);
+  const [savingEditL,setSavingEditL]=useState(false);
+  const abrirEditarLimpiadora=(l)=>setEditL({id:l.id,nombre:l.nombre||"",modalidad:l.modalidad||"por_horas",tarifa_hora:l.tarifa_hora!=null?String(l.tarifa_hora):""});
+  const guardarEditarLimpiadora=async()=>{
+    if(!editL||savingEditL||!editL.nombre.trim())return;
+    setSavingEditL(true);
+    try{
+      await sbPatch("limpiadoras",`id=eq.${editL.id}`,{nombre:editL.nombre.trim(),modalidad:editL.modalidad,tarifa_hora:editL.modalidad==="por_horas"?(parseFloat(editL.tarifa_hora)||null):null},tok);
+      setEditL(null);await load_();
+    }catch(_){}setSavingEditL(false);
+  };
   const verAnal=async l=>{
     if(anal?.id===l.id){setAnal(null);return;}
     setAnal(l);setAnalLoad(true);setAnalData(null);
@@ -9287,6 +9324,7 @@ function LimpiadorasPage({tok,rol}){
               {l.notas&&<div style={{fontSize:11,color:"#8A8580",marginTop:4}}>{l.notas}</div>}
             </div>
             <div style={{display:"flex",gap:6,flexShrink:0}}>
+              <button className="btn bg sm" onClick={()=>abrirEditarLimpiadora(l)} style={{display:"inline-flex",alignItems:"center",gap:4}}><FmIcon name="edit" size={12} stroke="currentColor"/>Editar</button>
               <button className="btn bg sm" onClick={()=>verAnal(l)}>{abierto?"▲":"📊"}</button>
               <button className="btn bg sm" onClick={()=>toggleActiva(l)}>{l.activa?"Desactivar":"Activar"}</button>
             </div>
@@ -9325,6 +9363,17 @@ function LimpiadorasPage({tok,rol}){
         </div>
         {form.pin&&form.pinConfirm&&form.pin!==form.pinConfirm&&<div style={{fontSize:12,color:"#F35757",marginBottom:10}}>Los PINs no coinciden</div>}
         <div className="mft"><button className="btn bg" onClick={()=>setShowForm(false)}>Cancelar</button><button className="btn bp" onClick={crear} disabled={saving||!form.nombre||form.pin.length!==4||form.pin!==form.pinConfirm}>{saving?"Guardando…":"🧹 Crear"}</button></div>
+      </div>
+    </div>}
+    {editL&&<div className="ov" onClick={()=>setEditL(null)}>
+      <div className="modal" onClick={e=>e.stopPropagation()}>
+        <h3>✏️ Editar limpiadora</h3>
+        <div className="fg"><label>Nombre *</label><input className="fi" value={editL.nombre} onChange={e=>setEditL(v=>({...v,nombre:e.target.value}))} placeholder="Ej: María López"/></div>
+        <div className="fg"><label>Modalidad</label><select className="fi" value={editL.modalidad} onChange={e=>setEditL(v=>({...v,modalidad:e.target.value}))}>
+          <option value="por_horas">Por horas</option><option value="precio_fijo_servicio">Precio fijo por servicio</option><option value="permuta">Permuta</option>
+        </select></div>
+        {editL.modalidad==="por_horas"&&<div className="fg"><label>Tarifa €/hora</label><input type="number" inputMode="decimal" className="fi" value={editL.tarifa_hora} onChange={e=>setEditL(v=>({...v,tarifa_hora:e.target.value}))} placeholder="Ej: 12"/></div>}
+        <div className="mft"><button className="btn bg" onClick={()=>setEditL(null)}>Cancelar</button><button className="btn bp" onClick={guardarEditarLimpiadora} disabled={savingEditL||!editL.nombre.trim()}>{savingEditL?"Guardando…":"Guardar cambios"}</button></div>
       </div>
     </div>}
   </>;
@@ -10218,6 +10267,11 @@ function Gastos({tok,perfil}){
   const [saving,setSaving]=useState(false);
   // Detalle de gasto (overlay)
   const [selGasto,setSelGasto]=useState(null);
+  // Control de pago en bloque
+  const [pagoFiltro,setPagoFiltro]=useState("todos"); // "todos" | "pendientes" | "pagados"
+  const [selMode,setSelMode]=useState(false);
+  const [sel,setSel]=useState(()=>new Set());
+  const [pagoSaving,setPagoSaving]=useState(false);
 
   const formVacio={fecha:hoyStr,categoria:"Personal",concepto:"",importe:"",recurrente:false,frecuencia:"mensual",notas:""};
   const [form,setForm]=useState(formVacio);
@@ -10254,9 +10308,27 @@ function Gastos({tok,perfil}){
     await load_();
   };
 
-  const filtrados=catFiltro==="todas"?gastos:gastos.filter(g=>g.categoria===catFiltro);
-  const total=filtrados.reduce((s,g)=>s+(parseFloat(g.importe)||0),0);
+  const baseFiltrados=catFiltro==="todas"?gastos:gastos.filter(g=>g.categoria===catFiltro);
+  const total=baseFiltrados.reduce((s,g)=>s+(parseFloat(g.importe)||0),0);
+  const pagadoTotal=baseFiltrados.filter(g=>g.pagado).reduce((s,g)=>s+(parseFloat(g.importe)||0),0);
+  const pendienteTotal=Math.max(0,total-pagadoTotal);
+  const filtrados=pagoFiltro==="todos"?baseFiltrados:baseFiltrados.filter(g=>pagoFiltro==="pagados"?g.pagado:!g.pagado);
   const cats=[...new Set(gastos.map(g=>g.categoria).filter(Boolean))];
+
+  const toggleSel=id=>setSel(prev=>{const n=new Set(prev);n.has(id)?n.delete(id):n.add(id);return n;});
+  const selVisiblesTodos=filtrados.length>0&&filtrados.every(g=>sel.has(g.id));
+  const toggleSelTodos=()=>{if(selVisiblesTodos)setSel(new Set());else setSel(new Set(filtrados.map(g=>g.id)));};
+  const selImporte=filtrados.filter(g=>sel.has(g.id)).reduce((s,g)=>s+(parseFloat(g.importe)||0),0);
+  const marcarPago=async(pagado)=>{
+    if(sel.size===0||pagoSaving)return;
+    setPagoSaving(true);
+    const ids=[...sel];
+    try{
+      await sbPatch("gastos",`id=in.(${ids.join(",")})`,{pagado,fecha_pago:pagado?hoyStr:null},tok);
+      setSel(new Set());setSelMode(false);await load_();
+    }catch(_){}
+    setPagoSaving(false);
+  };
 
   const periodos=[
     {lbl:"Este mes",d:mesIni,h:mesFin},
@@ -10288,7 +10360,17 @@ function Gastos({tok,perfil}){
       <div style={{background:"linear-gradient(135deg,#1A1A1A 0%,#2a2520 100%)",borderRadius:20,padding:18,color:"white"}}>
         <div style={{fontSize:10,color:T.gold,letterSpacing:1,textTransform:"uppercase",fontWeight:700,marginBottom:4}}>Total período</div>
         <div style={{fontSize:38,fontWeight:700,letterSpacing:-1.2,lineHeight:1}}>{fmtE(total)}</div>
-        <div style={{fontSize:12,color:"rgba(255,255,255,.55)",marginTop:6}}>{filtrados.length} gastos · {gastos.filter(g=>GASTO_AUTO.includes(g.origen)).length} automáticos</div>
+        <div style={{fontSize:12,color:"rgba(255,255,255,.55)",marginTop:6}}>{baseFiltrados.length} gastos · {gastos.filter(g=>GASTO_AUTO.includes(g.origen)).length} automáticos</div>
+        <div style={{display:"flex",gap:10,marginTop:12}}>
+          <div style={{flex:1,background:"rgba(255,255,255,.06)",borderRadius:12,padding:"10px 12px"}}>
+            <div style={{fontSize:9.5,color:"rgba(255,255,255,.5)",letterSpacing:.6,textTransform:"uppercase",fontWeight:700}}>Pagado</div>
+            <div style={{fontSize:18,fontWeight:700,color:T.oliveSoft,marginTop:2,letterSpacing:-.4}}>{fmtE(pagadoTotal)}</div>
+          </div>
+          <div style={{flex:1,background:"rgba(255,255,255,.06)",borderRadius:12,padding:"10px 12px"}}>
+            <div style={{fontSize:9.5,color:"rgba(255,255,255,.5)",letterSpacing:.6,textTransform:"uppercase",fontWeight:700}}>Pendiente</div>
+            <div style={{fontSize:18,fontWeight:700,color:pendienteTotal>0?T.gold:"rgba(255,255,255,.6)",marginTop:2,letterSpacing:-.4}}>{fmtE(pendienteTotal)}</div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -10315,30 +10397,59 @@ function Gastos({tok,perfil}){
       {["todas",...cats].map(f=>{const on=catFiltro===f;return<button key={f} onClick={()=>setCatFiltro(f)} style={{flexShrink:0,height:28,padding:"0 12px",borderRadius:999,border:`1px solid ${on?T.ink:T.line}`,background:on?T.ink:T.surface,color:on?"white":T.ink2,fontFamily:T.sans,fontSize:11,fontWeight:700,cursor:"pointer",textTransform:"capitalize"}}>{f==="todas"?"Todas":f}</button>;})}
     </div>
 
+    {/* Estado de pago: filtro + selección en bloque */}
+    <div style={{padding:"0 20px 10px",display:"flex",gap:8,alignItems:"center"}}>
+      <div style={{display:"flex",gap:6,flex:1,overflowX:"auto"}}>
+        {[{k:"todos",lbl:"Todos"},{k:"pendientes",lbl:"Pendientes"},{k:"pagados",lbl:"Pagados"}].map(f=>{const on=pagoFiltro===f.k;const c=f.k==="pendientes"?T.gold:f.k==="pagados"?T.olive:T.ink;return<button key={f.k} onClick={()=>setPagoFiltro(f.k)} style={{flexShrink:0,height:28,padding:"0 12px",borderRadius:999,border:`1px solid ${on?c:T.line}`,background:on?c:T.surface,color:on?(f.k==="pendientes"?T.ink:"white"):T.ink2,fontFamily:T.sans,fontSize:11,fontWeight:700,cursor:"pointer"}}>{f.lbl}</button>;})}
+      </div>
+      <button onClick={()=>{setSelMode(m=>!m);setSel(new Set());}} style={{flexShrink:0,height:28,padding:"0 12px",borderRadius:999,border:`1px solid ${selMode?T.terracotta:T.line}`,background:selMode?T.terracotta+"14":T.surface,color:selMode?T.terracotta:T.ink2,fontFamily:T.sans,fontSize:11,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:5}}><FmIcon name="check" size={12} stroke={selMode?T.terracotta:T.ink2} sw={2.4}/>{selMode?"Cancelar":"Marcar pagos"}</button>
+    </div>
+    {selMode&&filtrados.length>0&&(
+      <div style={{padding:"0 20px 8px"}}>
+        <button onClick={toggleSelTodos} style={{fontFamily:T.sans,fontSize:11.5,fontWeight:700,color:T.ink2,background:"transparent",border:0,cursor:"pointer",padding:0}}>{selVisiblesTodos?"Deseleccionar todos":`Seleccionar todos (${filtrados.length})`}</button>
+      </div>
+    )}
+
     {/* Lista */}
-    <div style={{padding:"0 20px"}}>
+    <div style={{padding:"0 20px",paddingBottom:selMode&&sel.size>0?92:0}}>
       {load?<div className="loading"><div className="spin"/><span>Cargando…</span></div>
       :filtrados.length===0?<div style={{textAlign:"center",padding:"40px 0",color:T.ink3,fontSize:13}}>Sin gastos en este período</div>
-      :filtrados.map(g=>{const esAuto=GASTO_AUTO.includes(g.origen);const olbl=origenLbl(g.origen);const color=catColors[g.categoria]||T.ink3;
-        return<div key={g.id} onClick={()=>setSelGasto(g)} style={{background:T.surface,borderRadius:16,padding:14,border:`1px solid ${T.line}`,marginBottom:8,display:"flex",gap:12,alignItems:"center",cursor:"pointer"}}>
+      :filtrados.map(g=>{const esAuto=GASTO_AUTO.includes(g.origen);const olbl=origenLbl(g.origen);const color=catColors[g.categoria]||T.ink3;const checked=sel.has(g.id);
+        return<div key={g.id} onClick={()=>selMode?toggleSel(g.id):setSelGasto(g)} style={{background:T.surface,borderRadius:16,padding:14,border:`1px solid ${selMode&&checked?T.terracotta:T.line}`,marginBottom:8,display:"flex",gap:12,alignItems:"center",cursor:"pointer"}}>
+          {selMode&&<div style={{width:22,height:22,borderRadius:6,flexShrink:0,border:`2px solid ${checked?T.terracotta:T.line}`,background:checked?T.terracotta:"transparent",display:"flex",alignItems:"center",justifyContent:"center"}}>{checked&&<FmIcon name="check" size={12} stroke="white" sw={2.6}/>}</div>}
           <div style={{width:4,borderRadius:999,background:color,alignSelf:"stretch",flexShrink:0}}/>
           <div style={{flex:1,minWidth:0}}>
             <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:3,flexWrap:"wrap"}}>
               <span style={{display:"inline-flex",height:18,padding:"0 7px",borderRadius:999,background:color+"22",color:color,fontSize:9.5,fontWeight:700,textTransform:"capitalize"}}>{g.categoria||"—"}</span>
+              <span style={{display:"inline-flex",height:18,padding:"0 7px",borderRadius:999,background:(g.pagado?T.olive:T.gold)+"22",color:g.pagado?"#4A6A22":"#7A5A00",fontSize:9.5,fontWeight:700}}>{g.pagado?"Pagado":"Pendiente"}</span>
               {olbl&&<span style={{display:"inline-flex",height:18,padding:"0 7px",borderRadius:999,background:T.ink3+"22",color:T.ink3,fontSize:9.5,fontWeight:700}}>{olbl}</span>}
               {g.recurrente&&<span style={{display:"inline-flex",height:18,padding:"0 7px",borderRadius:999,background:T.softBlue+"22",color:"#2A5BA0",fontSize:9.5,fontWeight:700}}>Recurrente</span>}
               {(g.reserva_vinculada_id||g.reserva_id)&&<span style={{display:"inline-flex",height:18,padding:"0 7px",borderRadius:999,background:T.lavender+"22",color:"#4A3A8A",fontSize:9.5,fontWeight:700}}>Vinculado</span>}
               {g.factura_url&&<FmIcon name="mail" size={11} stroke={T.ink3}/>}
             </div>
             <div style={{fontSize:14,fontWeight:700,color:T.ink,letterSpacing:-.2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{g.concepto}</div>
-            <div style={{fontSize:11,color:T.ink3,marginTop:3,display:"flex",alignItems:"center",gap:4}}><FmIcon name="calendar" size={10} stroke={T.ink3}/>{new Date(g.fecha+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"})}</div>
+            <div style={{fontSize:11,color:T.ink3,marginTop:3,display:"flex",alignItems:"center",gap:4}}><FmIcon name="calendar" size={10} stroke={T.ink3}/>{new Date(g.fecha+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"})}{g.pagado&&g.fecha_pago&&<span style={{color:T.ink4}}> · pagado {new Date(g.fecha_pago+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"})}</span>}</div>
           </div>
           <div style={{textAlign:"right",flexShrink:0}}>
             <div style={{fontSize:16,fontWeight:700,color:T.ink,letterSpacing:-.3}}>{fmtE(g.importe)}</div>
-            <FmIcon name="chevR" size={14} stroke={T.ink3}/>
+            {!selMode&&<FmIcon name="chevR" size={14} stroke={T.ink3}/>}
           </div>
         </div>;})}
     </div>
+
+    {/* Barra de acción de pago en bloque */}
+    {selMode&&sel.size>0&&(
+      <div style={{position:"fixed",left:0,right:0,bottom:0,zIndex:995,padding:"12px 20px calc(12px + env(safe-area-inset-bottom,0px))",background:"rgba(255,255,255,.96)",borderTop:`1px solid ${T.line}`,backdropFilter:"blur(8px)"}}>
+        <div style={{display:"flex",alignItems:"center",gap:10,maxWidth:520,margin:"0 auto"}}>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontSize:12.5,fontWeight:700,color:T.ink}}>{sel.size} {sel.size===1?"seleccionado":"seleccionados"}</div>
+            <div style={{fontSize:11,color:T.ink3,fontWeight:600}}>{fmtE(selImporte)}</div>
+          </div>
+          <button onClick={()=>marcarPago(false)} disabled={pagoSaving} style={{height:40,padding:"0 14px",borderRadius:999,border:`1px solid ${T.line}`,background:T.surface,color:T.ink2,fontFamily:T.sans,fontSize:13,fontWeight:700,cursor:pagoSaving?"not-allowed":"pointer"}}>Pendiente</button>
+          <button onClick={()=>marcarPago(true)} disabled={pagoSaving} style={{height:40,padding:"0 18px",borderRadius:999,border:0,background:pagoSaving?T.olive+"88":T.olive,color:"white",fontFamily:T.sans,fontSize:13,fontWeight:700,cursor:pagoSaving?"not-allowed":"pointer",display:"flex",alignItems:"center",gap:6}}><FmIcon name="check" size={15} stroke="white" sw={2.6}/>{pagoSaving?"Guardando…":"Marcar pagado"}</button>
+        </div>
+      </div>
+    )}
 
     {/* Detalle de gasto — overlay */}
     {selGasto&&<GastoDetail gasto={selGasto} tok={tok} perfil={perfil} onClose={()=>setSelGasto(null)} onSaved={async(g)=>{await load_();setSelGasto(g||null);}} onDeleted={async()=>{await load_();setSelGasto(null);}}/>}
@@ -14704,6 +14815,466 @@ function Catalogo({perfil,tok,rol,setPage}){
               </div>
             </>;
           })()}
+        </div>
+      </div>
+    </div>}
+  </div>;
+}
+
+// ─── PRESUPUESTOS ─────────────────────────────────────────────────────────────
+// Helpers de formato y cálculo (nivel módulo, reutilizables por UI y PDF)
+const pptNum=s=>{const n=parseFloat(String(s??"").replace(",","."));return isNaN(n)?0:n;};
+const pptEUR=v=>((Math.round((parseFloat(v)||0)*100)/100)).toLocaleString("es-ES",{minimumFractionDigits:2,maximumFractionDigits:2})+" €";
+const pptNumFmt=v=>{const n=Math.round((parseFloat(v)||0)*100)/100;return Number.isInteger(n)?String(n):n.toLocaleString("es-ES",{minimumFractionDigits:0,maximumFractionDigits:2});};
+const pptNumero=n=>"PRE-"+String(n||0).padStart(6,"0");
+const pptEsc=s=>String(s??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+// Totales de un presupuesto a partir de sus líneas + config (IVA/descuento)
+function pptCalcTotales(lineas,{con_iva,iva_pct,descuento_pct}){
+  const subtotal=(lineas||[]).reduce((s,l)=>s+pptNum(l.cantidad)*pptNum(l.precio_unitario),0);
+  const dPct=parseFloat(descuento_pct)||0;
+  const descuento=Math.round(subtotal*dPct/100*100)/100;
+  const base=Math.round((subtotal-descuento)*100)/100;
+  const iPct=parseFloat(iva_pct)||0;
+  const iva=con_iva?Math.round(base*iPct/100*100)/100:0;
+  const total=Math.round((base+iva)*100)/100;
+  return{subtotal:Math.round(subtotal*100)/100,descuento,base,iva,total,dPct,iPct};
+}
+// Imprime un documento HTML autocontenido vía iframe oculto (PDF vectorial, sin deps)
+function pptImprimirHTML(html){
+  const ifr=document.createElement("iframe");
+  ifr.style.position="fixed";ifr.style.right="0";ifr.style.bottom="0";ifr.style.width="0";ifr.style.height="0";ifr.style.border="0";
+  document.body.appendChild(ifr);
+  const doc=ifr.contentWindow.document;
+  doc.open();doc.write(html);doc.close();
+  const go=()=>{try{ifr.contentWindow.focus();ifr.contentWindow.print();}catch(_){}setTimeout(()=>{try{document.body.removeChild(ifr);}catch(_){}} ,60000);};
+  // Espera a que el iframe cargue antes de imprimir
+  if(ifr.contentWindow.document.readyState==="complete")setTimeout(go,300);
+  else ifr.onload=()=>setTimeout(go,300);
+}
+// Construye el HTML del presupuesto para el cliente
+function pptDocumentoHTML(p,lineas){
+  const t=pptCalcTotales(lineas,p);
+  const fechaFmt=d=>d?new Date(d+"T00:00:00").toLocaleDateString("es-ES",{day:"2-digit",month:"long",year:"numeric"}):"";
+  const validoHasta=(()=>{if(!p.fecha)return"";const base=new Date(p.fecha+"T00:00:00");base.setDate(base.getDate()+(parseInt(p.validez_dias)||0));return base.toLocaleDateString("es-ES",{day:"2-digit",month:"long",year:"numeric"});})();
+  const filas=(lineas||[]).map(l=>{
+    const imp=pptNum(l.cantidad)*pptNum(l.precio_unitario);
+    const cantTxt=pptNumFmt(l.cantidad)+(l.unidad?(" "+pptEsc(l.unidad)):"");
+    return `<tr>
+      <td class="c-desc"><div class="l-nom">${pptEsc(l.nombre||"—")}</div>${l.descripcion?`<div class="l-desc">${pptEsc(l.descripcion)}</div>`:""}</td>
+      <td class="c-num">${cantTxt}</td>
+      <td class="c-num">${pptEUR(l.precio_unitario)}</td>
+      <td class="c-num c-imp">${pptEUR(imp)}</td>
+    </tr>`;
+  }).join("");
+  const rowTot=(label,val,cls="")=>`<tr class="${cls}"><td></td><td></td><td class="t-lbl">${label}</td><td class="c-num">${pptEUR(val)}</td></tr>`;
+  return `<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><title>${pptNumero(p.numero)} · Finca El Molino</title>
+  <style>
+    @page{size:A4;margin:16mm 14mm;}
+    *{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+    body{font-family:-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:#1A1A1A;margin:0;font-size:12px;line-height:1.5;}
+    .head{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #EC683E;padding-bottom:14px;margin-bottom:18px;}
+    .brand h1{font-size:22px;margin:0;letter-spacing:-.5px;color:#1A1A1A;}
+    .brand .sub{font-size:11px;color:#7A766F;margin-top:2px;letter-spacing:.5px;text-transform:uppercase;}
+    .doc-meta{text-align:right;}
+    .doc-meta .tag{display:inline-block;background:#EC683E;color:#fff;font-weight:700;font-size:12px;padding:5px 12px;border-radius:6px;letter-spacing:.5px;}
+    .doc-meta .num{font-size:16px;font-weight:800;margin-top:8px;color:#1A1A1A;}
+    .doc-meta .date{font-size:11px;color:#7A766F;margin-top:2px;}
+    .parties{display:flex;justify-content:space-between;gap:24px;margin-bottom:18px;}
+    .party{flex:1;}
+    .party .lbl{font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#7A766F;margin-bottom:4px;}
+    .party .val{font-size:12px;color:#1A1A1A;}
+    .party .val strong{font-size:13px;}
+    .title{font-size:15px;font-weight:700;margin:0 0 12px;color:#1A1A1A;}
+    table{width:100%;border-collapse:collapse;}
+    thead th{text-align:left;font-size:9px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:#7A766F;border-bottom:1.5px solid #E5E0D6;padding:0 8px 7px;}
+    thead th.c-num{text-align:right;}
+    tbody td{padding:9px 8px;border-bottom:1px solid #EEEAE3;vertical-align:top;}
+    .c-num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;}
+    .c-desc{width:56%;}
+    .l-nom{font-weight:600;}
+    .l-desc{font-size:10.5px;color:#7A766F;margin-top:2px;}
+    .c-imp{font-weight:700;}
+    .tots{margin-top:6px;}
+    .tots td{padding:5px 8px;border:0;}
+    .tots .t-lbl{text-align:right;color:#3A3733;font-weight:600;}
+    .tots tr.grand td{border-top:2px solid #1A1A1A;padding-top:10px;font-size:15px;font-weight:800;color:#EC683E;}
+    .tots tr.grand .t-lbl{color:#1A1A1A;}
+    .foot{margin-top:24px;padding-top:14px;border-top:1px solid #E5E0D6;}
+    .foot .valid{font-size:11px;color:#7A766F;margin-bottom:10px;}
+    .foot .cond-lbl{font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#7A766F;margin-bottom:4px;}
+    .foot .cond{font-size:11px;color:#3A3733;white-space:pre-wrap;}
+    .sign{margin-top:34px;color:#7A766F;font-size:10px;text-align:center;}
+  </style></head>
+  <body>
+    <div class="head">
+      <div class="brand"><h1>Finca El Molino</h1><div class="sub">Murcia · Est. 1892</div></div>
+      <div class="doc-meta"><span class="tag">PRESUPUESTO</span><div class="num">${pptNumero(p.numero)}</div><div class="date">${fechaFmt(p.fecha)}</div></div>
+    </div>
+    <div class="parties">
+      <div class="party"><div class="lbl">Para</div><div class="val"><strong>${pptEsc(p.cliente_nombre||"—")}</strong>${p.cliente_email?`<br>${pptEsc(p.cliente_email)}`:""}${p.cliente_telefono?`<br>${pptEsc(p.cliente_telefono)}`:""}</div></div>
+      ${p.evento_fecha?`<div class="party" style="text-align:right"><div class="lbl">Fecha del evento</div><div class="val">${fechaFmt(p.evento_fecha)}</div></div>`:""}
+    </div>
+    ${p.titulo?`<div class="title">${pptEsc(p.titulo)}</div>`:""}
+    <table>
+      <thead><tr><th class="c-desc">Concepto</th><th class="c-num">Cant.</th><th class="c-num">Precio</th><th class="c-num">Importe</th></tr></thead>
+      <tbody>${filas||`<tr><td colspan="4" style="color:#7A766F;padding:14px 8px">Sin líneas</td></tr>`}</tbody>
+    </table>
+    <table class="tots">
+      ${rowTot("Subtotal",t.subtotal)}
+      ${t.descuento>0?rowTot("Descuento ("+pptNumFmt(t.dPct)+"%)",-t.descuento):""}
+      ${p.con_iva?rowTot("Base imponible",t.base):""}
+      ${p.con_iva?rowTot("IVA ("+pptNumFmt(t.iPct)+"%)",t.iva):""}
+      <tr class="grand"><td></td><td></td><td class="t-lbl">TOTAL</td><td class="c-num">${pptEUR(t.total)}</td></tr>
+    </table>
+    <div class="foot">
+      ${validoHasta?`<div class="valid">Presupuesto válido hasta el <strong>${validoHasta}</strong> (${pptNumFmt(p.validez_dias)} días).${p.con_iva?"":" Precios sin IVA."}</div>`:(p.con_iva?"":`<div class="valid">Precios sin IVA.</div>`)}
+      ${p.condiciones?`<div class="cond-lbl">Condiciones</div><div class="cond">${pptEsc(p.condiciones)}</div>`:""}
+    </div>
+    <div class="sign">Finca El Molino · Murcia · Gracias por su confianza</div>
+  </body></html>`;
+}
+
+function Presupuestos({perfil,tok,rol,setPage}){
+  const isA=rol==="admin";
+  const ESTADOS=[{k:"borrador",lbl:"Borrador",c:T.ink3},{k:"enviado",lbl:"Enviado",c:T.softBlue},{k:"aceptado",lbl:"Aceptado",c:T.olive},{k:"rechazado",lbl:"Rechazado",c:T.coral}];
+  const estInfo=k=>ESTADOS.find(e=>e.k===k)||ESTADOS[0];
+  const HEADER_VACIO={titulo:"",cliente_nombre:"",cliente_email:"",cliente_telefono:"",evento_fecha:"",fecha:new Date().toISOString().split("T")[0],validez_dias:"30",estado:"borrador",con_iva:true,iva_pct:"21",descuento_pct:"0",notas:"",condiciones:""};
+  const nuevaLinea=(over={})=>({key:Math.random().toString(36).slice(2),catalogo_servicio_id:null,nombre:"",descripcion:"",unidad:"",cantidad:"1",precio_unitario:"",...over});
+
+  const[list,setList]=useState([]);
+  const[load,setLoad]=useState(true);
+  const[err,setErr]=useState(null);
+  const[reloadKey,setReloadKey]=useState(0);
+  const[filtroEstado,setFiltroEstado]=useState("todos");
+
+  const[editor,setEditor]=useState(null); // null | {mode:'add'} | {mode:'edit',id}
+  const[form,setForm]=useState(HEADER_VACIO);
+  const[lineas,setLineas]=useState([]);
+  const[loadLin,setLoadLin]=useState(false);
+  const[saving,setSaving]=useState(false);
+  const[deleting,setDeleting]=useState(false);
+  const[sheetErr,setSheetErr]=useState("");
+
+  const[catalogo,setCatalogo]=useState([]);
+  const[showCat,setShowCat]=useState(false);
+  const[catQ,setCatQ]=useState("");
+
+  // Carga lista
+  useEffect(()=>{
+    if(!isA||!tok){setLoad(false);return;}
+    (async()=>{
+      try{
+        const rows=await sbGet("presupuestos","?select=*&order=fecha.desc,numero.desc",tok);
+        setList(rows||[]);setErr(null);
+      }catch(_){setErr("No se pudieron cargar los presupuestos. Revisa permisos o conexión.");}
+      setLoad(false);
+    })();
+  },[tok,isA,reloadKey]);
+
+  // Carga catálogo (para el selector de líneas)
+  useEffect(()=>{
+    if(!isA||!tok)return;
+    sbGet("catalogo_servicios","?activo=eq.true&select=*&order=favorito.desc.nullslast,categoria.asc,nombre.asc",tok).then(r=>setCatalogo(r||[])).catch(()=>{});
+  },[tok,isA]);
+
+  const abrirNuevo=()=>{setForm(HEADER_VACIO);setLineas([nuevaLinea()]);setSheetErr("");setEditor({mode:"add"});};
+  const abrirEditar=async(row)=>{
+    setForm({
+      titulo:row.titulo||"",cliente_nombre:row.cliente_nombre||"",cliente_email:row.cliente_email||"",cliente_telefono:row.cliente_telefono||"",
+      evento_fecha:row.evento_fecha||"",fecha:row.fecha||new Date().toISOString().split("T")[0],validez_dias:String(row.validez_dias??30),
+      estado:row.estado||"borrador",con_iva:row.con_iva!==false,iva_pct:String(row.iva_pct??21),descuento_pct:String(row.descuento_pct??0),
+      notas:row.notas||"",condiciones:row.condiciones||"",
+    });
+    setLineas([]);setLoadLin(true);setSheetErr("");setEditor({mode:"edit",id:row.id,numero:row.numero});
+    try{
+      const ls=await sbGet("presupuesto_lineas",`?presupuesto_id=eq.${row.id}&select=*&order=orden.asc,created_at.asc`,tok);
+      setLineas((ls||[]).map(l=>nuevaLinea({catalogo_servicio_id:l.catalogo_servicio_id||null,nombre:l.nombre||"",descripcion:l.descripcion||"",unidad:l.unidad||"",cantidad:String(l.cantidad??1),precio_unitario:l.precio_unitario!=null?String(l.precio_unitario):""})));
+    }catch(_){setSheetErr("No se pudieron cargar las líneas de este presupuesto.");}
+    setLoadLin(false);
+  };
+
+  const setLinea=(key,patch)=>setLineas(prev=>prev.map(l=>l.key===key?{...l,...patch}:l));
+  const quitarLinea=key=>setLineas(prev=>prev.filter(l=>l.key!==key));
+  const addDesdeCatalogo=s=>{
+    setLineas(prev=>[...prev,nuevaLinea({catalogo_servicio_id:s.id,nombre:s.nombre||"",descripcion:s.descripcion||"",unidad:s.unidad||"",cantidad:"1",precio_unitario:s.precio_cliente_default!=null?String(s.precio_cliente_default):""})]);
+    setShowCat(false);setCatQ("");
+  };
+
+  const totales=pptCalcTotales(lineas,{con_iva:form.con_iva,iva_pct:form.iva_pct,descuento_pct:form.descuento_pct});
+
+  const guardar=async()=>{
+    if(saving||deleting)return;
+    if(!form.cliente_nombre.trim()){setSheetErr("Indica el nombre del cliente.");return;}
+    const validas=lineas.filter(l=>l.nombre.trim()||pptNum(l.precio_unitario)>0);
+    if(validas.length===0){setSheetErr("Añade al menos una línea con concepto o precio.");return;}
+    setSaving(true);setSheetErr("");
+    const header={
+      titulo:form.titulo.trim()||null,
+      cliente_nombre:form.cliente_nombre.trim(),
+      cliente_email:form.cliente_email.trim()||null,
+      cliente_telefono:form.cliente_telefono.trim()||null,
+      evento_fecha:form.evento_fecha||null,
+      fecha:form.fecha||new Date().toISOString().split("T")[0],
+      validez_dias:parseInt(form.validez_dias)||0,
+      estado:form.estado,
+      con_iva:!!form.con_iva,
+      iva_pct:parseFloat(String(form.iva_pct).replace(",","."))||0,
+      descuento_pct:parseFloat(String(form.descuento_pct).replace(",","."))||0,
+      total:totales.total,
+      notas:form.notas.trim()||null,
+      condiciones:form.condiciones.trim()||null,
+    };
+    const lineasPayload=(pid)=>validas.map((l,i)=>({
+      presupuesto_id:pid,
+      catalogo_servicio_id:l.catalogo_servicio_id||null,
+      nombre:l.nombre.trim()||"—",
+      descripcion:l.descripcion.trim()||null,
+      unidad:l.unidad.trim()||null,
+      cantidad:pptNum(l.cantidad)||1,
+      precio_unitario:pptNum(l.precio_unitario)||0,
+      orden:i,
+    }));
+    try{
+      if(editor.mode==="add"){
+        const created=await sbPost("presupuestos",header,tok);
+        const pid=Array.isArray(created)?created[0]?.id:created?.id;
+        if(pid)await sbPost("presupuesto_lineas",lineasPayload(pid),tok);
+      }else{
+        await sbPatch("presupuestos",`id=eq.${editor.id}`,header,tok);
+        // Sincroniza líneas: borra e inserta (admin-only, volúmenes pequeños)
+        await sbDelete("presupuesto_lineas",`presupuesto_id=eq.${editor.id}`,tok);
+        await sbPost("presupuesto_lineas",lineasPayload(editor.id),tok);
+      }
+      setEditor(null);setReloadKey(k=>k+1);
+    }catch(_){setSheetErr("No se pudo guardar el presupuesto. Inténtalo de nuevo.");}
+    setSaving(false);
+  };
+
+  const borrar=async()=>{
+    if(!editor||editor.mode!=="edit"||deleting||saving)return;
+    if(!window.confirm(`¿Eliminar el presupuesto ${pptNumero(editor.numero)}? Esta acción no se puede deshacer.`))return;
+    setDeleting(true);setSheetErr("");
+    try{
+      await sbDelete("presupuestos",`id=eq.${editor.id}`,tok);
+      setEditor(null);setReloadKey(k=>k+1);
+    }catch(_){setSheetErr("No se pudo eliminar. Inténtalo de nuevo.");}
+    setDeleting(false);
+  };
+
+  // Exporta PDF desde la lista (carga líneas si hace falta) o desde el editor
+  const exportarPDF=async(row,lineasActuales)=>{
+    let ls=lineasActuales;
+    if(!ls){
+      try{ls=await sbGet("presupuesto_lineas",`?presupuesto_id=eq.${row.id}&select=*&order=orden.asc,created_at.asc`,tok);}catch(_){ls=[];}
+    }
+    pptImprimirHTML(pptDocumentoHTML(row,ls||[]));
+  };
+  const exportarDesdeEditor=()=>{
+    const snap={...form,numero:editor?.numero??"",validez_dias:parseInt(form.validez_dias)||0,iva_pct:parseFloat(String(form.iva_pct).replace(",","."))||0,descuento_pct:parseFloat(String(form.descuento_pct).replace(",","."))||0};
+    const ls=lineas.filter(l=>l.nombre.trim()||pptNum(l.precio_unitario)>0);
+    pptImprimirHTML(pptDocumentoHTML(snap,ls));
+  };
+
+  if(!isA)return <div style={{padding:"54px 20px",textAlign:"center",color:T.ink3,fontSize:13}}>Esta sección es sólo para administradores.</div>;
+
+  const filtrados=filtroEstado==="todos"?list:list.filter(p=>p.estado===filtroEstado);
+  const inputStyle={width:"100%",background:T.surface,border:`1px solid ${T.line}`,borderRadius:14,padding:"12px 14px",fontFamily:T.sans,fontSize:13,color:T.ink,outline:"none",boxSizing:"border-box"};
+  const lblStyle={fontSize:11,color:T.ink3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase",marginBottom:8};
+
+  return <div style={{background:T.bg,minHeight:"100%",paddingBottom:100}}>
+    {/* Header */}
+    <div style={{padding:"54px 20px 16px",display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:10}}>
+      <div style={{flex:1}}>
+        <div style={{fontSize:12,color:T.ink3,fontWeight:500,marginBottom:2}}>Comercial · Ofertas a clientes</div>
+        <div style={{fontSize:30,fontWeight:700,color:T.ink,letterSpacing:-1,lineHeight:1.02}}>Presupuestos</div>
+      </div>
+      <button onClick={abrirNuevo} title="Nuevo presupuesto" style={{width:40,height:40,borderRadius:999,background:T.terracotta,color:"white",border:0,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",boxShadow:"0 6px 14px rgba(236,104,62,.3)",flexShrink:0}}>
+        <FmIcon name="plus" size={18} stroke="white"/>
+      </button>
+    </div>
+
+    {/* Filtros por estado */}
+    {!load&&!err&&list.length>0&&(
+      <div style={{padding:"0 20px 10px",display:"flex",gap:6,overflowX:"auto"}}>
+        {[{k:"todos",lbl:"Todos"},...ESTADOS].map(e=>{
+          const on=filtroEstado===e.k;
+          return <button key={e.k} onClick={()=>setFiltroEstado(e.k)} style={{flexShrink:0,height:30,padding:"0 12px",borderRadius:999,border:`1px solid ${on?T.ink:T.line}`,background:on?T.ink:T.surface,color:on?"white":T.ink2,fontFamily:T.sans,fontSize:12,fontWeight:700,cursor:"pointer"}}>{e.lbl}</button>;
+        })}
+      </div>
+    )}
+
+    {/* Body */}
+    <div style={{padding:"0 20px"}}>
+      {load&&<div style={{padding:"40px 0",textAlign:"center",color:T.ink3,fontSize:13,fontWeight:500}}>Cargando…</div>}
+
+      {!load&&err&&(
+        <div style={{background:T.surface,border:`1px solid ${T.coral}40`,borderRadius:16,padding:"16px",display:"flex",alignItems:"center",gap:12}}>
+          <div style={{width:36,height:36,borderRadius:12,background:T.coral+"22",color:T.coral,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><FmIcon name="warn" size={16} stroke={T.coral}/></div>
+          <div style={{flex:1,fontSize:13,color:T.ink,fontWeight:500,lineHeight:1.45}}>{err}</div>
+        </div>
+      )}
+
+      {!load&&!err&&list.length===0&&(
+        <div style={{background:T.surface,border:`1px solid ${T.line}`,borderRadius:20,padding:"36px 24px",textAlign:"center",marginTop:8}}>
+          <div style={{width:56,height:56,borderRadius:18,background:T.bg,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 16px"}}><FmIcon name="briefcase" size={22} stroke={T.ink3} sw={1.6}/></div>
+          <div style={{fontSize:16,fontWeight:700,color:T.ink,letterSpacing:-.3,marginBottom:6}}>Aún no tienes presupuestos</div>
+          <div style={{fontSize:13,color:T.ink3,fontWeight:500,lineHeight:1.5,maxWidth:300,margin:"0 auto"}}>Crea el primero para ofrecérselo a un cliente y exportarlo a PDF.</div>
+        </div>
+      )}
+
+      {!load&&!err&&list.length>0&&filtrados.length===0&&(
+        <div style={{background:T.surface,border:`1px solid ${T.line}`,borderRadius:20,padding:"28px 24px",textAlign:"center",marginTop:4,fontSize:13,color:T.ink3}}>Sin presupuestos en este estado.</div>
+      )}
+
+      {!load&&!err&&filtrados.length>0&&(
+        <div style={{display:"flex",flexDirection:"column",gap:8}}>
+          {filtrados.map(p=>{
+            const ei=estInfo(p.estado);
+            return <div key={p.id} onClick={()=>abrirEditar(p)} style={{background:T.surface,borderRadius:16,padding:"14px 16px",border:`1px solid ${T.line}`,display:"flex",alignItems:"center",gap:12,cursor:"pointer"}}>
+              <div style={{width:40,height:40,borderRadius:12,background:T.terracotta+"22",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><FmIcon name="briefcase" size={18} stroke={T.terracotta} sw={2}/></div>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:2}}>
+                  <span style={{fontSize:10.5,fontWeight:800,color:T.ink3,fontFamily:T.mono}}>{pptNumero(p.numero)}</span>
+                  <span style={{display:"inline-flex",height:18,padding:"0 8px",borderRadius:999,background:ei.c+"22",color:ei.c,fontSize:9.5,fontWeight:700,alignItems:"center",textTransform:"uppercase",letterSpacing:.3}}>{ei.lbl}</span>
+                </div>
+                <div style={{fontSize:14,fontWeight:600,color:T.ink,letterSpacing:-.2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.cliente_nombre||"—"}</div>
+                {(p.titulo||p.fecha)&&<div style={{fontSize:11,color:T.ink3,fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",marginTop:1}}>{[p.titulo,p.fecha?new Date(p.fecha+"T00:00:00").toLocaleDateString("es-ES"):null].filter(Boolean).join(" · ")}</div>}
+              </div>
+              <div style={{textAlign:"right",flexShrink:0}}>
+                <div style={{fontSize:14,fontWeight:800,color:T.ink,fontFamily:T.mono}}>{pptEUR(p.total)}</div>
+                <button onClick={e=>{e.stopPropagation();exportarPDF(p);}} title="Exportar PDF" style={{marginTop:4,display:"inline-flex",alignItems:"center",gap:4,background:"transparent",border:`1px solid ${T.line}`,borderRadius:999,padding:"4px 9px",fontFamily:T.sans,fontSize:10.5,fontWeight:700,color:T.ink2,cursor:"pointer"}}><FmIcon name="download" size={11} stroke={T.ink2} sw={2}/>PDF</button>
+              </div>
+            </div>;
+          })}
+        </div>
+      )}
+    </div>
+
+    {/* Editor (modal inferior) */}
+    {editor&&<div style={{position:"fixed",inset:0,background:"rgba(20,15,10,.6)",zIndex:1001,display:"flex",alignItems:"flex-end",fontFamily:T.sans}} onClick={()=>!saving&&!deleting&&setEditor(null)}>
+      <div style={{width:"100%",background:T.bg,borderTopLeftRadius:24,borderTopRightRadius:24,maxHeight:"94vh",overflow:"auto",paddingBottom:34}} onClick={e=>e.stopPropagation()}>
+        <div style={{padding:"14px 20px 0",display:"flex",justifyContent:"center"}}><div style={{width:44,height:4,borderRadius:999,background:T.line}}/></div>
+        <div style={{padding:"14px 20px 16px",display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:`1px solid ${T.line}`}}>
+          <div>
+            <div style={{fontSize:12,color:T.ink3,fontWeight:500,marginBottom:2}}>Presupuesto · {editor.mode==="add"?"Nuevo":pptNumero(editor.numero)}</div>
+            <div style={{fontSize:22,fontWeight:700,color:T.ink,letterSpacing:-.6}}>{editor.mode==="add"?"Nuevo presupuesto":"Editar presupuesto"}</div>
+          </div>
+          <button onClick={()=>!saving&&!deleting&&setEditor(null)} style={{width:32,height:32,borderRadius:999,background:T.surface,border:`1px solid ${T.line}`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}><FmIcon name="x" size={15} stroke={T.ink}/></button>
+        </div>
+
+        <div style={{padding:"16px 20px",display:"flex",flexDirection:"column",gap:14}}>
+          {/* Datos cliente */}
+          <div><div style={lblStyle}>Cliente *</div>
+            <input value={form.cliente_nombre} onChange={e=>setForm(v=>({...v,cliente_nombre:e.target.value}))} placeholder="Nombre del cliente" style={{...inputStyle,fontWeight:600}}/>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+            <div><div style={lblStyle}>Email</div><input value={form.cliente_email} onChange={e=>setForm(v=>({...v,cliente_email:e.target.value}))} placeholder="cliente@email.com" style={inputStyle}/></div>
+            <div><div style={lblStyle}>Teléfono</div><input value={form.cliente_telefono} onChange={e=>setForm(v=>({...v,cliente_telefono:e.target.value}))} placeholder="600 000 000" style={inputStyle}/></div>
+          </div>
+          <div><div style={lblStyle}>Título / concepto</div>
+            <input value={form.titulo} onChange={e=>setForm(v=>({...v,titulo:e.target.value}))} placeholder="Ej: Boda Ana & Luis — Iluminación, sonido y DJ" style={inputStyle}/>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10}}>
+            <div><div style={lblStyle}>Fecha</div><input type="date" value={form.fecha} onChange={e=>setForm(v=>({...v,fecha:e.target.value}))} style={inputStyle}/></div>
+            <div><div style={lblStyle}>Evento</div><input type="date" value={form.evento_fecha} onChange={e=>setForm(v=>({...v,evento_fecha:e.target.value}))} style={inputStyle}/></div>
+            <div><div style={lblStyle}>Validez (días)</div><input type="text" inputMode="numeric" value={form.validez_dias} onChange={e=>setForm(v=>({...v,validez_dias:e.target.value}))} style={inputStyle}/></div>
+          </div>
+          <div><div style={lblStyle}>Estado</div>
+            <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+              {ESTADOS.map(e=>{const on=form.estado===e.k;return <button key={e.k} onClick={()=>setForm(v=>({...v,estado:e.k}))} style={{height:34,padding:"0 14px",borderRadius:999,border:`1px solid ${on?e.c:T.line}`,background:on?e.c+"22":T.surface,color:on?e.c:T.ink2,fontFamily:T.sans,fontSize:12.5,fontWeight:700,cursor:"pointer"}}>{e.lbl}</button>;})}
+            </div>
+          </div>
+
+          {/* Líneas */}
+          <div style={{marginTop:4,paddingTop:12,borderTop:`1px solid ${T.line}`}}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
+              <div style={lblStyle}>Líneas del presupuesto</div>
+            </div>
+            {loadLin&&<div style={{padding:"12px 0",fontSize:12,color:T.ink3,textAlign:"center"}}>Cargando líneas…</div>}
+            <div style={{display:"flex",flexDirection:"column",gap:10}}>
+              {lineas.map(l=>{
+                const imp=pptNum(l.cantidad)*pptNum(l.precio_unitario);
+                return <div key={l.key} style={{background:T.surface,border:`1px solid ${T.line}`,borderRadius:14,padding:"12px 12px 10px"}}>
+                  <div style={{display:"flex",gap:8,alignItems:"flex-start"}}>
+                    <input value={l.nombre} onChange={e=>setLinea(l.key,{nombre:e.target.value})} placeholder="Concepto (ej: Iluminación LED)" style={{...inputStyle,flex:1,fontWeight:600,border:0,background:"transparent",padding:"4px 2px"}}/>
+                    <button onClick={()=>quitarLinea(l.key)} title="Quitar" style={{width:26,height:26,borderRadius:8,background:"transparent",border:0,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",flexShrink:0}}><FmIcon name="x" size={13} stroke={T.ink3} sw={2}/></button>
+                  </div>
+                  <input value={l.descripcion} onChange={e=>setLinea(l.key,{descripcion:e.target.value})} placeholder="Descripción (opcional)" style={{...inputStyle,border:0,background:"transparent",padding:"2px 2px",fontSize:12,color:T.ink2}}/>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginTop:8,alignItems:"end"}}>
+                    <div><div style={{fontSize:9.5,color:T.ink3,fontWeight:700,textTransform:"uppercase",letterSpacing:.4,marginBottom:4}}>Cant.</div><input type="text" inputMode="decimal" value={l.cantidad} onChange={e=>setLinea(l.key,{cantidad:e.target.value})} style={{...inputStyle,padding:"9px 10px",textAlign:"right"}}/></div>
+                    <div><div style={{fontSize:9.5,color:T.ink3,fontWeight:700,textTransform:"uppercase",letterSpacing:.4,marginBottom:4}}>Precio €</div><input type="text" inputMode="decimal" value={l.precio_unitario} onChange={e=>setLinea(l.key,{precio_unitario:e.target.value})} placeholder="0" style={{...inputStyle,padding:"9px 10px",textAlign:"right",fontWeight:700}}/></div>
+                    <div style={{textAlign:"right",paddingBottom:9}}><div style={{fontSize:9.5,color:T.ink3,fontWeight:700,textTransform:"uppercase",letterSpacing:.4,marginBottom:4}}>Importe</div><div style={{fontSize:14,fontWeight:800,color:T.ink,fontFamily:T.mono}}>{pptEUR(imp)}</div></div>
+                  </div>
+                </div>;
+              })}
+            </div>
+            <div style={{display:"flex",gap:8,marginTop:10}}>
+              <button onClick={()=>{setCatQ("");setShowCat(true);}} style={{flex:1,padding:"10px 12px",borderRadius:999,border:`1px dashed ${T.line}`,background:T.surface,color:T.ink2,fontFamily:T.sans,fontSize:12.5,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}><FmIcon name="sparkle" size={12} stroke={T.ink2} sw={2}/> Desde catálogo</button>
+              <button onClick={()=>setLineas(prev=>[...prev,nuevaLinea()])} style={{flex:1,padding:"10px 12px",borderRadius:999,border:`1px dashed ${T.line}`,background:T.surface,color:T.ink2,fontFamily:T.sans,fontSize:12.5,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}><FmIcon name="plus" size={12} stroke={T.ink2} sw={2.4}/> Línea libre</button>
+            </div>
+          </div>
+
+          {/* IVA / descuento */}
+          <div style={{marginTop:4,paddingTop:12,borderTop:`1px solid ${T.line}`,display:"flex",flexDirection:"column",gap:12}}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,padding:"12px 14px",borderRadius:14,background:T.surface,border:`1px solid ${T.line}`}}>
+              <div><div style={{fontSize:12.5,fontWeight:700,color:T.ink}}>Aplicar IVA</div><div style={{fontSize:10.5,fontWeight:600,color:form.con_iva?T.olive:T.ink3}}>{form.con_iva?`Sí · ${pptNumFmt(form.iva_pct)}%`:"No — precios sin IVA"}</div></div>
+              <div style={{display:"flex",alignItems:"center",gap:10}}>
+                {form.con_iva&&<input type="text" inputMode="decimal" value={form.iva_pct} onChange={e=>setForm(v=>({...v,iva_pct:e.target.value}))} style={{width:56,background:T.bg,border:`1px solid ${T.line}`,borderRadius:10,padding:"7px 8px",fontFamily:T.sans,fontSize:13,fontWeight:700,color:T.ink,outline:"none",textAlign:"right"}}/>}
+                <button onClick={()=>setForm(v=>({...v,con_iva:!v.con_iva}))} style={{width:38,height:22,borderRadius:999,background:form.con_iva?T.ink:T.lineStrong,position:"relative",border:"none",cursor:"pointer",flexShrink:0}}><span style={{position:"absolute",top:2,left:form.con_iva?18:2,width:18,height:18,borderRadius:999,background:"#fff",transition:"left .15s"}}/></button>
+              </div>
+            </div>
+            <div><div style={lblStyle}>Descuento global (%)</div><input type="text" inputMode="decimal" value={form.descuento_pct} onChange={e=>setForm(v=>({...v,descuento_pct:e.target.value}))} placeholder="0" style={inputStyle}/></div>
+          </div>
+
+          {/* Resumen totales */}
+          <div style={{background:T.surface,border:`1px solid ${T.line}`,borderRadius:16,padding:"14px 16px",display:"flex",flexDirection:"column",gap:7}}>
+            <div style={{display:"flex",justifyContent:"space-between",fontSize:12.5,color:T.ink2}}><span>Subtotal</span><span style={{fontFamily:T.mono,fontWeight:600}}>{pptEUR(totales.subtotal)}</span></div>
+            {totales.descuento>0&&<div style={{display:"flex",justifyContent:"space-between",fontSize:12.5,color:T.ink2}}><span>Descuento ({pptNumFmt(totales.dPct)}%)</span><span style={{fontFamily:T.mono,fontWeight:600}}>−{pptEUR(totales.descuento)}</span></div>}
+            {form.con_iva&&<div style={{display:"flex",justifyContent:"space-between",fontSize:12.5,color:T.ink2}}><span>Base imponible</span><span style={{fontFamily:T.mono,fontWeight:600}}>{pptEUR(totales.base)}</span></div>}
+            {form.con_iva&&<div style={{display:"flex",justifyContent:"space-between",fontSize:12.5,color:T.ink2}}><span>IVA ({pptNumFmt(totales.iPct)}%)</span><span style={{fontFamily:T.mono,fontWeight:600}}>{pptEUR(totales.iva)}</span></div>}
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",borderTop:`1.5px solid ${T.line}`,paddingTop:8,marginTop:2}}><span style={{fontSize:14,fontWeight:800,color:T.ink}}>TOTAL</span><span style={{fontFamily:T.mono,fontWeight:800,fontSize:18,color:T.terracotta}}>{pptEUR(totales.total)}</span></div>
+          </div>
+
+          <div><div style={lblStyle}>Condiciones (salen en el PDF)</div><textarea value={form.condiciones} onChange={e=>setForm(v=>({...v,condiciones:e.target.value}))} placeholder="Ej: 50% de reserva a la firma, resto 7 días antes del evento. Precios sujetos a disponibilidad." rows={3} style={{...inputStyle,resize:"none"}}/></div>
+          <div><div style={lblStyle}>Notas internas (no salen en el PDF)</div><textarea value={form.notas} onChange={e=>setForm(v=>({...v,notas:e.target.value}))} placeholder="Notas privadas" rows={2} style={{...inputStyle,resize:"none"}}/></div>
+
+          {sheetErr&&<div style={{fontSize:12,color:"#9A2A22",fontWeight:600,padding:"8px 12px",background:T.coral+"14",border:`1px solid ${T.coral}33`,borderRadius:10}}>{sheetErr}</div>}
+
+          <div style={{display:"flex",gap:8,paddingTop:4}}>
+            <button onClick={exportarDesdeEditor} title="Exportar PDF" style={{flex:1,padding:"14px 0",borderRadius:999,border:`1px solid ${T.line}`,background:T.surface,color:T.ink,fontFamily:T.sans,fontWeight:700,fontSize:14,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}><FmIcon name="download" size={15} stroke={T.ink}/> Exportar PDF</button>
+            <button onClick={guardar} disabled={saving||deleting} style={{flex:2,padding:"14px 0",borderRadius:999,border:0,background:saving||deleting?T.ink+"55":T.ink,color:"#fff",fontFamily:T.sans,fontWeight:700,fontSize:14,cursor:saving||deleting?"not-allowed":"pointer"}}>{saving?"Guardando…":(editor.mode==="add"?"Crear presupuesto":"Guardar cambios")}</button>
+          </div>
+          {editor.mode==="edit"&&<button onClick={borrar} disabled={deleting||saving} style={{width:"100%",marginTop:10,padding:"12px 0",borderRadius:999,border:`1px solid ${T.coral}55`,background:T.coral+"14",color:"#9A2A22",fontFamily:T.sans,fontWeight:700,fontSize:13,cursor:deleting||saving?"not-allowed":"pointer",opacity:deleting||saving?.6:1}}>{deleting?"Eliminando…":"🗑 Borrar presupuesto"}</button>}
+        </div>
+      </div>
+    </div>}
+
+    {/* Sub-modal: elegir del catálogo */}
+    {showCat&&<div style={{position:"fixed",inset:0,background:"rgba(20,15,10,.6)",zIndex:1003,display:"flex",alignItems:"flex-end",fontFamily:T.sans}} onClick={()=>setShowCat(false)}>
+      <div style={{width:"100%",background:T.bg,borderTopLeftRadius:24,borderTopRightRadius:24,maxHeight:"80vh",overflow:"auto",paddingBottom:34}} onClick={e=>e.stopPropagation()}>
+        <div style={{padding:"14px 20px 0",display:"flex",justifyContent:"center"}}><div style={{width:44,height:4,borderRadius:999,background:T.line}}/></div>
+        <div style={{padding:"14px 20px 12px",display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:`1px solid ${T.line}`}}>
+          <div style={{fontSize:20,fontWeight:700,color:T.ink,letterSpacing:-.5}}>Elegir del catálogo</div>
+          <button onClick={()=>setShowCat(false)} style={{width:32,height:32,borderRadius:999,background:T.surface,border:`1px solid ${T.line}`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}><FmIcon name="x" size={15} stroke={T.ink}/></button>
+        </div>
+        <div style={{padding:"12px 20px"}}>
+          <div style={{display:"flex",alignItems:"center",gap:10,background:T.surface,border:`1px solid ${T.line}`,borderRadius:16,padding:"11px 14px",marginBottom:10}}>
+            <FmIcon name="search" size={16} stroke={T.ink3}/>
+            <input value={catQ} onChange={e=>setCatQ(e.target.value)} placeholder="Buscar servicio" style={{flex:1,border:0,outline:"none",background:"transparent",fontFamily:T.sans,fontSize:13,color:T.ink}}/>
+          </div>
+          {catalogo.length===0&&<div style={{padding:"24px 0",textAlign:"center",color:T.ink3,fontSize:13}}>No hay servicios en el catálogo.</div>}
+          <div style={{display:"flex",flexDirection:"column",gap:6}}>
+            {catalogo.filter(s=>{const t=catQ.trim().toLowerCase();return !t||(s.nombre||"").toLowerCase().includes(t)||(s.categoria||"").toLowerCase().includes(t);}).map(s=>(
+              <button key={s.id} onClick={()=>addDesdeCatalogo(s)} style={{background:T.surface,border:`1px solid ${T.line}`,borderRadius:14,padding:"11px 14px",display:"flex",alignItems:"center",gap:12,cursor:"pointer",textAlign:"left",fontFamily:T.sans}}>
+                <div style={{width:36,height:36,borderRadius:10,background:T.terracotta+"22",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><FmIcon name="sparkle" size={16} stroke={T.terracotta} sw={2}/></div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:13.5,fontWeight:600,color:T.ink,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{s.nombre}</div>
+                  {s.categoria&&<div style={{fontSize:9.5,fontWeight:700,letterSpacing:.5,textTransform:"uppercase",color:T.ink3}}>{s.categoria}</div>}
+                </div>
+                {s.precio_cliente_default!=null&&<div style={{fontSize:13,fontWeight:700,color:T.ink,fontFamily:T.mono,flexShrink:0}}>{pptEUR(s.precio_cliente_default)}</div>}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
     </div>}
